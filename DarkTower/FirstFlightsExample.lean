@@ -181,6 +181,39 @@ example : (ScopeQuery.answers selectedQuery cascadeStore).map (fun binding => bi
   rfl
 
 /--
+Apply the first-flights graph-rewrite fold.
+
+The fold's discharge reading is `DischargeKind.queryAnswer`: when the cascade
+query has at least one answer, the selected pattern drives the rewrite that
+re-grades the `want-port` from payoff-hungry to canonical.  With no cascade
+answer, the input sorry hole is left unchanged.
+-/
+def fold (q : ScopeQuery.Query sig Pattern Var) (db : ScopeQuery.Store sig Pattern)
+    (h : TypedHole) : TypedHole :=
+  if (ScopeQuery.answers q db).isEmpty then h else foldedPort
+
+/-- Empty cascade store used to witness that the fold is selection-conditioned. -/
+def emptyCascadeStore : ScopeQuery.Store sig Pattern :=
+  []
+
+/-- The applied fold takes the first-flights sorry to the wiring. -/
+theorem fold_selected : fold selectedQuery cascadeStore wantPortHole = foldedPort :=
+  rfl
+
+/-- After the applied fold, the want port is no longer payoff-hungry. -/
+theorem fold_selected_not_hungry :
+    Not (IsHungry (fold selectedQuery cascadeStore wantPortHole) Checkpoint.wantPort) := by
+  simp [fold_selected, IsHungry, foldedPort]
+
+/--
+Without a cascade selection, the fold leaves the original sorry hole hungry.
+This is the negative conditioning witness: the rewrite is not unconditional.
+-/
+theorem fold_empty_store_leaves_hungry :
+    IsHungry (fold selectedQuery emptyCascadeStore wantPortHole) Checkpoint.wantPort := by
+  simp [fold, emptyCascadeStore, ScopeQuery.answers, IsHungry, wantPortHole]
+
+/--
 The `:jointly-with` cascade edge is a `BV.copar`, exercising the connective that
 the linear mined `:composes` chain cannot express.
 -/
