@@ -108,17 +108,16 @@ inductive GammaFeed where
   deriving DecidableEq, Repr
 
 /--
-γ's feeds as a typed-hole interface.  Satiety records the live wiring as of
-2026-07-05, post-classical-retirement, pre-repair:
+γ's feeds as a typed-hole interface.  Satiety records the live wiring.
 
-* `realizedDG` is FED (the executor edge is live) — graded `canon`;
-* `expectedDG` is HUNGRY — its only live feed was the classical fold's ΔG,
-  severed by the retirement ruling; graded `payoff` (the hungry grade).
-
-THE CONTRACT OF THIS FILE: when the repair lands (escrow ΔG → expected leg),
-this satiety must flip to `canon` in the same commit — the `IsHungry` example
-below will fail to compile until it is rewritten as its negation, forcing the
-formal wiring to track the real one.
+HISTORY (the file's contract, honored): as first committed (2026-07-05,
+post-classical-retirement, pre-repair), `expectedDG` was graded `payoff`
+(hungry) and `IsHungry gammaFeedHole GammaPort.expectedDG` was a THEOREM —
+the γ starvation, formally stated.  The repair landed the same day
+(futon2 `d05dd35`: source-consistent escrow feed, `*gamma-escrow-feed?*`
+default on, 55 tests green), so the satiety flips to `canon` and the
+example below is now the negation.  Severing this feed again would force
+whoever does it to come back here and re-prove the hunger.
 -/
 def gammaFeedHole : TypedHole where
   poly :=
@@ -126,18 +125,18 @@ def gammaFeedHole : TypedHole where
       B := fun _ => GammaFeed }
   satiety := fun port =>
     match port with
-    | GammaPort.expectedDG => SatietyGrade.payoff
+    | GammaPort.expectedDG => SatietyGrade.canon
     | GammaPort.realizedDG => SatietyGrade.canon
 
 /-- A port is hungry when its satiety is the payoff grade (FirstFlights idiom). -/
 def IsHungry (T : TypedHole) (a : T.poly.A) : Prop :=
   T.satiety a = SatietyGrade.payoff
 
-/-- **The γ starvation, as a theorem.**  The expected-ΔG port is hungry:
-its classical feed was severed by the retirement ruling and the escrow
-repair has not yet landed.  This example is MEANT to be broken by the
-repair commit. -/
-example : IsHungry gammaFeedHole GammaPort.expectedDG := by
+/-- **The γ starvation, discharged.**  The expected-ΔG port is FED — the
+escrow's coverage-ΔG feeds it source-consistently (futon2 `d05dd35`).
+The original theorem here proved the port hungry; the repair commit
+flipped it, per this file's contract. -/
+example : ¬ IsHungry gammaFeedHole GammaPort.expectedDG := by
   simp [IsHungry, gammaFeedHole]
 
 /-- The realized leg is fed — the executor edge survived the ruling. -/
