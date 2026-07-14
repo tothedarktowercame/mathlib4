@@ -22,6 +22,28 @@ energy → acts → learns**. *DarkTower-native* means five things:
 4. the validation properties are **Lean theorems** a repair must flip;
 5. completeness is a **`Coverage`** proof.
 
+## Generators, evaluators, and the Tokamak are one comb
+
+The generator / evaluator / controller distinction is **wiring**, not species:
+
+- a **generator** is a comb `state → state` (produces behaviour;
+  cf. `MetaCAExample.lean`);
+- an **evaluator** is a comb `behaviour → score` (consumes behaviour — e.g. a
+  spatial transfer-entropy discriminator);
+- a **Tokamak** is this AIF loop — `perceive ◁ evaluate ◁ act ◁ learn`, with
+  feedback — carrying **both** an evaluate-leg (`gateF`/`gateG`) and an act-leg
+  (`enact`).
+
+So the AIF loop is the **general** comb; a pure generator and a pure evaluator
+are its degenerate cases (drop the evaluate-leg / drop the act-leg). The Tokamak
+is therefore the **self-evaluating generator** — its free energy over what it
+observes *is* the score of what it generates. Hand-crafted evaluators
+(`behaviour → score`) are feed-forward and fit the current machinery; the
+Tokamak is recurrent and is the construction that forces the open-diagram layer
+(below). Build the tokamak as this general comb, with the CA-dynamic occupants
+and the discriminators recognised as the same object with legs removed. `blend`
+(fill-mixing) is one operation over all of them.
+
 ## Mapping — AIF feature → DarkTower construct
 
 The AIF feature column follows the R1–R12 audit of the ants reference
