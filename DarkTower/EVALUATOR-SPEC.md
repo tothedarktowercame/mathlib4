@@ -131,6 +131,39 @@ itself a result about the domain's difficulty. Expect measures to need
 MetaCA-specific adaptation (the §3.5 alphabet question; per-cell-rule-aware
 estimators) rather than off-the-shelf 1D-CA statistics.
 
+## 3.7 The estimate is a variation slot — the coherence occupant (DERIVE, 2026-07-14)
+
+Four fills now fail the anchor: nn-TE, distance-TE, offset-heterogeneity,
+AIS-heterogeneity. The *shape* of the fails is the finding: **every occupant so
+far estimates INFORMATION** (storage or transfer), and information is what chaos
+*maximizes* — so they reward chaos (or, for AIS, predictability, fooled by
+predictable-noise on MetaCA). A glider is not high-information; it is
+high-**coherence**: a pattern that persists as it propagates. Coherence is
+*orthogonal* to information — chaos has high information and zero coherence (its
+patterns never recur); a glider has modest information and high coherence.
+
+So the next fill is on the `estimate` hole (not the source or aggregate):
+
+- `conditionalMI` (current) → information (storage / transfer);
+- `coherence` → shifted self-similarity: how well the spacetime matches itself
+  under the glider shift `(d, τ)`, computed on the **fluctuation field**
+  (mean/domain-subtracted, so uniform frozen regions do **not** score as trivially
+  self-similar).
+
+**ARGUE (coherence occupant).** IF a glider is a pattern that persists as it
+propagates at velocity `v = d/τ`, THEN the fluctuation at `(i, t)` recurs at
+`(i+d, t+τ)` → high lagged self-similarity along the velocity; chaos has no
+recurrence (low), frozen has no fluctuation (excluded → low). SO
+`estimate := coherence` at the glider offset should give complex > {chaotic,
+frozen} — `SeparatesEoC` where every information estimate failed. BECAUSE EoC is
+coherent propagation, a *persistence* property, not an information quantity. (Draw
+on the existing boundary-guardian diagonal-autocorrelation diagnostic.)
+
+`coherenceOccupant = { sourceFill = offset(d,τ), estimateFill = coherence,
+aggregateFill = mean }`. VERIFY on the ECAs first (same anchor). A pass gives the
+glider detector **and** confirms MetaCA EoC is coherence, not information; a fail
+escalates to computational-mechanics particle detection.
+
 ## 4. Evaluator-blend = comb-fill
 
 A blended evaluator ("3 AIS : 2 TE") is a `Fill` mixing two evaluator-occupants,
