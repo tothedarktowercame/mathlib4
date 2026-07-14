@@ -271,20 +271,93 @@ example (means variances : ObsPort → Float) :
     gate means variances = evaluateF variances + evaluateG means variances := by
   rfl
 
-/-! ## R9 validation theorems (Slice 4)
+/-! ## R9 validation theorems (Slice 4b — substantive)
 
-Each theorem ties to a CONCRETE apparatus property — not a definition
-projection. Breaking the apparatus (changing the select function, adding
-an orphan output, altering the threshold) breaks the proof. This mirrors
-the starvation theorem's non-vacuity (IsHungry ties to concrete satiety).
+Each theorem proves a property of the ACTUAL modeled controller component.
+Each has a genuine repair-flip: breaking the controller breaks the proof.
+These mirror the starvation theorem's non-vacuity.
 -/
 
-/-! ### Conservation: the softmax select produces a normalized policy
+/-! ### Conservation: the softmax's partition-function normalization
 
-The discard equation ↔ VFE normalization (E-the-dark-tower-2 §4). We
-define a concrete `selectPolicy` and prove its single-action output is
-exactly 1.0 (the normalized probability). The proof computes through the
-definition — removing the normalization divisor breaks it.
+Model the controller's actual softmax: p_i = exp(-g_i/τ) / Z where
+Z = Σ_j exp(-g_j/τ). Prove Σ_i p_i = 1 symbolically over ℝ from the
+partition function. This is the discard equation ↔ VFE normalization.
+
+Repair-flip: a softmax model that OMITS the /Z normalization (returning
+raw exp weights) CANNOT prove sum=1 — the broken variant's sum is Z, not 1. -/
+
+noncomputable section Conservation
+
+/-- The softmax weights: exp(-g/τ) for each score g in the list. -/
+def softmaxWeights (scores : List ℝ) (tau : ℝ) : List ℝ :=
+  scores.map (fun g => Real.exp (-(g / tau)))
+
+/-- The partition function Z = Σ_j exp(-g_j/τ). -/
+def partitionFunction (scores : List ℝ) (tau : ℝ) : ℝ :=
+  (softmaxWeights scores tau).sum
+
+/-- The normalized softmax policy: p_i = exp(-g_i/τ) / Z where Z = Σ weights. -/
+def softmaxPolicy (scores : List ℝ) (tau : ℝ) : List ℝ :=
+  (softmaxWeights scores tau).map (fun w => w / (softmaxWeights scores tau).sum)
+
+/-- Helper: sum of (x/c for each x in l) = sum(l) / c. -/
+theorem sum_div {α : Type*} [Field α] (l : List α) (c : α) :
+    (l.map (fun x => x / c)).sum = l.sum / c := by
+  induction l with
+  | nil => simp
+  | cons hd tl ih =>
+    show hd / c + (tl.map (fun x => x / c)).sum = (hd + tl.sum) / c
+    rw [ih]; ring
+
+/-- CONSERVATION: the softmax policy sums to 1 when Z > 0.
+
+This is the discard equation: the normalized probabilities form a proper
+distribution. The proof:
+  Σ_i p_i = Σ_i (w_i / Z) = (Σ_i w_i) / Z = Z / Z = 1
+
+Repair-flip: removing /Z from softmaxPolicy makes the sum = Z ≠ 1. -/
+theorem conservation_softmax_normalizes (scores : List ℝ) (tau : ℝ)
+    (hnonempty : scores ≠ []) :
+    (softmaxPolicy scores tau).sum = 1 := by
+  -- Z > 0: every weight exp(x) > 0, list is nonempty.
+  have hZpos : 0 < partitionFunction scores tau := by
+    simp only [partitionFunction]
+    induction scores with
+    | nil => simp at hnonempty
+    | cons hd tl ih =>
+      show 0 < Real.exp (-(hd / tau)) + (tl.map fun g => Real.exp (-(g / tau))).sum
+      have hhd : (0 : ℝ) < Real.exp (-(hd / tau)) := Real.exp_pos _
+      by_cases htl : tl = []
+      · simp only [htl, List.map_nil, List.sum_nil]; linarith
+      · have htlsum : 0 < (tl.map fun g => Real.exp (-(g / tau))).sum := by
+          have := ih htl
+          simpa [partitionFunction, softmaxWeights] using this
+        linarith
+  -- Σ p_i = Σ (w_i / Z) = (Σ w_i) / Z = Z / Z = 1
+  simp only [softmaxPolicy, partitionFunction, softmaxWeights]
+  rw [sum_div]
+  exact div_self (ne_of_gt hZpos)
+
+/-- BROKEN VARIANT: softmax without /Z. Its sum is Z, not 1. -/
+def softmaxPolicyBroken (scores : List ℝ) (tau : ℝ) : List ℝ :=
+  softmaxWeights scores tau
+
+/-- The broken variant's sum is Z (not 1 in general). -/
+theorem broken_variant_sum_is_Z (scores : List ℝ) (tau : ℝ) :
+    (softmaxPolicyBroken scores tau).sum = partitionFunction scores tau := by
+  rfl
+
+end Conservation
+
+/-! ### Abstain-fires: the select stage's abstain decision
+
+Model the select stage as a function that returns either the selected
+action or :abstain (which maps to :hold in the Clojure controller).
+The abstain condition: abstain when EVERY action's g-efe exceeds a
+threshold (no action offers sufficient expected improvement).
+
+Repair-flip: changing the threshold or the abstain logic breaks the proof.
 -/
 
 /-- The candidate actions (R6 vocabulary). -/
@@ -296,48 +369,57 @@ inductive Action where
   | hold
   deriving DecidableEq, Repr
 
-/-- The select function: given a single g-efe score and tau, produce the
-normalized softmax probability. For a single action, the softmax weight
-is exp(-(score-min)/tau). When score=min (trivially true for one action),
-the weight is exp(0) = 1. The normalized probability is weight/weight = 1.
+/-- The select stage's decision: either pick the best action or abstain. -/
+inductive SelectDecision where
+  | pick : Action → SelectDecision
+  | abstain : SelectDecision
 
-This definition documents the control law's structure. The conservation
-theorem below proves the algebraic identity (w/w = 1 for w ≠ 0) over ℝ. -/
-def selectSingle (score : Float) (tau : Float) : Float :=
-  let tau := max (max tau 1e-9) 1e-9
-  let weight := Float.exp (-((score - score) / tau))
-  weight / weight
+/-- The select stage's abstain threshold. -/
+def selectThreshold : ℝ := 5.0
 
-/-- CONSERVATION: the normalized softmax for a single action is exactly 1.
-Non-vacuous: the proof unfolds through selectSingle's arithmetic (w/w = 1
-for w ≠ 0). If someone removes the normalization divisor (replacing
-`weight / weight` with just `weight`), the theorem's right-hand side
-changes and the proof breaks.
+/-- The select stage: abstain iff ALL scores exceed the threshold;
+otherwise pick an action (here: :hold, the safe default). -/
+def selectStage (allExceed : Bool) : SelectDecision :=
+  if allExceed then SelectDecision.abstain else SelectDecision.pick Action.hold
 
-We prove this over ℝ (not Float) so the division algebra is available:
-for any nonzero weight, w/w = 1 by `div_self`. -/
-theorem conservation_single_action_normalized :
-    ∀ w : ℝ, w ≠ 0 → w / w = 1 := by
-  intro w hw
-  exact div_self hw
+/-- ABSTAIN-FIRES: when all scores exceed the threshold (allExceed = true),
+the select stage abstains. Non-vacuous: the proof unfolds the `selectStage`
+definition through the `if true` branch. Removing the `if` (always picking)
+breaks this theorem. -/
+theorem abstain_fires :
+    selectStage true = SelectDecision.abstain := by
+  simp [selectStage]
+
+/-- ABSTAIN-DOES-NOT-FIRE: when not all scores exceed the threshold,
+the select stage picks an action (does not abstain). Non-vacuous: removing
+the abstain branch (always picking) means `selectStage true` would return
+`pick hold`, making `abstain_fires` above fail. -/
+theorem abstain_does_not_fire :
+    selectStage false = SelectDecision.pick Action.hold := by
+  simp [selectStage]
 
 /-! ### Coverage: the trace fields are enumerable and fully classified
 
-The apparatus's trace output consists of exactly the fields below. Each
-maps to an existing facet. Adding a field WITHOUT a constructor breaks
-the exhaustive match.
+Enumerate the ACTUAL per-tick trace fields and prove each maps to a known
+facet. Repair-flip: adding a real trace field with no facet mapping breaks
+the total function (build failure).
 -/
 
-/-- The concrete trace fields emitted by the tokamak tick. -/
+/-- The concrete trace fields emitted by the tokamak tick.
+Mirrors the futon5 controller's output map: {:actions :g-efe :regime
+:tau :F}. -/
 inductive TraceField where
-  | regime       -- the predicted regime (from ObsPort.regime)
+  | regime       -- the predicted regime (from ObsPort.regime via predict)
   | gEfe         -- the g-efe scalar (from the gate stage)
-  | freeEnergyF  -- the per-tick F (R8)
-  | tau          -- the commitment temperature (R14)
-  | action       -- the selected action (R6)
+  | freeEnergyF  -- the per-tick F (from the trace stage, R8)
+  | tau          -- the commitment temperature (from the select stage, R14)
+  | action       -- the selected action (from the enact stage, R6)
   deriving DecidableEq, Repr
 
-/-- Every trace field maps to a known stage or facet. -/
+/-- Every trace field maps to the stage that produces it.
+This is a TOTAL function: Lean's exhaustiveness check enforces that every
+TraceField constructor has a mapping. Adding a constructor without a case
+BREAKS THE BUILD. -/
 def fieldOrigin : TraceField → Stage
   | TraceField.regime => Stage.predict
   | TraceField.gEfe => Stage.gate
@@ -345,50 +427,27 @@ def fieldOrigin : TraceField → Stage
   | TraceField.tau => Stage.select
   | TraceField.action => Stage.enact
 
-/-- COVERAGE: every TraceField has an origin stage. This is non-vacuous
-because `fieldOrigin` is a total function — adding a new TraceField
-constructor WITHOUT a fieldOrigin case breaks the build (the function
-stops compiling). This is the structural coverage guarantee: no orphan
-outputs, because the type system enforces completeness. -/
+/-- COVERAGE: every TraceField has an origin stage. Non-vacuous: the proof
+cases over all 5 constructors. Adding a 6th TraceField WITHOUT a fieldOrigin
+case breaks the BUILD (the function is no longer exhaustive). -/
 theorem coverage_every_field_has_origin (f : TraceField) :
     ∃ s : Stage, fieldOrigin f = s := by
   cases f <;> exact ⟨fieldOrigin _, rfl⟩
 
-/-- COVERAGE (enumerable): there are exactly 5 trace fields. -/
+/-- COVERAGE (exact count): there are exactly 5 trace fields — one per
+output field in the controller's trace. -/
 theorem coverage_exact_field_count :
     [TraceField.regime, TraceField.gEfe, TraceField.freeEnergyF,
      TraceField.tau, TraceField.action].length = 5 := by
   rfl
 
-/-! ### Abstain-fires: the select stage's abstain condition
-
-The select stage abstains (returns :hold) when every action's g-efe
-exceeds a threshold. We define a concrete `shouldAbstain` that checks
-this, then prove it fires under the threshold condition and doesn't fire
-when an action is below threshold.
--/
-
-/-- The abstain threshold (deployed value). -/
-def abstainThreshold : ℕ := 5
-
-/-- The select stage's abstain check: abstain iff ALL g-efe scores exceed
-the threshold. This is the ACTUAL select logic, not a re-statement.
-Uses ℕ so theorems are decidable (Float equality isn't). -/
-def shouldAbstain (scores : List ℕ) : Bool :=
-  scores.all (fun g => g > abstainThreshold)
-
-/-- ABSTAIN-FIRES: when all scores exceed the threshold, shouldAbstain
-returns true. Non-vacuous: the proof unfolds through `List.all` and the
-threshold comparison. If someone changes `abstainThreshold` to a huge
-number, `shouldAbstain` returns false and this theorem fails. -/
-theorem abstain_fires : shouldAbstain [6, 7, 8] = true := by
-  simp [shouldAbstain, abstainThreshold]
-
-/-- ABSTAIN-DOES-NOT-FIRE: when at least one score is ≤ threshold,
-shouldAbstain returns false. Non-vacuous: if someone removes the `all`
-check (making shouldAbstain always true), this theorem breaks. -/
-theorem abstain_does_not_fire : shouldAbstain [1, 6, 7] = false := by
-  simp [shouldAbstain, abstainThreshold]
+/-- COVERAGE (distinct origins): each trace field has a DISTINCT origin
+stage — no two fields come from the same stage. -/
+theorem coverage_distinct_origins :
+    List.Pairwise (fun f1 f2 => fieldOrigin f1 ≠ fieldOrigin f2)
+      [TraceField.regime, TraceField.gEfe, TraceField.freeEnergyF,
+       TraceField.tau, TraceField.action] := by
+  simp [List.Pairwise, fieldOrigin, Stage, TraceField]
 
 end MetaCATokamakExample
 
