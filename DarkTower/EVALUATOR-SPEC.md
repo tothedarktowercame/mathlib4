@@ -164,6 +164,46 @@ aggregateFill = mean }`. VERIFY on the ECAs first (same anchor). A pass gives th
 glider detector **and** confirms MetaCA EoC is coherence, not information; a fail
 escalates to computational-mechanics particle detection.
 
+## 3.8 Particle detection — the structural occupant (DERIVE, 2026-07-14)
+
+Joe's call: don't trust the fragile coherence pass (Rule-54-driven, misses Rule
+110) or build the search on it; go to computational-mechanics **particle
+detection** — harder to build, but it extracts the *actual* structures (domains,
+gliders) as objects, so it is far more informative later (velocities, collisions,
+lifetimes), not just a scalar.
+
+Particle detection still fits the evaluator-comb, but the `estimate` stage becomes
+STRUCTURE EXTRACTION rather than a statistic (Hanson–Crutchfield):
+
+1. **domain** — identify the regular spatiotemporal background(s): a finite-state
+   transducer / regular language the bulk of the spacetime obeys (an ε-machine
+   filter; itself a comb).
+2. **filter** — scan the spacetime through the transducer → a DEFECT field (0
+   where the pattern obeys a domain, 1 where it deviates).
+3. **particles** — the connected/propagating defects are the particles (gliders,
+   domain walls); their velocities and interactions are the "computation."
+
+**The EoC signature is a CONJUNCTION, not a density** (raw defect-density fails —
+chaos has the highest). A CA is EoC iff its spacetime **decomposes into regular
+domains WITH sparse propagating particles**:
+
+- **complex** — high domain-coverage AND nonzero, sparse particle-density → fires;
+- **chaotic** — LOW domain-coverage (no regular background explains it) → fails
+  the domain half;
+- **frozen** — high domain-coverage but ZERO particles → fails the particle half.
+
+So `estimate := domainFilterParticleExtract`, `aggregate := domainCoverage ×
+particleSparsity` (the conjunction), and `SeparatesEoC` should hold **robustly**
+(not Rule-54-luck, and it must catch **Rule 110** — coherence's miss) because it
+requires *both* structure and motion — the actual class-4 signature.
+
+**Difficulty (honest).** For ECAs the domains are catalogued / findable (dominant
+spatiotemporal period). For MetaCA — 256-valued, per-cell rules, evolving — the
+domains are UNKNOWN and must be **discovered** (ε-machine / regular-language
+inference), the genuinely hard part. INSTANTIATE ECA-first (validate the
+signature on known EoC, including Rule 110), then MetaCA domain-discovery as its
+own slice.
+
 ## 4. Evaluator-blend = comb-fill
 
 A blended evaluator ("3 AIS : 2 TE") is a `Fill` mixing two evaluator-occupants,
