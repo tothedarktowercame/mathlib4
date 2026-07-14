@@ -204,6 +204,49 @@ inference), the genuinely hard part. INSTANTIATE ECA-first (validate the
 signature on known EoC, including Rule 110), then MetaCA domain-discovery as its
 own slice.
 
+## 3.9 Local causal states — the proper structural occupant (DERIVE, 2026-07-14)
+
+Joe's call to build it: the CSSR / ε-machine reconstruction the scope stop
+(`futon5/data/particle-detection-SCOPE.md`) showed is required — and it doubles
+as a reference for the tokamak team, because **the causal states ARE the AIF
+generative model** (the minimal sufficient statistics of the past for predicting
+the future = the belief-states an AIF controller maintains). Build it as a clean,
+refactorable module: a map of "the kinds of structure you can extract in this
+domain."
+
+**Method — Rupe–Crutchfield local causal states** (the published method for
+coherent-structure / particle detection in CAs):
+
+1. **light-cones** — for each spacetime point, its past light-cone (cells that
+   could have influenced it, depth `h`) and future light-cone.
+2. **causal states** — cluster past light-cones into equivalence classes with the
+   same conditional future-light-cone distribution (CSSR / local-causal-state
+   reconstruction, with a significance test on each split).
+3. **causal-state field** — label each point with its local causal state.
+4. **domains = spatiotemporally homogeneous causal-state regions; particles = the
+   coherent inhomogeneities** (structured boundaries between domains — gliders,
+   walls). Exactly the decomposition the shortcut filters could not produce.
+
+**Conjunction signature** (spec §3.8) reads off the causal-state field:
+`domainCoverage × particleSparsity`. complex = large homogeneous causal-state
+domains + sparse coherent boundaries → fires; chaotic = no homogeneous regions
+(disordered field, low coverage) → fails; frozen = one causal state, no
+boundaries → fails.
+
+**SeparatesEoC, with the Rule-110 bar** (the shortcuts' failure): local causal
+states recover Rule 110's ether as a domain and its gliders as particles, so it
+must rank 110 above the chaotic rules.
+
+**Tokamak reuse.** Factor the causal-state inference (light-cones + CSSR + the
+significance test) as a standalone module; the tokamak's generative model is a
+consumer of exactly this — evaluator (domain/particle) and controller (belief)
+are two consumers of one causal-state substrate. "Everything is a comb" again.
+
+**INSTANTIATE, sliced.** (1) causal-state inference + the causal-state field on
+binary ECAs; (2) domain/particle decomposition + the conjunction + SeparatesEoC
+(Rule 110 gate); (3, later) MetaCA. Escape hatch stays: if a sub-step needs more
+than its slice, commit what holds + report.
+
 ## 4. Evaluator-blend = comb-fill
 
 A blended evaluator ("3 AIS : 2 TE") is a `Fill` mixing two evaluator-occupants,
