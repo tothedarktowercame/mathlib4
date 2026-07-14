@@ -6,9 +6,8 @@ import DarkTower.TypedHole
 /-!
 # Reproduced MetaCA dynamics as DarkTower objects
 
-This file gives a shared basis for reproduced contextual cell updates.  Both
-`evolve-sigil-with-mutating-template` and
-`evolve-sigil-with-blending-baldwin` follow the implementation order:
+This file gives a shared basis for reproduced CA cell updates.  Nine complete
+`evolve-sigil` dynamics follow the implementation order:
 
 1. read the left, center, and right genotype bytes together with the phenotype
    context quadruple;
@@ -27,7 +26,7 @@ Grounding:
 * `futon5/notebooks/sci-repro/src/scirepro/mutating_template.clj`;
 * `futon5/notebooks/sci-repro/src/scirepro/baldwin.clj`;
 * `futon5/notebooks/sci-repro/src/scirepro/engine.clj`, mutation mechanism;
-* `futon5/256ca.el:571-591,634-686,971-986,990-1065`.
+* `futon5/256ca.el:422-929,971-986,990-1065`.
 -/
 
 namespace DarkTower
@@ -86,12 +85,16 @@ inductive CombinePort where
 inductive TemplateConstructionFill where
   | noTemplate
   | contextQuadrupleFourCandidates
+  | contextQuadrupleCandidatesFilteredTowardBalance
   deriving DecidableEq, Repr
 
 /-- Candidate policies for choosing each output allele. -/
 inductive AlleleDecisionFill where
+  | centerLocalRule
   | firstTemplateMatchElseFallback
   | neighborAgreementElseFallback
+  | allThreeZeroOrOneNeighborsElseFallback
+  | neighborAgreementOptionallyFlippedElseFallback
   deriving DecidableEq, Repr
 
 /-- Candidate rules used when the contextual template has no match. -/
@@ -179,6 +182,7 @@ inductive MutatePort where
 
 /-- Candidate conditions deciding whether and how a byte is eligible for mutation. -/
 inductive PopulationTestFill where
+  | notConsulted
   | outsideTwoThroughSixOnes
   | contextPresentWithFirstThreeMatchCount
   | unconditional
@@ -186,6 +190,7 @@ inductive PopulationTestFill where
 
 /-- Candidate random gates for an eligible mutation. -/
 inductive ProbabilityGateFill where
+  | notConsulted
   | oneInTwenty
   | oneInThree
   | always
@@ -193,6 +198,7 @@ inductive ProbabilityGateFill where
 
 /-- Candidate policies for selecting a bit to change. -/
 inductive BitSelectionFill where
+  | notConsulted
   | randomMajorityBitAfterFullShuffle
   | uniformAllele
   | uniformPositionWithReplacementPerFlip
@@ -264,6 +270,39 @@ example : balanceMutationFill MutatePort.bitSelection =
 
 /-- Every balance-mutation port is fed by the reproduced dynamic. -/
 example (port : MutatePort) : mutateHole.satiety port = SatietyGrade.canon :=
+  rfl
+
+/--
+A faithful no-mutation occupant.  Its condition, random gate, and bit selector
+are not consulted; both effect branches expose the identity on the combined
+rule byte.  This distinguishes absence of mutation from an always-taken random
+gate whose selected effect merely happens to be the identity.
+-/
+def noMutationFill :
+    (port : mutateHole.poly.A) -> mutateHole.holeType port
+  | MutatePort.populationTest => PopulationTestFill.notConsulted
+  | MutatePort.probabilityGate => ProbabilityGateFill.notConsulted
+  | MutatePort.bitSelection => BitSelectionFill.notConsulted
+  | MutatePort.selectedEffect => MutationEffectFill.leaveUnchanged
+  | MutatePort.otherwiseEffect => MutationEffectFill.leaveUnchanged
+
+/-- `mutate-rule-n output 1`: one unconditional uniform-position bit flip. -/
+def oneBitMutationFill :
+    (port : mutateHole.poly.A) -> mutateHole.holeType port
+  | MutatePort.populationTest => PopulationTestFill.unconditional
+  | MutatePort.probabilityGate => ProbabilityGateFill.always
+  | MutatePort.bitSelection => BitSelectionFill.uniformPositionWithReplacementPerFlip
+  | MutatePort.selectedEffect => MutationEffectFill.flipExactlyOneSelectedBit
+  | MutatePort.otherwiseEffect => MutationEffectFill.leaveUnchanged
+
+/-- A no-mutation dynamic does not consult the probability gate. -/
+example : noMutationFill MutatePort.probabilityGate =
+    ProbabilityGateFill.notConsulted :=
+  rfl
+
+/-- The blending-mutation dynamic always performs its one selected flip. -/
+example : oneBitMutationFill MutatePort.selectedEffect =
+    MutationEffectFill.flipExactlyOneSelectedBit :=
   rfl
 
 /-! ## Baldwin occupant on the shared basis -/
@@ -338,6 +377,80 @@ example : baldwinMutationFill MutatePort.otherwiseEffect =
     balanceMutationFill MutatePort.otherwiseEffect :=
   rfl
 
+/-! ## Remaining combine occupants -/
+
+/--
+The base `evolve-sigil` performs the center byte's local truth-table lookup for
+every predecessor/center/successor allele triple.  It has no template branch.
+-/
+def localRuleCombineFill :
+    (port : combineHole.poly.A) -> combineHole.holeType port
+  | CombinePort.templateConstruction => TemplateConstructionFill.noTemplate
+  | CombinePort.alleleDecision => AlleleDecisionFill.centerLocalRule
+  | CombinePort.noMatchFallback => NoMatchFallbackFill.centerTruthTableLocalRule
+  | CombinePort.outputPacking => OutputPackingFill.eightBitsToRuleByte
+
+/--
+The collection template starts from the same ordered contextual candidates as
+the ad-hoc template.  It counts ones in the center local rule and filters out
+candidates producing the value already in excess: outputs of zero are removed
+when ones are scarce, and outputs of one are removed when zeros are scarce.
+-/
+def collectionTemplateCombineFill :
+    (port : combineHole.poly.A) -> combineHole.holeType port
+  | CombinePort.templateConstruction =>
+      TemplateConstructionFill.contextQuadrupleCandidatesFilteredTowardBalance
+  | CombinePort.alleleDecision => AlleleDecisionFill.firstTemplateMatchElseFallback
+  | CombinePort.noMatchFallback => NoMatchFallbackFill.centerTruthTableLocalRule
+  | CombinePort.outputPacking => OutputPackingFill.eightBitsToRuleByte
+
+/--
+The source-exact `blending-3` policy.  Its zero branch requires all three bits
+to be zero.  Its one branch tests predecessor=1 and successor=1, then repeats
+the successor test; it does not test the center bit.  This deliberately records
+the implementation rather than repairing the duplicated expression.
+-/
+def blending3CombineFill :
+    (port : combineHole.poly.A) -> combineHole.holeType port
+  | CombinePort.templateConstruction => TemplateConstructionFill.noTemplate
+  | CombinePort.alleleDecision =>
+      AlleleDecisionFill.allThreeZeroOrOneNeighborsElseFallback
+  | CombinePort.noMatchFallback => NoMatchFallbackFill.centerTruthTableLocalRule
+  | CombinePort.outputPacking => OutputPackingFill.eightBitsToRuleByte
+
+/--
+`blending-flip` copies agreed predecessor/successor bits when `flip` is nil and
+inverts those agreed bits when `flip` is non-nil.  Unequal neighbors retain the
+center local-rule fallback in either mode.
+-/
+def blendingFlipCombineFill :
+    (port : combineHole.poly.A) -> combineHole.holeType port
+  | CombinePort.templateConstruction => TemplateConstructionFill.noTemplate
+  | CombinePort.alleleDecision =>
+      AlleleDecisionFill.neighborAgreementOptionallyFlippedElseFallback
+  | CombinePort.noMatchFallback => NoMatchFallbackFill.centerTruthTableLocalRule
+  | CombinePort.outputPacking => OutputPackingFill.eightBitsToRuleByte
+
+/-- The base dynamic's allele port is the unblended center local rule. -/
+example : localRuleCombineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.centerLocalRule :=
+  rfl
+
+/-- Collection filtering is represented at the template-construction port. -/
+example : collectionTemplateCombineFill CombinePort.templateConstruction =
+    TemplateConstructionFill.contextQuadrupleCandidatesFilteredTowardBalance :=
+  rfl
+
+/-- The choosy blending variant retains its source-exact asymmetric predicate. -/
+example : blending3CombineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.allThreeZeroOrOneNeighborsElseFallback :=
+  rfl
+
+/-- The flip argument changes only how agreed neighbor bits are copied. -/
+example : blendingFlipCombineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.neighborAgreementOptionallyFlippedElseFallback :=
+  rfl
+
 /-- A reproduced dynamic is an occupant of the two shared variation holes. -/
 structure DynamicOccupant where
   /-- The dynamic's fill at every combine port. -/
@@ -355,6 +468,119 @@ def baldwinOccupant : DynamicOccupant where
   combineFill := baldwinCombineFill
   mutateFill := baldwinMutationFill
 
+/-- `evolve-sigil`: center local-rule lookup and no mutation. -/
+def evolveSigilOccupant : DynamicOccupant where
+  combineFill := localRuleCombineFill
+  mutateFill := noMutationFill
+
+/-- `evolve-sigil-with-blending`: neighbor agreement and no mutation. -/
+def blendingOccupant : DynamicOccupant where
+  combineFill := baldwinCombineFill
+  mutateFill := noMutationFill
+
+/--
+`evolve-sigil-with-blending-mutation`: neighbor agreement followed by exactly
+one unconditional random-position flip.
+-/
+def blendingMutationOccupant : DynamicOccupant where
+  combineFill := baldwinCombineFill
+  mutateFill := oneBitMutationFill
+
+/-- `evolve-sigil-with-ad-hoc-template`: contextual template and no mutation. -/
+def adHocTemplateOccupant : DynamicOccupant where
+  combineFill := mutatingTemplateCombineFill
+  mutateFill := noMutationFill
+
+/--
+`evolve-sigil-with-collection-template`: balance-filtered contextual template
+and no post-combine mutation.
+-/
+def collectionTemplateOccupant : DynamicOccupant where
+  combineFill := collectionTemplateCombineFill
+  mutateFill := noMutationFill
+
+/-- `evolve-sigil-with-blending-3`: source-exact choosy blend and no mutation. -/
+def blending3Occupant : DynamicOccupant where
+  combineFill := blending3CombineFill
+  mutateFill := noMutationFill
+
+/-- `evolve-sigil-with-blending-flip`: optional agreed-bit inversion, no mutation. -/
+def blendingFlipOccupant : DynamicOccupant where
+  combineFill := blendingFlipCombineFill
+  mutateFill := noMutationFill
+
+/-! ### Type-checks for the seven added occupants -/
+
+/-- The base dynamic occupies the allele port with plain local-rule lookup. -/
+example : evolveSigilOccupant.combineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.centerLocalRule :=
+  rfl
+
+/-- The base dynamic performs no random mutation draw. -/
+example : evolveSigilOccupant.mutateFill MutatePort.probabilityGate =
+    ProbabilityGateFill.notConsulted :=
+  rfl
+
+/-- Plain blending reuses the accepted Baldwin neighbor-agreement combine fill. -/
+example : blendingOccupant.combineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.neighborAgreementElseFallback :=
+  rfl
+
+/-- Plain blending has no post-combine mutation. -/
+example : blendingOccupant.mutateFill MutatePort.bitSelection =
+    BitSelectionFill.notConsulted :=
+  rfl
+
+/-- Blending-mutation reuses the same neighbor-agreement combine policy. -/
+example : blendingMutationOccupant.combineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.neighborAgreementElseFallback :=
+  rfl
+
+/-- Blending-mutation makes its single random-position flip unconditionally. -/
+example : blendingMutationOccupant.mutateFill MutatePort.probabilityGate =
+    ProbabilityGateFill.always :=
+  rfl
+
+/-- The ad-hoc template reuses the accepted four contextual candidates. -/
+example : adHocTemplateOccupant.combineFill CombinePort.templateConstruction =
+    TemplateConstructionFill.contextQuadrupleFourCandidates :=
+  rfl
+
+/-- The ad-hoc template has no separate mutation stage. -/
+example : adHocTemplateOccupant.mutateFill MutatePort.selectedEffect =
+    MutationEffectFill.leaveUnchanged :=
+  rfl
+
+/-- Collection-template filtering is distinct from the unfiltered ad-hoc fill. -/
+example : collectionTemplateOccupant.combineFill CombinePort.templateConstruction =
+    TemplateConstructionFill.contextQuadrupleCandidatesFilteredTowardBalance :=
+  rfl
+
+/-- Collection-template performs no post-combine mutation. -/
+example : collectionTemplateOccupant.mutateFill MutatePort.probabilityGate =
+    ProbabilityGateFill.notConsulted :=
+  rfl
+
+/-- Blending-3 occupies the combine hole with its asymmetric source predicate. -/
+example : blending3Occupant.combineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.allThreeZeroOrOneNeighborsElseFallback :=
+  rfl
+
+/-- Blending-3 ignores its fourth argument and performs no mutation. -/
+example : blending3Occupant.mutateFill MutatePort.populationTest =
+    PopulationTestFill.notConsulted :=
+  rfl
+
+/-- Blending-flip records the optional inversion in its combine fill. -/
+example : blendingFlipOccupant.combineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.neighborAgreementOptionallyFlippedElseFallback :=
+  rfl
+
+/-- Blending-flip has no post-combine mutation beyond that combine-time option. -/
+example : blendingFlipOccupant.mutateFill MutatePort.bitSelection =
+    BitSelectionFill.notConsulted :=
+  rfl
+
 /-- The accepted mutating-template occupant retains its four-candidate template. -/
 example : mutatingTemplateOccupant.combineFill CombinePort.templateConstruction =
     TemplateConstructionFill.contextQuadrupleFourCandidates :=
@@ -366,9 +592,26 @@ example : baldwinOccupant.mutateFill MutatePort.probabilityGate =
   rfl
 
 /-!
-The common `cellUpdate`, `combineHole`, and `mutateHole` now host two reproduced
-dynamics as distinct `DynamicOccupant` values.  This is a shared fill store for
-later work; it does not compose or interpolate the occupants.
+## Unified-basis coverage
+
+The common `cellUpdate`, `combineHole`, and `mutateHole` now host nine complete
+dynamics as distinct `DynamicOccupant` values: the two previously accepted
+mutating-template and Baldwin occupants plus seven added here.  The fill
+vocabulary grew only for genuine policy distinctions: plain local-rule
+selection, collection-template filtering, source-exact blending-3, optional
+agreed-neighbor inversion, explicit absence of mutation, and unconditional
+single-bit mutation.  This is a shared fill store for later work; it does not
+compose or interpolate the occupants.
+
+`evolve-sigil-with-blending-baldwin-2` is deferred.  At `256ca.el:691-750` it
+is explicitly marked `TODO: finish this`; it computes `mutations` but never
+uses that count, constructs `output` but never calls `get-genotype-from-rule`,
+and its final `mapc` returns `local-data` rather than a genotype byte.  Thus it
+does not satisfy the shared skeleton's combine-byte -> mutate-byte -> write-byte
+boundary.  Supplying a `DynamicOccupant` would invent the missing source
+semantics.  This deferral does not call for `Comb.lean`: an n-hole open diagram
+cannot repair a missing output operation or codomain.  Once the source defines
+that operation, the resulting policy can be assessed against these holes.
 -/
 
 /--
