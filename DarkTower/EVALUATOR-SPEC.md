@@ -39,7 +39,8 @@ generators:
 - `nearestNeighbor` — source = the adjacent cell's past. → **nn-TE** (`local transfer`).
 - `offset (d, τ)` — source = the cell `d` sites away, `τ` steps back. → **distance/lagged TE**.
 
-**`paramHole`** — `{destPast k, sourcePast l, offset (d,τ), correction, aggregate}`.
+**`paramHole`** — `{destPast k, sourcePast l, offset (d,τ), alphabet, correction, aggregate}`
+(the `alphabet` fill is load-bearing — see §3.5).
 
 So **AIS, nn-TE, and distance-TE are three occupants of ONE evaluator-comb**,
 differing only by the `sourceHole` fill — the precise mirror of the 9 CA
@@ -61,6 +62,33 @@ dynamics being occupants of one generator-comb. `DynamicOccupant` has a twin:
   `I(source@offset ; dest-next | dest-past)` is high exactly when a coherent
   structure connects them, and low for chaos (no coherent velocity) and for
   frozen (no information). This is the occupant that should reproduce the eye.
+
+## 3.5 Rotation and alphabet — an open empirical question (Joe, 2026-07-14)
+
+§3 tacitly assumed a glider is a *same-value* diagonal. In a 256-valued (8-bit)
+MetaCA rendered in greyscale we **cannot know in advance** whether gliders stay
+one value or *rotate* — change value as they propagate while keeping a coherent
+trajectory. Two facts shape the design:
+
+- **TE is value-mapping-agnostic.** `I(source@offset ; dest-next | dest-past)`
+  measures whether the source *reduces uncertainty* about the destination, not
+  whether they carry the *same* symbol. A glider whose value maps `X → Y`
+  consistently as it moves still scores high TE. So the estimator is already
+  partly robust to rotation — it detects coherent *dependence*, not identity.
+- **The alphabet decides which rotation is visible** (the `alphabet` fill of
+  `paramHole`):
+  - `bitplane` (binary, one plane) — estimable, but blind to a rotation that is
+    not bit-aligned (a value cycle one plane reads as noise);
+  - `fullCell` (256 symbols) — rotation-aware, but sample-starved (severe
+    entropy-estimation bias);
+  - `coarse` (a few bins over the 8-bit value) — a middle ground.
+
+**Resolution: VERIFY answers it; do not assume.** The INSTANTIATE runs the
+distance-TE occupant across alphabets. If `fullCell`/`coarse` distance-TE
+satisfies `SeparatesEoC` and reproduces the eye ordering where `bitplane` does
+not, **that is evidence the gliders rotate** (their coherence is not per-bit). If
+all alphabets agree, they stay same-value. Either way the measure *reports* the
+answer instead of presuming it — the honest form of "we can't know in advance."
 
 ## 4. Evaluator-blend = comb-fill
 
