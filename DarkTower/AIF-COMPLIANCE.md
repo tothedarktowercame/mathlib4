@@ -44,6 +44,30 @@ Tokamak is recurrent and is the construction that forces the open-diagram layer
 and the discriminators recognised as the same object with legs removed. `blend`
 (fill-mixing) is one operation over all of them.
 
+## Shared substrate — local causal states (for the AIF build team)
+
+The DarkTower evaluator work is building the piece the tokamak's generative model
+needs. **A local-causal-state model *is* an AIF generative model**: the causal
+states are the minimal sufficient statistics of the past for predicting the future
+— i.e. the belief-states a controller maintains. The evaluator uses them to detect
+domains/particles (edge-of-chaos structure); the tokamak uses the same causal
+states as beliefs. Two consumers, one substrate.
+
+For the AIF build team, in order of readiness:
+
+- **Spec (DERIVE, ready):** `DarkTower/EVALUATOR-SPEC.md` §3.9 — Rupe–Crutchfield
+  local causal states (light-cones → CSSR clustering with a significance test →
+  causal-state field → domains/particles), with the tokamak-reuse framing. §3.1–3.8
+  are the surrounding evaluator-comb derivation.
+- **Requirements (ready):** `futon5/data/particle-detection-SCOPE.md` — the exact
+  CSSR / ε-machine / particle-tracking / boundary-audit requirements, and the
+  evidence for *why* the tile/translation shortcuts fail (Rule 110).
+- **Code (in flight):** `futon5/src/futon5/mmca/local_causal_states.clj` — a
+  standalone, refactorable causal-state inference module (light-cones + CSSR +
+  significance test), being built as shared substrate. Not yet committed; lands
+  from the current evaluator slice. The reusability into the AIF generative model
+  is an intended path, not a coincidence.
+
 ## Mapping — AIF feature → DarkTower construct
 
 The AIF feature column follows the R1–R12 audit of the ants reference
