@@ -90,6 +90,47 @@ not, **that is evidence the gliders rotate** (their coherence is not per-bit). I
 all alphabets agree, they stay same-value. Either way the measure *reports* the
 answer instead of presuming it — the honest form of "we can't know in advance."
 
+## 3.6 The aggregate is a variation slot — the heterogeneity occupant (DERIVE, 2026-07-14)
+
+VERIFY killed both TE occupants (nn and distance-at-velocity) the same way:
+mean-aggregated transfer entropy ranks chaotic above complex. Diagnosis: **the
+three occupants so far all AGGREGATE BY MEAN, and the mean is dominated by the
+bulk** — TE-mean rewards dense flow (chaos uniformly high), AIS-mean rewards
+predictable domains (complex has large quiet domains). The sparse coherent
+gliders the eye reads are invisible to any average.
+
+But `aggregate` is already a `paramHole` fill, so the fix is a new fill, not a
+new estimator:
+
+- `mean` (current) → the bulk statistic;
+- `heterogeneity` → the spatial variance / dispersion of the *local* field.
+
+**ARGUE (heterogeneity occupant).** IF gliders are sparse coherent structures
+against quiet domains, THEN the local-info field is high on the glider and low in
+the domains — **high spatial variance** — whereas chaos is uniformly high (low
+variance) and frozen uniformly zero (low variance). SO `aggregate := heterogeneity`
+should give complex > {chaotic, frozen} — `SeparatesEoC` where the mean fails.
+BECAUSE EoC is *heterogeneous local computation* (structure + background), not
+high average anything.
+
+`heterogeneityOccupant = { sourceFill = offset(d,τ), aggregateFill = heterogeneity }`.
+VERIFY on the ECAs first (same anchor). If it also fails, escalate to
+computational-mechanics particle detection (extract gliders directly) rather than
+another information statistic.
+
+## Domain note — banked fails are evidence the domain is hard (Joe, 2026-07-14)
+
+AIS, nn-TE, and distance-TE are Lizier-style local-information-dynamics measures
+developed for **uniform, binary, 1D** CAs. MetaCA is none of those: 256-valued
+cells, a **different rule per cell** (the genotype *is* the local rule),
+genotype↔phenotype coupling, and rules that *evolve*. The trust-anchor fails are
+therefore not (only) methodological dead-ends — they are substantive evidence
+that standard 1D-CA computational-mechanics concepts do **not** transfer intact
+to this richer substrate. Banking these fails, with pre-registered anchors, is
+itself a result about the domain's difficulty. Expect measures to need
+MetaCA-specific adaptation (the §3.5 alphabet question; per-cell-rule-aware
+estimators) rather than off-the-shelf 1D-CA statistics.
+
 ## 4. Evaluator-blend = comb-fill
 
 A blended evaluator ("3 AIS : 2 TE") is a `Fill` mixing two evaluator-occupants,
