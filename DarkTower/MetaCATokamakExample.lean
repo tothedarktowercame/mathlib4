@@ -142,12 +142,78 @@ example : ¬ IsHungry obsHole ObsPort.regime := by
 example : obsHole.holeType ObsPort.pressure = ObsFeed :=
   rfl
 
-/-!
+/-! ## EoC preference C (R19) and EFE occupants (R5)
+
 The EFE decomposition is structurally copar (⅋), not seq — non-signalling.
 This is visible in the `tick` definition above: `BV.copar (evaluateF) (evaluateG)`.
-The `gate` stage that follows combines them; neither leg can signal the other.
-The g-efe/TypedHole/theorem content is Slice 2+.
+
+The occupants below give the evaluateF/evaluateG/gate stages concrete Lean
+types. The math (Gaussian KL + Gaussian entropy) mirrors the Clojure
+`futon5.aif.efe` kernel, which in turn mirrors `ants.aif.efe` byte-for-byte.
 -/
+
+/-- The EoC confinement preference C: target means per channel. -/
+def eocTargetMeans : ObsPort → Float
+  | ObsPort.pressure => 0.5
+  | ObsPort.selectivity => 0.4
+  | ObsPort.structure => 0.4
+  | ObsPort.activity => 0.5
+  | ObsPort.regime => 0.0  -- regime is categorical, not a numeric target
+
+/-- The EoC confinement preference C: target variances (σ²) per channel. -/
+def eocTargetVariances : ObsPort → Float
+  | ObsPort.pressure => 0.0225  -- 0.15²
+  | ObsPort.selectivity => 0.0225
+  | ObsPort.structure => 0.0225
+  | ObsPort.activity => 0.0225
+  | ObsPort.regime => 1.0  -- no constraint on regime via Gaussian
+
+/-- The constant 2πe used in Gaussian entropy. -/
+def twoPiE : Float := 2.0 * 3.141592653589793 * 2.718281828459045
+
+/-- Gaussian differential entropy: 1/2 * ln(2*pi*e*sigma^2), floored at 1e-9. -/
+def gaussianEntropy (sigmaSq : Float) : Float :=
+  0.5 * Float.log (twoPiE * max sigmaSq 1e-9)
+
+/-- Gaussian KL divergence: 1/2[ln(s2_sq/s1_sq) + (s1_sq + (mu1-mu2)^2)/s2_sq - 1]. -/
+def gaussianKL (mu1 sigmaSq1 mu2 sigmaSq2 : Float) : Float :=
+  let s1 := max sigmaSq1 1e-9
+  let s2 := max sigmaSq2 1e-9
+  let d := mu1 - mu2
+  0.5 * (Float.log (s2 / s1) + (s1 + d * d) / s2 - 1.0)
+
+/-- evaluateF — the epistemic leg: ambiguity = Σ ½·ln(2πe·σ²) per channel.
+
+This is the predicted observation entropy — "what would I learn?" Higher
+predicted variance → higher ambiguity → higher EFE contribution.
+Mirrors `futon5.aif.efe/gaussian-entropy` + `ambiguity`. -/
+def evaluateF (variances : ObsPort → Float) : Float :=
+  (gaussianEntropy (variances ObsPort.pressure)
+    + gaussianEntropy (variances ObsPort.selectivity)
+    + gaussianEntropy (variances ObsPort.structure)
+    + gaussianEntropy (variances ObsPort.activity))
+
+/-- evaluateG — the pragmatic leg: KL-risk = Σ KL(N(μ,σ²)‖N(C_μ,C_σ²)) per channel.
+
+This is the divergence from the EoC preference C — "how far from confinement?"
+Mirrors `futon5.aif.efe/gaussian-kl` + `risk`. -/
+def evaluateG (means variances : ObsPort → Float) : Float :=
+  (gaussianKL (means ObsPort.pressure) (variances ObsPort.pressure)
+     (eocTargetMeans ObsPort.pressure) (eocTargetVariances ObsPort.pressure)
+  + gaussianKL (means ObsPort.selectivity) (variances ObsPort.selectivity)
+     (eocTargetMeans ObsPort.selectivity) (eocTargetVariances ObsPort.selectivity)
+  + gaussianKL (means ObsPort.structure) (variances ObsPort.structure)
+     (eocTargetMeans ObsPort.structure) (eocTargetVariances ObsPort.structure)
+  + gaussianKL (means ObsPort.activity) (variances ObsPort.activity)
+     (eocTargetMeans ObsPort.activity) (eocTargetVariances ObsPort.activity))
+
+/-- gate — combine the copar legs into G_efe = risk + ambiguity.
+
+The gate stage takes the simultaneous copar readings (evaluateF ⅋ evaluateG)
+and combines them into the scalar G_efe per candidate action. Neither leg
+signals the other; they are independent readings held by BV.copar. -/
+def gate (means variances : ObsPort → Float) : Float :=
+  evaluateF variances + evaluateG means variances
 
 /-- The tick's evaluateF/evaluateG are the 4th seq-argument (copar position). -/
 example : ∃ rest : BV Stage,
@@ -159,6 +225,11 @@ example : ∃ rest : BV Stage,
   ⟨BV.seq (BV.atom Stage.gate)
     (BV.seq (BV.atom Stage.select)
       (BV.seq (BV.atom Stage.enact) (BV.atom Stage.trace))), rfl⟩
+
+/-- evaluateF + evaluateG = gate (the gate combines the copar legs). -/
+example (means variances : ObsPort → Float) :
+    gate means variances = evaluateF variances + evaluateG means variances := by
+  rfl
 
 end MetaCATokamakExample
 
