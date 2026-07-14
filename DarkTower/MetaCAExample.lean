@@ -4,28 +4,30 @@ import DarkTower.Fill
 import DarkTower.TypedHole
 
 /-!
-# The mutating-template cellular update as a DarkTower object
+# Reproduced MetaCA dynamics as DarkTower objects
 
-This file models one contextual cell update from
-`evolve-sigil-with-mutating-template`.  It follows the implementation order:
+This file gives a shared basis for reproduced contextual cell updates.  Both
+`evolve-sigil-with-mutating-template` and
+`evolve-sigil-with-blending-baldwin` follow the implementation order:
 
 1. read the left, center, and right genotype bytes together with the phenotype
    context quadruple;
-2. build the four-candidate context template and combine eight allele triples,
-   taking the first template match and otherwise applying the center byte's
-   local truth-table rule;
-3. apply balance mutation to the combined byte;
+2. combine eight allele triples using the selected policy: ordered contextual
+   template matching or predecessor/successor agreement, with the center
+   byte's local truth-table rule as fallback;
+3. apply the selected mutation policy to the combined byte;
 4. write the resulting genotype byte.
 
-The combine and mutation stages are variation slots.  Each is represented by a
-`TypedHole` whose positions are its semantic ports and whose dependent
-directions are the fills admissible at that port.  The occupant functions pick
-the fills used by this particular dynamic.
+The combine and mutation stages are shared variation slots.  Each is
+represented by a `TypedHole` whose positions are its semantic ports and whose
+dependent directions are the fills admissible at that port.  The occupant
+functions pick the fills used by each reproduced dynamic.
 
 Grounding:
 * `futon5/notebooks/sci-repro/src/scirepro/mutating_template.clj`;
+* `futon5/notebooks/sci-repro/src/scirepro/baldwin.clj`;
 * `futon5/notebooks/sci-repro/src/scirepro/engine.clj`, mutation mechanism;
-* `futon5/256ca.el:971-986,990-1065`.
+* `futon5/256ca.el:571-591,634-686,971-986,990-1065`.
 -/
 
 namespace DarkTower
@@ -45,7 +47,7 @@ inductive Stage where
 
 /--
 The three genotype bytes and phenotype quadruple are independent simultaneous
-reads.  Their values feed a serial combine, balance-mutation, and write spine.
+reads.  Their values feed a serial combine, selected mutation, and write spine.
 -/
 def cellUpdate : BV Stage :=
   BV.seq
@@ -164,9 +166,9 @@ example : mutatingTemplateCombineFill CombinePort.noMatchFallback =
 example (port : CombinePort) : combineHole.satiety port = SatietyGrade.canon :=
   rfl
 
-/-! ## Balance-mutation variation slot -/
+/-! ## Shared mutation variation slot -/
 
-/-- Ports that jointly determine the post-combine balance mutation. -/
+/-- Ports that jointly determine the selected post-combine mutation. -/
 inductive MutatePort where
   | populationTest
   | probabilityGate
@@ -175,15 +177,17 @@ inductive MutatePort where
   | otherwiseEffect
   deriving DecidableEq, Repr
 
-/-- Candidate tests deciding whether a byte is eligible for mutation. -/
+/-- Candidate conditions deciding whether and how a byte is eligible for mutation. -/
 inductive PopulationTestFill where
   | outsideTwoThroughSixOnes
+  | contextPresentWithFirstThreeMatchCount
   | unconditional
   deriving DecidableEq, Repr
 
 /-- Candidate random gates for an eligible mutation. -/
 inductive ProbabilityGateFill where
   | oneInTwenty
+  | oneInThree
   | always
   deriving DecidableEq, Repr
 
@@ -191,11 +195,13 @@ inductive ProbabilityGateFill where
 inductive BitSelectionFill where
   | randomMajorityBitAfterFullShuffle
   | uniformAllele
+  | uniformPositionWithReplacementPerFlip
   deriving DecidableEq, Repr
 
 /-- Candidate effects applied to a rule byte. -/
 inductive MutationEffectFill where
   | flipExactlyOneSelectedBit
+  | flipContextMatchCountPlusTwoBits
   | leaveUnchanged
   deriving DecidableEq, Repr
 
@@ -208,11 +214,12 @@ def MutateDirection : MutatePort -> Type
   | MutatePort.otherwiseEffect => MutationEffectFill
 
 /--
-The mutation interface is fully fed.  `outsideTwoThroughSixOnes` means more
-than six ones or fewer than two ones.  Only such bytes draw the one-in-twenty
-gate; a successful gate fully shuffles positions carrying the majority value,
-selects the last shuffled position, and flips exactly that bit.  Every other
-path returns the combined byte unchanged.
+The shared mutation interface is fully fed by each occupant.  For the balance
+occupant, `outsideTwoThroughSixOnes` means more than six ones or fewer than two
+ones.  Only such bytes draw the one-in-twenty gate; a successful gate fully
+shuffles positions carrying the majority value, selects the last shuffled
+position, and flips exactly that bit.  Every other path returns the combined
+byte unchanged.
 -/
 def mutateHole : TypedHole where
   poly :=
@@ -258,6 +265,111 @@ example : balanceMutationFill MutatePort.bitSelection =
 /-- Every balance-mutation port is fed by the reproduced dynamic. -/
 example (port : MutatePort) : mutateHole.satiety port = SatietyGrade.canon :=
   rfl
+
+/-! ## Baldwin occupant on the shared basis -/
+
+/--
+Baldwin reuses the existing combine directions: there is no contextual
+template; equal predecessor/successor bits are copied, and unequal neighbors
+fall back to the center genotype's local truth-table rule.
+-/
+def baldwinCombineFill :
+    (port : combineHole.poly.A) -> combineHole.holeType port
+  | CombinePort.templateConstruction => TemplateConstructionFill.noTemplate
+  | CombinePort.alleleDecision => AlleleDecisionFill.neighborAgreementElseFallback
+  | CombinePort.noMatchFallback => NoMatchFallbackFill.centerTruthTableLocalRule
+  | CombinePort.outputPacking => OutputPackingFill.eightBitsToRuleByte
+
+/-- Baldwin occupies the shared template port with no template. -/
+example : baldwinCombineFill CombinePort.templateConstruction =
+    TemplateConstructionFill.noTemplate :=
+  rfl
+
+/-- Baldwin copies an agreed predecessor/successor bit before considering fallback. -/
+example : baldwinCombineFill CombinePort.alleleDecision =
+    AlleleDecisionFill.neighborAgreementElseFallback :=
+  rfl
+
+/-- Unequal Baldwin neighbors use the same center local-rule fill. -/
+example : baldwinCombineFill CombinePort.noMatchFallback =
+    NoMatchFallbackFill.centerTruthTableLocalRule :=
+  rfl
+
+/--
+The Baldwin mutation occupant requires a nonempty context, draws the random
+gate modulo three, and acts only when that draw is zero.  It counts positions
+zero through two whose phenotype bit equals position three, adds two, then
+performs that many sequential flips.  Every flip draws a fresh uniform
+position in `0..7`; positions are sampled with replacement, so repeated draws
+can cancel earlier flips.  A missing context consumes no random draw and leaves
+the combined byte unchanged.
+-/
+def baldwinMutationFill :
+    (port : mutateHole.poly.A) -> mutateHole.holeType port
+  | MutatePort.populationTest =>
+      PopulationTestFill.contextPresentWithFirstThreeMatchCount
+  | MutatePort.probabilityGate => ProbabilityGateFill.oneInThree
+  | MutatePort.bitSelection => BitSelectionFill.uniformPositionWithReplacementPerFlip
+  | MutatePort.selectedEffect => MutationEffectFill.flipContextMatchCountPlusTwoBits
+  | MutatePort.otherwiseEffect => MutationEffectFill.leaveUnchanged
+
+/-- Baldwin's condition records both context presence and the exact match count. -/
+example : baldwinMutationFill MutatePort.populationTest =
+    PopulationTestFill.contextPresentWithFirstThreeMatchCount :=
+  rfl
+
+/-- Baldwin uses `(random 3) < 1`, represented by the one-in-three fill. -/
+example : baldwinMutationFill MutatePort.probabilityGate =
+    ProbabilityGateFill.oneInThree :=
+  rfl
+
+/-- `mutate-rule-n` draws each flip position uniformly and with replacement. -/
+example : baldwinMutationFill MutatePort.bitSelection =
+    BitSelectionFill.uniformPositionWithReplacementPerFlip :=
+  rfl
+
+/-- Baldwin performs exactly the context-match count plus two flips. -/
+example : baldwinMutationFill MutatePort.selectedEffect =
+    MutationEffectFill.flipContextMatchCountPlusTwoBits :=
+  rfl
+
+/-- Both policies leave the byte unchanged when their respective gate does not act. -/
+example : baldwinMutationFill MutatePort.otherwiseEffect =
+    balanceMutationFill MutatePort.otherwiseEffect :=
+  rfl
+
+/-- A reproduced dynamic is an occupant of the two shared variation holes. -/
+structure DynamicOccupant where
+  /-- The dynamic's fill at every combine port. -/
+  combineFill : (port : combineHole.poly.A) -> combineHole.holeType port
+  /-- The dynamic's fill at every mutation port. -/
+  mutateFill : (port : mutateHole.poly.A) -> mutateHole.holeType port
+
+/-- The mutating-template dynamic occupies the shared skeleton and holes. -/
+def mutatingTemplateOccupant : DynamicOccupant where
+  combineFill := mutatingTemplateCombineFill
+  mutateFill := balanceMutationFill
+
+/-- The Baldwin dynamic occupies the same shared skeleton and holes. -/
+def baldwinOccupant : DynamicOccupant where
+  combineFill := baldwinCombineFill
+  mutateFill := baldwinMutationFill
+
+/-- The accepted mutating-template occupant retains its four-candidate template. -/
+example : mutatingTemplateOccupant.combineFill CombinePort.templateConstruction =
+    TemplateConstructionFill.contextQuadrupleFourCandidates :=
+  rfl
+
+/-- The second occupant selects Baldwin's distinct random gate on the same interface. -/
+example : baldwinOccupant.mutateFill MutatePort.probabilityGate =
+    ProbabilityGateFill.oneInThree :=
+  rfl
+
+/-!
+The common `cellUpdate`, `combineHole`, and `mutateHole` now host two reproduced
+dynamics as distinct `DynamicOccupant` values.  This is a shared fill store for
+later work; it does not compose or interpolate the occupants.
+-/
 
 /--
 Nested polynomial substitution records the two serial variation slots at the
