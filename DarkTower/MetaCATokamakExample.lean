@@ -115,11 +115,21 @@ inductive ObsFeed where
 def ObsDirection : ObsPort → Type
   | _ => ObsFeed
 
-/--
-The observation interface as a typed-hole. In the fed (live) apparatus, all
-ports grade `canon` — the CA step produces them every tick. The satiety grading
-and the starvation theorem (`IsHungry` for a severed feed) are Slice 3.
+/-! ## Satiety-graded TypedHoles and the starvation theorem (Slice 3)
+
+The compliance milestone (AIF-COMPLIANCE.md invariant 1): every observation
+feed is a satiety-graded `TypedHole`, and **starvation is a theorem**. A
+severed feed → a provable `IsHungry`; the fed apparatus → `¬ IsHungry`. A
+feed regression must BREAK the build (repair-flips-the-theorem).
+
+This mirrors the `gammaFeedHole` / FirstFlights idiom in
+`WMPipelineExample.lean`: the fed hole grades `canon` and proves `¬ IsHungry`;
+the severed hole grades `payoff` and proves `IsHungry`. Repairing a severed
+feed (changing its satiety from `payoff` to `canon`) flips the theorem.
 -/
+
+/-- The fed observation interface: all ports grade `canon` (the CA step
+produces them every tick). This is the live apparatus. -/
 def obsHole : TypedHole where
   poly :=
     { A := ObsPort
@@ -130,12 +140,42 @@ def obsHole : TypedHole where
 def IsHungry (T : TypedHole) (a : T.poly.A) : Prop :=
   T.satiety a = SatietyGrade.payoff
 
-/-- In the live apparatus, the pressure port is fed (not hungry). -/
+/-- The severed observation interface: all ports grade `payoff` (hungry).
+This models a CA step that has been severed — no metrics are produced, so
+every observation port is starved. -/
+def severedObsHole : TypedHole where
+  poly :=
+    { A := ObsPort
+      B := ObsDirection }
+  satiety := fun _ => SatietyGrade.payoff
+
+/-- THE STARVATION THEOREM (compliance invariant 1): a severed feed is hungry.
+In the severed apparatus, the pressure port is provably hungry. -/
+example : IsHungry severedObsHole ObsPort.pressure := by
+  simp [IsHungry, severedObsHole]
+
+/-- A severed regime port is also hungry. -/
+example : IsHungry severedObsHole ObsPort.regime := by
+  simp [IsHungry, severedObsHole]
+
+/-- All severed ports are hungry (the full starvation). -/
+example (port : ObsPort) : IsHungry severedObsHole port := by
+  simp [IsHungry, severedObsHole]
+
+/-- REPAIR-FLIPS-THE-THEOREM: in the fed (live) apparatus, the pressure port
+is NOT hungry. If someone severs the feed (changing obsHole's satiety from
+`canon` to `payoff`), this proof breaks — they must come back here and
+re-prove hunger, exactly as WMPipelineExample.lean's gammaFeedHole contract
+demands. -/
 example : ¬ IsHungry obsHole ObsPort.pressure := by
   simp [IsHungry, obsHole]
 
-/-- In the live apparatus, the regime port is fed (not hungry). -/
+/-- The fed regime port is not hungry. -/
 example : ¬ IsHungry obsHole ObsPort.regime := by
+  simp [IsHungry, obsHole]
+
+/-- All fed ports are not hungry (the full fed apparatus). -/
+example (port : ObsPort) : ¬ IsHungry obsHole port := by
   simp [IsHungry, obsHole]
 
 /-- Every observation port accepts `ObsFeed` (the interface types check). -/
