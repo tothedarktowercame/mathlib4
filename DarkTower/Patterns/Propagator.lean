@@ -239,6 +239,39 @@ Every permutation is onto, hence has `FREE = ∅`, hence no scaffold. A census o
 theorem permutation_free_eq_empty (s : Equiv.Perm N) : Free s = ∅ :=
   free_eq_empty_of_surjective s.surjective
 
+/-! ## What the value map must be
+
+claude-6 (lucy) asked whether `TransferEligible` forces `nu` to be an involution.
+It does not: `Recipe` asks for nothing but two endo-maps, and `TransferEligible`
+only asks that an operator factor through *some* `Recipe`.  But that is the wrong
+question.  The property that bites is **fixed-point-freeness**, and it bites hard:
+one fixed point in `nu` kills the propagator for *every* shape map at once. -/
+
+/-- **If `nu` has any fixed point, the propagator settles — whatever `s` is.**
+
+The constant colouring at `p` satisfies the constraint for every shape map, so the
+fixed-point set is never empty and the carrier always has somewhere to come to
+rest.  A carrier that settles is dead (Figure 8 moves precisely because it has no
+fixed point).  So the requirement on `nu` is not that it be an involution but that
+it have no fixed point; `Bool.not` qualifies, which is why the MetaCA runs at all. -/
+theorem settles_if_nu_has_fixed_point [DecidableEq N]
+    (s : N → N) (nu : P → P) (p : P) (hfix : nu p = p) :
+    IsFixed (⟨s, nu⟩ : Recipe N P) (fun _ => p) := by
+  rw [isFixed_iff_equivariant]
+  intro k
+  simp [hfix]
+
+/-- Contrapositive: a propagator with *no* solution forces `nu` to be
+fixed-point-free.  This is the form the design reading uses — before building a
+controlled vocabulary, test the candidate `nu` for fixed points; any term mapping
+to itself is dead on arrival for every `s`. -/
+theorem nu_fixed_point_free_of_isEmpty [DecidableEq N]
+    (s : N → N) (nu : P → P)
+    (h : IsEmpty {g : N → P // IsFixed (⟨s, nu⟩ : Recipe N P) g}) :
+    ∀ p, nu p ≠ p := by
+  intro p hp
+  exact h.elim ⟨fun _ => p, settles_if_nu_has_fixed_point s nu p hp⟩
+
 /-! ## Isomorphism invariance and the conjugate twins -/
 
 /-- Precomposition by an endo-set isomorphism bijects the corresponding hom-sets. -/
