@@ -207,7 +207,35 @@ theorem free_eq_empty_of_surjective {s : N → N} (hs : Function.Surjective s) :
   ext x
   simp [Free, hs x]
 
-/-- In particular, a permutation never has a free position. -/
+/-- **A propagator has a scaffold iff its shape map is not surjective.**
+
+The forward direction alone was stated; the cascade reading (claude-6, 2026-07-16)
+needs the biconditional, so that FREE stops being an observation repeated in three
+places and becomes one theorem.  Non-surjectivity is not a side-condition on the
+mechanism — it *is* the mechanism: `s` must miss something for anything to be held
+still. -/
+theorem free_eq_empty_iff_surjective {s : N → N} :
+    Free s = ∅ ↔ Function.Surjective s := by
+  constructor
+  · intro h x
+    by_contra hx
+    have hmem : x ∈ Free s := hx
+    rw [h] at hmem
+    exact hmem
+  · exact free_eq_empty_of_surjective
+
+/-- The contrapositive — the form the cascade reading actually uses:
+**there is a scaffold exactly when the shape map misses something.** -/
+theorem free_nonempty_iff_not_surjective {s : N → N} :
+    (Free s).Nonempty ↔ ¬ Function.Surjective s := by
+  rw [Set.nonempty_iff_ne_empty, ne_eq, free_eq_empty_iff_surjective]
+
+/-- In particular, a permutation never has a free position.
+
+Read with `free_nonempty_iff_not_surjective`, this says the permutation family is
+not merely a narrower case than `s : N → N` — it is **disjoint from the mechanism**.
+Every permutation is onto, hence has `FREE = ∅`, hence no scaffold. A census over
+`Equiv.Perm` is a census of exactly the maps that cannot exhibit the phenomenon. -/
 theorem permutation_free_eq_empty (s : Equiv.Perm N) : Free s = ∅ :=
   free_eq_empty_of_surjective s.surjective
 
