@@ -83,19 +83,47 @@ def fixedEquivHom [DecidableEq N] (r : Recipe N P) :
   left_inv _ := rfl
   right_inv _ := rfl
 
-/-! ## Boolean negation and even cycles -/
+/-! ## Boolean negation and alternating colourings
 
-/-- A constructive two-colouring formulation of “every cycle is even”.
+**Naming caveat (claude-2 review, 2026-07-16).**  This section previously called
+`HasAlternatingColouring` by the name `EveryCycleEven`, and stated the theorem
+below as “fixed rules exist iff every cycle is even”.  That name promised what
+the definition withholds: the predicate below is *definitionally* “an equivariant
+two-colouring exists”, so the theorem was `A ↔ A`, provable by unfolding, and
+nothing here mentions cycles, orbits, or parity.  Renamed to say what it means.
 
-For a permutation, a colour changes at every step exactly when every orbit
-cycle has even length.  This formulation includes one-cycles: a fixed point
-would demand a Boolean unequal to itself. -/
-def EveryCycleEven (s : Equiv.Perm N) : Prop :=
+**The real cycle theorem is NOT proved here, and is worth proving.**  It is:
+
+    HasAlternatingColouring s ↔ ∀ c ∈ s.cycleType, Even c
+
+Follow a cycle of length `L`: equivariance forces `g k = (Bool.not)^[L] (g k)`,
+and `(Bool.not)^[L] = id` exactly when `L` is even; conversely, colour each orbit
+by the parity of the distance from a chosen representative.  Verified numerically
+before it was ever stated in Lean: of the 40320 permutations of eight positions,
+exactly **11025** admit an equivariant Boolean rule, and that set is *identical*
+to the set whose cycles are all even.  Proving it wants `Equiv.Perm.cycleType` and
+`Equiv.Perm.sameCycle` from mathlib; it is a genuine slice, not a rename.
+
+Note the corollaries below (`identity_has_no_fixed`, `emacsBug_has_no_fixed`) do
+**not** route through this section — they prove `IsEmpty` directly — so they stand
+on their own regardless. -/
+
+/-- There is a two-colouring of `N` that flips at every `s`-step.
+
+This is exactly the shape of an equivariant map `(N, s) → (Bool, not)`, and is
+stated here only to name that shape.  It is **not** a statement about cycles; see
+the section docstring for the cycle-parity theorem this does not prove. -/
+def HasAlternatingColouring (s : Equiv.Perm N) : Prop :=
   ∃ colour : N → Bool, ∀ k, colour (s k) = !colour k
 
-/-- Boolean-negating fixed rules exist exactly when every cycle is even. -/
-theorem bool_fixed_exists_iff_everyCycleEven [DecidableEq N] (s : Equiv.Perm N) :
-    Nonempty {g : N → Bool // IsFixed ⟨s, Bool.not⟩ g} ↔ EveryCycleEven s := by
+/-- Boolean-negating fixed rules are exactly the alternating colourings.
+
+Honest content: this unfolds `IsFixed` through `isFixed_iff_equivariant`.  It
+carries no cycle-parity content — that is the open theorem in the section
+docstring. -/
+theorem bool_fixed_exists_iff_hasAlternatingColouring
+    [DecidableEq N] (s : Equiv.Perm N) :
+    Nonempty {g : N → Bool // IsFixed ⟨s, Bool.not⟩ g} ↔ HasAlternatingColouring s := by
   rw [nonempty_subtype]
   exact exists_congr fun g ↦ isFixed_iff_equivariant ⟨s, Bool.not⟩ g
 
