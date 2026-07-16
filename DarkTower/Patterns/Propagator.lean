@@ -117,6 +117,21 @@ def emacsShift (k : Fin 8) : Fin 8 :=
 
 theorem emacsShift_zero : emacsShift 0 = 0 := rfl
 
+/-- The parenthetical “permutation” in the source note does not apply to the Emacs bug. -/
+theorem emacsShift_not_injective : ¬Function.Injective emacsShift := by
+  intro h
+  have hz : emacsShift 0 = emacsShift 1 := by decide
+  have := h hz
+  norm_num at this
+
+/-- Bit seven has no preimage, so the Emacs map is not surjective either. -/
+theorem emacsShift_not_surjective : ¬Function.Surjective emacsShift := by
+  intro h
+  obtain ⟨k, hk⟩ := h 7
+  have hv := congrArg Fin.val hk
+  change k.val - 1 = 7 at hv
+  omega
+
 /-- The fixed point at zero makes the Boolean constraint inconsistent. -/
 theorem emacsBug_has_no_fixed :
     IsEmpty {g : Fin 8 → Bool // IsFixed (⟨emacsShift, Bool.not⟩ : Recipe (Fin 8) Bool) g} := by
@@ -226,6 +241,25 @@ def TransferEligible [DecidableEq N] (op : N → (N → P) → (N → P)) : Prop
 def Recipe.transport (r : Recipe N P) (eN : N ≃ N') (eP : P ≃ P') : Recipe N' P' where
   shape := eN ∘ r.shape ∘ eN.symm
   value := eP ∘ r.value ∘ eP.symm
+
+/-- Transport a rule in the exponential by rebasing its input and output coordinates. -/
+def transportRule (eN : N ≃ N') (eP : P ≃ P') (g : N → P) : N' → P' :=
+  eP ∘ g ∘ eN.symm
+
+/-- Elementary propagator updates commute with transport to the new exponential. -/
+theorem transport_update [DecidableEq N] [DecidableEq N']
+    (r : Recipe N P) (eN : N ≃ N') (eP : P ≃ P') (k : N) (g : N → P) :
+    transportRule eN eP (update r k g) =
+      update (r.transport eN eP) (eN k) (transportRule eN eP g) := by
+  funext j
+  by_cases hj : j = eN (r.shape k)
+  · subst j
+    simp [transportRule, Recipe.transport, update]
+  · have hj' : eN.symm j ≠ r.shape k := by
+      intro h
+      apply hj
+      exact (eN.apply_symm_apply j).symm.trans (congrArg eN h)
+    simp [transportRule, Recipe.transport, update, hj, hj']
 
 /-- The same shape/value recipe remains eligible on the transported exponential. -/
 theorem transported_is_eligible [DecidableEq N'] (r : Recipe N P) (eN : N ≃ N') (eP : P ≃ P') :
