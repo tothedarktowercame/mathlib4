@@ -295,10 +295,103 @@ noncomputable instance alternatingColouringFintype [Fintype N]
     (s : Equiv.Perm N) : Fintype (AlternatingColouring s) :=
   Fintype.ofInjective (fun colour => colour.1) Subtype.val_injective
 
-/-- The existence/zero part of the signed-cycle colouring count: the finite type
-of alternating colourings is nonempty exactly under the corrected cycle condition.
-The sharper cardinality `2 ^ s.cycleType.card` requires a separate orbit-choice
-equivalence. -/
+private def InvariantBool (s : Equiv.Perm N) :=
+  {bits : N → Bool // ∀ k, bits (s k) = bits k}
+
+private noncomputable instance invariantBoolFintype [Fintype N]
+    (s : Equiv.Perm N) : Fintype (InvariantBool s) :=
+  Fintype.ofInjective (fun bits => bits.1) Subtype.val_injective
+
+private abbrev CycleFactor [Fintype N] [DecidableEq N] (s : Equiv.Perm N) :=
+  {d // d ∈ s.cycleFactorsFinset}
+
+private noncomputable def cycleFactorRep [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (d : CycleFactor s) : N :=
+  Classical.choose ((Equiv.Perm.mem_cycleFactorsFinset_iff.mp d.property).1.nonempty_support)
+
+private lemma cycleFactorRep_mem [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (d : CycleFactor s) :
+    cycleFactorRep s d ∈ d.1.support :=
+  Classical.choose_spec ((Equiv.Perm.mem_cycleFactorsFinset_iff.mp d.property).1.nonempty_support)
+
+private lemma cycleFactor_eq_cycleOf_rep [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (d : CycleFactor s) :
+    d.1 = s.cycleOf (cycleFactorRep s d) :=
+  s.cycle_is_cycleOf (cycleFactorRep_mem s d) d.property
+
+private def cycleFactorOf [Fintype N] [DecidableEq N] (s : Equiv.Perm N)
+    (hfree : s.support = Finset.univ) (k : N) : CycleFactor s :=
+  ⟨s.cycleOf k, Equiv.Perm.cycleOf_mem_cycleFactorsFinset_iff.mpr <| by
+    rw [hfree]
+    exact Finset.mem_univ k⟩
+
+private lemma cycleFactorOf_apply [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (hfree : s.support = Finset.univ) (k : N) :
+    cycleFactorOf s hfree (s k) = cycleFactorOf s hfree k := by
+  apply Subtype.ext
+  exact s.cycleOf_self_apply k
+
+private lemma invariant_pow (s : Equiv.Perm N) (bits : N → Bool)
+    (hbits : ∀ k, bits (s k) = bits k) (n : ℕ) (k : N) :
+    bits ((s ^ n) k) = bits k := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+      rw [pow_succ', Equiv.Perm.mul_apply, hbits, ih]
+
+private noncomputable def alternatingInvariantEquiv [Fintype N]
+    (s : Equiv.Perm N) (base : AlternatingColouring s) :
+    AlternatingColouring s ≃ InvariantBool s where
+  toFun colour := ⟨fun k => decide (colour.1 k = base.1 k), fun k => by
+    change decide (colour.1 (s k) = base.1 (s k)) =
+      decide (colour.1 k = base.1 k)
+    rw [colour.property k, base.property k]
+    cases colour.1 k <;> cases base.1 k <;> rfl⟩
+  invFun bits := ⟨fun k => if bits.1 k then base.1 k else !base.1 k, fun k => by
+    change (if bits.1 (s k) then base.1 (s k) else !base.1 (s k)) =
+      !(if bits.1 k then base.1 k else !base.1 k)
+    rw [bits.property k, base.property k]
+    cases bits.1 k <;> cases base.1 k <;> rfl⟩
+  left_inv colour := by
+    apply Subtype.ext
+    funext k
+    cases hc : colour.1 k <;> cases hb : base.1 k <;> simp [hc, hb]
+  right_inv bits := by
+    apply Subtype.ext
+    funext k
+    cases ha : bits.1 k <;> cases hb : base.1 k <;> simp [ha, hb]
+
+private noncomputable def invariantCycleFactorEquiv [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (hfree : s.support = Finset.univ) :
+    InvariantBool s ≃ (CycleFactor s → Bool) where
+  toFun bits d := bits.1 (cycleFactorRep s d)
+  invFun choices := ⟨fun k => choices (cycleFactorOf s hfree k), fun k => by
+    change choices (cycleFactorOf s hfree (s k)) = choices (cycleFactorOf s hfree k)
+    rw [cycleFactorOf_apply]⟩
+  left_inv bits := by
+    apply Subtype.ext
+    funext k
+    have hk : s k ≠ k := by
+      rw [← Equiv.Perm.mem_support, hfree]
+      exact Finset.mem_univ k
+    have hsame : s.SameCycle k
+        (cycleFactorRep s (cycleFactorOf s hfree k)) :=
+      (Equiv.Perm.mem_support_cycleOf_iff' hk).mp
+        (cycleFactorRep_mem s (cycleFactorOf s hfree k))
+    obtain ⟨n, _hn, _hn', hpow⟩ := hsame.symm.exists_pow_eq s
+    have hi := invariant_pow s bits.1 bits.property n
+      (cycleFactorRep s (cycleFactorOf s hfree k))
+    rw [hpow] at hi
+    exact hi.symm
+  right_inv choices := by
+    funext d
+    change choices (cycleFactorOf s hfree (cycleFactorRep s d)) = choices d
+    congr 1
+    apply Subtype.ext
+    exact (cycleFactor_eq_cycleOf_rep s d).symm
+
+/-- The existence part of the signed-cycle colouring count: the finite type of
+alternating colourings is nonempty exactly under the corrected cycle condition. -/
 theorem alternatingColouring_card_pos_iff [Fintype N] [DecidableEq N]
     (s : Equiv.Perm N) :
     0 < Fintype.card (AlternatingColouring s) ↔
@@ -325,6 +418,37 @@ theorem alternatingColouring_card_eq_zero_iff [Fintype N] [DecidableEq N]
   · intro hcycles
     apply Nat.eq_zero_of_not_pos
     exact fun hpos => hcycles ((alternatingColouring_card_pos_iff s).mp hpos)
+
+/-- When every point lies on a recorded even cycle, each cycle contributes one
+independent Boolean choice, giving `2 ^ s.cycleType.card` colourings in total. -/
+theorem alternatingColouring_card_eq_two_pow_cycleType_card
+    [Fintype N] [DecidableEq N] (s : Equiv.Perm N)
+    (hfree : s.support = Finset.univ)
+    (heven : ∀ c ∈ s.cycleType, Even c) :
+    Fintype.card (AlternatingColouring s) = 2 ^ s.cycleType.card := by
+  obtain ⟨base, hbase⟩ :=
+    (hasAlternatingColouring_iff_cycleType_even s).mpr ⟨hfree, heven⟩
+  calc
+    Fintype.card (AlternatingColouring s) = Fintype.card (InvariantBool s) :=
+      Fintype.card_congr (alternatingInvariantEquiv s ⟨base, hbase⟩)
+    _ = Fintype.card (CycleFactor s → Bool) :=
+      Fintype.card_congr (invariantCycleFactorEquiv s hfree)
+    _ = 2 ^ s.cycleType.card := by
+      simp [CycleFactor, Equiv.Perm.cycleType_def]
+
+/-- The full signed-cycle count: fixed points or recorded odd cycles give no
+alternating colouring; otherwise there are two independent choices per cycle. -/
+theorem alternatingColouring_card_eq [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) :
+    Fintype.card (AlternatingColouring s) =
+      if s.support = Finset.univ ∧ ∀ c ∈ s.cycleType, Even c then
+        2 ^ s.cycleType.card
+      else 0 := by
+  by_cases hcycles : s.support = Finset.univ ∧ ∀ c ∈ s.cycleType, Even c
+  · rw [if_pos hcycles]
+    exact alternatingColouring_card_eq_two_pow_cycleType_card s hcycles.1 hcycles.2
+  · rw [if_neg hcycles]
+    exact (alternatingColouring_card_eq_zero_iff s).mpr hcycles
 
 /-- Boolean-negating fixed rules are exactly the alternating colourings.
 
