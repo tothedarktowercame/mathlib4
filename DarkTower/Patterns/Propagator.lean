@@ -92,17 +92,20 @@ the definition withholds: the predicate below is *definitionally* “an equivari
 two-colouring exists”, so the theorem was `A ↔ A`, provable by unfolding, and
 nothing here mentions cycles, orbits, or parity.  Renamed to say what it means.
 
-**The real cycle theorem is NOT proved here, and is worth proving.**  It is:
+The signed-cycle fixed-point theorem specialized to this action is proved below:
 
-    HasAlternatingColouring s ↔ ∀ c ∈ s.cycleType, Even c
+    HasAlternatingColouring s ↔
+      s.support = Finset.univ ∧ ∀ c ∈ s.cycleType, Even c
 
 Follow a cycle of length `L`: equivariance forces `g k = (Bool.not)^[L] (g k)`,
 and `(Bool.not)^[L] = id` exactly when `L` is even; conversely, colour each orbit
 by the parity of the distance from a chosen representative.  Verified numerically
 before it was ever stated in Lean: of the 40320 permutations of eight positions,
-exactly **11025** admit an equivariant Boolean rule, and that set is *identical*
-to the set whose cycles are all even.  Proving it wants `Equiv.Perm.cycleType` and
-`Equiv.Perm.sameCycle` from mathlib; it is a genuine slice, not a rename.
+exactly **11025** admit an equivariant Boolean rule.  Since mathlib's `cycleType`
+omits one-cycles, the support condition is essential: it excludes fixed points,
+while `cycleType` records the parity of every remaining cycle.  The proof uses
+`Equiv.Perm.cycleType` and `Equiv.Perm.SameCycle`; it is a genuine cycle argument,
+not a rename.
 
 Note the corollaries below (`identity_has_no_fixed`, `emacsBug_has_no_fixed`) do
 **not** route through this section — they prove `IsEmpty` directly — so they stand
@@ -111,16 +114,223 @@ on their own regardless. -/
 /-- There is a two-colouring of `N` that flips at every `s`-step.
 
 This is exactly the shape of an equivariant map `(N, s) → (Bool, not)`, and is
-stated here only to name that shape.  It is **not** a statement about cycles; see
-the section docstring for the cycle-parity theorem this does not prove. -/
+stated here only to name that shape.  The theorem below gives its cycle-parity
+characterization. -/
 def HasAlternatingColouring (s : Equiv.Perm N) : Prop :=
   ∃ colour : N → Bool, ∀ k, colour (s k) = !colour k
+
+private lemma iterate_not_eq_self_iff_even (n : ℕ) (b : Bool) :
+    (Bool.not^[n]) b = b ↔ Even n := by
+  induction n using Nat.twoStepInduction with
+  | zero => simp
+  | one => cases b <;> simp
+  | more n ih0 _ =>
+      rw [show Bool.not^[n + 2] b = Bool.not^[n] b by
+        rw [show n + 2 = n + 1 + 1 by omega, Function.iterate_succ_apply,
+          Function.iterate_succ_apply, Bool.not_not]]
+      apply ih0.trans
+      rw [Nat.even_iff, Nat.even_iff]
+      omega
+
+private lemma iterate_not_apply_not (n : ℕ) (b : Bool) :
+    (Bool.not^[n]) (!b) = !(Bool.not^[n]) b := by
+  induction n with
+  | zero => rfl
+  | succ n ih => simp only [Function.iterate_succ_apply, Bool.not_not, ih]
+
+private lemma alternating_pow (s : Equiv.Perm N) (colour : N → Bool)
+    (h : ∀ k, colour (s k) = !colour k) (n : ℕ) (k : N) :
+    colour ((s ^ n) k) = (Bool.not^[n]) (colour k) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+      rw [pow_succ', Equiv.Perm.mul_apply, h, Function.iterate_succ_apply, ih,
+        iterate_not_apply_not]
+
+private lemma even_of_alternating_pow_fixed (s : Equiv.Perm N) (colour : N → Bool)
+    (h : ∀ k, colour (s k) = !colour k) {n : ℕ} {k : N}
+    (hfix : (s ^ n) k = k) : Even n := by
+  have hi := alternating_pow s colour h n k
+  rw [hfix] at hi
+  exact (iterate_not_eq_self_iff_even n (colour k)).mp hi.symm
+
+private noncomputable def cycleRep [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (_hfree : s.support = Finset.univ) (k : N) : N :=
+  if h : (s.cycleOf k).support.Nonempty then Classical.choose h else k
+
+private lemma cycleRep_mem [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (hfree : s.support = Finset.univ) (k : N) :
+    cycleRep s hfree k ∈ (s.cycleOf k).support := by
+  have hne : (s.cycleOf k).support.Nonempty := Equiv.Perm.support_cycleOf_nonempty.mpr <| by
+    rw [← Equiv.Perm.mem_support, hfree]
+    exact Finset.mem_univ k
+  simp only [cycleRep, dif_pos hne]
+  exact Classical.choose_spec hne
+
+private lemma cycleRep_apply [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (hfree : s.support = Finset.univ) (k : N) :
+    cycleRep s hfree (s k) = cycleRep s hfree k := by
+  have hc := s.cycleOf_self_apply k
+  have hk : (s.cycleOf k).support.Nonempty := Equiv.Perm.support_cycleOf_nonempty.mpr <| by
+    rw [← Equiv.Perm.mem_support, hfree]
+    exact Finset.mem_univ k
+  simp only [cycleRep, hc, dif_pos hk]
+
+private lemma mem_toList_cycleRep [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (hfree : s.support = Finset.univ) (k : N) :
+    k ∈ s.toList (cycleRep s hfree k) := by
+  rw [Equiv.Perm.mem_toList_iff]
+  have hk : k ∈ s.support := by simp [hfree]
+  have hr := cycleRep_mem s hfree k
+  have hsame : s.SameCycle k (cycleRep s hfree k) :=
+    (Equiv.Perm.mem_support_cycleOf_iff' (f := s) (x := k) (y := cycleRep s hfree k)
+      (by simpa [Equiv.Perm.mem_support] using hk)).mp hr
+  exact ⟨hsame.symm, hsame.mem_support_iff.mp hk⟩
+
+private lemma cycleRep_length_even [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (hfree : s.support = Finset.univ)
+    (heven : ∀ c ∈ s.cycleType, Even c) (k : N) :
+    Even (s.toList (cycleRep s hfree k)).length := by
+  rw [Equiv.Perm.length_toList]
+  apply heven
+  rw [Equiv.Perm.cycleType_def, Multiset.mem_map]
+  refine ⟨s.cycleOf (cycleRep s hfree k), ?_, rfl⟩
+  rw [← Finset.mem_def, Equiv.Perm.cycleOf_mem_cycleFactorsFinset_iff,
+    show s.support = Finset.univ from hfree]
+  exact Finset.mem_univ _
+
+private lemma cycleRep_idx_apply [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) (hfree : s.support = Finset.univ) (k : N) :
+    List.idxOf (s k) (s.toList (cycleRep s hfree k)) =
+      (List.idxOf k (s.toList (cycleRep s hfree k)) + 1) %
+        (s.toList (cycleRep s hfree k)).length := by
+  let l := s.toList (cycleRep s hfree k)
+  have hk : k ∈ l := mem_toList_cycleRep s hfree k
+  have hsnext : s k = l.next k hk := (Equiv.Perm.next_toList_eq_apply _ _ _ hk).symm
+  rw [hsnext, List.next_eq_getElem]
+  exact (Equiv.Perm.nodup_toList _ _).idxOf_getElem _ _
+
+/-- A Lean formalization of the signed-cycle fixed-point criterion, specialized to
+`bit[s k] = ¬bit[k]`: an alternating colouring exists exactly when there are no
+fixed points and every nontrivial cycle has even length. -/
+theorem hasAlternatingColouring_iff_cycleType_even [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) :
+    HasAlternatingColouring s ↔
+      s.support = Finset.univ ∧ ∀ c ∈ s.cycleType, Even c := by
+  constructor
+  · rintro ⟨colour, hcolour⟩
+    constructor
+    · ext k
+      simp only [Equiv.Perm.mem_support, Finset.mem_univ, iff_true]
+      intro hfix
+      have h := hcolour k
+      rw [hfix] at h
+      cases colour k <;> simp at h
+    · intro c hc
+      rw [Equiv.Perm.cycleType_def, Multiset.mem_map] at hc
+      obtain ⟨d, hd, rfl⟩ := hc
+      have hdf : d ∈ s.cycleFactorsFinset := Finset.mem_def.mpr hd
+      have hdc := (Equiv.Perm.mem_cycleFactorsFinset_iff.mp hdf).1
+      obtain ⟨k, hk⟩ := hdc.nonempty_support
+      apply even_of_alternating_pow_fixed s colour hcolour (k := k)
+      change (s ^ d.support.card) k = k
+      rw [← Equiv.Perm.cycleOf_pow_apply_self s k,
+        ← s.cycle_is_cycleOf hk hdf, ← hdc.orderOf, pow_orderOf_eq_one,
+        Equiv.Perm.one_apply]
+  · rintro ⟨hfree, heven⟩
+    let colour : N → Bool := fun k => decide (Odd <|
+      List.idxOf k (s.toList (cycleRep s hfree k)))
+    refine ⟨colour, fun k => ?_⟩
+    have hrep := cycleRep_apply s hfree k
+    have hidx := cycleRep_idx_apply s hfree k
+    have hlen := cycleRep_length_even s hfree heven k
+    have hlen' : Even (s.cycleOf (cycleRep s hfree k)).support.card := by
+      simpa only [Equiv.Perm.length_toList] using hlen
+    simp only [colour, hrep, hidx]
+    rw [← decide_not]
+    apply decide_eq_decide.mpr
+    simpa only [Equiv.Perm.length_toList] using
+      ((Odd.mod_even_iff hlen').trans Nat.odd_add_one)
+
+/-- For the eight-bit specialization, every alternating colouring has four true
+bits. Thus its Langton parameter is `4 / 8 = 1 / 2`. -/
+theorem alternatingColouring_true_card_eq_four (s : Equiv.Perm (Fin 8))
+    (colour : Fin 8 → Bool) (hcolour : ∀ k, colour (s k) = !colour k) :
+    (Finset.univ.filter fun k => colour k).card = 4 := by
+  have _hcycles : ∀ c ∈ s.cycleType, Even c :=
+    (hasAlternatingColouring_iff_cycleType_even s).mp ⟨colour, hcolour⟩ |>.2
+  let toFalse : {k : Fin 8 // colour k = true} → {k : Fin 8 // colour k = false} :=
+    fun k => ⟨s k, by rw [hcolour k, k.property]; rfl⟩
+  let toTrue : {k : Fin 8 // colour k = false} → {k : Fin 8 // colour k = true} :=
+    fun k => ⟨s.symm k, by
+      have h := hcolour (s.symm k)
+      simp only [s.apply_symm_apply] at h
+      cases hk : colour (s.symm k)
+      · have ht : colour (k : Fin 8) = true := by simpa [hk] using h
+        rw [k.property] at ht
+        contradiction
+      · rfl⟩
+  let e : {k : Fin 8 // colour k = true} ≃ {k : Fin 8 // colour k = false} :=
+    Equiv.mk toFalse toTrue
+      (fun k => by apply Subtype.ext; exact s.symm_apply_apply k)
+      (fun k => by apply Subtype.ext; exact s.apply_symm_apply k)
+  have hcard : Fintype.card {k : Fin 8 // colour k = true} =
+      Fintype.card {k : Fin 8 // colour k = false} := Fintype.card_congr e
+  have hsum := Finset.card_filter_add_card_filter_not
+    (s := Finset.univ) (fun k : Fin 8 => colour k)
+  rw [Finset.card_univ, Fintype.card_fin] at hsum
+  have hfalse : (Finset.univ.filter fun k : Fin 8 => ¬(colour k = true)) =
+      Finset.univ.filter fun k : Fin 8 => colour k = false := by
+    ext k
+    cases colour k <;> simp
+  rw [hfalse] at hsum
+  rw [Fintype.card_subtype, Fintype.card_subtype] at hcard
+  omega
+
+/-- Alternating colourings, as a finite type for counting statements. -/
+def AlternatingColouring [Fintype N] (s : Equiv.Perm N) :=
+  {colour : N → Bool // ∀ k, colour (s k) = !colour k}
+
+noncomputable instance alternatingColouringFintype [Fintype N]
+    (s : Equiv.Perm N) : Fintype (AlternatingColouring s) :=
+  Fintype.ofInjective (fun colour => colour.1) Subtype.val_injective
+
+/-- The existence/zero part of the signed-cycle colouring count: the finite type
+of alternating colourings is nonempty exactly under the corrected cycle condition.
+The sharper cardinality `2 ^ s.cycleType.card` requires a separate orbit-choice
+equivalence. -/
+theorem alternatingColouring_card_pos_iff [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) :
+    0 < Fintype.card (AlternatingColouring s) ↔
+      s.support = Finset.univ ∧ ∀ c ∈ s.cycleType, Even c := by
+  rw [Fintype.card_pos_iff]
+  constructor
+  · rintro ⟨⟨colour, hcolour⟩⟩
+    exact (hasAlternatingColouring_iff_cycleType_even s).mp ⟨colour, hcolour⟩
+  · intro hcycles
+    obtain ⟨colour, hcolour⟩ :=
+      (hasAlternatingColouring_iff_cycleType_even s).mpr hcycles
+    exact ⟨⟨colour, hcolour⟩⟩
+
+/-- A fixed point or a recorded odd cycle forces the alternating-colouring count
+to be zero. This is the zero branch of the signed-cycle counting theorem. -/
+theorem alternatingColouring_card_eq_zero_iff [Fintype N] [DecidableEq N]
+    (s : Equiv.Perm N) :
+    Fintype.card (AlternatingColouring s) = 0 ↔
+      ¬(s.support = Finset.univ ∧ ∀ c ∈ s.cycleType, Even c) := by
+  constructor
+  · intro hzero hcycles
+    have hpos := (alternatingColouring_card_pos_iff s).mpr hcycles
+    omega
+  · intro hcycles
+    apply Nat.eq_zero_of_not_pos
+    exact fun hpos => hcycles ((alternatingColouring_card_pos_iff s).mp hpos)
 
 /-- Boolean-negating fixed rules are exactly the alternating colourings.
 
 Honest content: this unfolds `IsFixed` through `isFixed_iff_equivariant`.  It
-carries no cycle-parity content — that is the open theorem in the section
-docstring. -/
+carries no cycle-parity content; that is supplied by
+`hasAlternatingColouring_iff_cycleType_even`. -/
 theorem bool_fixed_exists_iff_hasAlternatingColouring
     [DecidableEq N] (s : Equiv.Perm N) :
     Nonempty {g : N → Bool // IsFixed ⟨s, Bool.not⟩ g} ↔ HasAlternatingColouring s := by
