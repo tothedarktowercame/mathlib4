@@ -38,6 +38,13 @@ namespace Genome
 
 variable {ι Rule : Type*}
 
+/-- Genomes agreeing pointwise on both components are equal. -/
+@[ext] theorem ext {g g' : Genome ι Rule}
+    (hf : ∀ i, g.field i = g'.field i) (hh : ∀ i, g.held i = g'.held i) : g = g' := by
+  cases g; cases g'
+  simp only [Genome.mk.injEq]
+  exact ⟨funext hf, funext hh⟩
+
 /-- Make every locus fixed without changing any inherited rule. -/
 def holdAll (g : Genome ι Rule) : Genome ι Rule where
   field := g.field
@@ -448,6 +455,113 @@ theorem dependence_holdAll_eq_zero [Fintype ι] (g : Full ι Rule) :
   norm_num
 
 end Full
+
+
+/-! ## Selectable assimilation, and the conflict it exposes (codex-1)
+
+`BaldwinWitness` asks that raw function stay above threshold along the path.  That
+is necessary but NOT sufficient, because selection does not act on raw function --
+it acts on cost-adjusted fitness.  A step can preserve function and still be
+unselectable, and the measured runs suggest that is exactly what happens here:
+holding a locus loses more function than its cost saving returns.
+
+The arithmetic is worth stating plainly.  With `fitness = performance - c * dependence`,
+a dependence-reducing step is selectable exactly when the function it costs is no
+more than the cost it saves.  So the two requirements -- dependence falling, fitness
+not falling -- can conflict, and Lean should say so rather than leaving it implicit.
+-/
+
+namespace ExperimentalDesign
+
+variable {ι Rule : Type*}
+
+/-- Cost-adjusted fitness, which is what selection actually ranks. -/
+def selectedFitness (d : ExperimentalDesign ι Rule) (c : ℝ) (g : Genome ι Rule) : ℝ :=
+  d.performance g - c * d.plasticDependence g
+
+/--
+A path that selection could actually traverse: every step is accessible, keeps raw
+function above threshold, does not lose fitness, and does not increase dependence.
+Strictly stronger than `BaldwinWitness`, whose steps may be invisible or adverse to
+selection.
+-/
+structure SelectableAssimilationPath (d : ExperimentalDesign ι Rule) (c : ℝ) (n : Nat) where
+  path : Fin (n + 1) → Genome ι Rule
+  accessibleStep : ∀ i : Fin n, d.accessible (path i.castSucc) (path i.succ)
+  rawFunction : ∀ i, d.Successful (path i)
+  fitnessNonDecreasing :
+    ∀ i : Fin n, d.selectedFitness c (path i.castSucc) ≤ d.selectedFitness c (path i.succ)
+  dependenceNonIncreasing :
+    ∀ i : Fin n,
+      d.plasticDependence (path i.succ) ≤ d.plasticDependence (path i.castSucc)
+
+/--
+THE CONFLICT, made explicit.  A dependence-reducing step keeps its fitness exactly
+when the function it costs is at most `c` times the dependence it saves.  Read right
+to left this says: if holding a locus loses more function than the cost term returns,
+the step is invisible to selection however much it assimilates.
+-/
+theorem fitness_step_iff_loss_le_saving
+    (d : ExperimentalDesign ι Rule) (c : ℝ) (g g' : Genome ι Rule) :
+    d.selectedFitness c g ≤ d.selectedFitness c g' ↔
+      d.performance g - d.performance g' ≤
+        c * (d.plasticDependence g - d.plasticDependence g') := by
+  simp only [selectedFitness]
+  constructor <;> intro h <;> nlinarith [h]
+
+/-- If every accessible dependence-reducing step loses more function than its cost
+saving returns, no selectable path of positive length exists. -/
+theorem no_selectable_path_of_loss_exceeds_saving
+    {d : ExperimentalDesign ι Rule} {c : ℝ} {n : Nat} (hn : 0 < n)
+    (hloss : ∀ g g', d.accessible g g' →
+      d.plasticDependence g' ≤ d.plasticDependence g →
+      c * (d.plasticDependence g - d.plasticDependence g') <
+        d.performance g - d.performance g') :
+    IsEmpty (d.SelectableAssimilationPath c n) := by
+  refine ⟨fun w => ?_⟩
+  have hi : (⟨0, hn⟩ : Fin n) = ⟨0, hn⟩ := rfl
+  have hacc := w.accessibleStep ⟨0, hn⟩
+  have hdep := w.dependenceNonIncreasing ⟨0, hn⟩
+  have hfit := w.fitnessNonDecreasing ⟨0, hn⟩
+  have := hloss _ _ hacc hdep
+  rw [fitness_step_iff_loss_le_saving] at hfit
+  linarith
+
+/--
+The local gate codex-1 proposes: locus `i` is assimilable in `g` when SOME inherited
+rule, held there permanently, keeps raw function above threshold while not losing
+fitness.  A long evolutionary run is justified only once at least one such locus is
+certified in a high-performing plastic genome -- otherwise the run cannot succeed and
+its null result carries no information.
+-/
+def LocallyAssimilable [DecidableEq ι] (d : ExperimentalDesign ι Rule) (c : ℝ)
+    (g : Genome ι Rule) (i : ι) : Prop :=
+  ∃ r : Rule,
+    let g' : Genome ι Rule :=
+      { field := fun j => if j = i then r else g.field j
+        held := fun j => if j = i then true else g.held j }
+    d.Successful g' ∧ d.selectedFitness c g ≤ d.selectedFitness c g'
+
+/-- A one-step selectable path certifies a locally assimilable locus at any locus
+whose held flag it turned on. -/
+theorem locallyAssimilable_of_step [DecidableEq ι]
+    {d : ExperimentalDesign ι Rule} {c : ℝ} {g g' : Genome ι Rule} (i : ι)
+    (hgood : d.Successful g') (hfit : d.selectedFitness c g ≤ d.selectedFitness c g')
+    (hfield : ∀ j, j ≠ i → g'.field j = g.field j)
+    (hheld : ∀ j, j ≠ i → g'.held j = g.held j)
+    (hi : g'.held i = true) :
+    d.LocallyAssimilable c g i := by
+  refine ⟨g'.field i, ?_, ?_⟩
+  · have : (⟨fun j => if j = i then g'.field i else g.field j,
+             fun j => if j = i then true else g.held j⟩ : Genome ι Rule) = g' := by
+      ext j <;> by_cases h : j = i <;> simp [h, hfield, hheld, hi]
+    rw [this]; exact hgood
+  · have : (⟨fun j => if j = i then g'.field i else g.field j,
+             fun j => if j = i then true else g.held j⟩ : Genome ι Rule) = g' := by
+      ext j <;> by_cases h : j = i <;> simp [h, hfield, hheld, hi]
+    rw [this]; exact hfit
+
+end ExperimentalDesign
 
 /-! ## The mutation-only baseline for the current elitist lifecycle -/
 
