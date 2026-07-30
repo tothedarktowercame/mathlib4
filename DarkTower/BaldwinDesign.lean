@@ -264,6 +264,120 @@ theorem not_degenerate_of_witness {d : ExperimentalDesign ι Rule} {n : Nat}
 
 end ExperimentalDesign
 
+
+/-! ## Layering fidelity (I2)
+
+Every extension of the measured substrate must reduce to the published
+measurement when its new machinery sits in the neutral position.  This caught a
+real defect: injecting a heritable genotype left the random tape un-advanced by
+the draws the original construction made, and the reference value moved from
+`12.3875` to `11.0083` while still reproducing byte-for-byte.  Determinism is not
+fidelity.
+
+The obligation is carried as a field, so an extension cannot be stated without
+discharging it.
+-/
+
+/-- An extension of a reference measurement, carrying its own agreement proof. -/
+structure Extension (ι : Type*) (Rule : Type*) where
+  design : ExperimentalDesign ι Rule
+  Neutral : Genome ι Rule → Prop
+  reference : Genome ι Rule → ℝ
+  agrees : ∀ g, Neutral g → design.performance g = reference g
+
+namespace Extension
+
+variable {ι Rule : Type*}
+
+/-- On neutral genomes an extension is indistinguishable from its reference. -/
+theorem performance_eq_reference (e : Extension ι Rule) {g : Genome ι Rule}
+    (hg : e.Neutral g) : e.design.performance g = e.reference g := e.agrees g hg
+
+/-- Extensions agreeing with the same reference agree with each other where both
+are neutral, so a chain of extensions cannot drift. -/
+theorem agree_of_shared_reference (e₁ e₂ : Extension ι Rule)
+    (href : e₁.reference = e₂.reference) {g : Genome ι Rule}
+    (h₁ : e₁.Neutral g) (h₂ : e₂.Neutral g) :
+    e₁.design.performance g = e₂.design.performance g := by
+  rw [e₁.agrees g h₁, e₂.agrees g h₂, href]
+
+end Extension
+
+/-! ## Mutation reachability (I4)
+
+A gene whose values the operator cannot reach looks present and is not.  If the
+assimilated endpoint requires a value outside the reachable set, no witness can
+exist however long the run.
+-/
+
+/-- Reflexive transitive closure of a one-step genetic operator. -/
+inductive Reaches {α : Type*} (step : α → α → Prop) : α → α → Prop
+  | refl (a : α) : Reaches step a a
+  | tail {a b c : α} : Reaches step a b → step b c → Reaches step a c
+
+namespace Reaches
+
+variable {α : Type*} {step : α → α → Prop}
+
+theorem single {a b : α} (h : step a b) : Reaches step a b :=
+  .tail (.refl a) h
+
+theorem trans {a b c : α} (hab : Reaches step a b) : Reaches step b c → Reaches step a c := by
+  intro hbc
+  induction hbc with
+  | refl => exact hab
+  | tail _ hstep ih => exact .tail ih hstep
+
+end Reaches
+
+/-- Every value of `gene` in `domain` is attainable from `start`. -/
+def GeneReachable {ι Rule V : Type*} (step : Genome ι Rule → Genome ι Rule → Prop)
+    (gene : Genome ι Rule → V) (domain : Set V) (start : Genome ι Rule) : Prop :=
+  ∀ v ∈ domain, ∃ g, Reaches step start g ∧ gene g = v
+
+/-- If the operator cannot reach the value the endpoint needs, there is no path
+to it, so no run length rescues the experiment. -/
+theorem no_path_of_unreachable {ι Rule V : Type*}
+    {step : Genome ι Rule → Genome ι Rule → Prop} {gene : Genome ι Rule → V}
+    {start target : Genome ι Rule}
+    (hne : ∀ g, Reaches step start g → gene g ≠ gene target) :
+    ¬ Reaches step start target :=
+  fun h => hne target h rfl
+
+/-! ## Treatments must separate (I9)
+
+Four cost arms once produced byte-identical trajectories.  That is not a robust
+result; it says the treatment never reached selection.  The mechanism is exact:
+selection sees only the ORDER of scores, so a term that shifts every genome by
+the same amount is invisible.  When the population had converged in gain, the
+cost `c * gamma` was such a constant.
+-/
+
+namespace ExperimentalDesign
+
+variable {ι Rule : Type*}
+
+/-- Two designs induce the same selection order. -/
+def RankingEquivalent (d₁ d₂ : ExperimentalDesign ι Rule) : Prop :=
+  ∀ g g' : Genome ι Rule,
+    d₁.performance g ≤ d₁.performance g' ↔ d₂.performance g ≤ d₂.performance g'
+
+/-- Subtracting a constant from every genome preserves the selection order, so a
+cost term that is uniform across the population cannot act. -/
+theorem rankingEquivalent_sub_const (d : ExperimentalDesign ι Rule) (k : ℝ) :
+    d.RankingEquivalent { d with performance := fun g => d.performance g - k } := by
+  intro g g'
+  constructor
+  · intro h; linarith
+  · intro h; linarith
+
+/-- Ranking equivalence is reflexive; identical arms are expected to coincide and
+their coincidence is therefore not evidence of anything. -/
+theorem rankingEquivalent_refl (d : ExperimentalDesign ι Rule) :
+    d.RankingEquivalent d := fun _ _ => Iff.rfl
+
+end ExperimentalDesign
+
 /-! ## The mutation-only baseline for the current elitist lifecycle -/
 
 /--
