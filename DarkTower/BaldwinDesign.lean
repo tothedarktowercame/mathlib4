@@ -378,6 +378,77 @@ theorem rankingEquivalent_refl (d : ExperimentalDesign ι Rule) :
 
 end ExperimentalDesign
 
+
+/-! ## The refinement to the executable model (I11)
+
+The Clojure implementation carries FIVE heritable components -- `field`, `hold`,
+`mask`, `gamma`, `update-prob` -- while `Genome` above carries two.  The missing
+three are not incidental: `performance` and `plasticDependence` both depend on
+them, so without them in the genome the Lean design fields have no concrete
+instantiation and the refinement claim is empty.
+
+The honest resolution is to say so in the type.  `Plasticity` collects the
+scalars, `Full` pairs them with the locus structure, and the design operates on
+`Full`.  `holdAll` lifts unchanged, so every theorem above about static endpoints
+continues to apply to the executable model.
+-/
+
+/-- The scalar plasticity controls the implementation also inherits. -/
+structure Plasticity (ι : Type*) where
+  gamma : ℝ
+  updateProb : ℝ
+  mask : ι → Bool
+
+/-- The genome the executable model actually evolves. -/
+structure Full (ι : Type*) (Rule : Type*) where
+  loci : Genome ι Rule
+  plasticity : Plasticity ι
+
+namespace Full
+
+variable {ι Rule : Type*}
+
+/-- Fix every locus, leaving the scalars alone. -/
+def holdAll (g : Full ι Rule) : Full ι Rule :=
+  { g with loci := g.loci.holdAll }
+
+/-- Static means every locus is held, exactly as before. -/
+def IsStatic (g : Full ι Rule) : Prop := g.loci.IsStatic
+
+theorem holdAll_isStatic (g : Full ι Rule) : g.holdAll.IsStatic :=
+  Genome.holdAll_isStatic _
+
+theorem holdAll_field (g : Full ι Rule) (i : ι) :
+    g.holdAll.loci.field i = g.loci.field i :=
+  Genome.holdAll_field _ i
+
+/-- Holding leaves the scalars untouched, so an endpoint test changes only what it
+is meant to change. -/
+theorem holdAll_plasticity (g : Full ι Rule) :
+    g.holdAll.plasticity = g.plasticity := rfl
+
+/--
+The operational plastic dependence the implementation both REPORTS and CHARGES.
+
+A locus contributes exactly when it can rewrite (not held), does rewrite
+(`updateProb`), and reads the current phenotype rather than the frozen snapshot
+(`mask` and `gamma`).  Previously the implementation reported the unheld fraction
+while charging `c * gamma * fraction`, so the reported and selected quantities
+were different things and neither matched this field.
+-/
+noncomputable def dependence [Fintype ι] (g : Full ι Rule) : ℝ :=
+  g.plasticity.gamma * g.plasticity.updateProb *
+    ((Finset.univ.filter (fun i => !g.loci.held i && g.plasticity.mask i)).card /
+      (Fintype.card ι : ℝ))
+
+/-- A fully static genome has zero plastic dependence, whatever its scalars. -/
+theorem dependence_holdAll_eq_zero [Fintype ι] (g : Full ι Rule) :
+    g.holdAll.dependence = 0 := by
+  simp only [dependence, holdAll, Genome.holdAll]
+  norm_num
+
+end Full
+
 /-! ## The mutation-only baseline for the current elitist lifecycle -/
 
 /--
