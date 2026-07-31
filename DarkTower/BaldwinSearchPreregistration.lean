@@ -35,6 +35,10 @@ structure Trace where
   coupledMutationObserved : Bool
   variableP0Observed : Bool
   fixedP0Observed : Bool
+  /-- The actual initial phenotype used by the fixed treatment.  Recording only
+  that some value was fixed would still permit choosing it after seeing pilot
+  results. -/
+  fixedP0Value : String
   sharedRandomTape : Bool
   configurationValid : Bool
   positiveControlPassed : Bool
@@ -46,6 +50,10 @@ structure Trace where
   fixedP0Witness : Bool
   coupledFixedP0Witness : Bool
   deriving Repr
+
+/-- The fixed initial phenotype, committed before implementation and pilot data. -/
+def fixedP0Phenotype : String :=
+  "01011111101100010000000111010011001010110101011111011001100001010010111111100101"
 
 def independentMutation : Flag Trace where
   name := "independent hold/rule mutation"
@@ -74,9 +82,10 @@ def variableP0 : Flag Trace where
 def fixedP0 : Flag Trace where
   name := "preregistered fixed p0"
   observable :=
-    { name := "every evaluation records the same preregistered initial phenotype"
-      holds := fun t => t.fixedP0Observed = true
-      check := fun t => t.fixedP0Observed
+    { name := "every evaluation records the exact preregistered initial phenotype"
+      holds := fun t =>
+        t.fixedP0Observed = true ∧ t.fixedP0Value = fixedP0Phenotype
+      check := fun t => t.fixedP0Observed && (t.fixedP0Value == fixedP0Phenotype)
       check_sound := by simp }
 
 def alignedTape : Flag Trace where
@@ -222,6 +231,7 @@ def unimplementedSmoke : Trace where
   coupledMutationObserved := false
   variableP0Observed := true
   fixedP0Observed := false
+  fixedP0Value := ""
   sharedRandomTape := false
   configurationValid := false
   positiveControlPassed := false
