@@ -146,6 +146,35 @@ noncomputable def baseRegistration : Registration Trace where
   budgetCap := 240
   teardownDeadline := some 240
 
+/-- The exact paid pilot protocol.  These values are data rather than shell-script
+defaults, so population size, precision, cost, and HGT cannot be chosen after the
+worker has been provisioned. -/
+structure ProductionProtocol where
+  mode : String
+  generations : Nat
+  population : Nat
+  evaluationSeeds : Nat
+  evaluationSites : Nat
+  warmup : Nat
+  cost : ℝ
+  witnessReachThreshold : ℝ
+  hgt : Bool
+  pilotEvolutionSeed : Nat
+  armTimeoutMinutes : Nat
+
+noncomputable def productionProtocol : ProductionProtocol where
+  mode := "hold-only"
+  generations := 30
+  population := 24
+  evaluationSeeds := 3
+  evaluationSites := 10
+  warmup := 8
+  cost := 0.05
+  witnessReachThreshold := 10.0
+  hgt := false
+  pilotEvolutionSeed := 20260730
+  armTimeoutMinutes := 75
+
 def replication : ReplicationPlan where
   pilotSeeds := [20260730]
   confirmationSeeds := [20260801, 20260802]
