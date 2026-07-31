@@ -112,6 +112,23 @@ hard to obtain dishonestly.
 def Launch {Trace : Type u} (r : Registration Trace) (e : Evidence) (smoke : Trace)
     (_w : ReadyToRun r e smoke) (run : Registration Trace → Trace) : Trace := run r
 
+/--
+The stronger launch token for a prospective registration.  Besides the base readiness
+gate, its smoke trace must show that none of the preregistered stop conditions already
+fires.  Runtime supervisors remain responsible for applying the same exact checks to
+later traces.
+-/
+structure ProspectiveReadyToRun {Trace : Type u} {Outcome : Type*}
+    (r : ProspectiveRegistration Trace Outcome) (e : Evidence) (smoke : Trace) where
+  baseReady : ReadyToRun r.base e smoke
+  smokeClear : ∀ s ∈ r.stopRules, s.check smoke = false
+
+/-- The designated launch entry point for a prospective registration. -/
+def ProspectiveLaunch {Trace : Type u} {Outcome : Type*}
+    (r : ProspectiveRegistration Trace Outcome) (e : Evidence) (smoke : Trace)
+    (_w : ProspectiveReadyToRun r e smoke)
+    (run : ProspectiveRegistration Trace Outcome → Trace) : Trace := run r
+
 /-! ## The general refusal, and its instances -/
 
 /--

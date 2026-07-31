@@ -168,6 +168,66 @@ structure Registration (Trace : Type u) where
   /-- Teardown scheduled independently of the run succeeding. -/
   teardownDeadline : Option ℝ
 
+/-! ## Prospective commitments
+
+The first version of this module was exercised retrospectively.  That exposed three
+commitments which cannot be reconstructed honestly after seeing the data: replication
+seeds, stop rules, and the interpretation function.  They live in a separate wrapper
+so that old post-registrations remain readable while new experiments cannot omit them.
+-/
+
+/-- Pilot and confirmatory random seeds, fixed before the pilot is inspected. -/
+structure ReplicationPlan where
+  pilotSeeds : List Nat
+  confirmationSeeds : List Nat
+  pilotNonempty : pilotSeeds ≠ []
+  confirmationNonempty : confirmationSeeds ≠ []
+  disjoint : pilotSeeds.Disjoint confirmationSeeds
+
+/--
+A stopping condition together with an exact executable test.  Requiring an `iff`, rather
+than only soundness, prevents a checker which always returns `false` from satisfying the
+registration while never stopping a failed run.
+-/
+structure StopRule (Trace : Type u) where
+  name : String
+  fires : Trace → Prop
+  check : Trace → Bool
+  check_iff : ∀ t, check t = true ↔ fires t
+
+/-- A pre-committed total interpretation of every trace the experiment may emit. -/
+structure DecisionRule (Trace : Type u) (Outcome : Type*) where
+  name : String
+  classify : Trace → Outcome
+
+/--
+The prospective envelope around a base registration.  Its fields have no defaults:
+replication, at least one stop rule, and an interpretation must exist before this value
+can be constructed.
+-/
+structure ProspectiveRegistration (Trace : Type u) (Outcome : Type*) where
+  base : Registration Trace
+  replication : ReplicationPlan
+  stopRules : List (StopRule Trace)
+  stopRulesNonempty : stopRules ≠ []
+  decision : DecisionRule Trace Outcome
+
+/-- A prospective registration always names a confirmatory seed. -/
+theorem ProspectiveRegistration.exists_confirmationSeed
+    {Trace : Type u} {Outcome : Type*} (r : ProspectiveRegistration Trace Outcome) :
+    ∃ seed, seed ∈ r.replication.confirmationSeeds := by
+  cases h : r.replication.confirmationSeeds with
+  | nil => exact (r.replication.confirmationNonempty h).elim
+  | cons seed seeds => exact ⟨seed, by simp⟩
+
+/-- No pilot seed can be silently recycled as confirmatory replication. -/
+theorem ProspectiveRegistration.confirmation_not_pilot
+    {Trace : Type u} {Outcome : Type*} (r : ProspectiveRegistration Trace Outcome)
+    {seed : Nat} (h : seed ∈ r.replication.confirmationSeeds) :
+    seed ∉ r.replication.pilotSeeds := by
+  intro hp
+  exact List.disjoint_left.mp r.replication.disjoint hp h
+
 /--
 A single thing that must be true before launch.
 
