@@ -974,22 +974,30 @@ private def noAblationTrace : Trace :=
 theorem regression_wrong_memory_is_typed_refusal :
     ∃ errors, validate wrongMemoryTrace = .error errors ∧
       ProtocolError.wrongMemoryWithheld ∈ errors := by
-  native_decide
+  have h : validateErrors wrongMemoryTrace = [.wrongMemoryWithheld] := by native_decide
+  refine ⟨[.wrongMemoryWithheld], ?_, by simp⟩
+  simp [validate, h]
 
 theorem regression_shared_session_is_typed_refusal :
     ∃ errors, validate sharedSessionTrace = .error errors ∧
       ProtocolError.sharedSession ∈ errors := by
-  native_decide
+  have h : validateErrors sharedSessionTrace = [.sharedSession] := by native_decide
+  refine ⟨[.sharedSession], ?_, by simp⟩
+  simp [validate, h]
 
 theorem regression_post_solution_revision_is_typed_refusal :
     ∃ errors, validate postSolutionTrace = .error errors ∧
       ProtocolError.wrongBaseRevision ∈ errors := by
-  native_decide
+  have h : validateErrors postSolutionTrace = [.wrongBaseRevision] := by native_decide
+  refine ⟨[.wrongBaseRevision], ?_, by simp⟩
+  simp [validate, h]
 
 theorem regression_no_ablation_is_typed_refusal :
     ∃ errors, validate noAblationTrace = .error errors ∧
       ProtocolError.wrongMemoryWithheld ∈ errors := by
-  native_decide
+  have h : validateErrors noAblationTrace = [.wrongMemoryWithheld] := by native_decide
+  refine ⟨[.wrongMemoryWithheld], ?_, by simp⟩
+  simp [validate, h]
 
 /-! ## What this experiment does not settle, and one honest residue
 
