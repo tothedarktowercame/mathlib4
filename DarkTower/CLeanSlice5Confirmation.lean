@@ -357,31 +357,37 @@ noncomputable def aifFullArm : Arm where
   name := "aif-full"
   neutral := false
   axes := []
+  role := ArmRole.treatment
 
 noncomputable def noCanonicalAmbiguityArm : Arm where
   name := "no-canonical-ambiguity"
   neutral := false
   axes := [canonicalAmbiguityAxis]
+  role := ArmRole.positiveControl
 
 noncomputable def noDirectedEigArm : Arm where
   name := "no-directed-eig"
   neutral := false
   axes := [directedEigAxis]
+  role := ArmRole.treatment
 
 noncomputable def noInfoGainArm : Arm where
   name := "no-info-gain"
   neutral := false
   axes := [infoGainAxis]
+  role := ArmRole.treatment
 
 noncomputable def noRiskArm : Arm where
   name := "no-risk"
   neutral := false
   axes := [klRiskAxis]
+  role := ArmRole.treatment
 
 noncomputable def classicArm : Arm where
   name := "classic"
   neutral := true
   axes := []
+  role := ArmRole.baselineNeutral
 
 inductive TraceClass where
   | controlViolated
@@ -477,6 +483,41 @@ noncomputable def prospectiveRegistration :
   stopRulesNonempty := by simp
   decision := decisionRule
 
+def readinessEvidence : Evidence where
+  toolchainExercised := true
+  codeIdentityAsserted := true
+  teardownExercised := true
+  armsShownDistinct := true
+
+def readinessSmoke : ExperimentTrace where
+  classification := TraceClass.controlViolated
+  positiveControlViolated := false
+
+noncomputable def baseReadyToRun :
+    ReadyToRun baseRegistration readinessEvidence readinessSmoke where
+  apparatus := by simp [Evidence.apparatusSound, readinessEvidence]
+  discharged := by
+    intro o ho
+    simp [Registration.obligations, baseRegistration, aifFullArm, noCanonicalAmbiguityArm, noDirectedEigArm, noInfoGainArm, noRiskArm, classicArm] at ho
+    rcases ho with (rfl | rfl | rfl | rfl | rfl | h)
+    · exact canonicalAmbiguityAxis_predicted_not_navigable
+    · exact directedEigAxis_navigable
+    · exact infoGainAxis_navigable
+    · exact klRiskAxis_navigable
+    · rfl
+    · rcases h with (rfl | rfl)
+      · norm_num [Discharged, baseRegistration]
+      · rfl
+
+noncomputable def prospectiveReadyToRun :
+    ProspectiveReadyToRun prospectiveRegistration readinessEvidence readinessSmoke where
+  baseReady := by simpa [prospectiveRegistration] using baseReadyToRun
+  smokeClear := by
+    intro s hs
+    simp only [prospectiveRegistration, List.mem_singleton] at hs
+    subst s
+    rfl
+
 example : prospectiveRegistration.stopRules ≠ [] := by decide
 example : prospectiveRegistration.replication.pilotSeeds.Disjoint
     prospectiveRegistration.replication.confirmationSeeds :=
@@ -486,11 +527,13 @@ example : ¬ canonicalAmbiguityAxis.Navigable := canonicalAmbiguityAxis_predicte
 /-- The positive control's dead axis is an explicit prediction, not
 an accidentally accepted treatment axis. -/
 theorem positiveControl_nonNavigability_registered :
-    Obligation.axisNavigable canonicalAmbiguityAxis ∈ baseRegistration.obligations ∧
+    Obligation.axisPredictedNonNavigable canonicalAmbiguityAxis ∈
+      baseRegistration.obligations ∧
       ¬ canonicalAmbiguityAxis.Navigable := by
   constructor
-  · exact mem_obligations_axisNavigable (a := noCanonicalAmbiguityArm)
-      (by simp [baseRegistration]) (by simp [noCanonicalAmbiguityArm])
+  · exact mem_obligations_axisPredictedNonNavigable
+      (a := noCanonicalAmbiguityArm) (by simp [baseRegistration])
+      (by simp [noCanonicalAmbiguityArm]) (by simp [noCanonicalAmbiguityArm])
   · exact canonicalAmbiguityAxis_predicted_not_navigable
 
 end CLeanExperiment_slice5_confirmation

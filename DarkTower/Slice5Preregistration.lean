@@ -220,13 +220,14 @@ noncomputable def originalAblationArm : Arm where
   name := "aif-no-epistemic"
   neutral := false
   axes := [ambiguityAxis]
+  role := .treatment
 
 /-- The original registration, reconstructed from `M-aif-ants-port.md` Slice 5. -/
 noncomputable def originalRegistration : Registration AntTrace where
   name := "M-aif-ants-port Slice 5 (2026-07-14, as written)"
   claim := ClaimForm.comparative
-  arms := [⟨"aif-full", false, [ambiguityAxis]⟩, originalAblationArm,
-           ⟨"classic", true, []⟩]
+  arms := [⟨"aif-full", false, [ambiguityAxis], .treatment⟩, originalAblationArm,
+           ⟨"classic", true, [], .baselineNeutral⟩]
   flags := []
   estimatedCost := 1
   budgetCap := 1
@@ -249,6 +250,7 @@ theorem original_obligation_undischargeable :
   constructor
   · exact mem_obligations_axisNavigable (a := originalAblationArm)
       (by simp [originalRegistration]) (by simp [originalAblationArm])
+      (by simp [originalAblationArm])
   · exact ambiguity_not_navigable
 
 /-! ## The re-specified design
@@ -265,18 +267,21 @@ noncomputable def positiveControlArm : Arm where
   name := "no-canonical-ambiguity"
   neutral := false
   axes := [ambiguityAxis]
+  role := .positiveControl
 
 /-- The live epistemic test. -/
 noncomputable def eigArm : Arm where
   name := "no-directed-eig"
   neutral := false
   axes := [directedEigAxis]
+  role := .treatment
 
 /-- The risk-leg ablation, absent from every previous design. -/
 noncomputable def riskArm : Arm where
   name := "no-risk"
   neutral := false
   axes := [riskAxis]
+  role := .treatment
 
 /-- The stop rule that makes the positive control load-bearing: if the cancelling
 term moves anything, the run halts and is not interpreted. -/

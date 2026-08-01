@@ -138,6 +138,15 @@ inductive ClaimForm
   | descriptive
   deriving DecidableEq, Repr
 
+/-- The inferential role of an experimental arm.  Only a positive control
+reverses the polarity of its axis obligation: its predicted null must itself be
+proved, rather than silently exempting the axis from scrutiny. -/
+inductive ArmRole
+  | treatment
+  | baselineNeutral
+  | positiveControl
+  deriving DecidableEq, Repr
+
 /-- An arm of the experiment. -/
 structure Arm where
   name : String
@@ -145,6 +154,9 @@ structure Arm where
   neutral : Bool
   /-- The axes this arm's search moves along. -/
   axes : List Axis
+  /-- What inferential job this arm performs.  The dependent default preserves
+  old declarations while classifying their neutral baselines honestly. -/
+  role : ArmRole := if neutral then .baselineNeutral else .treatment
 
 /-! ## The registration, and the obligations it generates -/
 
@@ -238,6 +250,9 @@ every consumer must then say how it is discharged.
 inductive Obligation (Trace : Type u)
   /-- This axis must carry gradient somewhere. -/
   | axisNavigable (a : Axis)
+  /-- This positive-control axis must be proved unable to move the treatment.
+  This is the opposite proposition, not an exemption from an obligation. -/
+  | axisPredictedNonNavigable (a : Axis)
   /-- Some arm must have selection disabled. -/
   | controlPresent
   /-- Some pair of arms must be able to differ; identical arms are an inert
@@ -259,7 +274,10 @@ control, because the obligation appears without being asked for.
 -/
 def Registration.obligations {Trace : Type u} (r : Registration Trace) :
     List (Obligation Trace) :=
-  (r.arms.flatMap (fun a => a.axes.map Obligation.axisNavigable)) ++
+  (r.arms.flatMap (fun a =>
+    match a.role with
+    | ArmRole.positiveControl => a.axes.map Obligation.axisPredictedNonNavigable
+    | _ => a.axes.map Obligation.axisNavigable)) ++
   (match r.claim with
    | ClaimForm.rarerThanChance => [Obligation.controlPresent]
    | ClaimForm.comparative => [Obligation.armsSeparable]
@@ -267,13 +285,27 @@ def Registration.obligations {Trace : Type u} (r : Registration Trace) :
   (r.flags.map Obligation.flagHonoured) ++
   [Obligation.withinBudget, Obligation.teardownScheduled]
 
-/-- Every axis of every arm generates a navigability obligation. -/
+/-- Every axis of a non-positive-control arm generates a navigability obligation.
+The role premise is necessary: without it the statement is false for positive
+controls, whose obligation deliberately has the opposite polarity. -/
 theorem mem_obligations_axisNavigable {Trace : Type u} {r : Registration Trace}
-    {a : Arm} (ha : a ∈ r.arms) {ax : Axis} (hax : ax ∈ a.axes) :
+    {a : Arm} (ha : a ∈ r.arms) (hrole : a.role ≠ ArmRole.positiveControl)
+    {ax : Axis} (hax : ax ∈ a.axes) :
     Obligation.axisNavigable ax ∈ r.obligations := by
   unfold Registration.obligations
   simp only [List.mem_append, List.mem_flatMap, List.mem_map]
-  exact Or.inl (Or.inl (Or.inl ⟨a, ha, ax, hax, rfl⟩))
+  refine Or.inl (Or.inl (Or.inl ⟨a, ha, ?_⟩))
+  split <;> simp_all
+
+/-- Every axis of a positive-control arm generates the predicted-null
+obligation instead of the treatment navigability obligation. -/
+theorem mem_obligations_axisPredictedNonNavigable
+    {Trace : Type u} {r : Registration Trace} {a : Arm} (ha : a ∈ r.arms)
+    (hrole : a.role = ArmRole.positiveControl) {ax : Axis} (hax : ax ∈ a.axes) :
+    Obligation.axisPredictedNonNavigable ax ∈ r.obligations := by
+  unfold Registration.obligations
+  simp only [List.mem_append, List.mem_flatMap, List.mem_map]
+  exact Or.inl (Or.inl (Or.inl ⟨a, ha, by simp [hrole, hax]⟩))
 
 /-- A "rarer than chance" claim always generates the control obligation. -/
 theorem mem_obligations_controlPresent {Trace : Type u} {r : Registration Trace}

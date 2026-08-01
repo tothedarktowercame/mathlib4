@@ -80,6 +80,7 @@ be vacuous cannot be added without saying what would rule it out.
 def Discharged {Trace : Type u} (r : Registration Trace) (e : Evidence) (smoke : Trace) :
     Obligation Trace → Prop
   | Obligation.axisNavigable a => a.Navigable
+  | Obligation.axisPredictedNonNavigable a => ¬ a.Navigable
   | Obligation.controlPresent => ∃ a ∈ r.arms, a.neutral = true
   | Obligation.armsSeparable => e.armsShownDistinct = true
   | Obligation.flagHonoured f => f.honoured smoke
@@ -149,16 +150,18 @@ theorem no_witness_of_undischarged {Trace : Type u} {r : Registration Trace}
 but one is refused here rather than discovered afterwards. -/
 theorem no_witness_of_dead_axis {Trace : Type u} {r : Registration Trace}
     {e : Evidence} {smoke : Trace} {a : Arm} (ha : a ∈ r.arms)
+    (hrole : a.role ≠ ArmRole.positiveControl)
     {ax : Axis} (hax : ax ∈ a.axes) (hdead : ¬ ax.Navigable) :
     IsEmpty (ReadyToRun r e smoke) :=
-  no_witness_of_undischarged (mem_obligations_axisNavigable ha hax) hdead
+  no_witness_of_undischarged (mem_obligations_axisNavigable ha hrole hax) hdead
 
 /-- A constant axis admits no witness, via the preregistration's lemma. -/
 theorem no_witness_of_constant_axis {Trace : Type u} {r : Registration Trace}
     {e : Evidence} {smoke : Trace} {a : Arm} (ha : a ∈ r.arms)
+    (hrole : a.role ≠ ArmRole.positiveControl)
     {ax : Axis} (hax : ax ∈ a.axes) (hconst : ∀ x y, ax.score x = ax.score y) :
     IsEmpty (ReadyToRun r e smoke) :=
-  no_witness_of_dead_axis ha hax (not_navigable_of_constant hconst)
+  no_witness_of_dead_axis ha hrole hax (not_navigable_of_constant hconst)
 
 /-- A "rarer than chance" claim with no no-selection arm admits no witness. -/
 theorem no_witness_of_missing_control {Trace : Type u} {r : Registration Trace}
@@ -203,9 +206,20 @@ null results can quietly be worth.
 -/
 theorem certified_axes_are_navigable {Trace : Type u} {r : Registration Trace}
     {e : Evidence} {smoke : Trace} (w : ReadyToRun r e smoke)
-    {a : Arm} (ha : a ∈ r.arms) {ax : Axis} (hax : ax ∈ a.axes) :
+    {a : Arm} (ha : a ∈ r.arms) (hrole : a.role ≠ ArmRole.positiveControl)
+    {ax : Axis} (hax : ax ∈ a.axes) :
     0 < ax.gradientSteps :=
-  w.discharged _ (mem_obligations_axisNavigable ha hax)
+  w.discharged _ (mem_obligations_axisNavigable ha hrole hax)
+
+/-- Under certification, every positive-control axis has its predicted null
+proved.  Positive controls therefore strengthen the gate rather than bypassing
+it. -/
+theorem certified_positiveControl_axes_are_not_navigable
+    {Trace : Type u} {r : Registration Trace} {e : Evidence} {smoke : Trace}
+    (w : ReadyToRun r e smoke) {a : Arm} (ha : a ∈ r.arms)
+    (hrole : a.role = ArmRole.positiveControl) {ax : Axis} (hax : ax ∈ a.axes) :
+    ¬ ax.Navigable :=
+  w.discharged _ (mem_obligations_axisPredictedNonNavigable ha hrole hax)
 
 /-- Under certification, every declared setting was in force during the smoke run. -/
 theorem certified_flags_act {Trace : Type u} {r : Registration Trace}
