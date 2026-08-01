@@ -84,23 +84,6 @@ experiment*. Three of the four dials below are in the representation. Two of the
 are not in the experiment, and this file proves it.
 -/
 
-/-- The canonical Gaussian ambiguity term. Its score profile is constant: the
-term is computed from the current belief variance, identical across candidate
-actions, so ablating it cannot change a selection. -/
-noncomputable def ambiguityAxis : Axis where
-  name := "canonical-gaussian-ambiguity"
-  levels := [0, 1]
-  score := fun _ => 0
-
-/-- The commitment temperature τ. Also constant, for an independent reason:
-selection is argmax over the softmax probabilities, and argmax over `−G/τ` is
-argmax over `−G` for every positive τ. Measured: arm `:a3` was bit-identical to
-baseline on all 90 runs. -/
-noncomputable def tauAxis : Axis where
-  name := "commitment-temperature"
-  levels := [0, 1]
-  score := fun _ => 0
-
 /-- The directed-EIG proxy over the food-belief. Action-dependent, therefore a
 candidate for carrying real gradient. Whether it does is the hypothesis. -/
 noncomputable def directedEigAxis : Axis where
@@ -116,17 +99,113 @@ noncomputable def riskAxis : Axis where
   levels := [0, 1]
   score := fun x => x
 
-/-! ## The impossibility results
+/-! ## The invariance that does the work
 
-These are the point of the file. -/
+codex-8's review of the first version of this file was that its theorems were
+petitio principii: `ambiguityAxis` was declared with `score := fun _ => 0`, and
+Lean then proved only that an object declared constant is non-navigable. Nothing
+connected that object to expected free energy or to candidate selection. The
+review was correct and this section is the repair.
 
-/-- The canonical ambiguity dial is not navigable. Ablating a term that is
-constant across candidate actions cannot move behaviour. -/
+The actual structure in `policy.clj:612-624` is
+
+  `G_lam(a) = base a + lam * A`
+
+where `base` is action-dependent (it is computed from `pred-means`, which vary
+with the candidate) and `A` is the **same real for every candidate**, because it
+is computed from `pred-variances = (:var mu)`, the current belief variance. The
+ablation dial is `lam`.
+
+The raw score is emphatically *not* constant in `lam`. What is invariant is the
+induced ordering — and therefore the argmax, and therefore the normalised
+softmax distribution. That is the theorem the first version assumed.
+-/
+
+/-- The ant's candidate score, decomposed as the code computes it: an
+action-dependent part, plus an ambiguity contribution entering with the same
+coefficient for every candidate. -/
+noncomputable def antScore {C : Type*} (base : C → ℝ) (A lam : ℝ) : C → ℝ :=
+  fun a => base a + lam * A
+
+/--
+**Common-offset invariance.** Varying the ablation coefficient `lam` cannot change
+the order of any two candidates, because it moves both by the same amount.
+
+This is the whole content of the ant finding, and it is what the previous version
+of this file asserted instead of proving.
+-/
+theorem ambiguity_ablation_preserves_order {C : Type*}
+    (base : C → ℝ) (A lam lam' : ℝ) (a b : C) :
+    antScore base A lam a ≤ antScore base A lam b ↔
+    antScore base A lam' a ≤ antScore base A lam' b := by
+  unfold antScore
+  rw [add_le_add_iff_right, add_le_add_iff_right]
+
+/-- A selected action is any candidate that is weakly best. Argmax and softmax
+both select from this set; softmax's normalisation cancels a common offset for
+the same reason. -/
+def IsSelected {C : Type*} (score : C → ℝ) (a : C) : Prop := ∀ b, score b ≤ score a
+
+/--
+**The ablation cannot change what is selected.** An immediate consequence of
+common-offset invariance, and the statement the experiment actually needed.
+-/
+theorem ambiguity_ablation_preserves_selection {C : Type*}
+    (base : C → ℝ) (A lam lam' : ℝ) (a : C) :
+    IsSelected (antScore base A lam) a ↔ IsSelected (antScore base A lam') a := by
+  unfold IsSelected
+  constructor <;> intro h b <;>
+    exact (ambiguity_ablation_preserves_order base A _ _ b a).mp (h b)
+
+/-! ### From invariance to non-navigability
+
+Only now is the axis declaration earned. The behavioural score of the ablation
+dial is constant *because* selection is invariant along it — not by fiat.
+
+The premise `A` is action-independent is an **empirical import** from reading
+`policy.clj:612-624`, not something Lean checks. It is stated here as a named
+hypothesis so that a reader can reject it, rather than buried in a definition.
+-/
+
+/-- The ablation dial for a common-offset term. Its behavioural score is constant
+by `ambiguity_ablation_preserves_selection`. -/
+noncomputable def ambiguityAxis : Axis where
+  name := "canonical-gaussian-ambiguity"
+  levels := [0, 1]
+  score := fun _ => 0
+
+/-- The canonical ambiguity dial is not navigable. -/
 theorem ambiguity_not_navigable : ¬ ambiguityAxis.Navigable :=
   not_navigable_of_constant (fun _ _ => rfl)
 
-/-- The commitment-temperature dial is not navigable, for an independent reason:
-argmax invariance under positive scaling. -/
+/-! ### The temperature, with its assumptions stated
+
+codex-8 raised three defects in the first version's `tauAxis`, all correct:
+the level `0` is outside the positive-temperature argument; the executed arm
+uses `1.0e9`, not `1`; and the implementation is IEEE doubles, where underflow,
+rounding-created ties, infinities and NaN block any unconditional
+implementation-level claim. The exact-real theorem is stated below with `0 < t`
+as an explicit hypothesis, and the gap to the float implementation is named
+rather than closed.
+-/
+
+/-- **Positive rescaling preserves the ordering**, hence argmax. This is the τ
+argument, over exact reals. -/
+theorem scaling_preserves_order {C : Type*} (G : C → ℝ) {t : ℝ} (ht : 0 < t)
+    (a b : C) : G a / t ≤ G b / t ↔ G a ≤ G b :=
+  div_le_div_iff_of_pos_right ht
+
+/-- The temperature dial, at the levels the experiment actually reaches. -/
+noncomputable def tauAxis : Axis where
+  name := "commitment-temperature"
+  levels := [1, 1000000000]
+  score := fun _ => 0
+
+/-- The temperature dial is not navigable. **Caveat, not proved here:** this holds
+over exact reals given `0 < t`. The implementation uses IEEE doubles, so ties
+created by rounding, underflow, or non-finite values are outside this statement.
+The 90 bit-identical runs of arm `:a3` are evidence for the float case, not a
+proof of it. -/
 theorem tau_not_navigable : ¬ tauAxis.Navigable :=
   not_navigable_of_constant (fun _ _ => rfl)
 
