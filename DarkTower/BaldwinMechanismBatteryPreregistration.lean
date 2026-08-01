@@ -64,6 +64,8 @@ structure Trace where
   /-- Held rule/locus combinations which preserve function and are at least as
   fit as the unheld baseline under the registered capacity cost. -/
   usefulHeldEndpoints : Nat
+  /-- The executable validator recomputed probe/map key sets and response tests. -/
+  artifactValidatorPassed : Bool
   artifactsChecksummed : Bool
   deriving Repr
 
@@ -90,16 +92,18 @@ def complete : Flag Trace where
       holds := fun t =>
         t.alleleProbesObserved = expectedAlleleProbes ∧
         t.mapRowsObserved = expectedMapRows ∧
-        t.mapCheckpointsComplete = true ∧ t.artifactsChecksummed = true
+        t.mapCheckpointsComplete = true ∧ t.artifactValidatorPassed = true ∧
+        t.artifactsChecksummed = true
       check := fun t =>
         t.alleleProbesObserved == expectedAlleleProbes &&
         t.mapRowsObserved == expectedMapRows &&
-        t.mapCheckpointsComplete && t.artifactsChecksummed
+        t.mapCheckpointsComplete && t.artifactValidatorPassed &&
+        t.artifactsChecksummed
       check_sound := by
         intro t h
         simp only [Bool.and_eq_true, beq_iff_eq] at h
-        obtain ⟨⟨⟨ha, hb⟩, hc⟩, hd⟩ := h
-        exact ⟨ha, hb, hc, hd⟩ }
+        obtain ⟨⟨⟨⟨ha, hb⟩, hc⟩, hd⟩, he⟩ := h
+        exact ⟨ha, hb, hc, hd, he⟩ }
 
 noncomputable def unchangedFieldArm : Arm where
   name := "unchanged inherited field paired baseline"
@@ -145,7 +149,8 @@ def classify (t : Trace) : Outcome :=
       !t.pairedSchedulesAligned ||
       t.alleleProbesObserved != expectedAlleleProbes ||
       t.mapRowsObserved != expectedMapRows ||
-      !t.mapCheckpointsComplete || !t.artifactsChecksummed then
+      !t.mapCheckpointsComplete || !t.artifactValidatorPassed ||
+      !t.artifactsChecksummed then
     .invalid
   else if t.familywiseResponsiveAlleles = 0 then
     if t.usefulHeldEndpoints = 0 then .contentFlatNoEndpoint
@@ -164,18 +169,20 @@ def invalidApparatus : StopRule Trace where
     t.pairedSchedulesAligned = false ∨
     t.alleleProbesObserved ≠ expectedAlleleProbes ∨
     t.mapRowsObserved ≠ expectedMapRows ∨
-    t.mapCheckpointsComplete = false ∨ t.artifactsChecksummed = false
+    t.mapCheckpointsComplete = false ∨ t.artifactValidatorPassed = false ∨
+    t.artifactsChecksummed = false
   check := fun t =>
     !t.sourceRevisionBound || !t.inputChecksumBound ||
     !t.pairedSchedulesAligned ||
     t.alleleProbesObserved != expectedAlleleProbes ||
     t.mapRowsObserved != expectedMapRows ||
-    !t.mapCheckpointsComplete || !t.artifactsChecksummed
+    !t.mapCheckpointsComplete || !t.artifactValidatorPassed ||
+    !t.artifactsChecksummed
   check_iff := by
     intro t
     cases t.sourceRevisionBound <;> cases t.inputChecksumBound <;>
       cases t.pairedSchedulesAligned <;> cases t.mapCheckpointsComplete <;>
-      cases t.artifactsChecksummed <;> simp
+      cases t.artifactValidatorPassed <;> cases t.artifactsChecksummed <;> simp
 
 noncomputable def experiment : ProspectiveRegistration Trace Outcome where
   base := base
