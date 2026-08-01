@@ -174,6 +174,88 @@ def BaldwinWitness.endpoint {d : ExperimentalDesign ι Rule} {n : Nat}
 
 end ExperimentalDesign
 
+/-! ## Learning-guided evolution is weaker than assimilation
+
+`BaldwinWitness` deliberately certifies the strong endpoint: plastic dependence
+falls and the final inherited field works statically.  That is not the only causal
+claim called a Baldwin effect.  Lifetime adaptation may instead alter selection so
+that evolution produces inherited starting points or biases which learn sooner or
+generalise better, while learning remains useful.
+
+The comparison below makes that weaker claim explicit.  Its two evolutionary
+relations are declared by the design, rather than reconstructed after seeing the
+winning lineages.  Likewise, `preparedness` and `heldOutPreparedness` are declared
+readouts, not witness-chosen scoring functions.
+-/
+
+/-- An experimental design for the causal guidance claim.
+
+`selectedWithLearning` and `selectedWithoutLearning` describe the realised
+between-generation transitions under the two paired selection regimes.
+`preparedness` measures inherited early-learning performance on preregistered
+training tasks; `heldOutPreparedness` applies the same readout to a disjoint task set.
+-/
+structure GuidanceDesign (ι : Type*) (Rule : Type*)
+    extends ExperimentalDesign ι Rule where
+  preparedness : Genome ι Rule → ℝ
+  heldOutPreparedness : Genome ι Rule → ℝ
+  selectedWithLearning : Genome ι Rule → Genome ι Rule → Prop
+  selectedWithoutLearning : Genome ι Rule → Genome ι Rule → Prop
+
+namespace GuidanceDesign
+
+variable {ι Rule : Type*}
+
+/--
+A certificate that lifetime adaptation changed evolution of inherited preparedness.
+
+Both arms begin at the same inherited population summary and follow their declared
+selection relations.  The learning-enabled arm must finish strictly ahead of the
+no-learning evolutionary control on both the preregistered training readout and the
+held-out readout.  No decline in plastic dependence is required: that additional
+claim remains the job of `BaldwinWitness`.
+-/
+structure GuidanceWitness (d : GuidanceDesign ι Rule) (n : Nat) where
+  withLearningPath : Fin (n + 1) → Genome ι Rule
+  withoutLearningPath : Fin (n + 1) → Genome ι Rule
+  commonAncestor : withLearningPath 0 = withoutLearningPath 0
+  withLearningStep :
+    ∀ i : Fin n,
+      d.selectedWithLearning (withLearningPath i.castSucc) (withLearningPath i.succ)
+  withoutLearningStep :
+    ∀ i : Fin n,
+      d.selectedWithoutLearning
+        (withoutLearningPath i.castSucc) (withoutLearningPath i.succ)
+  withLearningFunctional : d.Successful (withLearningPath (Fin.last n))
+  withoutLearningFunctional : d.Successful (withoutLearningPath (Fin.last n))
+  trainingAdvantage :
+    d.preparedness (withoutLearningPath (Fin.last n)) <
+      d.preparedness (withLearningPath (Fin.last n))
+  heldOutAdvantage :
+    d.heldOutPreparedness (withoutLearningPath (Fin.last n)) <
+      d.heldOutPreparedness (withLearningPath (Fin.last n))
+
+/-- A guidance certificate exposes the learned arm's final inherited genome. -/
+def GuidanceWitness.withLearningEndpoint {d : GuidanceDesign ι Rule} {n : Nat}
+    (w : d.GuidanceWitness n) : Genome ι Rule :=
+  w.withLearningPath (Fin.last n)
+
+/-- Guidance entails a strict training-readout contrast against the paired control. -/
+theorem GuidanceWitness.training_strict {d : GuidanceDesign ι Rule} {n : Nat}
+    (w : d.GuidanceWitness n) :
+    d.preparedness (w.withoutLearningPath (Fin.last n)) <
+      d.preparedness w.withLearningEndpoint :=
+  w.trainingAdvantage
+
+/-- Guidance also entails a strict held-out contrast, ruling out a training-only fit. -/
+theorem GuidanceWitness.heldOut_strict {d : GuidanceDesign ι Rule} {n : Nat}
+    (w : d.GuidanceWitness n) :
+    d.heldOutPreparedness (w.withoutLearningPath (Fin.last n)) <
+      d.heldOutPreparedness w.withLearningEndpoint :=
+  w.heldOutAdvantage
+
+end GuidanceDesign
+
 /--
 A MetaCA experiment chooses one of the already formalized dynamic occupants
 and supplies the experimental declarations above.  This is the explicit seam
