@@ -971,6 +971,12 @@ private def noAblationTrace : Trace :=
        regressionRun .ablateLoadBearing "lb-session" "pre" none 3,
        regressionRun .ablateIncidental "inc-session" "pre" none 2] }
 
+private def threeErrorsTrace : Trace :=
+  { regressionTrace with runs :=
+      [regressionRun .control "shared-session" "post" none 1,
+       regressionRun .ablateLoadBearing "shared-session" "post" (some "wrong") 3,
+       regressionRun .ablateIncidental "inc-session" "post" (some "inc") 2] }
+
 theorem regression_wrong_memory_is_typed_refusal :
     ∃ errors, validate wrongMemoryTrace = .error errors ∧
       ProtocolError.wrongMemoryWithheld ∈ errors := by
@@ -998,6 +1004,12 @@ theorem regression_no_ablation_is_typed_refusal :
   have h : validateErrors noAblationTrace = [.wrongMemoryWithheld] := by decide
   refine ⟨[.wrongMemoryWithheld], ?_, by simp⟩
   simp [validate, h]
+
+/-- Validation accumulates independent failures instead of stopping at the first. -/
+theorem regression_validator_reports_all_errors :
+    validateErrors threeErrorsTrace =
+      [.wrongMemoryWithheld, .sharedSession, .wrongBaseRevision] := by
+  decide
 
 /-! ## What this experiment does not settle, and one honest residue
 
