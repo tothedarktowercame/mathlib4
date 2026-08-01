@@ -714,6 +714,15 @@ theorem validate_ok_noErrors {t : Trace} {v : ValidatedTrace}
   · assumption
   · simp_all
 
+/-- Reuse a raw-trace observable after the complete validator has certified it. -/
+def onValidated (observable : Observable Trace) : Observable ValidatedTrace where
+  name := observable.name
+  holds := fun v => observable.holds v.raw
+  check := fun v => observable.check v.raw
+  check_sound := by
+    intro v h
+    exact observable.check_sound v.raw h
+
 /-! ## Arms -/
 
 def controlArm : Arm where
@@ -730,6 +739,9 @@ def inArm : Arm where
   name := "ablate incidental"
   neutral := false
   axes := []
+  -- This arm is predicted not to move effort: it is the positive control for
+  -- the rubric's claim that load-bearing and incidental uses differ.
+  role := ArmRole.positiveControl
 
 def proseOnlyArm : Arm where
   name := "ablate prose-only (dropped by the structured field)"
@@ -749,18 +761,19 @@ Stop if same-corpus repeats disagree too often for an effect to be readable.
 Fires when more than a quarter of control runs failed to close a problem that
 is known to close.
 -/
-def noiseFloorTooHigh : StopRule Trace where
+def noiseFloorTooHigh : StopRule ValidatedTrace where
   name := "control arm fails to close in > 25% of runs"
-  fires := fun t => 4 * (t.notClosedIn ArmKind.control) > (t.armRuns ArmKind.control).length
-  check := fun t =>
-    decide (4 * (t.notClosedIn ArmKind.control) > (t.armRuns ArmKind.control).length)
+  fires := fun v => 4 * (v.raw.notClosedIn ArmKind.control) >
+    (v.raw.armRuns ArmKind.control).length
+  check := fun v => decide (4 * (v.raw.notClosedIn ArmKind.control) >
+    (v.raw.armRuns ArmKind.control).length)
   check_iff := by intro t; simp
 
 /-- Stop if the ablation did not take effect in some run. -/
-def ablationLeaked : StopRule Trace where
+def ablationLeaked : StopRule ValidatedTrace where
   name := "a withheld memory surfaced anyway"
-  fires := fun t => ∃ r ∈ t.runs, r.withheldPresent = true
-  check := fun t => t.runs.any (·.withheldPresent)
+  fires := fun v => ∃ r ∈ v.raw.runs, r.withheldPresent = true
+  check := fun v => v.raw.runs.any (·.withheldPresent)
   check_iff := by
     intro t
     constructor
@@ -800,58 +813,21 @@ at least two runs; the LB/IN separation counts when load-bearing exceeds
 incidental by at least two. These are commitments, not derivations, and are
 stated numerically so they cannot be adjusted after the counts are known.
 -/
-def classify : Trace → Outcome := fun t =>
-  -- Guard order matters: every validity precondition is discharged before any
-  -- comparison is attempted, so a substantive verdict cannot be reached on
-  -- data that should never have been analysed.
-  --
-  -- 1. Isolation. If the runner could reach the answer, nothing else means
-  --    anything.
-  if ! (t.isolation.homeReadDenied && t.isolation.noFutureCommits
-        && t.isolation.noAnalysisArtifacts && t.isolation.noRunnerSideStore) then
-    Outcome.indeterminate
-  -- 2. The expectation set is real. A guard that ranges over a set you control
-  --    is only as strong as that set: an empty panel makes every completeness
-  --    check pass vacuously.
-  else if ! expectationWellFormed.check t then Outcome.indeterminate
-  -- 3. Completeness, reusing the observables rather than restating their
-  --    logic: omissions, extras and duplicates each invalidate, and each is
-  --    checked separately so a failure says which.
-  else if ! (noOmissions.check t && noDuplicates.check t && noExtras.check t) then
-    Outcome.indeterminate
-  -- 4. The ablation actually ablated.
-  else if t.runs.any (·.withheldPresent) then Outcome.indeterminate
-  -- 4b. Something was actually withheld, and it was what the registration
-  --     named. Without this a trace that ablated NOTHING passes guard 4 and
-  --     can reach `rubricValidated`.
-  else if ! withholdingAsRegistered.check t then Outcome.indeterminate
-  -- 4c. Repeats are genuinely independent. A shared session means the runner
-  --     remembers its earlier attempt, which is not a replicate.
-  else if ! sessionsDistinct.check t then Outcome.indeterminate
-  -- 5. Ceiling check: these problems are known to close, so a control arm that
-  --    fails to reproduce closure signals a broken harness rather than a small
-  --    effect.
-  else if 4 * (t.notClosedIn ArmKind.control) > (t.armRuns ArmKind.control).length then
-    Outcome.indeterminate
-  else
-    -- The test. `n` is NON-TIED PROBLEMS, never seed-level pairs: seeds are
-    -- repeats within a problem, and counting them as independent would treble
-    -- `n` and turn a null significant.
-    let n := t.nonTiedProblems
-    let k := t.lbWinsProblems
-    if signTestPasses n k then Outcome.rubricValidated
-    -- Both arms exceeding control while the primary test does not pass means
-    -- the design is registering perturbation sensitivity as such. Note this is
-    -- NOT a finding that load-bearing equals incidental: failure to reject is
-    -- not equality, and the wording here is chosen to avoid implying it.
-    else if signTestPasses (t.nonTiedVs ArmKind.ablateLoadBearing)
-                           (t.winsVs ArmKind.ablateLoadBearing)
-            && signTestPasses (t.nonTiedVs ArmKind.ablateIncidental)
-                              (t.winsVs ArmKind.ablateIncidental) then
-      Outcome.anyAblationBreaks
-    else Outcome.rubricUnsupported
+def classify : ValidatedTrace → Outcome := fun validated =>
+  let t := validated.raw
+  -- Validity guards are absent by construction: raw traces do not inhabit the
+  -- domain of this function. `n` is NON-TIED PROBLEMS, never seed-level pairs.
+  let n := t.nonTiedProblems
+  let k := t.lbWinsProblems
+  if signTestPasses n k then Outcome.rubricValidated
+  else if signTestPasses (t.nonTiedVs ArmKind.ablateLoadBearing)
+                         (t.winsVs ArmKind.ablateLoadBearing)
+          && signTestPasses (t.nonTiedVs ArmKind.ablateIncidental)
+                            (t.winsVs ArmKind.ablateIncidental) then
+    Outcome.anyAblationBreaks
+  else Outcome.rubricUnsupported
 
-def decision : DecisionRule Trace Outcome where
+def decision : DecisionRule ValidatedTrace Outcome where
   name := "arm-wise non-closure against the control floor, thresholds fixed pre-hoc"
   classify := classify
 
@@ -888,24 +864,26 @@ def replication : ReplicationPlan where
 
 /-! ## The registration -/
 
-def base : Registration Trace where
+def base : Registration ValidatedTrace where
   name := "E2 — memory ablation on closed problems in an isolated account"
   claim := ClaimForm.comparative
   -- Three arms, not four: the prose-only arm tested a separate hypothesis and
   -- was never read by the decision rule. Banked rather than given a role.
   arms := [controlArm, lbArm, inArm]
   flags :=
-    [⟨"isolated account cannot read operator home", homeUnreadable⟩,
-     ⟨"history truncated at base revision", historyTruncated⟩,
-     ⟨"analysis artifacts unreachable", artifactsUnreachable⟩,
-     ⟨"runner-side store unreachable", runnerStoreUnreachable⟩,
-     ⟨"ablation took effect", ablationTookEffect⟩,
-     ⟨"expectation set non-empty and duplicate-free", expectationWellFormed⟩,
-     ⟨"no expected cell missing", noOmissions⟩,
-     ⟨"no expected cell observed twice", noDuplicates⟩,
-     ⟨"no run outside the registered panel", noExtras⟩,
-     ⟨"each run withheld the registered memory", withholdingAsRegistered⟩,
-     ⟨"no two runs shared a session", sessionsDistinct⟩]
+    [⟨"isolated account cannot read operator home", onValidated homeUnreadable⟩,
+     ⟨"history truncated at base revision", onValidated historyTruncated⟩,
+     ⟨"analysis artifacts unreachable", onValidated artifactsUnreachable⟩,
+     ⟨"runner-side store unreachable", onValidated runnerStoreUnreachable⟩,
+     ⟨"ablation took effect", onValidated ablationTookEffect⟩,
+     ⟨"expectation set non-empty and duplicate-free", onValidated expectationWellFormed⟩,
+     ⟨"no expected cell missing", onValidated noOmissions⟩,
+     ⟨"no expected cell observed twice", onValidated noDuplicates⟩,
+     ⟨"no run outside the registered panel", onValidated noExtras⟩,
+     ⟨"each run withheld the registered memory", onValidated withholdingAsRegistered⟩,
+     ⟨"no two runs shared a session", onValidated sessionsDistinct⟩,
+     ⟨"every run uses the registered pre-solution revision",
+       onValidated revisionsAsRegistered⟩]
   -- From a measured rate: ~20-35k runner tokens per dispatch, observed on a
   -- comparable design. 6-8 problems x 3 arms x 3 repeats, with the control
   -- arm run first as the pilot. The multiplier is included: an estimate
@@ -922,7 +900,7 @@ def base : Registration Trace where
   -- gap worth raising against the facility rather than papering over here.
   teardownDeadline := some 86400
 
-def registration : ProspectiveRegistration Trace Outcome where
+def registration : ProspectiveRegistration ValidatedTrace Outcome where
   base := base
   replication := replication
   stopRules := [noiseFloorTooHigh, ablationLeaked]
