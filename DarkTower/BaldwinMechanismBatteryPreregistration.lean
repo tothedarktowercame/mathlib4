@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import DarkTower.BaldwinMechanismPreregistration
 import DarkTower.ExperimentalDesign
+import Mathlib.Data.Nat.Choose.Basic
 
 /-!
 # Preregistration: MetaCA inherited-content response and held endpoints
@@ -26,6 +27,29 @@ open ExperimentPreregistration ExperimentalDesign
 
 def expectedAlleleProbes : Nat := 640
 def expectedMapRows : Nat := 80 * 256
+
+/-- Upper tail of the fair-binomial null, kept in exact natural arithmetic. -/
+def binomTail (n k : Nat) : Nat :=
+  ((List.range (n + 1)).filter (fun i => k ≤ i)).foldl
+    (fun acc i => acc + Nat.choose n i) 0
+
+/-- Two-sided exact paired sign test with Bonferroni familywise alpha 0.05.
+
+Ties have already been excluded, so `positive + negative` is the sample size.
+The integer inequality is
+`2 * tail / 2^n ≤ 0.05 / familySize`, hence
+`40 * familySize * tail ≤ 2^n`. -/
+def familywiseSignificant (positive negative familySize : Nat) : Bool :=
+  let n := positive + negative
+  let k := max positive negative
+  decide (0 < n) && decide (0 < familySize) &&
+    decide (40 * familySize * binomTail n k ≤ 2 ^ n)
+
+theorem production_22_of_24_passes :
+    familywiseSignificant 22 2 expectedAlleleProbes = true := by decide
+
+theorem production_21_of_24_fails :
+    familywiseSignificant 21 3 expectedAlleleProbes = false := by decide
 
 structure Trace where
   sourceRevisionBound : Bool
