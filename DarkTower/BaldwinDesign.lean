@@ -191,16 +191,19 @@ readouts, not witness-chosen scoring functions.
 /-- An experimental design for the causal guidance claim.
 
 `selectedWithLearning` and `selectedWithoutLearning` describe the realised
-between-generation transitions under the two paired selection regimes.
-`preparedness` measures inherited early-learning performance on preregistered
-training tasks; `heldOutPreparedness` applies the same readout to a disjoint task set.
+between-generation transitions between whole populations under the two paired
+selection regimes. `preparedness` measures aggregate inherited early-learning
+performance on preregistered training tasks; `heldOutPreparedness` applies the same
+readout to a disjoint task set. The population is the causal unit: paired arms begin
+with the same population, but their best final genomes need not share one lineage.
 -/
 structure GuidanceDesign (ι : Type*) (Rule : Type*)
     extends ExperimentalDesign ι Rule where
-  preparedness : Genome ι Rule → ℝ
-  heldOutPreparedness : Genome ι Rule → ℝ
-  selectedWithLearning : Genome ι Rule → Genome ι Rule → Prop
-  selectedWithoutLearning : Genome ι Rule → Genome ι Rule → Prop
+  preparedness : List (Genome ι Rule) → ℝ
+  heldOutPreparedness : List (Genome ι Rule) → ℝ
+  functionalPopulation : List (Genome ι Rule) → Prop
+  selectedWithLearning : List (Genome ι Rule) → List (Genome ι Rule) → Prop
+  selectedWithoutLearning : List (Genome ι Rule) → List (Genome ι Rule) → Prop
 
 namespace GuidanceDesign
 
@@ -216,8 +219,8 @@ held-out readout.  No decline in plastic dependence is required: that additional
 claim remains the job of `BaldwinWitness`.
 -/
 structure GuidanceWitness (d : GuidanceDesign ι Rule) (n : Nat) where
-  withLearningPath : Fin (n + 1) → Genome ι Rule
-  withoutLearningPath : Fin (n + 1) → Genome ι Rule
+  withLearningPath : Fin (n + 1) → List (Genome ι Rule)
+  withoutLearningPath : Fin (n + 1) → List (Genome ι Rule)
   commonAncestor : withLearningPath 0 = withoutLearningPath 0
   withLearningStep :
     ∀ i : Fin n,
@@ -226,8 +229,8 @@ structure GuidanceWitness (d : GuidanceDesign ι Rule) (n : Nat) where
     ∀ i : Fin n,
       d.selectedWithoutLearning
         (withoutLearningPath i.castSucc) (withoutLearningPath i.succ)
-  withLearningFunctional : d.Successful (withLearningPath (Fin.last n))
-  withoutLearningFunctional : d.Successful (withoutLearningPath (Fin.last n))
+  withLearningFunctional : d.functionalPopulation (withLearningPath (Fin.last n))
+  withoutLearningFunctional : d.functionalPopulation (withoutLearningPath (Fin.last n))
   trainingAdvantage :
     d.preparedness (withoutLearningPath (Fin.last n)) <
       d.preparedness (withLearningPath (Fin.last n))
@@ -237,7 +240,7 @@ structure GuidanceWitness (d : GuidanceDesign ι Rule) (n : Nat) where
 
 /-- A guidance certificate exposes the learned arm's final inherited genome. -/
 def GuidanceWitness.withLearningEndpoint {d : GuidanceDesign ι Rule} {n : Nat}
-    (w : d.GuidanceWitness n) : Genome ι Rule :=
+    (w : d.GuidanceWitness n) : List (Genome ι Rule) :=
   w.withLearningPath (Fin.last n)
 
 /-- Guidance entails a strict training-readout contrast against the paired control. -/
