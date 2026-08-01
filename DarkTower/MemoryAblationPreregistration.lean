@@ -907,6 +907,90 @@ def registration : ProspectiveRegistration ValidatedTrace Outcome where
   stopRulesNonempty := by simp
   decision := decision
 
+/-! ## Permanent adversarial regression suite
+
+These are small closed traces, not examples hidden in prose.  Each theorem
+states that the public validator returns a typed refusal containing the error
+which the corresponding historical design omitted.
+-/
+
+private def regressionPanel : List PanelEntry :=
+  [{ problem := "p", baseRevision := "pre", lbMemory := "lb", incMemory := "inc" }]
+
+private def regressionIsolation : IsolationProbe :=
+  { homeReadDenied := true
+    noFutureCommits := true
+    noAnalysisArtifacts := true
+    noRunnerSideStore := true }
+
+private def regressionRun (arm : ArmKind) (session revision : String)
+    (withheld : Option String) (attempts : Nat) : Run :=
+  { problemId := "p"
+    arm := arm
+    sessionId := session
+    seed := 1
+    baseRevision := revision
+    attemptsToClose := attempts
+    closed := true
+    sorriesRemaining := 0
+    distinctRoutesTried := 1
+    withheldMemory := withheld
+    withheldPresent := false }
+
+private def regressionTrace : Trace :=
+  { runs :=
+      [regressionRun .control "control-session" "pre" none 1,
+       regressionRun .ablateLoadBearing "lb-session" "pre" (some "lb") 3,
+       regressionRun .ablateIncidental "inc-session" "pre" (some "inc") 2]
+    panel := regressionPanel
+    seeds := [1]
+    isolation := regressionIsolation
+    discarded := [] }
+
+private def wrongMemoryTrace : Trace :=
+  { regressionTrace with runs :=
+      [regressionRun .control "control-session" "pre" none 1,
+       regressionRun .ablateLoadBearing "lb-session" "pre" (some "wrong") 3,
+       regressionRun .ablateIncidental "inc-session" "pre" (some "inc") 2] }
+
+private def sharedSessionTrace : Trace :=
+  { regressionTrace with runs :=
+      [regressionRun .control "shared-session" "pre" none 1,
+       regressionRun .ablateLoadBearing "shared-session" "pre" (some "lb") 3,
+       regressionRun .ablateIncidental "inc-session" "pre" (some "inc") 2] }
+
+private def postSolutionTrace : Trace :=
+  { regressionTrace with runs :=
+      [regressionRun .control "control-session" "post" none 1,
+       regressionRun .ablateLoadBearing "lb-session" "post" (some "lb") 3,
+       regressionRun .ablateIncidental "inc-session" "post" (some "inc") 2] }
+
+private def noAblationTrace : Trace :=
+  { regressionTrace with runs :=
+      [regressionRun .control "control-session" "pre" none 1,
+       regressionRun .ablateLoadBearing "lb-session" "pre" none 3,
+       regressionRun .ablateIncidental "inc-session" "pre" none 2] }
+
+theorem regression_wrong_memory_is_typed_refusal :
+    ∃ errors, validate wrongMemoryTrace = .error errors ∧
+      ProtocolError.wrongMemoryWithheld ∈ errors := by
+  native_decide
+
+theorem regression_shared_session_is_typed_refusal :
+    ∃ errors, validate sharedSessionTrace = .error errors ∧
+      ProtocolError.sharedSession ∈ errors := by
+  native_decide
+
+theorem regression_post_solution_revision_is_typed_refusal :
+    ∃ errors, validate postSolutionTrace = .error errors ∧
+      ProtocolError.wrongBaseRevision ∈ errors := by
+  native_decide
+
+theorem regression_no_ablation_is_typed_refusal :
+    ∃ errors, validate noAblationTrace = .error errors ∧
+      ProtocolError.wrongMemoryWithheld ∈ errors := by
+  native_decide
+
 /-! ## What this experiment does not settle, and one honest residue
 
 * **It tests the rubric, not the memories.** A `rubricValidated` outcome
