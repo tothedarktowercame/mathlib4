@@ -79,15 +79,23 @@ structure Trace where
   unusable : List String
   /-- Total offered dispatches in the corpus, in time order. -/
   totalDispatches : Nat
-  /-- Zero-based position, in time order, of the EARLIEST dispatch carrying arm
-  attribution.
-
-  This field exists because of a defect the first version of this registration
-  failed to catch: the attribution field turned out to be populated only from
-  a point late in the corpus, so the measured subset was a recency tail rather
-  than a sample. A rate computed over it cannot be generalised, and nothing in
-  the original design could say so. -/
+  /-- Zero-based position, in time order, of the earliest dispatch carrying arm
+  attribution. Retained for reporting; **not** the basis of the coverage
+  observable — see `attributedSpanSeconds`. -/
   earliestAttributedIndex : Nat
+  /-- Elapsed seconds from the first to the last dispatch in the corpus. -/
+  corpusSpanSeconds : Nat
+  /-- Elapsed seconds from the first ATTRIBUTED dispatch to the last dispatch.
+
+  Coverage must be stated in elapsed time, not in ordinal position. The first
+  version of this registration used the index, and on the real trace that
+  index sits at 71 of 129 — comfortably inside the first two-thirds, so the
+  check passed. The same trace covers **6.6% of elapsed time**: attribution
+  began 6.9 hours before the end of a 105-hour corpus. Receipt density is
+  heavily skewed toward the final days, so ordinal position and temporal
+  coverage diverge by an order of magnitude, and the ordinal reading is the
+  misleading one. -/
+  attributedSpanSeconds : Nat
   deriving Repr
 
 namespace Trace
@@ -131,24 +139,31 @@ def attributionComplete : Observable Trace where
     simpa using List.isEmpty_iff.mp h
 
 /--
-**The attributed subset is not a recency tail.**
+**The attributed subset is not a recency tail — measured in elapsed time.**
 
-The earliest attributed dispatch must fall within the first two-thirds of the
-corpus in time order. An instrument switched on late measures the period after
-it was switched on, and a rate computed there cannot be read as a property of
-the corpus.
+The attributed window must span at least half the corpus's elapsed duration.
+An instrument switched on late measures the period after it was switched on,
+and a rate computed there cannot be read as a property of the corpus.
 
-This observable exists because the first version of this experiment had no way
-to state it. Arm attribution began at one point in a six-day corpus and covered
-only the final hours; the rate it produced was correct for that window and
-uninterpretable beyond it. On that trace this check returns `false`, which is
-the behaviour wanted: the run should not have been treated as a corpus-wide
-measurement.
+**This is the second version of this observable, and the first was wrong in an
+instructive way.** It required the earliest attributed dispatch to sit within
+the first two-thirds of the corpus *by ordinal position*. On the trace that
+motivated the observable, that index is 71 of 129 — so the check **passed**,
+on precisely the data it was written to reject. Attribution there begins 6.9
+hours before the end of a 105-hour corpus: 6.6% of elapsed time. Dispatch
+density is heavily skewed toward the final days, so ordinal rank and temporal
+coverage diverge by an order of magnitude.
+
+The first version was not vacuous — it could return `false`, and did so on a
+constructed counter-trace. It measured the wrong *dimension*. `check_sound`
+guarantees a check never passes a trace violating the stated claim; it cannot
+tell you the claim is the wrong one. That distinction is worth stating, because
+soundness is easy to mistake for adequacy.
 -/
 def coverageNotTail : Observable Trace where
-  name := "earliest attributed dispatch lies in the first two-thirds of the corpus"
-  holds := fun t => 3 * t.earliestAttributedIndex < 2 * t.totalDispatches
-  check := fun t => decide (3 * t.earliestAttributedIndex < 2 * t.totalDispatches)
+  name := "attributed window spans at least half the corpus's elapsed duration"
+  holds := fun t => t.corpusSpanSeconds ≤ 2 * t.attributedSpanSeconds
+  check := fun t => decide (t.corpusSpanSeconds ≤ 2 * t.attributedSpanSeconds)
   check_sound := by intro t h; exact of_decide_eq_true h
 
 /-! ## Arms
