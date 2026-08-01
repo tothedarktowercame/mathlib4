@@ -32,13 +32,13 @@ universe u v
 
 /-- Exact tasks are fixed by deterministic generator version, seed, and count. -/
 def trainingTaskSpecification : String :=
-  "metaca-guidance-task-generator-v1/train/seed=2026080201/count=12"
+  "metaca-guidance-tasks-v1/train/seeds=1..3/sites=0,20,40,60"
 
 def heldOutTaskSpecification : String :=
-  "metaca-guidance-task-generator-v1/heldout/seed=2026080202/count=12"
+  "metaca-guidance-tasks-v1/heldout/seeds=101..103/sites=0,20,40,60"
 
 /-- Learning budgets at which every evolved endpoint is evaluated. -/
-def learningBudgets : List Nat := [0, 4, 16, 64]
+def learningBudgets : List Nat := [0, 4, 16, 64, 120]
 
 /--
 What the smoke test and final analysis must report.  The outcome fields contain real
@@ -165,8 +165,8 @@ structure ProductionProtocol where
 noncomputable def productionProtocol : ProductionProtocol where
   generations := 40
   population := 32
-  evaluationSeeds := 4
-  evaluationSites := 10
+  evaluationSeeds := 3
+  evaluationSites := 4
   trainingTasks := 12
   heldOutTasks := 12
   budgets := learningBudgets
