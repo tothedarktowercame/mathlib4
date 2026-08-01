@@ -71,9 +71,23 @@ structure Trace where
   surfacings : List Surfacing
   /-- Dispatch ids whose recall returned no memories. -/
   emptyDispatches : List String
+  /-- Dispatches that surfaced memories but carry NO arm attribution. These are
+  the instrument's blind spot and must be counted, not dropped. -/
+  unattributedNonEmpty : List String
   /-- Dispatch ids present in the corpus but lacking a recorded query, and so
   excluded from rates. Held as data so the denominator is auditable. -/
   unusable : List String
+  /-- Total offered dispatches in the corpus, in time order. -/
+  totalDispatches : Nat
+  /-- Zero-based position, in time order, of the EARLIEST dispatch carrying arm
+  attribution.
+
+  This field exists because of a defect the first version of this registration
+  failed to catch: the attribution field turned out to be populated only from
+  a point late in the corpus, so the measured subset was a recency tail rather
+  than a sample. A rate computed over it cannot be generalised, and nothing in
+  the original design could say so. -/
+  earliestAttributedIndex : Nat
   deriving Repr
 
 namespace Trace
@@ -109,31 +123,33 @@ unattributed surfacing is indistinguishable from one the instrument could not
 classify.
 -/
 def attributionComplete : Observable Trace where
-  name := "every surfacing carries an arm attribution"
-  holds := fun t => ∀ s ∈ t.surfacings, s.viaPattern = true ∨ s.viaPattern = false
-  check := fun _ => true
+  name := "no dispatch surfaced memories without arm attribution"
+  holds := fun t => t.unattributedNonEmpty = []
+  check := fun t => t.unattributedNonEmpty.isEmpty
   check_sound := by
-    intro t _ s _
-    cases s.viaPattern
-    · exact Or.inr rfl
-    · exact Or.inl rfl
+    intro t h
+    simpa using List.isEmpty_iff.mp h
 
 /--
-The empty dispatches are carried in the trace rather than dropped.
+**The attributed subset is not a recency tail.**
 
-A trace that omitted them would let a pattern-arm rate be computed over
-non-empty dispatches only, which is the denominator error this programme has
-made four times already.
+The earliest attributed dispatch must fall within the first two-thirds of the
+corpus in time order. An instrument switched on late measures the period after
+it was switched on, and a rate computed there cannot be read as a property of
+the corpus.
+
+This observable exists because the first version of this experiment had no way
+to state it. Arm attribution began at one point in a six-day corpus and covered
+only the final hours; the rate it produced was correct for that window and
+uninterpretable beyond it. On that trace this check returns `false`, which is
+the behaviour wanted: the run should not have been treated as a corpus-wide
+measurement.
 -/
-def emptiesRetained : Observable Trace where
-  name := "dispatches with no surfacings are represented in the trace"
-  holds := fun t => t.emptyDispatches = [] ∨ t.emptyDispatches ≠ []
-  check := fun _ => true
-  check_sound := by
-    intro t _
-    by_cases h : t.emptyDispatches = []
-    · exact Or.inl h
-    · exact Or.inr h
+def coverageNotTail : Observable Trace where
+  name := "earliest attributed dispatch lies in the first two-thirds of the corpus"
+  holds := fun t => 3 * t.earliestAttributedIndex < 2 * t.totalDispatches
+  check := fun t => decide (3 * t.earliestAttributedIndex < 2 * t.totalDispatches)
+  check_sound := by intro t h; exact of_decide_eq_true h
 
 /-! ## Arms
 
@@ -235,13 +251,19 @@ def base : Registration Trace where
   name := "E1 — retrieval arm attribution in the frozen corpus"
   claim := ClaimForm.comparative
   arms := [contentArm, patternArm]
-  flags := [⟨"arm attribution present", attributionComplete⟩,
-            ⟨"empty dispatches retained", emptiesRetained⟩]
+  flags := [⟨"no unattributed non-empty dispatch", attributionComplete⟩,
+            ⟨"attributed subset is not a recency tail", coverageNotTail⟩]
   -- Frozen corpus, no dispatches, no runner tokens. The cost is one extraction
   -- pass over 129 receipts, measured from the comparable P1 extraction.
   estimatedCost := 0
   budgetCap := 0
-  teardownDeadline := none
+  -- An offline analysis still has a teardown: the scratch extraction is
+  -- deleted whether or not the run concludes anything. `none` was wrong — it
+  -- left the registration unable to produce a `ReadyToRun` witness, because
+  -- the facility generates a teardown obligation unconditionally. A zero-cost
+  -- experiment is not an experiment without cleanup; it is one whose cleanup
+  -- is cheap.
+  teardownDeadline := some 3600
 
 def registration : ProspectiveRegistration Trace Outcome where
   base := base
