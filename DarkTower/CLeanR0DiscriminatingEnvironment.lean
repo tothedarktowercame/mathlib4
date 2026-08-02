@@ -132,99 +132,6 @@ structure SeedTriple where
   deriving DecidableEq, Repr
 
 def pilotSeedTriples : List SeedTriple := [
-  { scenario := Scenario.patchy, run := 1, food := 202608110, movement := 202608111, choice := 202658110 },
-  { scenario := Scenario.patchy, run := 2, food := 202608112, movement := 202608113, choice := 202658111 },
-  { scenario := Scenario.patchy, run := 3, food := 202608114, movement := 202608115, choice := 202658112 },
-  { scenario := Scenario.patchy, run := 4, food := 202608116, movement := 202608117, choice := 202658113 },
-  { scenario := Scenario.patchy, run := 5, food := 202608118, movement := 202608119, choice := 202658114 },
-  { scenario := Scenario.patchy, run := 6, food := 202608120, movement := 202608121, choice := 202658115 },
-  { scenario := Scenario.patchy, run := 7, food := 202608122, movement := 202608123, choice := 202658116 },
-  { scenario := Scenario.patchy, run := 8, food := 202608124, movement := 202608125, choice := 202658117 },
-  { scenario := Scenario.patchy, run := 9, food := 202608126, movement := 202608127, choice := 202658118 },
-  { scenario := Scenario.patchy, run := 10, food := 202608128, movement := 202608129, choice := 202658119 },
-  { scenario := Scenario.patchy, run := 11, food := 202608130, movement := 202608131, choice := 202658120 },
-  { scenario := Scenario.patchy, run := 12, food := 202608132, movement := 202608133, choice := 202658121 },
-  { scenario := Scenario.patchy, run := 13, food := 202608134, movement := 202608135, choice := 202658122 },
-  { scenario := Scenario.patchy, run := 14, food := 202608136, movement := 202608137, choice := 202658123 },
-  { scenario := Scenario.patchy, run := 15, food := 202608138, movement := 202608139, choice := 202658124 },
-  { scenario := Scenario.patchy, run := 16, food := 202608140, movement := 202608141, choice := 202658125 },
-  { scenario := Scenario.patchy, run := 17, food := 202608142, movement := 202608143, choice := 202658126 },
-  { scenario := Scenario.patchy, run := 18, food := 202608144, movement := 202608145, choice := 202658127 },
-  { scenario := Scenario.patchy, run := 19, food := 202608146, movement := 202608147, choice := 202658128 },
-  { scenario := Scenario.patchy, run := 20, food := 202608148, movement := 202608149, choice := 202658129 },
-  { scenario := Scenario.patchy, run := 21, food := 202608150, movement := 202608151, choice := 202658130 },
-  { scenario := Scenario.patchy, run := 22, food := 202608152, movement := 202608153, choice := 202658131 },
-  { scenario := Scenario.patchy, run := 23, food := 202608154, movement := 202608155, choice := 202658132 },
-  { scenario := Scenario.patchy, run := 24, food := 202608156, movement := 202608157, choice := 202658133 },
-  { scenario := Scenario.patchy, run := 25, food := 202608158, movement := 202608159, choice := 202658134 },
-  { scenario := Scenario.patchy, run := 26, food := 202608160, movement := 202608161, choice := 202658135 },
-  { scenario := Scenario.patchy, run := 27, food := 202608162, movement := 202608163, choice := 202658136 },
-  { scenario := Scenario.patchy, run := 28, food := 202608164, movement := 202608165, choice := 202658137 },
-  { scenario := Scenario.patchy, run := 29, food := 202608166, movement := 202608167, choice := 202658138 },
-  { scenario := Scenario.patchy, run := 30, food := 202608168, movement := 202608169, choice := 202658139 },
-  { scenario := Scenario.sparse, run := 1, food := 202708110, movement := 202708111, choice := 202758110 },
-  { scenario := Scenario.sparse, run := 2, food := 202708112, movement := 202708113, choice := 202758111 },
-  { scenario := Scenario.sparse, run := 3, food := 202708114, movement := 202708115, choice := 202758112 },
-  { scenario := Scenario.sparse, run := 4, food := 202708116, movement := 202708117, choice := 202758113 },
-  { scenario := Scenario.sparse, run := 5, food := 202708118, movement := 202708119, choice := 202758114 },
-  { scenario := Scenario.sparse, run := 6, food := 202708120, movement := 202708121, choice := 202758115 },
-  { scenario := Scenario.sparse, run := 7, food := 202708122, movement := 202708123, choice := 202758116 },
-  { scenario := Scenario.sparse, run := 8, food := 202708124, movement := 202708125, choice := 202758117 },
-  { scenario := Scenario.sparse, run := 9, food := 202708126, movement := 202708127, choice := 202758118 },
-  { scenario := Scenario.sparse, run := 10, food := 202708128, movement := 202708129, choice := 202758119 },
-  { scenario := Scenario.sparse, run := 11, food := 202708130, movement := 202708131, choice := 202758120 },
-  { scenario := Scenario.sparse, run := 12, food := 202708132, movement := 202708133, choice := 202758121 },
-  { scenario := Scenario.sparse, run := 13, food := 202708134, movement := 202708135, choice := 202758122 },
-  { scenario := Scenario.sparse, run := 14, food := 202708136, movement := 202708137, choice := 202758123 },
-  { scenario := Scenario.sparse, run := 15, food := 202708138, movement := 202708139, choice := 202758124 },
-  { scenario := Scenario.sparse, run := 16, food := 202708140, movement := 202708141, choice := 202758125 },
-  { scenario := Scenario.sparse, run := 17, food := 202708142, movement := 202708143, choice := 202758126 },
-  { scenario := Scenario.sparse, run := 18, food := 202708144, movement := 202708145, choice := 202758127 },
-  { scenario := Scenario.sparse, run := 19, food := 202708146, movement := 202708147, choice := 202758128 },
-  { scenario := Scenario.sparse, run := 20, food := 202708148, movement := 202708149, choice := 202758129 },
-  { scenario := Scenario.sparse, run := 21, food := 202708150, movement := 202708151, choice := 202758130 },
-  { scenario := Scenario.sparse, run := 22, food := 202708152, movement := 202708153, choice := 202758131 },
-  { scenario := Scenario.sparse, run := 23, food := 202708154, movement := 202708155, choice := 202758132 },
-  { scenario := Scenario.sparse, run := 24, food := 202708156, movement := 202708157, choice := 202758133 },
-  { scenario := Scenario.sparse, run := 25, food := 202708158, movement := 202708159, choice := 202758134 },
-  { scenario := Scenario.sparse, run := 26, food := 202708160, movement := 202708161, choice := 202758135 },
-  { scenario := Scenario.sparse, run := 27, food := 202708162, movement := 202708163, choice := 202758136 },
-  { scenario := Scenario.sparse, run := 28, food := 202708164, movement := 202708165, choice := 202758137 },
-  { scenario := Scenario.sparse, run := 29, food := 202708166, movement := 202708167, choice := 202758138 },
-  { scenario := Scenario.sparse, run := 30, food := 202708168, movement := 202708169, choice := 202758139 },
-  { scenario := Scenario.snowdrift, run := 1, food := 202808110, movement := 202808111, choice := 202858110 },
-  { scenario := Scenario.snowdrift, run := 2, food := 202808112, movement := 202808113, choice := 202858111 },
-  { scenario := Scenario.snowdrift, run := 3, food := 202808114, movement := 202808115, choice := 202858112 },
-  { scenario := Scenario.snowdrift, run := 4, food := 202808116, movement := 202808117, choice := 202858113 },
-  { scenario := Scenario.snowdrift, run := 5, food := 202808118, movement := 202808119, choice := 202858114 },
-  { scenario := Scenario.snowdrift, run := 6, food := 202808120, movement := 202808121, choice := 202858115 },
-  { scenario := Scenario.snowdrift, run := 7, food := 202808122, movement := 202808123, choice := 202858116 },
-  { scenario := Scenario.snowdrift, run := 8, food := 202808124, movement := 202808125, choice := 202858117 },
-  { scenario := Scenario.snowdrift, run := 9, food := 202808126, movement := 202808127, choice := 202858118 },
-  { scenario := Scenario.snowdrift, run := 10, food := 202808128, movement := 202808129, choice := 202858119 },
-  { scenario := Scenario.snowdrift, run := 11, food := 202808130, movement := 202808131, choice := 202858120 },
-  { scenario := Scenario.snowdrift, run := 12, food := 202808132, movement := 202808133, choice := 202858121 },
-  { scenario := Scenario.snowdrift, run := 13, food := 202808134, movement := 202808135, choice := 202858122 },
-  { scenario := Scenario.snowdrift, run := 14, food := 202808136, movement := 202808137, choice := 202858123 },
-  { scenario := Scenario.snowdrift, run := 15, food := 202808138, movement := 202808139, choice := 202858124 },
-  { scenario := Scenario.snowdrift, run := 16, food := 202808140, movement := 202808141, choice := 202858125 },
-  { scenario := Scenario.snowdrift, run := 17, food := 202808142, movement := 202808143, choice := 202858126 },
-  { scenario := Scenario.snowdrift, run := 18, food := 202808144, movement := 202808145, choice := 202858127 },
-  { scenario := Scenario.snowdrift, run := 19, food := 202808146, movement := 202808147, choice := 202858128 },
-  { scenario := Scenario.snowdrift, run := 20, food := 202808148, movement := 202808149, choice := 202858129 },
-  { scenario := Scenario.snowdrift, run := 21, food := 202808150, movement := 202808151, choice := 202858130 },
-  { scenario := Scenario.snowdrift, run := 22, food := 202808152, movement := 202808153, choice := 202858131 },
-  { scenario := Scenario.snowdrift, run := 23, food := 202808154, movement := 202808155, choice := 202858132 },
-  { scenario := Scenario.snowdrift, run := 24, food := 202808156, movement := 202808157, choice := 202858133 },
-  { scenario := Scenario.snowdrift, run := 25, food := 202808158, movement := 202808159, choice := 202858134 },
-  { scenario := Scenario.snowdrift, run := 26, food := 202808160, movement := 202808161, choice := 202858135 },
-  { scenario := Scenario.snowdrift, run := 27, food := 202808162, movement := 202808163, choice := 202858136 },
-  { scenario := Scenario.snowdrift, run := 28, food := 202808164, movement := 202808165, choice := 202858137 },
-  { scenario := Scenario.snowdrift, run := 29, food := 202808166, movement := 202808167, choice := 202858138 },
-  { scenario := Scenario.snowdrift, run := 30, food := 202808168, movement := 202808169, choice := 202858139 }
-]
-
-def confirmationSeedTriples : List SeedTriple := [
   { scenario := Scenario.patchy, run := 1, food := 202610110, movement := 202610111, choice := 202660110 },
   { scenario := Scenario.patchy, run := 2, food := 202610112, movement := 202610113, choice := 202660111 },
   { scenario := Scenario.patchy, run := 3, food := 202610114, movement := 202610115, choice := 202660112 },
@@ -315,6 +222,9 @@ def confirmationSeedTriples : List SeedTriple := [
   { scenario := Scenario.snowdrift, run := 28, food := 202810164, movement := 202810165, choice := 202860137 },
   { scenario := Scenario.snowdrift, run := 29, food := 202810166, movement := 202810167, choice := 202860138 },
   { scenario := Scenario.snowdrift, run := 30, food := 202810168, movement := 202810169, choice := 202860139 }
+]
+
+def confirmationSeedTriples : List SeedTriple := [
 ]
 
 def priorConfirmationSeedTriples : List SeedTriple := [
@@ -415,6 +325,7 @@ noncomputable def canonicalAmbiguityAxis : Axis where
   name := "canonical-ambiguity"
   levels := [0, 1]
   score := fun _ => 0
+  onViolation := some ControlViolationDisposition.abandonRun
 
 theorem canonicalAmbiguityAxis_predicted_not_navigable : ¬ canonicalAmbiguityAxis.Navigable :=
   not_navigable_of_constant (fun _ _ => rfl)
@@ -527,62 +438,18 @@ def decisionRule : DecisionRule ExperimentTrace Outcome where
     | TraceClass.mixed => Outcome.reportGridAndScenarioSpecific
     | TraceClass.incomplete => Outcome.notInterpretable
 
-def pilotSeedIds : List Nat :=
-  (List.range 3).flatMap (fun s =>
-    (List.range 30).map (fun i =>
-      202608110 + 100000 * s + 2 * i))
+def reproducibilityEndpoint : NamedEndpoint where
+  name := "seeded-trace-replay"
+  nameNonempty := by decide
 
-def confirmationSeedIds : List Nat :=
+def pilotUnitIds : List Nat :=
   (List.range 3).flatMap (fun s =>
     (List.range 30).map (fun i =>
       202610110 + 100000 * s + 2 * i))
 
-def priorConfirmationSeedIds : List Nat :=
-  (List.range 3).flatMap (fun s =>
-    (List.range 30).map (fun i =>
-      202609110 + 100000 * s + 2 * i))
-
-theorem seedIds_disjoint : pilotSeedIds.Disjoint confirmationSeedIds := by
-  rw [List.disjoint_left]
-  intro x hp hc
-  simp only [pilotSeedIds, List.mem_flatMap] at hp
-  rcases hp with ⟨s, hs, hp⟩
-  simp only [List.mem_map] at hp
-  rcases hp with ⟨i, hi, rfl⟩
-  simp only [confirmationSeedIds, List.mem_flatMap] at hc
-  rcases hc with ⟨s', hs', hc⟩
-  simp only [List.mem_map] at hc
-  rcases hc with ⟨i', hi', heq⟩
-  have hs_lt := List.mem_range.mp hs
-  have hi_lt := List.mem_range.mp hi
-  have hs'_lt := List.mem_range.mp hs'
-  have hi'_lt := List.mem_range.mp hi'
-  omega
-
-theorem priorConfirmationSeedIds_disjoint :
-    priorConfirmationSeedIds.Disjoint confirmationSeedIds := by
-  rw [List.disjoint_left]
-  intro x hp hc
-  simp only [priorConfirmationSeedIds, List.mem_flatMap] at hp
-  rcases hp with ⟨s, hs, hp⟩
-  simp only [List.mem_map] at hp
-  rcases hp with ⟨i, hi, rfl⟩
-  simp only [confirmationSeedIds, List.mem_flatMap] at hc
-  rcases hc with ⟨s', hs', hc⟩
-  simp only [List.mem_map] at hc
-  rcases hc with ⟨i', hi', heq⟩
-  have hs_lt := List.mem_range.mp hs
-  have hi_lt := List.mem_range.mp hi
-  have hs'_lt := List.mem_range.mp hs'
-  have hi'_lt := List.mem_range.mp hi'
-  omega
-
-def replicationPlan : ReplicationPlan where
-  pilotSeeds := pilotSeedIds
-  confirmationSeeds := confirmationSeedIds
-  pilotNonempty := by native_decide
-  confirmationNonempty := by native_decide
-  disjoint := seedIds_disjoint
+def replicationPlan := ReplicationPlan.pilot
+  pilotUnitIds (by native_decide)
+  (VariationPlan.controlled reproducibilityEndpoint)
 
 noncomputable def baseRegistration : Registration ExperimentTrace where
   name := "r0-discriminating-environment"
@@ -598,7 +465,7 @@ noncomputable def baseRegistration : Registration ExperimentTrace where
 def teardownCommitment : String := "write r0-environment.{edn,md}; never overwrite pilot or confirmation artifacts"
 
 noncomputable def prospectiveRegistration :
-    ProspectiveRegistration ExperimentTrace Outcome where
+    ProspectiveRegistration Nat ExperimentTrace Outcome where
   base := baseRegistration
   replication := replicationPlan
   stopRules := [positiveControlViolatedStop]
@@ -636,14 +503,13 @@ noncomputable def prospectiveReadyToRun :
   baseReady := by simpa [prospectiveRegistration] using baseReadyToRun
   smokeClear := by
     intro s hs
-    simp only [prospectiveRegistration, List.mem_singleton] at hs
+    have h : s = positiveControlViolatedStop := by
+      simpa [prospectiveRegistration] using hs
     subst s
     rfl
 
 example : prospectiveRegistration.stopRules ≠ [] := by decide
-example : prospectiveRegistration.replication.pilotSeeds.Disjoint
-    prospectiveRegistration.replication.confirmationSeeds :=
-  replicationPlan.disjoint
+example : prospectiveRegistration.replication.stage = RegistrationStage.pilot := rfl
 example : ¬ canonicalAmbiguityAxis.Navigable := canonicalAmbiguityAxis_predicted_not_navigable
 
 /-- The positive control's dead axis is an explicit prediction, not
