@@ -80,6 +80,12 @@ theorem Flag.honoured_of_check {Trace : Type u} (f : Flag Trace) (t : Trace)
 
 /-! ## Axes -/
 
+/-- What an experiment commits to doing if a predicted-null control moves. -/
+inductive ControlViolationDisposition
+  | abandonRun
+  | recordAsFinding
+  deriving DecidableEq, Repr
+
 /--
 A parameter axis: the levels a search can actually occupy, and the score at each.
 
@@ -91,6 +97,8 @@ structure Axis where
   name : String
   levels : List ℝ
   score : ℝ → ℝ
+  /-- Required by the CLean renderer for positive-control axes. -/
+  onViolation : Option ControlViolationDisposition := none
 
 /-- Adjacent level pairs across which the score changes.
 

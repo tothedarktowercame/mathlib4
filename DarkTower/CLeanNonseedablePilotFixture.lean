@@ -131,14 +131,21 @@ inductive Outcome where
 
 structure ExperimentTrace where
   classification : TraceClass
-  positiveControlViolated : Bool
+  boundaryRefused : Bool
+  completedRuns : Nat
   deriving Repr
 
-def invalidTraceStop : StopRule ExperimentTrace where
-  name := "invalid-trace"
-  fires := fun trace => trace.positiveControlViolated = true
-  check := fun trace => trace.positiveControlViolated
+def boundaryRefusalStop : StopRule ExperimentTrace where
+  name := "boundary-refusal"
+  fires := fun trace => trace.boundaryRefused = true
+  check := fun trace => trace.boundaryRefused
   check_iff := fun _ => Iff.rfl
+
+def budgetCapStop : StopRule ExperimentTrace where
+  name := "budget-cap"
+  fires := fun trace => 4 ≤ trace.completedRuns
+  check := fun trace => decide (4 ≤ trace.completedRuns)
+  check_iff := fun trace => by simp
 
 def decisionRule : DecisionRule ExperimentTrace Outcome where
   name := "nonseedable-pilot-fixture-decision"
@@ -179,7 +186,7 @@ noncomputable def prospectiveRegistration :
     ProspectiveRegistration ProblemId ExperimentTrace Outcome where
   base := baseRegistration
   replication := replicationPlan
-  stopRules := [invalidTraceStop]
+  stopRules := [boundaryRefusalStop, budgetCapStop]
   stopRulesNonempty := by simp
   decision := decisionRule
 
@@ -191,7 +198,8 @@ def readinessEvidence : Evidence where
 
 def readinessSmoke : ExperimentTrace where
   classification := TraceClass.complete
-  positiveControlViolated := false
+  boundaryRefused := false
+  completedRuns := 0
 
 noncomputable def baseReadyToRun :
     ReadyToRun baseRegistration readinessEvidence readinessSmoke where
@@ -211,9 +219,11 @@ noncomputable def prospectiveReadyToRun :
   baseReady := by simpa [prospectiveRegistration] using baseReadyToRun
   smokeClear := by
     intro s hs
-    simp only [prospectiveRegistration, List.mem_singleton] at hs
-    subst s
-    rfl
+    have h : s = boundaryRefusalStop ∨ s = budgetCapStop := by
+      simpa [prospectiveRegistration] using hs
+    rcases h with (rfl | rfl)
+    · rfl
+    · rfl
 
 example : prospectiveRegistration.stopRules ≠ [] := by decide
 example : prospectiveRegistration.replication.stage = RegistrationStage.pilot := rfl

@@ -322,6 +322,7 @@ noncomputable def canonicalAmbiguityAxis : Axis where
   name := "canonical-ambiguity"
   levels := [0, 1]
   score := fun _ => 0
+  onViolation := some ControlViolationDisposition.abandonRun
 
 theorem canonicalAmbiguityAxis_predicted_not_navigable : ¬ canonicalAmbiguityAxis.Navigable :=
   not_navigable_of_constant (fun _ _ => rfl)
@@ -520,7 +521,8 @@ noncomputable def prospectiveReadyToRun :
   baseReady := by simpa [prospectiveRegistration] using baseReadyToRun
   smokeClear := by
     intro s hs
-    simp only [prospectiveRegistration, List.mem_singleton] at hs
+    have h : s = positiveControlViolatedStop := by
+      simpa [prospectiveRegistration] using hs
     subst s
     rfl
 
