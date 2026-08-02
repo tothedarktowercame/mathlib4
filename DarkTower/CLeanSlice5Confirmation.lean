@@ -428,24 +428,32 @@ def decisionRule : DecisionRule ExperimentTrace Outcome where
     | TraceClass.mixed => Outcome.reportPerScenarioNoGlobalClaim
     | TraceClass.incomplete => Outcome.pilotOnlyNotInterpretable
 
-def pilotSeedIds : List Nat :=
+def reproducibilityEndpoint : NamedEndpoint where
+  name := "seeded-trace-replay"
+  nameNonempty := by decide
+
+def predecessorEndpoint : NamedEndpoint where
+  name := "slice5-pilot"
+  nameNonempty := by decide
+
+def pilotUnitIds : List Nat :=
   (List.range 3).flatMap (fun s =>
     (List.range 30).map (fun i =>
       202608110 + 100000 * s + 2 * i))
 
-def confirmationSeedIds : List Nat :=
+def confirmationUnitIds : List Nat :=
   (List.range 3).flatMap (fun s =>
     (List.range 30).map (fun i =>
       202609110 + 100000 * s + 2 * i))
 
-theorem seedIds_disjoint : pilotSeedIds.Disjoint confirmationSeedIds := by
+theorem unitIds_disjoint : pilotUnitIds.Disjoint confirmationUnitIds := by
   rw [List.disjoint_left]
   intro x hp hc
-  simp only [pilotSeedIds, List.mem_flatMap] at hp
+  simp only [pilotUnitIds, List.mem_flatMap] at hp
   rcases hp with ⟨s, hs, hp⟩
   simp only [List.mem_map] at hp
   rcases hp with ⟨i, hi, rfl⟩
-  simp only [confirmationSeedIds, List.mem_flatMap] at hc
+  simp only [confirmationUnitIds, List.mem_flatMap] at hc
   rcases hc with ⟨s', hs', hc⟩
   simp only [List.mem_map] at hc
   rcases hc with ⟨i', hi', heq⟩
@@ -455,12 +463,10 @@ theorem seedIds_disjoint : pilotSeedIds.Disjoint confirmationSeedIds := by
   have hi'_lt := List.mem_range.mp hi'
   omega
 
-def replicationPlan : ReplicationPlan where
-  pilotSeeds := pilotSeedIds
-  confirmationSeeds := confirmationSeedIds
-  pilotNonempty := by native_decide
-  confirmationNonempty := by native_decide
-  disjoint := seedIds_disjoint
+def replicationPlan := ReplicationPlan.confirmation predecessorEndpoint
+  pilotUnitIds confirmationUnitIds (by native_decide) (by native_decide)
+  unitIds_disjoint
+  (VariationPlan.controlled reproducibilityEndpoint)
 
 noncomputable def baseRegistration : Registration ExperimentTrace where
   name := "slice5-confirmation"
@@ -476,7 +482,7 @@ noncomputable def baseRegistration : Registration ExperimentTrace where
 def teardownCommitment : String := "artifacts written under futon2/holes/labs/ants-faithfulness/ regardless of outcome"
 
 noncomputable def prospectiveRegistration :
-    ProspectiveRegistration ExperimentTrace Outcome where
+    ProspectiveRegistration Nat ExperimentTrace Outcome where
   base := baseRegistration
   replication := replicationPlan
   stopRules := [positiveControlViolatedStop]
@@ -519,9 +525,8 @@ noncomputable def prospectiveReadyToRun :
     rfl
 
 example : prospectiveRegistration.stopRules ≠ [] := by decide
-example : prospectiveRegistration.replication.pilotSeeds.Disjoint
-    prospectiveRegistration.replication.confirmationSeeds :=
-  replicationPlan.disjoint
+example : prospectiveRegistration.replication.stage = RegistrationStage.confirmation := rfl
+example : pilotUnitIds.Disjoint confirmationUnitIds := unitIds_disjoint
 example : ¬ canonicalAmbiguityAxis.Navigable := canonicalAmbiguityAxis_predicted_not_navigable
 
 /-- The positive control's dead axis is an explicit prediction, not
