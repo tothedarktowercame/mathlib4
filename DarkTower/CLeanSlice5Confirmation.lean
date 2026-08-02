@@ -465,7 +465,7 @@ theorem unitIds_disjoint : pilotUnitIds.Disjoint confirmationUnitIds := by
   omega
 
 def replicationPlan := ReplicationPlan.confirmation predecessorEndpoint
-  pilotUnitIds confirmationUnitIds (by native_decide) (by native_decide)
+  pilotUnitIds confirmationUnitIds (by decide) (by decide)
   unitIds_disjoint
   (VariationPlan.controlled reproducibilityEndpoint)
 

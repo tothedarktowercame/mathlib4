@@ -166,7 +166,7 @@ def pilotUnitIds : List ProblemId := [
 ]
 
 def replicationPlan := ReplicationPlan.pilot
-  pilotUnitIds (by native_decide)
+  pilotUnitIds (by decide)
   (VariationPlan.measured identityFloorEndpoint)
 
 noncomputable def baseRegistration : Registration ExperimentTrace where
