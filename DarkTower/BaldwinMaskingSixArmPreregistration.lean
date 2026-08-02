@@ -209,12 +209,10 @@ noncomputable def base : Registration Trace where
   budgetCap := 240
   teardownDeadline := some 240
 
-def replication : ReplicationPlan where
-  pilotSeeds := [901, 902, 903]
-  confirmationSeeds := confirmationEnvironmentSeeds
-  pilotNonempty := by simp
-  confirmationNonempty := by simp [confirmationEnvironmentSeeds]
-  disjoint := by simp [confirmationEnvironmentSeeds]
+def replication : ReplicationPlan Nat :=
+  ReplicationPlan.seededConfirmation "pilot" (by decide)
+    [901, 902, 903] confirmationEnvironmentSeeds (by simp)
+    (by simp [confirmationEnvironmentSeeds]) (by simp [confirmationEnvironmentSeeds])
 
 inductive Outcome
   | invalid
@@ -261,7 +259,7 @@ def invalidProtocol : StopRule Trace where
   check := fun t => !validTrace t
   check_iff := by intro t; cases h : validTrace t <;> simp
 
-noncomputable def experiment : ProspectiveRegistration Trace Outcome where
+noncomputable def experiment : ProspectiveRegistration Nat Trace Outcome where
   base := base
   replication := replication
   stopRules := [invalidProtocol]

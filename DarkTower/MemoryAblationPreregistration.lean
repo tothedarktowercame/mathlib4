@@ -855,12 +855,9 @@ Disjointness still does the work it was there for: the confirmation seeds are
 fixed before the pilot is looked at, so a floor cannot be re-estimated after
 the effect is seen.
 -/
-def replication : ReplicationPlan where
-  pilotSeeds := [20260801, 20260802, 20260803]
-  confirmationSeeds := [20260811, 20260812, 20260813]
-  pilotNonempty := by decide
-  confirmationNonempty := by decide
-  disjoint := by simp
+def replication : ReplicationPlan Nat :=
+  ReplicationPlan.seededConfirmation "pilot" (by decide)
+    [20260801, 20260802, 20260803] [20260811, 20260812, 20260813] (by decide) (by decide) (by simp)
 
 /-! ## The registration -/
 
@@ -900,7 +897,7 @@ def base : Registration ValidatedTrace where
   -- gap worth raising against the facility rather than papering over here.
   teardownDeadline := some 86400
 
-def registration : ProspectiveRegistration ValidatedTrace Outcome where
+def registration : ProspectiveRegistration Nat ValidatedTrace Outcome where
   base := base
   replication := replication
   stopRules := [noiseFloorTooHigh, ablationLeaked]

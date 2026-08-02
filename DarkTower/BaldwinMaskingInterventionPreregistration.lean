@@ -356,12 +356,11 @@ noncomputable def base : Registration Trace where
   budgetCap := 180
   teardownDeadline := some 180
 
-def replication : ReplicationPlan where
-  pilotSeeds := pilotEvaluationSeeds
-  confirmationSeeds := confirmationEvaluationSeeds
-  pilotNonempty := by simp [pilotEvaluationSeeds]
-  confirmationNonempty := by simp [confirmationEvaluationSeeds]
-  disjoint := by simp [pilotEvaluationSeeds, confirmationEvaluationSeeds]
+def replication : ReplicationPlan Nat :=
+  ReplicationPlan.seededConfirmation "pilot" (by decide)
+    pilotEvaluationSeeds confirmationEvaluationSeeds
+    (by simp [pilotEvaluationSeeds]) (by simp [confirmationEvaluationSeeds])
+    (by simp [pilotEvaluationSeeds, confirmationEvaluationSeeds])
 
 /-! ## Stopping and interpretation -/
 
@@ -430,7 +429,7 @@ def decision : DecisionRule Trace Outcome where
   name := "separate plastic visibility, held content specificity, and joint advantage"
   classify := classify
 
-noncomputable def experiment : ProspectiveRegistration Trace Outcome where
+noncomputable def experiment : ProspectiveRegistration Nat Trace Outcome where
   base := base
   replication := replication
   stopRules := [invalidProtocol, failedPositiveControl, inertTreatment, deadline]

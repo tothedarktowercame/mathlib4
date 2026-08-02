@@ -175,12 +175,9 @@ noncomputable def productionProtocol : ProductionProtocol where
   pilotEvolutionSeed := 20260730
   armTimeoutMinutes := 75
 
-def replication : ReplicationPlan where
-  pilotSeeds := [20260730]
-  confirmationSeeds := [20260801, 20260802]
-  pilotNonempty := by simp
-  confirmationNonempty := by simp
-  disjoint := by simp
+def replication : ReplicationPlan Nat :=
+  ReplicationPlan.seededConfirmation "pilot" (by decide)
+    [20260730] [20260801, 20260802] (by simp) (by simp) (by simp)
 
 def invalidConfiguration : StopRule Trace where
   name := "configuration or mode assertion failed"
@@ -236,7 +233,7 @@ def decision : DecisionRule Trace Outcome where
   name := "precommitted 2x2 Baldwin witness interpretation"
   classify := classify
 
-noncomputable def experiment : ProspectiveRegistration Trace Outcome where
+noncomputable def experiment : ProspectiveRegistration Nat Trace Outcome where
   base := baseRegistration
   replication := replication
   stopRules := [invalidConfiguration, failedPositiveControl, inertTreatment,

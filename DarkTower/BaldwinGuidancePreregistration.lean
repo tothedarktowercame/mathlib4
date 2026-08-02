@@ -175,12 +175,9 @@ noncomputable def productionProtocol : ProductionProtocol where
   pilotEvolutionSeed := 20260802
   armTimeoutMinutes := 80
 
-def replication : ReplicationPlan where
-  pilotSeeds := [20260802]
-  confirmationSeeds := [20260803, 20260804, 20260805]
-  pilotNonempty := by simp
-  confirmationNonempty := by simp
-  disjoint := by simp
+def replication : ReplicationPlan Nat :=
+  ReplicationPlan.seededConfirmation "pilot" (by decide)
+    [20260802] [20260803, 20260804, 20260805] (by simp) (by simp) (by simp)
 
 def invalidConfiguration {ι : Type u} {Rule : Type v} {d : GuidanceDesign ι Rule}
     {n : Nat} : StopRule (Trace d n) where
@@ -239,7 +236,7 @@ def decision {ι : Type u} {Rule : Type v} {d : GuidanceDesign ι Rule} {n : Nat
   classify := classify
 
 noncomputable def experiment {ι : Type u} {Rule : Type v}
-    (d : GuidanceDesign ι Rule) (n : Nat) : ProspectiveRegistration (Trace d n) Outcome where
+    (d : GuidanceDesign ι Rule) (n : Nat) : ProspectiveRegistration Nat (Trace d n) Outcome where
   base := baseRegistration d n
   replication := replication
   stopRules := [invalidConfiguration, failedPositiveControl, inertTreatment,

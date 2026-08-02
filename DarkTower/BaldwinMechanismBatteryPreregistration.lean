@@ -129,12 +129,9 @@ noncomputable def base : Registration Trace where
   budgetCap := 720
   teardownDeadline := some 720
 
-def replication : ReplicationPlan where
-  pilotSeeds := [1, 2, 3]
-  confirmationSeeds := [101, 102, 103]
-  pilotNonempty := by simp
-  confirmationNonempty := by simp
-  disjoint := by simp
+def replication : ReplicationPlan Nat :=
+  ReplicationPlan.seededConfirmation "pilot" (by decide)
+    [1, 2, 3] [101, 102, 103] (by simp) (by simp) (by simp)
 
 inductive Outcome
   | invalid
@@ -184,7 +181,7 @@ def invalidApparatus : StopRule Trace where
       cases t.pairedSchedulesAligned <;> cases t.mapCheckpointsComplete <;>
       cases t.artifactValidatorPassed <;> cases t.artifactsChecksummed <;> simp
 
-noncomputable def experiment : ProspectiveRegistration Trace Outcome where
+noncomputable def experiment : ProspectiveRegistration Nat Trace Outcome where
   base := base
   replication := replication
   stopRules := [invalidApparatus]

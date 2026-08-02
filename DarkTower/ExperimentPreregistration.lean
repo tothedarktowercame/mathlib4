@@ -254,6 +254,17 @@ def variation {ι : Type*} : ReplicationPlan ι → VariationPlan
   | .pilot _ _ variation => variation
   | .confirmation _ _ _ _ _ _ variation => variation
 
+/-- Compatibility constructor for genuinely seeded confirmation studies.  It
+still names the predecessor and carries the same nonemptiness/disjointness
+proofs; the fixed endpoint records deterministic seeded replay. -/
+def seededConfirmation (predecessorName : String) (predecessorNonempty : predecessorName ≠ "")
+    (pilotUnits confirmationUnits : List Nat)
+    (pilotNonempty : pilotUnits ≠ []) (confirmationNonempty : confirmationUnits ≠ [])
+    (disjoint : pilotUnits.Disjoint confirmationUnits) : ReplicationPlan Nat :=
+  .confirmation ⟨predecessorName, predecessorNonempty⟩ pilotUnits confirmationUnits
+    pilotNonempty confirmationNonempty disjoint
+    (.controlled ⟨"seeded-trace-replay", by decide⟩)
+
 end ReplicationPlan
 
 /--
