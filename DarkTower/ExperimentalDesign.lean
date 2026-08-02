@@ -119,16 +119,16 @@ gate, its smoke trace must show that none of the preregistered stop conditions a
 fires.  Runtime supervisors remain responsible for applying the same exact checks to
 later traces.
 -/
-structure ProspectiveReadyToRun {Trace : Type u} {Outcome : Type*}
-    (r : ProspectiveRegistration Trace Outcome) (e : Evidence) (smoke : Trace) where
+structure ProspectiveReadyToRun {ι : Type*} {Trace : Type u} {Outcome : Type*}
+    (r : ProspectiveRegistration ι Trace Outcome) (e : Evidence) (smoke : Trace) where
   baseReady : ReadyToRun r.base e smoke
   smokeClear : ∀ s ∈ r.stopRules, s.check smoke = false
 
 /-- The designated launch entry point for a prospective registration. -/
-def ProspectiveLaunch {Trace : Type u} {Outcome : Type*}
-    (r : ProspectiveRegistration Trace Outcome) (e : Evidence) (smoke : Trace)
+def ProspectiveLaunch {ι : Type*} {Trace : Type u} {Outcome : Type*}
+    (r : ProspectiveRegistration ι Trace Outcome) (e : Evidence) (smoke : Trace)
     (_w : ProspectiveReadyToRun r e smoke)
-    (run : ProspectiveRegistration Trace Outcome → Trace) : Trace := run r
+    (run : ProspectiveRegistration ι Trace Outcome → Trace) : Trace := run r
 
 /-! ## The general refusal, and its instances -/
 
