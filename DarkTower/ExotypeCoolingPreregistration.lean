@@ -90,8 +90,11 @@ def pilotUnits : List Nat := [20260803, 20260804, 20260805]
 def confirmationUnits : List Nat := [20260901, 20260902, 20260903, 20260904]
 
 def seedsPerCell : Nat := confirmationUnits.length * seedsPerUnit
+def totalRuns : Nat := 4 * 7 * 60
+def budgetMinutes : Nat := 30
 
 theorem seedsPerCell_eq : seedsPerCell = 60 := by decide
+theorem totalRuns_eq : totalRuns = 1680 := by decide
 
 theorem pilotUnits_nodup : pilotUnits.Nodup := by decide
 theorem confirmationUnits_nodup : confirmationUnits.Nodup := by decide
@@ -125,8 +128,41 @@ theorem temperatureBp_nodup : temperatureBp.Nodup := by decide
 def heldLambdaBp : Nat := 5500
 def heldMuBp : Nat := 1000
 def heldCoefficientBp : Nat := 50000
+def fieldWidth : Nat := 80
+def runSteps : Nat := 6000
+
+/-- The exact Futon5 revision on which the run and representative rate measurement must
+execute. -/
+def registeredSourceRevision : String :=
+  "541ef9eee18c69c1d46ba93094a39881f88b8bf5"
+
+/-- SHA-256 of the canonical input manifest enumerated by `registeredCellSettings`
+below, including replicate-block labels and the fixed run dimensions. -/
+def registeredInputManifestSha256 : String :=
+  "cfe147692080ae8e7f75ea1ff91b0ae6beaf9be7244500ded3d18c849ac858f4"
 
 /-! ## Measured outcomes -/
+
+/-- Temperature's complete operational status within one cell.  `linearAnneal` means
+linear interpolation at every step, including both declared endpoints.  `notApplied`
+records a nominal reporting level which is not supplied to selection. -/
+inductive TemperatureSchedule
+  | fixed (temperatureBp : Nat)
+  | linearAnneal (startTemperatureBp endTemperatureBp startStep endStep : Nat)
+  | notApplied (nominalTemperatureBp : Nat)
+  deriving BEq, DecidableEq, Repr
+
+/-- Exact settings read back from one arm/temperature cell. -/
+structure CellSettings where
+  armName : String
+  temperatureBasisPoints : Nat
+  lambdaBp : Nat
+  muBp : Nat
+  coefficientBp : Nat
+  width : Nat
+  steps : Nat
+  schedule : TemperatureSchedule
+  deriving BEq, DecidableEq, Repr
 
 structure LevelResult where
   temperatureBasisPoints : Nat
@@ -146,6 +182,9 @@ structure LevelResult where
   still-declining minimum -- after the whole programme insisted that a slower decline
   is not a plateau. It is now required at the minimiser. -/
   latePlateau : Bool
+  /-- Registered replicate-block identities contributing to this cell.  Expansion of a
+  block into its fifteen individual seeds is deliberately deferred to finding #9. -/
+  replicateUnitsObserved : List Nat
   seedsObserved : Nat
   deriving BEq, DecidableEq, Repr
 
@@ -184,11 +223,39 @@ def registeredReferencePredictor : ReferencePredictorIdentity where
   probabilityFloorNumerator := 1
   probabilityFloorDenominator := 1000000000
 
+/-- Identity of the workload whose throughput may justify the billing-run budget. -/
+structure BenchmarkWorkload where
+  sourceRevision : String
+  inputManifestSha256 : String
+  width : Nat
+  steps : Nat
+  instrumentation : List String
+  schedulesExercised : List String
+  deriving BEq, DecidableEq, Repr
+
+def registeredBenchmarkWorkload : BenchmarkWorkload where
+  sourceRevision := registeredSourceRevision
+  inputManifestSha256 := registeredInputManifestSha256
+  width := fieldWidth
+  steps := runSteps
+  instrumentation := ["reference-log-loss", "own-next-log-loss", "calibration", "sharpness"]
+  schedulesExercised := ["fixed", "linear-anneal", "not-applied"]
+
+/-- Raw timing evidence, not an asserted rate.  The budget comparison below is derived
+from completed runs and elapsed milliseconds without division or rounding. -/
+structure BenchmarkObservation where
+  workload : BenchmarkWorkload
+  completedRuns : Nat
+  elapsedMilliseconds : Nat
+  deriving BEq, DecidableEq, Repr
+
 structure Trace where
-  sourceRevisionBound : Bool
-  inputChecksumBound : Bool
+  sourceRevisionObserved : String
+  inputManifestSha256Observed : String
   /-- Read back from the run, not from the declaration. -/
   temperaturesObserved : List Nat
+  /-- Exact settings and full within-run temperature schedule read back per cell. -/
+  cellSettingsObserved : List CellSettings
   /-- Identity read from the scorer artifact actually used by the run. -/
   referencePredictorObserved : ReferencePredictorIdentity
   /-- Positive-control readback: the number of calls to temperature-dependent
@@ -198,6 +265,7 @@ structure Trace where
   context tape presented to the scorer at each nominal temperature.  The replay control
   requires the same nonzero checksum at every level. -/
   controlReplayChecksumsObserved : List Nat
+  benchmarkObserved : BenchmarkObservation
   results : List ArmResult
   /-- v2: now actually consumed, via `evidenceOf` below. In v1 this field existed
   and nothing read it, so the comparative claim's obligation was decorative. -/
@@ -221,12 +289,38 @@ def armNames : List String :=
 
 def levelsWellFormed (ls : List LevelResult) : Bool :=
   (ls.map (·.temperatureBasisPoints) == temperatureBp) &&
-  ls.all (fun r => seedsPerCell ≤ r.seedsObserved)
+  ls.all (fun r =>
+    r.replicateUnitsObserved == confirmationUnits &&
+    r.seedsObserved == seedsPerCell)
 
-def armWellFormed (t : Trace) (name : String) : Bool :=
-  match t.results.find? (fun a => a.armName == name) with
-  | some a => levelsWellFormed a.levels
-  | none => false
+def resultsWellFormed (t : Trace) : Bool :=
+  (t.results.map (·.armName) == armNames) &&
+  t.results.all (fun arm => levelsWellFormed arm.levels)
+
+def registeredSchedule (armName : String) (temperature : Nat) : TemperatureSchedule :=
+  if armName == "fixed-temperature" then .fixed temperature
+  else if armName == "annealed" then .linearAnneal 30000 temperature 0 runSteps
+  else .notApplied temperature
+
+def registeredCellSettings : List CellSettings :=
+  armNames.flatMap (fun armName => temperatureBp.map (fun temperature =>
+    { armName := armName
+      temperatureBasisPoints := temperature
+      lambdaBp := heldLambdaBp
+      muBp := heldMuBp
+      coefficientBp := heldCoefficientBp
+      width := fieldWidth
+      steps := runSteps
+      schedule := registeredSchedule armName temperature }))
+
+def benchmarkWellFormed (t : Trace) : Bool :=
+  (t.benchmarkObserved.workload == registeredBenchmarkWorkload) &&
+  0 < t.benchmarkObserved.completedRuns &&
+  0 < t.benchmarkObserved.elapsedMilliseconds
+
+def benchmarkWithinBudget (t : Trace) : Bool :=
+  totalRuns * t.benchmarkObserved.elapsedMilliseconds ≤
+    budgetMinutes * 60000 * t.benchmarkObserved.completedRuns
 
 /-- The no-selection arm and level from which both structural floors are derived.
 Choosing the source here prevents choosing a favourable baseline after seeing the
@@ -251,10 +345,15 @@ def controlRouteClosed (t : Trace) : Bool :=
         List.replicate temperatureBp.length checksum)
 
 def traceComplete (t : Trace) : Bool :=
+  (t.sourceRevisionObserved == registeredSourceRevision) &&
+  (t.inputManifestSha256Observed == registeredInputManifestSha256) &&
   (t.temperaturesObserved == temperatureBp) &&
+  (t.cellSettingsObserved == registeredCellSettings) &&
   (t.referencePredictorObserved == registeredReferencePredictor) &&
   controlRouteClosed t &&
-  armNames.all (armWellFormed t) &&
+  resultsWellFormed t &&
+  benchmarkWellFormed t &&
+  benchmarkWithinBudget t &&
   t.artifactsComplete && t.artifactsChecksummed
 
 /-! ## Scoring an axis
@@ -295,13 +394,16 @@ def settingsHonoured : Flag Trace where
   observable :=
     { name := "declared ladder, exact registered observer, and full cells observed"
       holds := fun t =>
-        t.sourceRevisionBound = true ∧ t.inputChecksumBound = true ∧
+        t.sourceRevisionObserved = registeredSourceRevision ∧
+        t.inputManifestSha256Observed = registeredInputManifestSha256 ∧
         traceComplete t = true
       check := fun t =>
-        t.sourceRevisionBound && t.inputChecksumBound && traceComplete t
+        (t.sourceRevisionObserved == registeredSourceRevision) &&
+        (t.inputManifestSha256Observed == registeredInputManifestSha256) &&
+        traceComplete t
       check_sound := by
         intro t h
-        simp only [Bool.and_eq_true] at h
+        simp only [Bool.and_eq_true, beq_iff_eq] at h
         exact ⟨h.1.1, h.1.2, h.2⟩ }
 
 /-! ## Arms -/
@@ -352,27 +454,24 @@ def evidenceOf (t : Trace) : Evidence where
   teardownExercised := t.teardownExercised
   armsShownDistinct := t.armOutputsDiffer
 
-/-! ## Cost
+/-! ## Cost -/
 
--- v2: stated as a product with no division, which is also what made v1's
--- `norm_num` goal unprovable. 4 arms x 7 levels x 60 seeds = 1680 runs; the rate is
--- 121 runs/min MEASURED WITHOUT retained scoring or annealing, so a timed pilot is
--- required by `pilotRateMustBeRemeasured` before this estimate may be relied on. -/
+/-- Cross-multiplied runtime estimate derived from raw representative timing evidence.
+The budget obligation compares these quantities directly, avoiding an asserted or
+rounded runs-per-minute field. -/
+def estimatedRunMilliseconds (t : Trace) : Nat :=
+  totalRuns * t.benchmarkObserved.elapsedMilliseconds
 
-def totalRuns : Nat := 4 * 7 * 60
-def measuredRunsPerMinute : Nat := 121
-def budgetMinutes : Nat := 30
+def benchmarkBudgetCapacity (t : Trace) : Nat :=
+  budgetMinutes * 60000 * t.benchmarkObserved.completedRuns
 
-theorem totalRuns_eq : totalRuns = 1680 := by decide
+/-- Invalid or absent benchmark evidence must fail the budget obligation itself, not
+merely the independent completeness flag. -/
+def registeredEstimatedCost (t : Trace) : Nat :=
+  if benchmarkWellFormed t then estimatedRunMilliseconds t else 1
 
-theorem within_declared_cap : totalRuns ≤ budgetMinutes * measuredRunsPerMinute := by
-  decide
-
-/-- The rate above was measured under different instrumentation. Registering it as
-sufficient is not the same as having measured it here. -/
-def pilotRateMustBeRemeasured : Prop :=
-  ∃ observedRunsPerMinute : Nat,
-    totalRuns ≤ budgetMinutes * observedRunsPerMinute
+def registeredBudgetCap (t : Trace) : Nat :=
+  if benchmarkWellFormed t then benchmarkBudgetCapacity t else 0
 
 /-! ## Interpretation
 
@@ -473,8 +572,18 @@ def instrumentStop : StopRule Trace where
   check := fun t => decide (t.referencePredictorObserved ≠ registeredReferencePredictor)
   check_iff := by intro t; simp
 
+def identityStop : StopRule Trace where
+  name := "source revision or input manifest differs from the registration"
+  fires := fun t =>
+    t.sourceRevisionObserved ≠ registeredSourceRevision ∨
+    t.inputManifestSha256Observed ≠ registeredInputManifestSha256
+  check := fun t => decide
+    (t.sourceRevisionObserved ≠ registeredSourceRevision ∨
+     t.inputManifestSha256Observed ≠ registeredInputManifestSha256)
+  check_iff := by intro t; simp
+
 def completenessStop : StopRule Trace where
-  name := "a declared cell is missing or under-seeded"
+  name := "trace identity, settings, schedule, sampling, or benchmark contradicts registration"
   fires := fun t => traceComplete t = false
   check := fun t => !traceComplete t
   check_iff := by
@@ -490,8 +599,8 @@ noncomputable def registration (t : Trace) : Registration Trace where
   arms := [fixedCooling t, annealedCooling t, noSelection,
     selectionBypassedReplayControl t]
   flags := [settingsHonoured]
-  estimatedCost := (totalRuns : ℝ)
-  budgetCap := ((budgetMinutes * measuredRunsPerMinute : Nat) : ℝ)
+  estimatedCost := (registeredEstimatedCost t : ℝ)
+  budgetCap := (registeredBudgetCap t : ℝ)
   teardownDeadline := some 90
 
 def replication : ReplicationPlan Nat :=
@@ -506,7 +615,7 @@ noncomputable def prospective (t : Trace) :
     ProspectiveRegistration Nat Trace Outcome where
   base := registration t
   replication := replication
-  stopRules := [deadlineStop, instrumentStop, completenessStop]
+  stopRules := [deadlineStop, instrumentStop, identityStop, completenessStop]
   stopRulesNonempty := by simp
   decision := decisionRule
 
