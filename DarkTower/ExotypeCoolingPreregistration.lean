@@ -70,6 +70,12 @@ minimum in temperature, the minimising field is classified late-window stationar
 its entropy and spatial autocorrelation both exceed the measured confetti floor by a
 declared margin.
 
+**Comparative commitment:** fixed-temperature and linear-annealed cooling are compared
+by summed reference log loss across the seven matched endpoints (equivalently mean loss,
+because completeness fixes both profiles at seven cells).  Equality is an explicit
+failure to separate, while every substantive outcome records which arm is lower.  The
+no-selection arm supplies the empirical structural floor rather than the arm contrast.
+
 It is refuted if the score is monotone across the ladder, if the minimiser sits at an
 endpoint, if the minimiser is still in transient decline, or if its structure does not
 clear the measured floor.
@@ -267,9 +273,6 @@ structure Trace where
   controlReplayChecksumsObserved : List Nat
   benchmarkObserved : BenchmarkObservation
   results : List ArmResult
-  /-- v2: now actually consumed, via `evidenceOf` below. In v1 this field existed
-  and nothing read it, so the comparative claim's obligation was decorative. -/
-  armOutputsDiffer : Bool
   toolchainExercised : Bool
   codeIdentityAsserted : Bool
   teardownExercised : Bool
@@ -443,16 +446,48 @@ noncomputable def selectionBypassedReplayControl (t : Trace) : Arm where
              onViolation := some .abandonRun
              score := controlScoreOf t }]
 
+/-! ## Registered arm contrast -/
+
+/-- Aggregate frozen-reference loss for one named arm.  Completeness has already fixed
+the exact ordered seven-level profile; this function remains total on arbitrary traces
+so the decision rule can classify malformed input as incomplete. -/
+def armReferenceLossTotal (t : Trace) (name : String) : Option Nat := do
+  let arm ← t.results.find? (fun result => result.armName == name)
+  if levelsWellFormed arm.levels then
+    some (arm.levels.foldl (fun total level => total + level.referenceLogLossBp) 0)
+  else none
+
+def fixedAnnealedTotals (t : Trace) : Option (Nat × Nat) := do
+  let fixed ← armReferenceLossTotal t "fixed-temperature"
+  let annealed ← armReferenceLossTotal t "annealed"
+  pure (fixed, annealed)
+
+/-- Direction of the preregistered fixed-versus-annealed contrast.  There is no equality
+constructor: equality is the explicit `fixedAnnealedNotSeparated` outcome below. -/
+inductive ContrastDirection
+  | fixedLower
+  | annealedLower
+  deriving DecidableEq, Repr
+
+def separatedDirection (fixed annealed : Nat) : Option ContrastDirection :=
+  if fixed < annealed then some .fixedLower
+  else if annealed < fixed then some .annealedLower
+  else none
+
 /-! ## Evidence
 
--- v2: `armsSeparable` is discharged by `Evidence.armsShownDistinct`, and v1 never
--- connected that to anything observed. It is now derived from the trace. -/
+The comparative evidence is computed from the named pair and registered statistic.
+There is no trace Boolean which can assert separation without exhibiting the two
+validated profiles. -/
 
 def evidenceOf (t : Trace) : Evidence where
   toolchainExercised := t.toolchainExercised
   codeIdentityAsserted := t.codeIdentityAsserted
   teardownExercised := t.teardownExercised
-  armsShownDistinct := t.armOutputsDiffer
+  armsShownDistinct :=
+    match fixedAnnealedTotals t with
+    | some (fixed, annealed) => decide (fixed ≠ annealed)
+    | none => false
 
 /-! ## Cost -/
 
@@ -501,17 +536,20 @@ def strictInteriorMinimum (xs : List Nat) : Option Nat :=
 
 inductive Outcome
   /-- The registered prediction: interior minimum, stationary there, structure above
-  the measured floor. -/
-  | interiorMinimumWithStructure
+  the measured floor, carrying the fixed-versus-annealed contrast direction. -/
+  | interiorMinimumWithStructure (contrast : ContrastDirection)
   /-- v2: new. Interior minimum, but still in transient decline at the minimiser. -/
-  | interiorMinimumStillTransient
+  | interiorMinimumStillTransient (contrast : ContrastDirection)
   /-- Interior minimum whose field does not clear the measured confetti floor. -/
-  | interiorMinimumWithoutStructure
+  | interiorMinimumWithoutStructure (contrast : ContrastDirection)
   /-- Genuinely monotone across the ladder: cooling buys nothing. -/
-  | monotone
+  | monotone (contrast : ContrastDirection)
   /-- v2: new. Non-monotone with no strict interior minimum -- ties, or a minimum
   at an endpoint. v1 reported these as `monotone`, which was false. -/
-  | noStrictInteriorMinimum
+  | noStrictInteriorMinimum (contrast : ContrastDirection)
+  /-- The named fixed-temperature and annealed profiles have equal aggregate reference
+  loss, so the comparative claim fails to separate. -/
+  | fixedAnnealedNotSeparated
   /-- The selection-bypassed replay control moved despite identical scorer input. -/
   | controlMoved
   /-- v2: new. Trace incomplete; nothing is interpretable. -/
@@ -537,25 +575,32 @@ def decision (t : Trace) : Outcome :=
         if 0 < spread (ctrl.levels.map (·.referenceLogLossBp))
         then Outcome.controlMoved
         else
-          let ss := arm.levels.map (·.referenceLogLossBp)
-          match strictInteriorMinimum ss with
-          | none => if isMonotone ss then Outcome.monotone
-                    else Outcome.noStrictInteriorMinimum
-          | some best =>
-              match arm.levels.find? (fun r => r.referenceLogLossBp == best),
-                    confettiReference t with
-              | some r, some confetti =>
-                  if !r.latePlateau then Outcome.interiorMinimumStillTransient
-                  else if confetti.entropyBp + structuralMarginBp ≤ r.entropyBp ∧
-                          confetti.autocorrelationBp + structuralMarginBp
-                            ≤ r.autocorrelationBp
-                  then Outcome.interiorMinimumWithStructure
-                  else Outcome.interiorMinimumWithoutStructure
-              | _, _ => Outcome.incomplete
+          match fixedAnnealedTotals t with
+          | none => Outcome.incomplete
+          | some (fixed, annealed) =>
+              match separatedDirection fixed annealed with
+              | none => Outcome.fixedAnnealedNotSeparated
+              | some contrast =>
+                  let ss := arm.levels.map (·.referenceLogLossBp)
+                  match strictInteriorMinimum ss with
+                  | none => if isMonotone ss then Outcome.monotone contrast
+                            else Outcome.noStrictInteriorMinimum contrast
+                  | some best =>
+                      match arm.levels.find? (fun r => r.referenceLogLossBp == best),
+                            confettiReference t with
+                      | some r, some confetti =>
+                          if !r.latePlateau then
+                            Outcome.interiorMinimumStillTransient contrast
+                          else if confetti.entropyBp + structuralMarginBp ≤ r.entropyBp ∧
+                                  confetti.autocorrelationBp + structuralMarginBp
+                                    ≤ r.autocorrelationBp
+                          then Outcome.interiorMinimumWithStructure contrast
+                          else Outcome.interiorMinimumWithoutStructure contrast
+                      | _, _ => Outcome.incomplete
     | _, _ => Outcome.incomplete
 
 def decisionRule : DecisionRule Trace Outcome where
-  name := "interior reference-score minimum, stationary, above the measured floor"
+  name := "fixed-vs-annealed contrast plus interior fixed-temperature minimum"
   classify := decision
 
 /-! ## Stop rules -/
@@ -593,7 +638,7 @@ def completenessStop : StopRule Trace where
 
 /-! ## The registration -/
 
-noncomputable def registration (t : Trace) : Registration Trace where
+private noncomputable def registration (t : Trace) : Registration Trace where
   name := "exotype-6e-cooling-reference-scored"
   claim := .comparative
   arms := [fixedCooling t, annealedCooling t, noSelection,
@@ -611,13 +656,34 @@ def replication : ReplicationPlan Nat :=
       { name := "control-vs-control reference log score at fixed tau"
         nameNonempty := by decide })
 
-noncomputable def prospective (t : Trace) :
+private noncomputable def prospective (t : Trace) :
     ProspectiveRegistration Nat Trace Outcome where
   base := registration t
   replication := replication
   stopRules := [deadlineStop, instrumentStop, identityStop, completenessStop]
   stopRulesNonempty := by simp
   decision := decisionRule
+
+/-- The only launch entry point licensed by this registration.  The registration,
+apparatus evidence, and smoke trace are all derived from the same trace argument, so an
+unrelated observation cannot discharge `armsSeparable`. -/
+abbrev ReadyToLaunch (t : Trace) :=
+  ProspectiveReadyToRun (prospective t) (evidenceOf t) t
+
+noncomputable def launch (t : Trace) (_ready : ReadyToLaunch t)
+    (run : ProspectiveRegistration Nat Trace Outcome → Trace) : Trace :=
+  ProspectiveLaunch (prospective t) (evidenceOf t) t _ready run
+
+/-- Equal aggregate fixed and annealed losses make the trace unable to supply the
+registration-specific launch token. -/
+theorem no_ready_of_fixedAnnealed_not_separated (t : Trace)
+    (h : (evidenceOf t).armsShownDistinct = false) : IsEmpty (ReadyToLaunch t) := by
+  refine ⟨fun ready => ?_⟩
+  have discharged := ready.baseReady.discharged Obligation.armsSeparable (by
+    simp [prospective, registration, Registration.obligations])
+  change (evidenceOf t).armsShownDistinct = true at discharged
+  rw [h] at discharged
+  contradiction
 
 /-! ## What this registration does NOT license
 
