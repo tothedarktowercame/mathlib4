@@ -57,10 +57,13 @@ statistic that cannot separate the state we want from the state we kept getting.
 -- survive, and which contexts they visit. A temperature could score well by
 -- selecting easily-predicted contexts without producing any field organisation.
 --
--- The frozen reference is common to all conditions, so differences in its log score
--- are attributable to the field rather than to a moving target. The own-NEXT score is
--- retained as a SECONDARY mechanistic measurement, and calibration and sharpness are
--- reported separately rather than summed into one number.
+-- The frozen reference is one common conditional observer in every condition, so the
+-- forecast function itself is not a moving target.  Temperature still changes the
+-- distribution of patterns and contexts presented to that observer; this is part of
+-- the registered estimand: predictability of the temperature-induced field under one
+-- common observer.  The own-NEXT score is retained as a SECONDARY mechanistic
+-- measurement, and calibration and sharpness are reported separately rather than
+-- summed into one number.
 
 **Prediction, committed before running:** the reference log score has an *interior*
 minimum in temperature, the minimising field is classified late-window stationary, and
@@ -151,14 +154,43 @@ structure ArmResult where
   levels : List LevelResult
   deriving BEq, DecidableEq, Repr
 
+/-- Complete identity and provenance of the common observer.  Equality of this value is
+the runtime boundary: a model with different code, training, ABI, or probability floor
+is a different predictor rather than another instance of the registered one. -/
+structure ReferencePredictorIdentity where
+  identifier : String
+  repositoryRevision : String
+  implementationSha256 : String
+  observationAbi : List String
+  trainingDataSha256 : Option String
+  fittingProcedure : String
+  scoringProcedure : String
+  probabilityFloorNumerator : Nat
+  probabilityFloorDenominator : Nat
+  deriving BEq, DecidableEq, Repr
+
+/-- The preregistered observer is the existing deterministic, unfitted EFE predictor.
+The source file was clean at the recorded revision when its SHA-256 was taken. -/
+def registeredReferencePredictor : ReferencePredictorIdentity where
+  identifier := "futon5.exotype.efe/predict"
+  repositoryRevision := "541ef9eee18c69c1d46ba93094a39881f88b8bf5"
+  implementationSha256 :=
+    "523c9d46b82894f09aeb0434d11bbe55a0324f4e522a6e23fdcaaca34cab66f8"
+  observationAbi := ["rule-change", "activity", "diversity", "hunger"]
+  trainingDataSha256 := none
+  fittingProcedure := "none: fixed declared constants with deterministic local shrinkage"
+  scoringProcedure :=
+    "mean channel negative log likelihood; Bernoulli outcome; clamp p to [1e-9,1-1e-9]"
+  probabilityFloorNumerator := 1
+  probabilityFloorDenominator := 1000000000
+
 structure Trace where
   sourceRevisionBound : Bool
   inputChecksumBound : Bool
   /-- Read back from the run, not from the declaration. -/
   temperaturesObserved : List Nat
-  /-- The frozen reference predictor's identity, asserted to be the same object in
-  every condition. -/
-  referencePredictorPinned : Bool
+  /-- Identity read from the scorer artifact actually used by the run. -/
+  referencePredictorObserved : ReferencePredictorIdentity
   /-- Positive-control readback: the number of calls to temperature-dependent
   selection at each nominal temperature.  The replay control requires seven zeros. -/
   controlSelectionCallsObserved : List Nat
@@ -170,10 +202,6 @@ structure Trace where
   /-- v2: now actually consumed, via `evidenceOf` below. In v1 this field existed
   and nothing read it, so the comparative claim's obligation was decorative. -/
   armOutputsDiffer : Bool
-  /-- Measured floors from the neutral and confetti arms, which the structural
-  threshold is defined against rather than being an absolute cutoff. -/
-  confettiAutocorrelationFloorBp : Nat
-  confettiEntropyFloorBp : Nat
   toolchainExercised : Bool
   codeIdentityAsserted : Bool
   teardownExercised : Bool
@@ -200,6 +228,15 @@ def armWellFormed (t : Trace) (name : String) : Bool :=
   | some a => levelsWellFormed a.levels
   | none => false
 
+/-- The no-selection arm and level from which both structural floors are derived.
+Choosing the source here prevents choosing a favourable baseline after seeing the
+treatment.  At `tau = 0.3` this is the registered empirical confetti reference. -/
+def confettiReferenceTemperatureBp : Nat := 3000
+
+def confettiReference (t : Trace) : Option LevelResult := do
+  let arm ← t.results.find? (fun a => a.armName == "no-selection")
+  arm.levels.find? (fun r => r.temperatureBasisPoints == confettiReferenceTemperatureBp)
+
 /-- The positive control closes both causal routes from temperature to its measured
 distribution.  Selection is never invoked, so temperature cannot alter which pattern
 acts.  The identical complete action/context tape is replayed at every nominal level,
@@ -215,7 +252,7 @@ def controlRouteClosed (t : Trace) : Bool :=
 
 def traceComplete (t : Trace) : Bool :=
   (t.temperaturesObserved == temperatureBp) &&
-  t.referencePredictorPinned &&
+  (t.referencePredictorObserved == registeredReferencePredictor) &&
   controlRouteClosed t &&
   armNames.all (armWellFormed t) &&
   t.artifactsComplete && t.artifactsChecksummed
@@ -254,9 +291,9 @@ noncomputable def controlScoreOf (t : Trace) (x : ℝ) : ℝ :=
 /-! ## Flags -/
 
 def settingsHonoured : Flag Trace where
-  name := "ladder in force, reference predictor pinned, every cell complete"
+  name := "ladder in force, registered reference predictor matched, every cell complete"
   observable :=
-    { name := "declared ladder, pinned reference, and full cells observed"
+    { name := "declared ladder, exact registered observer, and full cells observed"
       holds := fun t =>
         t.sourceRevisionBound = true ∧ t.inputChecksumBound = true ∧
         traceComplete t = true
@@ -406,15 +443,16 @@ def decision (t : Trace) : Outcome :=
           | none => if isMonotone ss then Outcome.monotone
                     else Outcome.noStrictInteriorMinimum
           | some best =>
-              match arm.levels.find? (fun r => r.referenceLogLossBp == best) with
-              | some r =>
+              match arm.levels.find? (fun r => r.referenceLogLossBp == best),
+                    confettiReference t with
+              | some r, some confetti =>
                   if !r.latePlateau then Outcome.interiorMinimumStillTransient
-                  else if t.confettiEntropyFloorBp + structuralMarginBp ≤ r.entropyBp ∧
-                          t.confettiAutocorrelationFloorBp + structuralMarginBp
+                  else if confetti.entropyBp + structuralMarginBp ≤ r.entropyBp ∧
+                          confetti.autocorrelationBp + structuralMarginBp
                             ≤ r.autocorrelationBp
                   then Outcome.interiorMinimumWithStructure
                   else Outcome.interiorMinimumWithoutStructure
-              | none => Outcome.incomplete
+              | _, _ => Outcome.incomplete
     | _, _ => Outcome.incomplete
 
 def decisionRule : DecisionRule Trace Outcome where
@@ -430,13 +468,10 @@ def deadlineStop : StopRule Trace where
   check_iff := by intro t; constructor <;> (intro h; exact h)
 
 def instrumentStop : StopRule Trace where
-  name := "reference predictor not pinned, so conditions are not comparable"
-  fires := fun t => t.referencePredictorPinned = false
-  check := fun t => !t.referencePredictorPinned
-  check_iff := by
-    intro t; constructor
-    · intro h; simpa using h
-    · intro h; simpa using h
+  name := "observed reference predictor differs from the preregistered identity"
+  fires := fun t => t.referencePredictorObserved ≠ registeredReferencePredictor
+  check := fun t => decide (t.referencePredictorObserved ≠ registeredReferencePredictor)
+  check_iff := by intro t; simp
 
 def completenessStop : StopRule Trace where
   name := "a declared cell is missing or under-seeded"
