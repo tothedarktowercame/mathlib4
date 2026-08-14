@@ -101,6 +101,38 @@ def observable (name : String) (holds : Trace → Prop) [DecidablePred holds] :
     intro t h
     exact of_decide_eq_true h
 
+/-- Claims fixed by the consolidated candidate, not supplied by the observed trace. -/
+def registeredCapabilities : List String :=
+  ["registration gates launch",
+   "frame containment is witnessed",
+   "created frame is worked",
+   "closed cycle has one disposition",
+   "memory offer has use-disposition",
+   "retrieval answers to need vocabulary",
+   "promotion is importable",
+   "promotion is need-taggable",
+   "measurement vector is populated"]
+
+/-- X's fields fixed before round one.  A trace may not shrink this denominator. -/
+def registeredMeasurementFields : List String :=
+  ["statement defects at review",
+   "terminal disposition",
+   "residual executable sorries",
+   "attempts or closer hops",
+   "axiom cleanliness",
+   "memories promoted",
+   "review escape rate",
+   "promoted then surfaced then used",
+   "contract leaks",
+   "duplicate declarations",
+   "locked-lemma exposure",
+   "promotion coverage",
+   "unconsumed promotions",
+   "import-only edges",
+   "scribe lane coverage",
+   "arc-lane yield",
+   "rewrite rule offered and used"]
+
 /-! ## F1--F9 as probe-backed observables -/
 
 def f1FrameWorked : Observable Trace :=
@@ -138,13 +170,15 @@ def f8WitnessedContainment : Observable Trace :=
 
 def f9CapabilityProbes : Observable Trace :=
   observable "F9: every claimed capability has a successful recorded probe" fun t =>
-    ∀ capability ∈ t.claimedCapabilities,
-      capability ∈ t.successfulCapabilityProbeIds
+    t.claimedCapabilities = registeredCapabilities ∧
+      ∀ capability ∈ registeredCapabilities,
+        capability ∈ t.successfulCapabilityProbeIds
 
 /-- X's population guarantee, separate from denominator discipline F6. -/
 def measurementVectorPopulated : Observable Trace :=
   observable "X: every required measurement field is populated" fun t =>
-    ∀ field ∈ t.requiredMeasurementFields, field ∈ t.populatedMeasurementFields
+    t.requiredMeasurementFields = registeredMeasurementFields ∧
+      ∀ field ∈ registeredMeasurementFields, field ∈ t.populatedMeasurementFields
 
 /-- P's importability guarantee. -/
 def promotionsImportable : Observable Trace :=
