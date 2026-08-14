@@ -287,6 +287,67 @@ theorem alternatingColouring_true_card_eq_four (s : Equiv.Perm (Fin 8))
   rw [Fintype.card_subtype, Fintype.card_subtype] at hcard
   omega
 
+/-! ## Paper worked examples and encoding regressions
+
+The paper writes ECA truth tables in Wolfram's displayed order
+
+    111, 110, 101, 100, 011, 010, 001, 000,
+
+and numbers those displayed positions from left to right.  This is the reverse
+of numbering positions by the binary value of the neighbourhood.  The following
+small executable theorems pin down that convention as well as the arithmetic in
+the paper's worked examples.
+-/
+
+/-- The bit at displayed Wolfram position `p` of an ECA rule number.  Position
+zero is the most significant (`111`) bit and position seven is the least
+significant (`000`) bit. -/
+def wolframBit (rule : Fin 256) (p : Fin 8) : Bool :=
+  rule.val.testBit (7 - p.val)
+
+/-- The same rule indexed instead by numerical neighbourhood value, from `000`
+at position zero to `111` at position seven. -/
+def numericalNeighbourhoodBit (rule : Fin 256) (n : Fin 8) : Bool :=
+  rule.val.testBit n.val
+
+/-- Offset `+2` on eight positions, represented by its one-line notation
+`[2, 3, 4, 5, 6, 7, 0, 1]`. -/
+def offsetTwoMap : Fin 8 → Fin 8 := ![2, 3, 4, 5, 6, 7, 0, 1]
+
+def offsetTwoInverseMap : Fin 8 → Fin 8 := ![6, 7, 0, 1, 2, 3, 4, 5]
+
+def offsetTwo : Equiv.Perm (Fin 8) where
+  toFun := offsetTwoMap
+  invFun := offsetTwoInverseMap
+  left_inv k := by fin_cases k <;> rfl
+  right_inv k := by fin_cases k <;> rfl
+
+/-- Apply all eight Boolean-negating writes of a permutation simultaneously. -/
+def simultaneousPropagator (s : Equiv.Perm (Fin 8)) (bits : Fin 8 → Bool) : Fin 8 → Bool :=
+  fun q => !(bits (s.symm q))
+
+/-- Paper Box 1: with offsets acting on displayed Wolfram positions,
+`P_{+2}(01101110) = 01100100`, or Rule 110 maps to Rule 100. -/
+theorem offsetTwo_rule110_eq_rule100 :
+    simultaneousPropagator offsetTwo (wolframBit 110) = wolframBit 100 := by
+  native_decide
+
+/-- The convention-sensitive contrast that motivated the explicit encoding:
+if the same one-line permutation acts on numerical neighbourhood values, Rule
+110 maps to Rule 70 instead. -/
+theorem numericalOffsetTwo_rule110_eq_rule70 :
+    simultaneousPropagator offsetTwo (numericalNeighbourhoodBit 110) =
+      numericalNeighbourhoodBit 70 := by
+  native_decide
+
+/-- Paper Box 2: the complete set of fixed ECA rule numbers for displayed
+offset `+2` is exactly `51, 102, 153, 204`. -/
+theorem offsetTwo_fixed_rule_iff (rule : Fin 256) :
+    IsFixed ⟨offsetTwo, Bool.not⟩ (wolframBit rule) ↔
+      rule ∈ ([51, 102, 153, 204] : List (Fin 256)) := by
+  rw [isFixed_iff_equivariant]
+  native_decide +revert
+
 /-- Alternating colourings, as a finite type for counting statements. -/
 def AlternatingColouring [Fintype N] (s : Equiv.Perm N) :=
   {colour : N → Bool // ∀ k, colour (s k) = !colour k}

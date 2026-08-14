@@ -83,8 +83,15 @@ structure Trace where
   attribution. Retained for reporting; **not** the basis of the coverage
   observable — see `attributedSpanSeconds`. -/
   earliestAttributedIndex : Nat
-  /-- Elapsed seconds from the first to the last dispatch in the corpus. -/
-  corpusSpanSeconds : Nat
+  /-- Elapsed **nanoseconds** from the first to the last dispatch in the corpus.
+
+  Nanoseconds rather than seconds because the two spans are truncated
+  independently, and near the observable's boundary independent truncation can
+  flip the verdict: real spans of 2.9 s and 1.0 s serialize as 2 and 1, so
+  `2 ≤ 2 * 1` passes although `2.9 ≤ 2 * 1.0` is false. The receipts carry
+  nanosecond-precision timestamps, so this unit is exact rather than merely
+  finer, and the failure mode is removed rather than made unlikely. -/
+  corpusSpanNanos : Nat
   /-- Elapsed seconds from the first ATTRIBUTED dispatch to the last dispatch.
 
   Coverage must be stated in elapsed time, not in ordinal position. The first
@@ -94,8 +101,8 @@ structure Trace where
   began 6.9 hours before the end of a 105-hour corpus. Receipt density is
   heavily skewed toward the final days, so ordinal position and temporal
   coverage diverge by an order of magnitude, and the ordinal reading is the
-  misleading one. -/
-  attributedSpanSeconds : Nat
+  misleading one. In nanoseconds, per `corpusSpanNanos`. -/
+  attributedSpanNanos : Nat
   deriving Repr
 
 namespace Trace
@@ -159,11 +166,16 @@ constructed counter-trace. It measured the wrong *dimension*. `check_sound`
 guarantees a check never passes a trace violating the stated claim; it cannot
 tell you the claim is the wrong one. That distinction is worth stating, because
 soundness is easy to mistake for adequacy.
+
+A third revision changed the unit from seconds to nanoseconds: independently
+truncated durations can flip this verdict at the boundary, which is a defect in
+the instrument even where the margin makes it harmless. Three passes, three
+defects, all of them in the instrument and none in the data.
 -/
 def coverageNotTail : Observable Trace where
   name := "attributed window spans at least half the corpus's elapsed duration"
-  holds := fun t => t.corpusSpanSeconds ≤ 2 * t.attributedSpanSeconds
-  check := fun t => decide (t.corpusSpanSeconds ≤ 2 * t.attributedSpanSeconds)
+  holds := fun t => t.corpusSpanNanos ≤ 2 * t.attributedSpanNanos
+  check := fun t => decide (t.corpusSpanNanos ≤ 2 * t.attributedSpanNanos)
   check_sound := by intro t h; exact of_decide_eq_true h
 
 /-! ## Arms
