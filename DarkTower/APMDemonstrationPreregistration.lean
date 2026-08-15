@@ -37,12 +37,12 @@ inductive Invariant
   deriving DecidableEq, Repr
 
 inductive RuntimeInvariant
-  | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9
+  | F2 | F3 | F4 | F5 | F6 | F8 | F9
   deriving DecidableEq, Repr
 
 def RuntimeInvariant.invariant : RuntimeInvariant → Invariant
   | .F2 => .F2 | .F3 => .F3 | .F4 => .F4 | .F5 => .F5
-  | .F6 => .F6 | .F7 => .F7 | .F8 => .F8 | .F9 => .F9
+  | .F6 => .F6 | .F8 => .F8 | .F9 => .F9
 
 /-- The module graph is part of the registration input, with a proof that every
 named enforcer is installed.  F1 is separated because it is structural, not a
@@ -71,7 +71,10 @@ def systemDesign : SystemDesign where
     intro i m hm
     cases i <;> simp at hm ⊢ <;> aesop
   structuralInvariants := [.F1]
-  runtimeInvariants := [.F2, .F3, .F4, .F5, .F6, .F7, .F8, .F9]
+  -- F7 is deliberately absent from round one's runtime contract. Its proposed
+  -- definition made "available" mean "retrieved", so its check could not fail.
+  -- Retaining it here would preregister a tautology as a measurement.
+  runtimeInvariants := [.F2, .F3, .F4, .F5, .F6, .F8, .F9]
 
 /-- The previously decorative module assignment is now a field used by the
 registration, and this theorem exposes its load-bearing coverage proof. -/
@@ -156,7 +159,10 @@ def observable (name : String) (holds : Trace → Prop) [DecidablePred holds] :
 
 /-- Claims fixed by the consolidated candidate, not supplied by the observed trace. -/
 def registeredCapabilities : List Capability :=
-  [.registrationGatesLaunch, .frameContainmentWitnessed, .createdFrameWorked,
+  -- Launch gating is discharged by construction: `Launch` requires a
+  -- `ReadyToRun`, and the generic uninhabitability theorems rule out that
+  -- witness when obligations fail. There is no runtime refusal event to probe.
+  [.frameContainmentWitnessed, .createdFrameWorked,
    .uniqueDisposition, .offerUseDisposition, .needRetrieval,
    .promotionImportable, .promotionNeedTaggable, .measurementPopulated]
 
@@ -259,7 +265,6 @@ noncomputable def runtimeInvariantObservable : RuntimeInvariant → Observable T
   | .F4 => f4StratumFrozen
   | .F5 => f5SingleRegime
   | .F6 => f6DeclaredDenominator
-  | .F7 => f7NeedRetrievable
   | .F8 => f8WitnessedContainment
   | .F9 => f9CapabilityProbes
 

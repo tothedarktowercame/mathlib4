@@ -117,7 +117,6 @@ def negativeF3 : Trace := { positiveTrace with memoryDispositionOfferIds := [] }
 def negativeF4 : Trace := { positiveTrace with stratumFrozenAt := 2, assignedAt := 1 }
 def negativeF5 : Trace := { positiveTrace with comparisonRegimes := ["r1", "r2"] }
 def negativeF6 : Trace := { positiveTrace with denominatorDeclared := false }
-def negativeF7 : Trace := { positiveTrace with needProbeRetrievedIds := [] }
 def negativeF8 : Trace := { positiveTrace with containmentProbePassed := false }
 def negativeF9 : Trace := { positiveTrace with capabilityProbes := probes.tail }
 
@@ -141,10 +140,6 @@ theorem negative_F5_refused : IsEmpty (ReadyToRun base evidence negativeF5) :=
 theorem negative_F6_refused : IsEmpty (ReadyToRun base evidence negativeF6) :=
   no_round1_witness_of_failed_invariant 1 2 (some 3) evidence negativeF6 .F6 (by
     simp [runtimeInvariantObservable, f6DeclaredDenominator, negativeF6, observable])
-
-theorem negative_F7_refused : IsEmpty (ReadyToRun base evidence negativeF7) :=
-  no_round1_witness_of_failed_invariant 1 2 (some 3) evidence negativeF7 .F7 (by
-    simp [runtimeInvariantObservable, f7NeedRetrievable, negativeF7, positiveTrace, observable])
 
 theorem negative_F8_refused : IsEmpty (ReadyToRun base evidence negativeF8) :=
   no_round1_witness_of_failed_invariant 1 2 (some 3) evidence negativeF8 .F8 (by
@@ -196,7 +191,7 @@ theorem negative_F9_is_single : allOtherRuntimeInvariantsHold .F9 negativeF9 := 
   all_goals decide
 
 /-! F9 intentionally subsumes concrete capabilities.  These are machine-checked
-entanglement findings: F2, F3, F7, and F8 cannot be clean single-violation rows
+entanglement findings: F2, F3, and F8 cannot be clean single-violation rows
 while F9 retains its repaired semantics. -/
 
 theorem F2_failure_entails_F9_failure (t : Trace) (h : ¬ f2UniqueDisposition.holds t) :
@@ -208,11 +203,6 @@ theorem F3_failure_entails_F9_failure (t : Trace) (h : ¬ f3OfferDispositions.ho
     ¬ f9CapabilityProbes.holds t := by
   intro hf
   exact h ((hf .offerUseDisposition (by simp [registeredCapabilities])).1)
-
-theorem F7_failure_entails_F9_failure (t : Trace) (h : ¬ f7NeedRetrievable.holds t) :
-    ¬ f9CapabilityProbes.holds t := by
-  intro hf
-  exact h ((hf .needRetrieval (by simp [registeredCapabilities])).1)
 
 theorem F8_failure_entails_F9_failure (t : Trace) (h : ¬ f8WitnessedContainment.holds t) :
     ¬ f9CapabilityProbes.holds t := by
