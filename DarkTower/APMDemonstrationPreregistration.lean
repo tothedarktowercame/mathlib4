@@ -101,7 +101,6 @@ structure WorkedFrame where
   changed : closingHash ≠ scaffoldHash
 
 inductive Capability
-  | registrationGatesLaunch
   | frameContainmentWitnessed
   | createdFrameWorked
   | uniqueDisposition
@@ -125,7 +124,6 @@ structure CapabilityProbe where
 structure Trace where
   problem : ProblemUnit
   frame : WorkedFrame
-  launchGateRefusedWithoutWitness : Bool
   cycleClosed : Bool
   dispositionIds : List String
   memoryOfferIds : List String
@@ -241,7 +239,6 @@ def promotionsNeedTagged : Observable Trace :=
 /-- The concrete predicate a capability probe must support.  Probe identity and
 capability truth are checked independently. -/
 def Capability.holds : Capability → Trace → Prop
-  | .registrationGatesLaunch, t => t.launchGateRefusedWithoutWitness = true
   | .frameContainmentWitnessed, t => f8WitnessedContainment.holds t
   | .createdFrameWorked, t => t.frame.closingHash ≠ t.frame.scaffoldHash
   | .uniqueDisposition, t => f2UniqueDisposition.holds t

@@ -26,8 +26,7 @@ def problem : ProblemUnit where
   lockedLemmaExposure := ["synthetic/locked-lemma"]
 
 def probes : List CapabilityProbe :=
-  [{ capability := .registrationGatesLaunch, evidenceId := "probe/registration", recorded := true },
-   { capability := .frameContainmentWitnessed, evidenceId := "probe/containment", recorded := true },
+  [{ capability := .frameContainmentWitnessed, evidenceId := "probe/containment", recorded := true },
    { capability := .createdFrameWorked, evidenceId := "probe/frame-worked", recorded := true },
    { capability := .uniqueDisposition, evidenceId := "probe/disposition", recorded := true },
    { capability := .offerUseDisposition, evidenceId := "probe/offer-use", recorded := true },
@@ -39,7 +38,6 @@ def probes : List CapabilityProbe :=
 def positiveTrace : Trace where
   problem := problem
   frame := { scaffoldHash := "scaffold", closingHash := "worked", changed := by decide }
-  launchGateRefusedWithoutWitness := true
   cycleClosed := true
   dispositionIds := ["disposition/closed"]
   memoryOfferIds := ["offer/one"]
@@ -73,7 +71,7 @@ def base : Registration Trace := round1Base 1 2 (some 3)
 theorem positive_flag_honoured (f : Flag Trace) (hf : f ∈ systemFlags) :
     f.honoured positiveTrace := by
   simp [systemFlags, systemDesign] at hf
-  rcases hf with h | h | h | h | h | h | h | h | h | h | h
+  rcases hf with h | h | h | h | h | h | h | h | h | h
   all_goals subst f
   all_goals
     simp [Flag.honoured, runtimeInvariantObservable, positiveTrace,
@@ -187,7 +185,7 @@ theorem negative_F9_is_single : allOtherRuntimeInvariantsHold .F9 negativeF9 := 
   intro i hi
   cases i <;> simp_all [runtimeInvariantObservable, negativeF9, positiveTrace,
     f2UniqueDisposition, f3OfferDispositions, f4StratumFrozen, f5SingleRegime,
-    f6DeclaredDenominator, f7NeedRetrievable, f8WitnessedContainment, observable]
+    f6DeclaredDenominator, f8WitnessedContainment, observable]
   all_goals decide
 
 /-! F9 intentionally subsumes concrete capabilities.  These are machine-checked
