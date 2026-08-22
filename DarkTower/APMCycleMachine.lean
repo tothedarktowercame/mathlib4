@@ -164,6 +164,42 @@ def validStudentBindings (snapshotDigest : String)
   (attempts.map (·.sessionId)).Nodup ∧
   ∀ attempt ∈ attempts, attempt.snapshotDigest = snapshotDigest
 
+/-- The promotion boundary is useful only when a distinct reviewer inspects
+the Student-visible base residuals, rather than merely approving provenance. -/
+structure PromotionEvidence where
+  scribeSeat : String
+  measurementProctorSeat : String
+  promotionProctorSeat : String
+  baseProblemBlob : String
+  problemPath : String
+  solverFinalHead : String
+  laneCount : Nat
+  reviewReason : String
+  reviewResidual : String
+  deriving DecidableEq, Repr
+
+def validPromotionEvidence (evidence : PromotionEvidence) : Prop :=
+  evidence.promotionProctorSeat ≠ evidence.scribeSeat ∧
+  evidence.promotionProctorSeat ≠ evidence.measurementProctorSeat ∧
+  evidence.baseProblemBlob ≠ "" ∧ evidence.problemPath ≠ "" ∧
+  evidence.solverFinalHead ≠ "" ∧ evidence.laneCount = 4 ∧
+  evidence.reviewReason ≠ "" ∧ evidence.reviewResidual ≠ ""
+
+def f24PromotionEvidence : PromotionEvidence where
+  scribeSeat := "f24-scribe"
+  measurementProctorSeat := "f24-proctor"
+  promotionProctorSeat := "f24-proctor"
+  baseProblemBlob := "ba00d348a51e63214064c534a6e29f1b1517e405"
+  problemPath := "problems/m93A02/lean/Main.lean"
+  solverFinalHead := "7d26e872f89040284c58c2f4b516f50a6a42fef2"
+  laneCount := 0
+  reviewReason := ""
+  reviewResidual := ""
+
+theorem f24_promotion_procedure_refused :
+    ¬ validPromotionEvidence f24PromotionEvidence := by
+  simp [validPromotionEvidence, f24PromotionEvidence]
+
 structure CampaignLane where
   campaignId : String
   regulatorId : String

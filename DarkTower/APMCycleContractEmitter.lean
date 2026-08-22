@@ -68,6 +68,15 @@ def contractJson : Json :=
           #[Json.str "attempt-ordinal", Json.str "promotion-receipt-id",
             Json.str "snapshot-id", Json.str "snapshot-digest",
             Json.str "accessible-memory-ids"])]),
+     ("promotion-policy", Json.mkObj
+       [("distinct-promotion-proctor", Json.bool true),
+        ("base-problem-blob-required", Json.bool true),
+        ("problem-path-required", Json.bool true),
+        ("solver-final-head-required", Json.bool true),
+        ("typed-lanes-required", Json.num 4),
+        ("persisted-review-reason-required", Json.bool true),
+        ("persisted-review-residual-required", Json.bool true),
+        ("student-query-log-required", Json.bool true)]),
      ("isolation-policy", Json.mkObj
        [("campaign-scoped-regulator", Json.bool true),
         ("campaign-scoped-problem-buffer", Json.bool true),
