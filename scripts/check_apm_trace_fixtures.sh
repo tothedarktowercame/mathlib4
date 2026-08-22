@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fixture_dir=${1:?usage: check_apm_trace_fixtures.sh FIXTURE-DIRECTORY}
+checker=DarkTower/APMCampaignTraceChecker.lean
+
+lake env lean --run "$checker" "$fixture_dir/valid.json"
+for mutant in skipped-promotion reordered-phases stale-ledger-reference premature-close; do
+  if lake env lean --run "$checker" "$fixture_dir/$mutant.json"; then
+    echo "mutation survived: $mutant" >&2
+    exit 1
+  fi
+done
