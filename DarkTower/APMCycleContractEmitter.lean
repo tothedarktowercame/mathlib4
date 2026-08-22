@@ -1,0 +1,63 @@
+/-
+Copyright (c) 2026 Joseph Corneli. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+-/
+import DarkTower.APMCycleMachine
+import Lean.Data.Json
+
+/-!
+# Deterministic executable contract emitter for the APM cycle machine
+
+The generated JSON is consumed by the Clojure implementation.  Policy fields
+are rendered from the Lean definitions; the runtime is not permitted to carry
+an independently maintained phase table.
+-/
+
+namespace DarkTower.APMCycleMachine.ContractEmitter
+
+open Lean
+
+def phaseName : Phase → String
+  | .preflight => "preflight"
+  | .solve => "solve"
+  | .verify => "verify"
+  | .promoteSolver => "promote-solver"
+  | .studentAttempt1 => "student-attempt-1"
+  | .guideIntervention1 => "guide-intervention-1"
+  | .studentAttempt2 => "student-attempt-2"
+  | .guideIntervention2 => "guide-intervention-2"
+  | .studentAttempt3 => "student-attempt-3"
+  | .scribeReduce => "scribe-reduce"
+  | .closeFrame => "close-frame"
+
+def phaseJson (phases : List Phase) : Json :=
+  Json.arr (phases.map (Json.str ∘ phaseName)).toArray
+
+def transitionJson (phase : Phase) : Json :=
+  Json.mkObj
+    [("from", Json.str (phaseName phase)),
+     ("to", match nextPhase? phase with
+       | some next => Json.str (phaseName next)
+       | none => Json.null)]
+
+def contractJson : Json :=
+  Json.mkObj
+    [("schema-version", Json.num 1),
+     ("contract-id", Json.str canonicalContract.id),
+     ("phase-order", phaseJson canonicalContract.phases),
+     ("transitions", Json.arr
+       (canonicalContract.phases.map transitionJson).toArray),
+     ("bounds", Json.mkObj
+       [("solver-max-rounds", Json.num 50),
+        ("solver-checkpoint-every", Json.num 10),
+        ("student-attempts", Json.num 3),
+        ("guide-interventions", Json.num 2),
+        ("analyst-tenure-frames", Json.num 2),
+        ("seat-turn-timeout-ms", Json.num 3600000),
+        ("zai-request-timeout-ms", Json.num 300000)])]
+
+def emit : IO Unit := IO.println contractJson.compress
+
+end DarkTower.APMCycleMachine.ContractEmitter
+
+def main : IO Unit := DarkTower.APMCycleMachine.ContractEmitter.emit
