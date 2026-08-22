@@ -56,6 +56,19 @@ def contractJson : Json :=
         ("persist-receipt", Json.bool true),
         ("restart-same-job", Json.bool true),
         ("client-timeout-is-success", Json.bool false)]),
+     ("memory-policy", Json.mkObj
+       [("content-addressed-snapshot", Json.bool true),
+        ("admit-after-solve-verify", Json.bool true),
+        ("independent-review", Json.bool true),
+        ("student-attempts", Json.num 3),
+        ("fresh-student-sessions", Json.bool true),
+        ("exact-snapshot-binding", Json.bool true)]),
+     ("isolation-policy", Json.mkObj
+       [("campaign-scoped-regulator", Json.bool true),
+        ("campaign-scoped-problem-buffer", Json.bool true),
+        ("distinct-continuation-session", Json.bool true),
+        ("distinct-analyst-session", Json.bool true),
+        ("projection-ledger-binding", Json.bool true)]),
      ("bounds", Json.mkObj
        [("solver-max-rounds", Json.num 50),
         ("solver-checkpoint-every", Json.num 10),

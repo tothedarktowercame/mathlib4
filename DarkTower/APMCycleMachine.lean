@@ -122,6 +122,37 @@ theorem client_timeout_never_establishes_success
     (_htimeout : observation.clientTimeoutObserved = true) :
     observation.timeoutTreatedAsSuccess = false := h.2.2.2.2.2.2.2.2.2
 
+structure StudentBinding where
+  ordinal : Nat
+  sessionId : String
+  snapshotDigest : String
+  deriving DecidableEq, Repr
+
+def validStudentBindings (snapshotDigest : String)
+    (attempts : List StudentBinding) : Prop :=
+  attempts.map (·.ordinal) = [1, 2, 3] ∧
+  (attempts.map (·.sessionId)).Nodup ∧
+  ∀ attempt ∈ attempts, attempt.snapshotDigest = snapshotDigest
+
+structure CampaignLane where
+  campaignId : String
+  regulatorId : String
+  problemBuffer : String
+  continuationSession : String
+  analystSession : String
+  ledgerDigest : String
+  projectionLedgerDigest : String
+  deriving DecidableEq, Repr
+
+def validCampaignIsolation (lanes : List CampaignLane) : Prop :=
+  2 ≤ lanes.length ∧
+  (lanes.map (·.campaignId)).Nodup ∧
+  (lanes.map (·.regulatorId)).Nodup ∧
+  (lanes.map (·.problemBuffer)).Nodup ∧
+  (lanes.map (·.continuationSession)).Nodup ∧
+  (lanes.map (·.analystSession)).Nodup ∧
+  ∀ lane ∈ lanes, lane.projectionLedgerDigest = lane.ledgerDigest
+
 def validAdvance (state : MachineState) (receipt : Receipt) : Prop :=
   state.activeClaim = none ∧
   receipt.campaignId = state.campaignId ∧

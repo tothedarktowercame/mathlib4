@@ -7,7 +7,9 @@ checker=DarkTower/APMCampaignTraceChecker.lean
 lake env lean --run "$checker" "$fixture_dir/valid.json"
 for mutant in skipped-promotion reordered-phases stale-ledger-reference premature-close \
   duplicate-job-identity unaccepted-activation nonterminal-advancement \
-  lost-restart-continuity timeout-as-success; do
+  lost-restart-continuity timeout-as-success wrong-snapshot \
+  depositor-is-reviewer reused-student-session campaign-isolation-collision \
+  projection-ledger-mismatch; do
   if lake env lean --run "$checker" "$fixture_dir/$mutant.json"; then
     echo "mutation survived: $mutant" >&2
     exit 1

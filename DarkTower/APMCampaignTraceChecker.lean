@@ -37,6 +37,22 @@ structure TraceStep where
   timeoutTreatedAsSuccess : Bool
   deriving FromJson, Repr
 
+structure TraceStudentBinding where
+  ordinal : Nat
+  sessionId : String
+  snapshotDigest : String
+  deriving FromJson, Repr
+
+structure TraceCampaignLane where
+  campaignId : String
+  regulatorId : String
+  problemBuffer : String
+  continuationSession : String
+  analystSession : String
+  ledgerDigest : String
+  projectionLedgerDigest : String
+  deriving FromJson, Repr
+
 structure CampaignTrace where
   schemaVersion : Nat
   campaignId : String
@@ -46,6 +62,12 @@ structure CampaignTrace where
   steps : List TraceStep
   closed : Bool
   terminalLedgerDigest : String
+  solverSnapshotDigest : String
+  snapshotAdmittedAfterSolveVerify : Bool
+  snapshotDepositor : String
+  snapshotReviewer : String
+  studentBindings : List TraceStudentBinding
+  campaignLanes : List TraceCampaignLane
   deriving FromJson, Repr
 
 def phaseName : Phase → String
@@ -106,6 +128,27 @@ def dispatchLifecycleValid (steps : List TraceStep) : Bool :=
   steps.all validDispatchStep &&
   (steps.map (·.jobId)).Nodup
 
+def memoryValid (trace : CampaignTrace) : Bool :=
+  !trace.solverSnapshotDigest.isEmpty &&
+  trace.snapshotAdmittedAfterSolveVerify &&
+  !trace.snapshotDepositor.isEmpty &&
+  !trace.snapshotReviewer.isEmpty &&
+  trace.snapshotDepositor != trace.snapshotReviewer &&
+  trace.studentBindings.map (·.ordinal) == [1, 2, 3] &&
+  (trace.studentBindings.map (·.sessionId)).Nodup &&
+  trace.studentBindings.all
+    fun binding => binding.snapshotDigest == trace.solverSnapshotDigest
+
+def campaignIsolationValid (trace : CampaignTrace) : Bool :=
+  2 ≤ trace.campaignLanes.length &&
+  (trace.campaignLanes.map (·.campaignId)).Nodup &&
+  (trace.campaignLanes.map (·.regulatorId)).Nodup &&
+  (trace.campaignLanes.map (·.problemBuffer)).Nodup &&
+  (trace.campaignLanes.map (·.continuationSession)).Nodup &&
+  (trace.campaignLanes.map (·.analystSession)).Nodup &&
+  trace.campaignLanes.all
+    fun lane => lane.projectionLedgerDigest == lane.ledgerDigest
+
 def accepts (trace : CampaignTrace) : Bool :=
   trace.schemaVersion == 1 &&
   !trace.campaignId.isEmpty &&
@@ -116,6 +159,8 @@ def accepts (trace : CampaignTrace) : Bool :=
   ledgerContinuous trace.steps &&
   receiptContinuous trace.steps &&
   dispatchLifecycleValid trace.steps &&
+  memoryValid trace &&
+  campaignIsolationValid trace &&
   trace.closed && terminalDigestMatches trace
 
 theorem acceptance_implies_canonical_order (trace : CampaignTrace)
