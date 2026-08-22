@@ -24,6 +24,17 @@ structure TraceStep where
   ledgerAfter : String
   receiptId : String
   priorReceiptId : Option String
+  jobId : String
+  activatedJobId : String
+  activationStatus : Nat
+  reactivatedJobId : String
+  terminalJobId : String
+  commandOwnExit : Option Nat
+  claimPersisted : Bool
+  receiptPersisted : Bool
+  resumedJobId : String
+  clientTimeoutObserved : Bool
+  timeoutTreatedAsSuccess : Bool
   deriving FromJson, Repr
 
 structure CampaignTrace where
@@ -80,6 +91,21 @@ def terminalDigestMatches (trace : CampaignTrace) : Bool :=
   | none => false
   | some step => trace.terminalLedgerDigest == step.ledgerAfter
 
+def validDispatchStep (step : TraceStep) : Bool :=
+  !step.jobId.isEmpty &&
+  step.activatedJobId == step.jobId &&
+  step.activationStatus == 202 &&
+  step.reactivatedJobId == step.jobId &&
+  step.terminalJobId == step.jobId &&
+  step.commandOwnExit == some 0 &&
+  step.claimPersisted && step.receiptPersisted &&
+  step.resumedJobId == step.jobId &&
+  !step.timeoutTreatedAsSuccess
+
+def dispatchLifecycleValid (steps : List TraceStep) : Bool :=
+  steps.all validDispatchStep &&
+  (steps.map (·.jobId)).Nodup
+
 def accepts (trace : CampaignTrace) : Bool :=
   trace.schemaVersion == 1 &&
   !trace.campaignId.isEmpty &&
@@ -89,6 +115,7 @@ def accepts (trace : CampaignTrace) : Bool :=
   stepEdges trace == expectedEdges &&
   ledgerContinuous trace.steps &&
   receiptContinuous trace.steps &&
+  dispatchLifecycleValid trace.steps &&
   trace.closed && terminalDigestMatches trace
 
 theorem acceptance_implies_canonical_order (trace : CampaignTrace)

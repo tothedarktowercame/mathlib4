@@ -47,6 +47,15 @@ def contractJson : Json :=
      ("phase-order", phaseJson canonicalContract.phases),
      ("transitions", Json.arr
        (canonicalContract.phases.map transitionJson).toArray),
+     ("dispatch-policy", Json.mkObj
+       [("preannounce-required", Json.bool true),
+        ("activation-status", Json.num 202),
+        ("idempotent-reactivation", Json.bool true),
+        ("terminal-command-own-exit", Json.num 0),
+        ("persist-claim", Json.bool true),
+        ("persist-receipt", Json.bool true),
+        ("restart-same-job", Json.bool true),
+        ("client-timeout-is-success", Json.bool false)]),
      ("bounds", Json.mkObj
        [("solver-max-rounds", Json.num 50),
         ("solver-checkpoint-every", Json.num 10),

@@ -91,6 +91,37 @@ structure Receipt where
   toPhase : Phase
   deriving DecidableEq, Repr
 
+structure DispatchObservation where
+  announcedJobId : String
+  activatedJobId : String
+  activationAccepted : Bool
+  reactivatedJobId : String
+  terminalJobId : String
+  commandOwnExit : Option Nat
+  claimPersisted : Bool
+  receiptPersisted : Bool
+  resumedJobId : String
+  clientTimeoutObserved : Bool
+  timeoutTreatedAsSuccess : Bool
+  deriving DecidableEq, Repr
+
+def validDispatch (observation : DispatchObservation) : Prop :=
+  observation.announcedJobId ≠ "" ∧
+  observation.activatedJobId = observation.announcedJobId ∧
+  observation.activationAccepted = true ∧
+  observation.reactivatedJobId = observation.announcedJobId ∧
+  observation.terminalJobId = observation.announcedJobId ∧
+  observation.commandOwnExit = some 0 ∧
+  observation.claimPersisted = true ∧
+  observation.receiptPersisted = true ∧
+  observation.resumedJobId = observation.announcedJobId ∧
+  observation.timeoutTreatedAsSuccess = false
+
+theorem client_timeout_never_establishes_success
+    (observation : DispatchObservation) (h : validDispatch observation)
+    (_htimeout : observation.clientTimeoutObserved = true) :
+    observation.timeoutTreatedAsSuccess = false := h.2.2.2.2.2.2.2.2.2
+
 def validAdvance (state : MachineState) (receipt : Receipt) : Prop :=
   state.activeClaim = none ∧
   receipt.campaignId = state.campaignId ∧
