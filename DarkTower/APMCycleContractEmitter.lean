@@ -62,7 +62,12 @@ def contractJson : Json :=
         ("independent-review", Json.bool true),
         ("student-attempts", Json.num 3),
         ("fresh-student-sessions", Json.bool true),
-        ("exact-snapshot-binding", Json.bool true)]),
+        ("exact-snapshot-binding", Json.bool true),
+        ("student-dispatch-witness-required", Json.bool true),
+        ("student-dispatch-required-fields", Json.arr
+          #[Json.str "attempt-ordinal", Json.str "promotion-receipt-id",
+            Json.str "snapshot-id", Json.str "snapshot-digest",
+            Json.str "accessible-memory-ids"])]),
      ("isolation-policy", Json.mkObj
        [("campaign-scoped-regulator", Json.bool true),
         ("campaign-scoped-problem-buffer", Json.bool true),

@@ -128,6 +128,36 @@ structure StudentBinding where
   snapshotDigest : String
   deriving DecidableEq, Repr
 
+/-- Evidence that must exist before a Student job may be dispatched.  This is
+stronger than observing a correct binding in the eventual campaign trace: it
+rules out launching an unbound Student and attempting to repair the receipt
+afterward. -/
+structure StudentDispatchWitness where
+  ordinal : Nat
+  promotionReceiptId : String
+  snapshotId : String
+  snapshotDigest : String
+  accessibleMemoryIds : List String
+  deriving DecidableEq, Repr
+
+def validStudentDispatchWitness (expectedOrdinal : Nat)
+    (witness : StudentDispatchWitness) : Prop :=
+  witness.ordinal = expectedOrdinal ∧
+  witness.promotionReceiptId ≠ "" ∧
+  witness.snapshotId ≠ "" ∧
+  witness.snapshotDigest ≠ ""
+
+def f24MissingSnapshotWitness : StudentDispatchWitness where
+  ordinal := 0
+  promotionReceiptId := ""
+  snapshotId := ""
+  snapshotDigest := ""
+  accessibleMemoryIds := []
+
+theorem f24_missing_snapshot_dispatch_refused :
+    ¬ validStudentDispatchWitness 1 f24MissingSnapshotWitness := by
+  simp [validStudentDispatchWitness, f24MissingSnapshotWitness]
+
 def validStudentBindings (snapshotDigest : String)
     (attempts : List StudentBinding) : Prop :=
   attempts.map (·.ordinal) = [1, 2, 3] ∧
