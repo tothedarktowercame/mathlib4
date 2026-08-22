@@ -69,6 +69,17 @@ def contractJson : Json :=
         ("distinct-continuation-session", Json.bool true),
         ("distinct-analyst-session", Json.bool true),
         ("projection-ledger-binding", Json.bool true)]),
+     ("terminal-policy", Json.mkObj
+       [("certified-phase-receipts", Json.num 11),
+        ("separate-problem-frame-outcomes", Json.bool true)]),
+     ("analyst-policy", Json.mkObj
+       [("outside-frame-order", Json.bool true),
+        ("wake-after-terminal-only", Json.bool true),
+        ("exactly-once-per-frame", Json.bool true),
+        ("append-only-series-input", Json.bool true),
+        ("tenure-frames", Json.num 2),
+        ("successor-handoff-required", Json.bool true),
+        ("in-flight-mutation", Json.bool false)]),
      ("bounds", Json.mkObj
        [("solver-max-rounds", Json.num 50),
         ("solver-checkpoint-every", Json.num 10),

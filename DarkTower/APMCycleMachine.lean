@@ -153,6 +153,48 @@ def validCampaignIsolation (lanes : List CampaignLane) : Prop :=
   (lanes.map (·.analystSession)).Nodup ∧
   ∀ lane ∈ lanes, lane.projectionLedgerDigest = lane.ledgerDigest
 
+inductive ProblemOutcome
+  | solved
+  | unsolved
+  deriving DecidableEq, Repr
+
+inductive FrameResult
+  | frameClosed
+  | framePartial
+  | frameVoid
+  deriving DecidableEq, Repr
+
+def validOutcome : ProblemOutcome → FrameResult → Prop
+  | .solved, .frameClosed => True
+  | .solved, .framePartial => True
+  | .unsolved, .framePartial => True
+  | .unsolved, .frameVoid => True
+  | _, _ => False
+
+structure AnalystWake where
+  frameId : String
+  terminal : Bool
+  ordinal : Nat
+  seriesInputVersion : Nat
+  appendOnly : Bool
+  proposalType : Option String
+  proposalDigest : Option String
+  successorHandoff : Bool
+  mutatesInFlight : Bool
+  deriving DecidableEq, Repr
+
+def validAnalystTenure (wakes : List AnalystWake) : Prop :=
+  wakes.length = 2 ∧ (wakes.map (·.frameId)).Nodup ∧
+  wakes.map (·.ordinal) = [1, 2] ∧
+  wakes.map (·.seriesInputVersion) = [1, 2] ∧
+  (∀ wake ∈ wakes, wake.terminal = true ∧ wake.appendOnly = true ∧
+    wake.mutatesInFlight = false) ∧
+  match wakes.getLast? with
+  | some wake => wake.proposalType = some "regime-proposal" ∧
+      ∃ digest, wake.proposalDigest = some digest ∧ digest ≠ "" ∧
+        wake.successorHandoff = true
+  | none => False
+
 def validAdvance (state : MachineState) (receipt : Receipt) : Prop :=
   state.activeClaim = none ∧
   receipt.campaignId = state.campaignId ∧

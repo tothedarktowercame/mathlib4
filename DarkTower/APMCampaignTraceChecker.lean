@@ -53,6 +53,18 @@ structure TraceCampaignLane where
   projectionLedgerDigest : String
   deriving FromJson, Repr
 
+structure TraceAnalystWake where
+  frameId : String
+  terminal : Bool
+  ordinal : Nat
+  seriesInputVersion : Nat
+  appendOnly : Bool
+  proposalType : Option String
+  proposalDigest : Option String
+  successorHandoff : Bool
+  mutatesInFlight : Bool
+  deriving FromJson, Repr
+
 structure CampaignTrace where
   schemaVersion : Nat
   campaignId : String
@@ -68,6 +80,10 @@ structure CampaignTrace where
   snapshotReviewer : String
   studentBindings : List TraceStudentBinding
   campaignLanes : List TraceCampaignLane
+  phaseReceiptIds : List String
+  problemOutcome : String
+  frameResult : String
+  analystWakes : List TraceAnalystWake
   deriving FromJson, Repr
 
 def phaseName : Phase → String
@@ -149,6 +165,28 @@ def campaignIsolationValid (trace : CampaignTrace) : Bool :=
   trace.campaignLanes.all
     fun lane => lane.projectionLedgerDigest == lane.ledgerDigest
 
+def terminalFrameValid (trace : CampaignTrace) : Bool :=
+  trace.phaseReceiptIds == trace.steps.map (·.receiptId) &&
+  trace.phaseReceiptIds.length == canonicalNames.length &&
+  trace.phaseReceiptIds.Nodup &&
+  ((trace.problemOutcome == "solved" &&
+      (trace.frameResult == "closed" || trace.frameResult == "partial")) ||
+   (trace.problemOutcome == "unsolved" &&
+      (trace.frameResult == "partial" || trace.frameResult == "void")))
+
+def analystValid (trace : CampaignTrace) : Bool :=
+  trace.analystWakes.length == 2 &&
+  (trace.analystWakes.map (·.frameId)).Nodup &&
+  trace.analystWakes.map (·.ordinal) == [1, 2] &&
+  trace.analystWakes.map (·.seriesInputVersion) == [1, 2] &&
+  trace.analystWakes.all
+    (fun wake => wake.terminal && wake.appendOnly && !wake.mutatesInFlight) &&
+  match trace.analystWakes.getLast? with
+  | some wake => wake.proposalType == some "regime-proposal" &&
+      wake.proposalDigest.any (fun digest => !digest.isEmpty) &&
+      wake.successorHandoff
+  | none => false
+
 def accepts (trace : CampaignTrace) : Bool :=
   trace.schemaVersion == 1 &&
   !trace.campaignId.isEmpty &&
@@ -161,6 +199,8 @@ def accepts (trace : CampaignTrace) : Bool :=
   dispatchLifecycleValid trace.steps &&
   memoryValid trace &&
   campaignIsolationValid trace &&
+  terminalFrameValid trace &&
+  analystValid trace &&
   trace.closed && terminalDigestMatches trace
 
 theorem acceptance_implies_canonical_order (trace : CampaignTrace)
