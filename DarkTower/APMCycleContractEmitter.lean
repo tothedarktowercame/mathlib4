@@ -105,6 +105,10 @@ def contractJson : Json :=
         ("terminal-collection-is-supervisor-progress", Json.bool true),
         ("artifact-identity-from-authority-not-observation", Json.bool true),
         ("preflight-requires-positive-sorry-baseline", Json.bool true),
+        ("preflight-blocking-warning-count", Json.num 0),
+        ("preflight-nonblocking-warning-kinds", Json.arr
+          #[Json.str "linter", Json.str "deprecation",
+            Json.str "compiler-warning"]),
         ("coordinator-intent-persisted-before-activation", Json.bool true),
         ("coordinator-restart-reconciles-deterministic-job-id", Json.bool true),
         ("coordinator-startup-uses-typed-registry", Json.bool true),
