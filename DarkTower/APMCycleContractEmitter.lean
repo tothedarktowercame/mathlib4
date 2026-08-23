@@ -100,7 +100,8 @@ def contractJson : Json :=
         ("repair-feedback-findings-required", Json.bool true),
         ("client-timeout-is-success", Json.bool false),
         ("terminal-lifecycle-actions-covered", Json.arr
-          #[Json.str "close-block", Json.str "close-campaign"])]),
+          #[Json.str "close-block", Json.str "close-campaign"]),
+        ("retirement-binds-recorded-terminal-head", Json.bool true)]),
      ("memory-policy", Json.mkObj
        [("content-addressed-snapshot", Json.bool true),
         ("admit-after-solve-verify", Json.bool true),

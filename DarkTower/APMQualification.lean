@@ -35,6 +35,10 @@ theorem terminal_lifecycle_handler_set_nonvacuous :
     terminalLifecycleActions.length = 2 :=
   terminal_lifecycle_actions_nonvacuous
 
+theorem stale_base_retirement_mutation_is_killed :
+    ¬ validWorkspaceRetirementBinding staleBaseRetirementMutant :=
+  stale_base_cannot_substitute_for_terminal_head
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,

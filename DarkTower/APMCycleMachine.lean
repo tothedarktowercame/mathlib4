@@ -250,6 +250,28 @@ def terminalLifecycleActions : List String := ["close-block", "close-campaign"]
 theorem terminal_lifecycle_actions_nonvacuous :
     terminalLifecycleActions.length = 2 := by decide
 
+structure WorkspaceRetirementBinding where
+  recordedTerminalHead : String
+  observedHead : String
+  worktreeClean : Bool
+  branchRetained : Bool
+  deriving DecidableEq, Repr
+
+def validWorkspaceRetirementBinding (binding : WorkspaceRetirementBinding) : Prop :=
+  binding.recordedTerminalHead ≠ "" ∧
+  binding.observedHead = binding.recordedTerminalHead ∧
+  binding.worktreeClean = true ∧ binding.branchRetained = true
+
+def staleBaseRetirementMutant : WorkspaceRetirementBinding where
+  recordedTerminalHead := "solved-head"
+  observedHead := "base-head"
+  worktreeClean := true
+  branchRetained := true
+
+theorem stale_base_cannot_substitute_for_terminal_head :
+    ¬ validWorkspaceRetirementBinding staleBaseRetirementMutant := by
+  simp [validWorkspaceRetirementBinding, staleBaseRetirementMutant]
+
 structure SubmissionAuthority where
   jobId : String
   dispatchId : String
