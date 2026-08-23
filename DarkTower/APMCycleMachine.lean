@@ -272,6 +272,19 @@ theorem stale_base_cannot_substitute_for_terminal_head :
     ¬ validWorkspaceRetirementBinding staleBaseRetirementMutant := by
   simp [validWorkspaceRetirementBinding, staleBaseRetirementMutant]
 
+inductive SupervisorDriveStatus where
+  | awaitingTerminal
+  | terminalCollected
+  | certified
+  deriving DecidableEq, Repr
+
+def supervisorMayAdvance : SupervisorDriveStatus → Bool
+  | .certified => true
+  | _ => false
+
+theorem terminal_collection_is_progress_but_not_certification :
+    supervisorMayAdvance .terminalCollected = false := by decide
+
 structure SubmissionAuthority where
   jobId : String
   dispatchId : String

@@ -39,6 +39,10 @@ theorem stale_base_retirement_mutation_is_killed :
     ¬ validWorkspaceRetirementBinding staleBaseRetirementMutant :=
   stale_base_cannot_substitute_for_terminal_head
 
+theorem collected_terminal_output_cannot_skip_certification :
+    supervisorMayAdvance .terminalCollected = false :=
+  terminal_collection_is_progress_but_not_certification
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,
