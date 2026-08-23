@@ -225,6 +225,88 @@ theorem conversation_cannot_advance_a_valid_submission
 theorem every_live_role_has_one_submission_schema : allLiveRoles.length = 7 := by
   rfl
 
+/-- Controller collection is a bounded persisted observation after the role's
+terminal turn.  It is performed before repair or a missing-observation ruling;
+conversation is never consulted as a fallback. -/
+structure RoleCollectionBudget where
+  collectionAttempts : Nat
+  repairAttempts : Nat
+  deriving DecidableEq, Repr
+
+def roleCollectionBudget (_ : LiveRole) : RoleCollectionBudget where
+  collectionAttempts := 1
+  repairAttempts := 1
+
+structure TerminalCollectionEvidence where
+  role : LiveRole
+  terminalObserved : Bool
+  collectionAttempts : Nat
+  repairAttempts : Nat
+  submissionAvailable : Bool
+  submissionCollected : Bool
+  collectionPersisted : Bool
+  missingObservationIssued : Bool
+  deriving DecidableEq, Repr
+
+def validTerminalCollection (e : TerminalCollectionEvidence) : Prop :=
+  let budget := roleCollectionBudget e.role
+  e.terminalObserved = true ∧ e.collectionPersisted = true ∧
+  e.collectionAttempts ≤ budget.collectionAttempts ∧
+  e.repairAttempts ≤ budget.repairAttempts ∧
+  (e.submissionAvailable = true → e.submissionCollected = true) ∧
+  (e.missingObservationIssued = true →
+    e.role = .student ∧ e.submissionAvailable = false ∧
+    e.collectionAttempts = budget.collectionAttempts ∧
+    e.repairAttempts = budget.repairAttempts)
+
+theorem available_submission_is_collected
+    (e : TerminalCollectionEvidence) (h : validTerminalCollection e)
+    (available : e.submissionAvailable = true) :
+    e.submissionCollected = true := h.2.2.2.2.1 available
+
+def prematureF25MissingObservation : TerminalCollectionEvidence where
+  role := .student
+  terminalObserved := true
+  collectionAttempts := 0
+  repairAttempts := 0
+  submissionAvailable := false
+  submissionCollected := false
+  collectionPersisted := true
+  missingObservationIssued := true
+
+theorem premature_f25_missing_observation_refused :
+    ¬ validTerminalCollection prematureF25MissingObservation := by
+  simp [validTerminalCollection, roleCollectionBudget,
+    prematureF25MissingObservation]
+
+def nonStudentSubstitution : TerminalCollectionEvidence where
+  role := .guide
+  terminalObserved := true
+  collectionAttempts := 1
+  repairAttempts := 1
+  submissionAvailable := false
+  submissionCollected := false
+  collectionPersisted := true
+  missingObservationIssued := true
+
+theorem non_student_missing_observation_refused :
+    ¬ validTerminalCollection nonStudentSubstitution := by
+  simp [validTerminalCollection, roleCollectionBudget, nonStudentSubstitution]
+
+def uncollectedValidSubmission : TerminalCollectionEvidence where
+  role := .student
+  terminalObserved := true
+  collectionAttempts := 1
+  repairAttempts := 0
+  submissionAvailable := true
+  submissionCollected := false
+  collectionPersisted := true
+  missingObservationIssued := false
+
+theorem available_but_uncollected_submission_refused :
+    ¬ validTerminalCollection uncollectedValidSubmission := by
+  simp [validTerminalCollection, roleCollectionBudget, uncollectedValidSubmission]
+
 /-- A terminal produced before typed submissions existed may be superseded
 exactly once.  This is a new job, not reinterpretation of the legacy terminal:
 it preserves the frozen evidence snapshot and starts a fresh role session. -/
