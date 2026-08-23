@@ -225,6 +225,36 @@ theorem conversation_cannot_advance_a_valid_submission
 theorem every_live_role_has_one_submission_schema : allLiveRoles.length = 7 := by
   rfl
 
+/-- A terminal produced before typed submissions existed may be superseded
+exactly once.  This is a new job, not reinterpretation of the legacy terminal:
+it preserves the frozen evidence snapshot and starts a fresh role session. -/
+structure TypedSubmissionMigration where
+  legacyJobId : String
+  replacementJobId : String
+  legacySnapshotId : String
+  replacementSnapshotId : String
+  freshSession : Bool
+  registeredBeforeActivation : Bool
+  migrationOrdinal : Nat
+  deriving DecidableEq, Repr
+
+def validTypedSubmissionMigration (migration : TypedSubmissionMigration) : Prop :=
+  migration.legacyJobId ≠ "" ∧ migration.replacementJobId ≠ "" ∧
+  migration.legacyJobId ≠ migration.replacementJobId ∧
+  migration.legacySnapshotId ≠ "" ∧
+  migration.replacementSnapshotId = migration.legacySnapshotId ∧
+  migration.freshSession = true ∧
+  migration.registeredBeforeActivation = true ∧
+  migration.migrationOrdinal = 1
+
+theorem typed_submission_migration_is_bounded_and_snapshot_preserving
+    (migration : TypedSubmissionMigration)
+    (h : validTypedSubmissionMigration migration) :
+    migration.migrationOrdinal = 1 ∧
+    migration.replacementSnapshotId = migration.legacySnapshotId ∧
+    migration.freshSession = true := by
+  exact ⟨h.2.2.2.2.2.2.2, h.2.2.2.2.1, h.2.2.2.2.2.1⟩
+
 /-- Evidence that must exist before a Student job may be dispatched.  This is
 stronger than observing a correct binding in the eventual campaign trace: it
 rules out launching an unbound Student and attempting to repair the receipt
