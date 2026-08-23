@@ -27,6 +27,14 @@ theorem reused_student_session_mutation_is_killed :
     ¬ validSessionRotation f25ReusedStudentSession :=
   f25_reused_student_session_refused
 
+theorem unpreserved_student_reset_mutation_is_killed :
+    ¬ validStudentAttemptWorkspaceTransition unpreservedStudentReset :=
+  unpreserved_student_reset_is_refused
+
+theorem unreviewed_guide_snapshot_mutation_is_killed :
+    ¬ validGuideSnapshotTransition unreviewedGuideSnapshot :=
+  unreviewed_guide_snapshot_is_refused
+
 theorem partial_terminal_analyst_wake_nonvacuous :
     analystWakeEligibleFrameResult "partial" :=
   partial_terminal_frame_wakes_analyst

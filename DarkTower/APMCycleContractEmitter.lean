@@ -125,6 +125,12 @@ def contractJson : Json :=
         ("fresh-session-rotation-mints-new-id", Json.bool true),
         ("student-session-distinctness-required-for-closed-frame", Json.bool true),
         ("exact-snapshot-binding", Json.bool true),
+        ("fresh-attempt-worktree-reset-to-base", Json.bool true),
+        ("attempt-state-preserved-before-reset", Json.bool true),
+        ("guide-deposits-independent-review", Json.bool true),
+        ("guide-union-snapshot-content-addressed", Json.bool true),
+        ("next-student-binds-latest-reviewed-snapshot", Json.bool true),
+        ("candidate-pattern-binding-required", Json.bool true),
         ("student-dispatch-witness-required", Json.bool true),
         ("student-dispatch-required-fields", Json.arr
           #[Json.str "attempt-ordinal", Json.str "promotion-receipt-id",

@@ -184,6 +184,67 @@ theorem f25_reused_session_cannot_support_closed_frame :
   simp [validSessionEvidenceForFrame, validSessionRotation,
         f25ReusedStudentSession]
 
+/-- Fresh conversational sessions are not sufficient isolation: before the
+next Student attempt, the prior worktree state must be durably preserved and
+the active worktree returned to the registered base revision. -/
+structure StudentAttemptWorkspaceTransition where
+  priorHead : String
+  baseRevision : String
+  resultingHead : String
+  preservationRef : String
+  preservationDigest : String
+  cleanAfter : Bool
+  deriving DecidableEq, Repr
+
+def validStudentAttemptWorkspaceTransition
+    (t : StudentAttemptWorkspaceTransition) : Prop :=
+  t.priorHead ≠ "" ∧ t.baseRevision ≠ "" ∧
+  t.resultingHead = t.baseRevision ∧
+  t.preservationRef ≠ "" ∧ t.preservationDigest ≠ "" ∧
+  t.cleanAfter = true
+
+def unpreservedStudentReset : StudentAttemptWorkspaceTransition where
+  priorHead := "attempt-1-head"
+  baseRevision := "registered-base"
+  resultingHead := "registered-base"
+  preservationRef := ""
+  preservationDigest := ""
+  cleanAfter := true
+
+theorem unpreserved_student_reset_is_refused :
+    ¬ validStudentAttemptWorkspaceTransition unpreservedStudentReset := by
+  simp [validStudentAttemptWorkspaceTransition, unpreservedStudentReset]
+
+/-- A Guide can extend the Student shelf only through independent review. The
+next Student binds to the exact content-addressed union snapshot, never to the
+Guide's conversational report or unreviewed candidates. -/
+structure GuideSnapshotTransition where
+  depositor : String
+  reviewer : String
+  priorSnapshotDigest : String
+  unionSnapshotDigest : String
+  nextStudentSnapshotDigest : String
+  candidatePatternsNonempty : Bool
+  deriving DecidableEq, Repr
+
+def validGuideSnapshotTransition (t : GuideSnapshotTransition) : Prop :=
+  t.depositor ≠ "" ∧ t.reviewer ≠ "" ∧ t.depositor ≠ t.reviewer ∧
+  t.priorSnapshotDigest ≠ "" ∧ t.unionSnapshotDigest ≠ "" ∧
+  t.nextStudentSnapshotDigest = t.unionSnapshotDigest ∧
+  t.candidatePatternsNonempty = true
+
+def unreviewedGuideSnapshot : GuideSnapshotTransition where
+  depositor := "f27-guide"
+  reviewer := "f27-guide"
+  priorSnapshotDigest := "solver-snapshot"
+  unionSnapshotDigest := "guide-union"
+  nextStudentSnapshotDigest := "solver-snapshot"
+  candidatePatternsNonempty := false
+
+theorem unreviewed_guide_snapshot_is_refused :
+    ¬ validGuideSnapshotTransition unreviewedGuideSnapshot := by
+  simp [validGuideSnapshotTransition, unreviewedGuideSnapshot]
+
 def analystWakeEligibleFrameResult (frameResult : String) : Prop :=
   frameResult = "closed" ∨ frameResult = "partial"
 
