@@ -790,4 +790,61 @@ def positiveRegistration : Registration where
 theorem positive_registration_accepted :
     positiveRegistration.matches canonicalContract := by decide
 
+structure DurableCoordinatorIntent where
+  coordinatorId : String
+  stateDigest : String
+  dispatchId : String
+  jobId : String
+  intentPersisted : Bool
+  activationAccepted : Bool
+  completionPersisted : Bool
+  restartReconciledSameJob : Bool
+  deriving DecidableEq, Repr
+
+def validDurableCoordinatorIntent (intent : DurableCoordinatorIntent) : Prop :=
+  intent.coordinatorId ≠ "" ∧ intent.stateDigest ≠ "" ∧
+  intent.dispatchId ≠ "" ∧ intent.jobId ≠ "" ∧
+  intent.intentPersisted = true ∧
+  (intent.activationAccepted = true → intent.intentPersisted = true) ∧
+  (intent.completionPersisted = true → intent.activationAccepted = true) ∧
+  (intent.restartReconciledSameJob = true → intent.intentPersisted = true)
+
+def activationBeforeIntentMutant : DurableCoordinatorIntent where
+  coordinatorId := "jit-f26"
+  stateDigest := "state-digest"
+  dispatchId := "dispatch-id"
+  jobId := "job-id"
+  intentPersisted := false
+  activationAccepted := true
+  completionPersisted := false
+  restartReconciledSameJob := false
+
+theorem activation_before_persisted_intent_is_refused :
+    ¬ validDurableCoordinatorIntent activationBeforeIntentMutant := by
+  simp [validDurableCoordinatorIntent, activationBeforeIntentMutant]
+
+structure CoordinatorRegistryEntry where
+  coordinatorId : String
+  coordinatorType : String
+  configPath : String
+  statePath : String
+  entryDigest : String
+  deriving DecidableEq, Repr
+
+def validCoordinatorRegistryEntry (entry : CoordinatorRegistryEntry) : Prop :=
+  entry.coordinatorId ≠ "" ∧ entry.coordinatorType ≠ "" ∧
+  entry.configPath ≠ "" ∧ entry.statePath ≠ "" ∧
+  entry.entryDigest ≠ ""
+
+def directoryHeuristicRegistryMutant : CoordinatorRegistryEntry where
+  coordinatorId := "jit-f26"
+  coordinatorType := "jit-queue"
+  configPath := ""
+  statePath := "data/apm-campaigns"
+  entryDigest := "digest"
+
+theorem directory_heuristic_is_not_canonical_registration :
+    ¬ validCoordinatorRegistryEntry directoryHeuristicRegistryMutant := by
+  simp [validCoordinatorRegistryEntry, directoryHeuristicRegistryMutant]
+
 end DarkTower.APMCycleMachine

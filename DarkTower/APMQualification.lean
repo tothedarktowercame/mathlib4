@@ -57,6 +57,14 @@ theorem solved_fixture_cannot_masquerade_as_unresolved_preflight :
     ¬ validPreflightSorryBaseline 2 0 0 :=
   zero_sorries_are_not_an_unresolved_preflight_baseline
 
+theorem activation_before_intent_mutation_is_killed :
+    ¬ validDurableCoordinatorIntent activationBeforeIntentMutant :=
+  activation_before_persisted_intent_is_refused
+
+theorem directory_discovery_mutation_is_killed :
+    ¬ validCoordinatorRegistryEntry directoryHeuristicRegistryMutant :=
+  directory_heuristic_is_not_canonical_registration
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,

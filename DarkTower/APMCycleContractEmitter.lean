@@ -104,7 +104,11 @@ def contractJson : Json :=
         ("retirement-binds-recorded-terminal-head", Json.bool true),
         ("terminal-collection-is-supervisor-progress", Json.bool true),
         ("artifact-identity-from-authority-not-observation", Json.bool true),
-        ("preflight-requires-positive-sorry-baseline", Json.bool true)]),
+        ("preflight-requires-positive-sorry-baseline", Json.bool true),
+        ("coordinator-intent-persisted-before-activation", Json.bool true),
+        ("coordinator-restart-reconciles-deterministic-job-id", Json.bool true),
+        ("coordinator-startup-uses-typed-registry", Json.bool true),
+        ("coordinator-startup-directory-heuristics", Json.bool false)]),
      ("memory-policy", Json.mkObj
        [("content-addressed-snapshot", Json.bool true),
         ("admit-after-solve-verify", Json.bool true),
