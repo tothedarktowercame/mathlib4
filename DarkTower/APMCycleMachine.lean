@@ -245,6 +245,11 @@ inductive LiveRole
 def allLiveRoles : List LiveRole :=
   [.solver, .student, .guide, .scribe, .proctor, .promotionProctor, .analyst]
 
+def terminalLifecycleActions : List String := ["close-block", "close-campaign"]
+
+theorem terminal_lifecycle_actions_nonvacuous :
+    terminalLifecycleActions.length = 2 := by decide
+
 structure SubmissionAuthority where
   jobId : String
   dispatchId : String

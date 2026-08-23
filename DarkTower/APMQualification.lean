@@ -31,6 +31,10 @@ theorem partial_terminal_analyst_wake_nonvacuous :
     analystWakeEligibleFrameResult "partial" :=
   partial_terminal_frame_wakes_analyst
 
+theorem terminal_lifecycle_handler_set_nonvacuous :
+    terminalLifecycleActions.length = 2 :=
+  terminal_lifecycle_actions_nonvacuous
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,
