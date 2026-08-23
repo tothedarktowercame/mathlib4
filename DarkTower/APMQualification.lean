@@ -69,6 +69,10 @@ theorem directory_discovery_mutation_is_killed :
     ¬ validCoordinatorRegistryEntry directoryHeuristicRegistryMutant :=
   directory_heuristic_is_not_canonical_registration
 
+theorem fresh_coordinator_retry_mutation_is_killed :
+    ¬ validCoordinatorRegistryEntry freshCoordinatorRetryMutant :=
+  retry_beyond_bound_is_refused
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,

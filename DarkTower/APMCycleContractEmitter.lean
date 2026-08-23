@@ -112,6 +112,9 @@ def contractJson : Json :=
         ("coordinator-intent-persisted-before-activation", Json.bool true),
         ("coordinator-restart-reconciles-deterministic-job-id", Json.bool true),
         ("coordinator-startup-uses-typed-registry", Json.bool true),
+        ("coordinator-one-registration-per-problem", Json.bool true),
+        ("coordinator-retries-increment-same-entry", Json.bool true),
+        ("coordinator-retry-beyond-maximum-refused", Json.bool true),
         ("coordinator-startup-directory-heuristics", Json.bool false)]),
      ("memory-policy", Json.mkObj
        [("content-addressed-snapshot", Json.bool true),

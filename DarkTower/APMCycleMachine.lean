@@ -848,26 +848,47 @@ theorem activation_before_persisted_intent_is_refused :
 
 structure CoordinatorRegistryEntry where
   coordinatorId : String
+  problemId : String
   coordinatorType : String
   configPath : String
   statePath : String
   entryDigest : String
+  retryCount : Nat
+  retryMax : Nat
   deriving DecidableEq, Repr
 
 def validCoordinatorRegistryEntry (entry : CoordinatorRegistryEntry) : Prop :=
-  entry.coordinatorId ≠ "" ∧ entry.coordinatorType ≠ "" ∧
+  entry.coordinatorId ≠ "" ∧ entry.problemId ≠ "" ∧
+  entry.coordinatorType ≠ "" ∧
   entry.configPath ≠ "" ∧ entry.statePath ≠ "" ∧
-  entry.entryDigest ≠ ""
+  entry.entryDigest ≠ "" ∧ entry.retryCount ≤ entry.retryMax
 
 def directoryHeuristicRegistryMutant : CoordinatorRegistryEntry where
   coordinatorId := "jit-f26"
+  problemId := "m94A03"
   coordinatorType := "jit-queue"
   configPath := ""
   statePath := "data/apm-campaigns"
   entryDigest := "digest"
+  retryCount := 0
+  retryMax := 2
 
 theorem directory_heuristic_is_not_canonical_registration :
     ¬ validCoordinatorRegistryEntry directoryHeuristicRegistryMutant := by
   simp [validCoordinatorRegistryEntry, directoryHeuristicRegistryMutant]
+
+def freshCoordinatorRetryMutant : CoordinatorRegistryEntry where
+  coordinatorId := "jit-m94A03-retry-v3"
+  problemId := "m94A03"
+  coordinatorType := "jit-queue"
+  configPath := "data/apm-campaigns/m94A03.edn"
+  statePath := "data/apm-campaigns/m94A03/state.edn"
+  entryDigest := "digest"
+  retryCount := 3
+  retryMax := 2
+
+theorem retry_beyond_bound_is_refused :
+    ¬ validCoordinatorRegistryEntry freshCoordinatorRetryMutant := by
+  simp [validCoordinatorRegistryEntry, freshCoordinatorRetryMutant]
 
 end DarkTower.APMCycleMachine
