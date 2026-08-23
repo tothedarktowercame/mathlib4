@@ -673,6 +673,12 @@ def bankableSolved (o : TerminalOutcome) : Prop :=
 
 def successorEligible (o : TerminalOutcome) : Prop := bankableSolved o
 
+/-- An unsolved partial frame may be retried only as the same problem from its
+exact retained Solver head.  This is distinct from ordinary queue succession:
+it neither banks a solved problem nor advances to the next problem. -/
+def retryEligible (o : TerminalOutcome) : Prop :=
+  validTerminalOutcome o ∧ o.problem = .unsolved ∧ o.frame = .framePartial
+
 inductive ObservationAuthor
   | student
   | controller
@@ -728,6 +734,18 @@ def conflatedF25Outcome : TerminalOutcome where
 theorem conflated_f25_outcome_not_bankable :
     ¬ bankableSolved conflatedF25Outcome := by
   simp [bankableSolved, validTerminalOutcome, validOutcome, conflatedF25Outcome]
+
+def f26ProgressOutcome : TerminalOutcome where
+  problem := .unsolved
+  frame := .framePartial
+  learning := .skipped
+
+theorem f26_progress_is_retryable_but_not_solved_or_successor_eligible :
+    retryEligible f26ProgressOutcome ∧
+    ¬ bankableSolved f26ProgressOutcome ∧
+    ¬ successorEligible f26ProgressOutcome := by
+  simp [retryEligible, bankableSolved, successorEligible, validTerminalOutcome,
+    validOutcome, f26ProgressOutcome]
 
 structure AnalystWake where
   frameId : String
