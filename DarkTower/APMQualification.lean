@@ -43,6 +43,12 @@ theorem collected_terminal_output_cannot_skip_certification :
     supervisorMayAdvance .terminalCollected = false :=
   terminal_collection_is_progress_but_not_certification
 
+theorem preflight_identity_remains_controller_owned
+    (x : PreflightAuthorityObservation)
+    (h : validPreflightAuthorityObservation x) :
+    x.authorityRevision ≠ "" ∧ x.authorityBlob ≠ "" :=
+  artifact_identity_is_not_an_agent_observation x h
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,

@@ -285,6 +285,24 @@ def supervisorMayAdvance : SupervisorDriveStatus → Bool
 theorem terminal_collection_is_progress_but_not_certification :
     supervisorMayAdvance .terminalCollected = false := by decide
 
+structure PreflightAuthorityObservation where
+  authorityRevision : String
+  authorityBlob : String
+  commandOwnExit : Nat
+  cleanBefore : Bool
+  cleanAfter : Bool
+  deriving DecidableEq, Repr
+
+def validPreflightAuthorityObservation (x : PreflightAuthorityObservation) : Prop :=
+  x.authorityRevision ≠ "" ∧ x.authorityBlob ≠ "" ∧
+  x.commandOwnExit = 0 ∧ x.cleanBefore = true ∧ x.cleanAfter = true
+
+theorem artifact_identity_is_not_an_agent_observation
+    (x : PreflightAuthorityObservation)
+    (h : validPreflightAuthorityObservation x) :
+    x.authorityRevision ≠ "" ∧ x.authorityBlob ≠ "" := by
+  exact ⟨h.1, h.2.1⟩
+
 structure SubmissionAuthority where
   jobId : String
   dispatchId : String
