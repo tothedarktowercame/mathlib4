@@ -103,7 +103,8 @@ def contractJson : Json :=
           #[Json.str "close-block", Json.str "close-campaign"]),
         ("retirement-binds-recorded-terminal-head", Json.bool true),
         ("terminal-collection-is-supervisor-progress", Json.bool true),
-        ("artifact-identity-from-authority-not-observation", Json.bool true)]),
+        ("artifact-identity-from-authority-not-observation", Json.bool true),
+        ("preflight-requires-positive-sorry-baseline", Json.bool true)]),
      ("memory-policy", Json.mkObj
        [("content-addressed-snapshot", Json.bool true),
         ("admit-after-solve-verify", Json.bool true),

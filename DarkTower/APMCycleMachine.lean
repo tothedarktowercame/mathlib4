@@ -303,6 +303,18 @@ theorem artifact_identity_is_not_an_agent_observation
     x.authorityRevision ≠ "" ∧ x.authorityBlob ≠ "" := by
   exact ⟨h.1, h.2.1⟩
 
+def validPreflightSorryBaseline (warnings sorryWarnings errors : Nat) : Prop :=
+  0 < sorryWarnings ∧ sorryWarnings ≤ warnings ∧ errors = 0
+
+theorem three_sorries_are_a_valid_nonvacuous_preflight_baseline :
+    validPreflightSorryBaseline 5 3 0 := by
+  unfold validPreflightSorryBaseline
+  exact ⟨by omega, by omega, rfl⟩
+
+theorem zero_sorries_are_not_an_unresolved_preflight_baseline :
+    ¬ validPreflightSorryBaseline 2 0 0 := by
+  norm_num [validPreflightSorryBaseline]
+
 structure SubmissionAuthority where
   jobId : String
   dispatchId : String
