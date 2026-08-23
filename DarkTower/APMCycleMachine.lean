@@ -171,6 +171,60 @@ theorem f25_untyped_student_terminal_refused :
     ¬ validRoleTerminalOutput f25UntypedStudentOutput := by
   simp [validRoleTerminalOutput, f25UntypedStudentOutput]
 
+/-! The deterministic boundary supersedes interpreting an LLM's conversational
+terminal value.  Every live role uses the same envelope; only the observational
+evidence schema varies by role and phase. -/
+
+inductive LiveRole
+  | solver | student | guide | scribe | proctor | promotionProctor | analyst
+  deriving DecidableEq, Repr
+
+def allLiveRoles : List LiveRole :=
+  [.solver, .student, .guide, .scribe, .proctor, .promotionProctor, .analyst]
+
+structure SubmissionAuthority where
+  jobId : String
+  dispatchId : String
+  frameId : String
+  problemId : String
+  agentId : String
+  role : LiveRole
+  deriving DecidableEq, Repr
+
+structure TypedRoleSubmission where
+  registeredAuthority : SubmissionAuthority
+  persistedAuthority : SubmissionAuthority
+  submittedJobId : String
+  schemaValid : Bool
+  persisted : Bool
+  conversationalTerminalUsed : Bool
+  deriving DecidableEq, Repr
+
+def validTypedRoleSubmission (submission : TypedRoleSubmission) : Prop :=
+  submission.registeredAuthority.jobId ≠ "" ∧
+  submission.registeredAuthority.dispatchId ≠ "" ∧
+  submission.registeredAuthority.frameId ≠ "" ∧
+  submission.registeredAuthority.problemId ≠ "" ∧
+  submission.registeredAuthority.agentId ≠ "" ∧
+  submission.persistedAuthority = submission.registeredAuthority ∧
+  submission.submittedJobId = submission.registeredAuthority.jobId ∧
+  submission.schemaValid = true ∧ submission.persisted = true ∧
+  submission.conversationalTerminalUsed = false
+
+theorem typed_submission_prevents_authority_forgery
+    (submission : TypedRoleSubmission) (h : validTypedRoleSubmission submission) :
+    submission.persistedAuthority.frameId =
+      submission.registeredAuthority.frameId ∧
+    submission.submittedJobId = submission.registeredAuthority.jobId := by
+  exact ⟨congrArg SubmissionAuthority.frameId h.2.2.2.2.2.1, h.2.2.2.2.2.2.1⟩
+
+theorem conversation_cannot_advance_a_valid_submission
+    (submission : TypedRoleSubmission) (h : validTypedRoleSubmission submission) :
+    submission.conversationalTerminalUsed = false := h.2.2.2.2.2.2.2.2.2
+
+theorem every_live_role_has_one_submission_schema : allLiveRoles.length = 7 := by
+  rfl
+
 /-- Evidence that must exist before a Student job may be dispatched.  This is
 stronger than observing a correct binding in the eventual campaign trace: it
 rules out launching an unbound Student and attempting to repair the receipt

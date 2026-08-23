@@ -35,6 +35,12 @@ structure TraceStep where
   resumedJobId : String
   clientTimeoutObserved : Bool
   timeoutTreatedAsSuccess : Bool
+  submissionRegistered : Bool
+  submissionPersisted : Bool
+  submissionSchemaValid : Bool
+  submissionAuthorityDerived : Bool
+  conversationUsedAsReceipt : Bool
+  submissionJobId : String
   deriving FromJson, Repr
 
 structure TraceStudentBinding where
@@ -138,7 +144,10 @@ def validDispatchStep (step : TraceStep) : Bool :=
   step.commandOwnExit == some 0 &&
   step.claimPersisted && step.receiptPersisted &&
   step.resumedJobId == step.jobId &&
-  !step.timeoutTreatedAsSuccess
+  !step.timeoutTreatedAsSuccess &&
+  step.submissionRegistered && step.submissionPersisted &&
+  step.submissionSchemaValid && step.submissionAuthorityDerived &&
+  !step.conversationUsedAsReceipt && step.submissionJobId == step.jobId
 
 def dispatchLifecycleValid (steps : List TraceStep) : Bool :=
   steps.all validDispatchStep &&
