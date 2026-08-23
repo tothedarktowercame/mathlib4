@@ -128,6 +128,49 @@ structure StudentBinding where
   snapshotDigest : String
   deriving DecidableEq, Repr
 
+/-- A role job is not successful merely because Agency reached `done`: its
+terminal value must carry the authority-bound typed report. -/
+structure RoleTerminalOutput where
+  commandOwnExit : Option Nat
+  frameId : String
+  problemId : String
+  expectedFrameId : String
+  expectedProblemId : String
+  typedReport : Bool
+  deriving DecidableEq, Repr
+
+def validRoleTerminalOutput (output : RoleTerminalOutput) : Prop :=
+  output.commandOwnExit = some 0 ∧ output.typedReport = true ∧
+  output.frameId = output.expectedFrameId ∧
+  output.problemId = output.expectedProblemId
+
+/-- One invalid terminal may create one new, pre-announced canonical repair
+job.  The rejected findings are durable input, not conversational context. -/
+structure TerminalOutputRepair where
+  originalJobId : String
+  repairJobId : String
+  attempt : Nat
+  findings : List String
+  repairedOutput : RoleTerminalOutput
+  deriving DecidableEq, Repr
+
+def validTerminalOutputRepair (repair : TerminalOutputRepair) : Prop :=
+  repair.originalJobId ≠ "" ∧ repair.repairJobId ≠ "" ∧
+  repair.repairJobId ≠ repair.originalJobId ∧ repair.attempt = 1 ∧
+  repair.findings ≠ [] ∧ validRoleTerminalOutput repair.repairedOutput
+
+def f25UntypedStudentOutput : RoleTerminalOutput where
+  commandOwnExit := none
+  frameId := ""
+  problemId := ""
+  expectedFrameId := "f25"
+  expectedProblemId := "m94A02"
+  typedReport := false
+
+theorem f25_untyped_student_terminal_refused :
+    ¬ validRoleTerminalOutput f25UntypedStudentOutput := by
+  simp [validRoleTerminalOutput, f25UntypedStudentOutput]
+
 /-- Evidence that must exist before a Student job may be dispatched.  This is
 stronger than observing a correct binding in the eventual campaign trace: it
 rules out launching an unbound Student and attempting to repair the receipt

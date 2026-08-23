@@ -55,6 +55,9 @@ def contractJson : Json :=
         ("persist-claim", Json.bool true),
         ("persist-receipt", Json.bool true),
         ("restart-same-job", Json.bool true),
+        ("typed-terminal-output-required", Json.bool true),
+        ("terminal-output-repair-attempts", Json.num 1),
+        ("repair-feedback-findings-required", Json.bool true),
         ("client-timeout-is-success", Json.bool false)]),
      ("memory-policy", Json.mkObj
        [("content-addressed-snapshot", Json.bool true),
