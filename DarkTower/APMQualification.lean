@@ -27,6 +27,10 @@ theorem reused_student_session_mutation_is_killed :
     ¬ validSessionRotation f25ReusedStudentSession :=
   f25_reused_student_session_refused
 
+theorem partial_terminal_analyst_wake_nonvacuous :
+    analystWakeEligibleFrameResult "partial" :=
+  partial_terminal_frame_wakes_analyst
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,

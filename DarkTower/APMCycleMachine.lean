@@ -184,6 +184,13 @@ theorem f25_reused_session_cannot_support_closed_frame :
   simp [validSessionEvidenceForFrame, validSessionRotation,
         f25ReusedStudentSession]
 
+def analystWakeEligibleFrameResult (frameResult : String) : Prop :=
+  frameResult = "closed" ∨ frameResult = "partial"
+
+theorem partial_terminal_frame_wakes_analyst :
+    analystWakeEligibleFrameResult "partial" := by
+  simp [analystWakeEligibleFrameResult]
+
 /-- A role job is not successful merely because Agency reached `done`: its
 terminal value must carry the authority-bound typed report. -/
 structure RoleTerminalOutput where

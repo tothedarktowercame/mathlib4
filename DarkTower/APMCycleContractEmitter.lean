@@ -143,6 +143,7 @@ def contractJson : Json :=
      ("analyst-policy", Json.mkObj
        [("outside-frame-order", Json.bool true),
         ("wake-after-terminal-only", Json.bool true),
+        ("partial-terminal-wakes-analyst", Json.bool true),
         ("exactly-once-per-frame", Json.bool true),
         ("append-only-series-input", Json.bool true),
         ("tenure-frames", Json.num 2),
