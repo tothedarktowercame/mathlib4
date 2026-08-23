@@ -427,12 +427,92 @@ inductive FrameResult
   | frameVoid
   deriving DecidableEq, Repr
 
+inductive LearningOutcome
+  | observed
+  | partiallyObserved
+  | unobserved
+  | skipped
+  deriving DecidableEq, Repr
+
 def validOutcome : ProblemOutcome → FrameResult → Prop
   | .solved, .frameClosed => True
   | .solved, .framePartial => True
   | .unsolved, .framePartial => True
   | .unsolved, .frameVoid => True
   | _, _ => False
+
+/-- Problem truth, frame completion, and learning measurement are orthogonal.
+A solved proof remains bankable when the learning trailer is incomplete. -/
+structure TerminalOutcome where
+  problem : ProblemOutcome
+  frame : FrameResult
+  learning : LearningOutcome
+  deriving DecidableEq, Repr
+
+def validTerminalOutcome (o : TerminalOutcome) : Prop :=
+  validOutcome o.problem o.frame ∧
+  (o.frame = .frameClosed → o.learning = .observed ∨ o.learning = .skipped)
+
+def bankableSolved (o : TerminalOutcome) : Prop :=
+  validTerminalOutcome o ∧ o.problem = .solved
+
+def successorEligible (o : TerminalOutcome) : Prop := bankableSolved o
+
+inductive ObservationAuthor
+  | student
+  | controller
+  deriving DecidableEq, Repr
+
+/-- A missing subjective measurement is controller evidence, never a forged
+Student receipt. It may fill the observation dependency while retaining its
+own distinct type and authorship. -/
+structure MissingObservationReceipt where
+  receiptType : String
+  author : ObservationAuthor
+  phase : Phase
+  jobId : String
+  reason : String
+  repairAttempts : Nat
+  contentDigest : String
+  deriving DecidableEq, Repr
+
+def validMissingObservationReceipt (r : MissingObservationReceipt) : Prop :=
+  r.receiptType = "student-observation-missing" ∧
+  r.author = .controller ∧
+  r.jobId ≠ "" ∧ r.reason = "typed-submission-missing" ∧
+  r.contentDigest ≠ ""
+
+def f25ReferenceOutcome : TerminalOutcome where
+  problem := .solved
+  frame := .framePartial
+  learning := .partiallyObserved
+
+theorem f25_reference_is_bankable_and_successor_eligible :
+    bankableSolved f25ReferenceOutcome ∧ successorEligible f25ReferenceOutcome := by
+  simp [bankableSolved, successorEligible, validTerminalOutcome, validOutcome,
+    f25ReferenceOutcome]
+
+def forgedStudentObservation : MissingObservationReceipt where
+  receiptType := "student-attempt"
+  author := .student
+  phase := .studentAttempt1
+  jobId := "f25-job"
+  reason := "typed-submission-missing"
+  repairAttempts := 1
+  contentDigest := "digest"
+
+theorem forged_student_observation_refused :
+    ¬ validMissingObservationReceipt forgedStudentObservation := by
+  simp [validMissingObservationReceipt, forgedStudentObservation]
+
+def conflatedF25Outcome : TerminalOutcome where
+  problem := .unsolved
+  frame := .framePartial
+  learning := .partiallyObserved
+
+theorem conflated_f25_outcome_not_bankable :
+    ¬ bankableSolved conflatedF25Outcome := by
+  simp [bankableSolved, validTerminalOutcome, validOutcome, conflatedF25Outcome]
 
 structure AnalystWake where
   frameId : String

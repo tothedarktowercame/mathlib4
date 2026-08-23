@@ -104,7 +104,15 @@ def contractJson : Json :=
         ("projection-ledger-binding", Json.bool true)]),
      ("terminal-policy", Json.mkObj
        [("certified-phase-receipts", Json.num 11),
-        ("separate-problem-frame-outcomes", Json.bool true)]),
+        ("separate-problem-frame-outcomes", Json.bool true),
+        ("learning-outcome-required", Json.bool true),
+        ("solved-partial-bankable", Json.bool true),
+        ("bankable-solved-successor-eligible", Json.bool true),
+        ("missing-observation-receipt-type",
+         Json.str "student-observation-missing"),
+        ("missing-observation-author", Json.str "controller"),
+        ("missing-observation-may-satisfy-observation-dependency", Json.bool true),
+        ("missing-observation-may-impersonate-student", Json.bool false)]),
      ("analyst-policy", Json.mkObj
        [("outside-frame-order", Json.bool true),
         ("wake-after-terminal-only", Json.bool true),
