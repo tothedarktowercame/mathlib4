@@ -50,12 +50,16 @@ theorem preflight_identity_remains_controller_owned
   artifact_identity_is_not_an_agent_observation x h
 
 theorem multi_sorry_preflight_is_nonvacuous :
-    validPreflightSorryBaseline 5 3 0 :=
+    validPreflightSorryBaseline 0 3 0 :=
   three_sorries_are_a_valid_nonvacuous_preflight_baseline
 
 theorem solved_fixture_cannot_masquerade_as_unresolved_preflight :
-    ¬ validPreflightSorryBaseline 2 0 0 :=
+    ¬ validPreflightSorryBaseline 0 0 0 :=
   zero_sorries_are_not_an_unresolved_preflight_baseline
+
+theorem blocking_preflight_diagnostic_is_killed :
+    ¬ validPreflightSorryBaseline 0 1 1 :=
+  blocking_warnings_refuse_preflight
 
 theorem activation_before_intent_mutation_is_killed :
     ¬ validDurableCoordinatorIntent activationBeforeIntentMutant :=
