@@ -128,6 +128,62 @@ structure StudentBinding where
   snapshotDigest : String
   deriving DecidableEq, Repr
 
+/-- JSON role submissions carry enum values as strings.  The deterministic
+adapter canonicalizes the one accepted close result before policy validation;
+the model does not require an LLM to synthesize an EDN keyword over JSON. -/
+def canonicalCloseResult (wireValue : String) : Option String :=
+  if wireValue = "closed" then some "closed"
+  else if wireValue = "partial" then some "partial"
+  else none
+
+def validCloseWireResult (wireValue : String) : Prop :=
+  canonicalCloseResult wireValue = some "closed" ∨
+  canonicalCloseResult wireValue = some "partial"
+
+theorem json_closed_result_is_accepted : validCloseWireResult "closed" := by
+  simp [validCloseWireResult, canonicalCloseResult]
+
+theorem partial_json_result_is_accepted : validCloseWireResult "partial" := by
+  simp [validCloseWireResult, canonicalCloseResult]
+
+theorem void_wire_result_is_refused : ¬ validCloseWireResult "void" := by
+  simp [validCloseWireResult, canonicalCloseResult]
+
+/-- Reset is a rotation, not merely clearing a registry cell.  The next
+invocation must mint a nonempty id distinct from the previously inhabited id. -/
+structure SessionRotation where
+  previousId : String
+  nextId : String
+  deriving DecidableEq, Repr
+
+def validSessionRotation (rotation : SessionRotation) : Prop :=
+  rotation.previousId ≠ "" ∧ rotation.nextId ≠ "" ∧
+  rotation.previousId ≠ rotation.nextId
+
+def f25ReusedStudentSession : SessionRotation where
+  previousId := "zai-5cb28d42"
+  nextId := "zai-5cb28d42"
+
+theorem f25_reused_student_session_refused :
+    ¬ validSessionRotation f25ReusedStudentSession := by
+  simp [validSessionRotation, f25ReusedStudentSession]
+
+/-- Session freshness is a closure condition.  A historical violation remains
+visible by making the frame partial; it must not erase a separately verified
+solved problem or block banking that proof. -/
+def validSessionEvidenceForFrame (frameResult : String)
+    (rotation : SessionRotation) : Prop :=
+  frameResult = "partial" ∨ validSessionRotation rotation
+
+theorem f25_reused_session_requires_partial_frame :
+    validSessionEvidenceForFrame "partial" f25ReusedStudentSession := by
+  simp [validSessionEvidenceForFrame]
+
+theorem f25_reused_session_cannot_support_closed_frame :
+    ¬ validSessionEvidenceForFrame "closed" f25ReusedStudentSession := by
+  simp [validSessionEvidenceForFrame, validSessionRotation,
+        f25ReusedStudentSession]
+
 /-- A role job is not successful merely because Agency reached `done`: its
 terminal value must carry the authority-bound typed report. -/
 structure RoleTerminalOutput where

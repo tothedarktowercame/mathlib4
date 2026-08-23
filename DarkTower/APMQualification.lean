@@ -17,6 +17,16 @@ theorem canonical_cycle_has_all_phases : canonicalPhaseOrder.length = 11 := by d
 theorem solved_problem_partial_frame_is_admissible :
     validOutcome .solved .framePartial := by trivial
 
+theorem close_json_wire_boundary_nonvacuous :
+    validCloseWireResult "closed" := json_closed_result_is_accepted
+
+theorem partial_json_wire_boundary_nonvacuous :
+    validCloseWireResult "partial" := partial_json_result_is_accepted
+
+theorem reused_student_session_mutation_is_killed :
+    ¬ validSessionRotation f25ReusedStudentSession :=
+  f25_reused_student_session_refused
+
 def analystWitness : List AnalystWake :=
   [{frameId := "f1", terminal := true, ordinal := 1,
     seriesInputVersion := 1, appendOnly := true,

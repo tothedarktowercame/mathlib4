@@ -105,6 +105,8 @@ def contractJson : Json :=
         ("independent-review", Json.bool true),
         ("student-attempts", Json.num 3),
         ("fresh-student-sessions", Json.bool true),
+        ("fresh-session-rotation-mints-new-id", Json.bool true),
+        ("student-session-distinctness-required-for-closed-frame", Json.bool true),
         ("exact-snapshot-binding", Json.bool true),
         ("student-dispatch-witness-required", Json.bool true),
         ("student-dispatch-required-fields", Json.arr
@@ -132,6 +134,7 @@ def contractJson : Json :=
         ("learning-outcome-required", Json.bool true),
         ("solved-partial-bankable", Json.bool true),
         ("bankable-solved-successor-eligible", Json.bool true),
+        ("close-result-wire-canonicalization", Json.bool true),
         ("missing-observation-receipt-type",
          Json.str "student-observation-missing"),
         ("missing-observation-author", Json.str "controller"),
