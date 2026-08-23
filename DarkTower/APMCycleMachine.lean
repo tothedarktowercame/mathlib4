@@ -255,6 +255,76 @@ theorem typed_submission_migration_is_bounded_and_snapshot_preserving
     migration.freshSession = true := by
   exact ⟨h.2.2.2.2.2.2.2, h.2.2.2.2.1, h.2.2.2.2.2.1⟩
 
+/-- Recovery from a job which was announced but never accepted for activation.
+The old job is terminally cancelled before a distinct replacement authority is
+registered; this recovery is independent of terminal-proof repair. -/
+structure UnacceptedJobSupersession where
+  oldJobId : String
+  replacementJobId : String
+  cancellationPersisted : Bool
+  replacementRegistered : Bool
+  replacementAccepted : Bool
+  supersessionOrdinal : Nat
+  deriving DecidableEq, Repr
+
+def validUnacceptedJobSupersession (s : UnacceptedJobSupersession) : Prop :=
+  s.oldJobId ≠ "" ∧ s.replacementJobId ≠ "" ∧
+  s.oldJobId ≠ s.replacementJobId ∧
+  s.cancellationPersisted = true ∧ s.replacementRegistered = true ∧
+  s.replacementAccepted = true ∧ s.supersessionOrdinal = 1
+
+theorem unaccepted_job_supersession_is_distinct_cancelled_and_bounded
+    (s : UnacceptedJobSupersession) (h : validUnacceptedJobSupersession s) :
+    s.oldJobId ≠ s.replacementJobId ∧ s.cancellationPersisted = true ∧
+    s.supersessionOrdinal = 1 := by
+  exact ⟨h.2.2.1, h.2.2.2.1, h.2.2.2.2.2.2⟩
+
+/-- Immutable authority shared by the deterministic announce, activation,
+typed-submission, and restart-reconciliation adapter boundaries. -/
+structure PreannouncedJobAuthority where
+  derivedJobId : String
+  announcedJobId : String
+  activatedJobId : String
+  submittedJobId : String
+  announcedRequestDigest : String
+  activatedRequestDigest : String
+  queuedSurvivedRestart : Bool
+  conflictingReplayRejected : Bool
+  deriving DecidableEq, Repr
+
+def validPreannouncedJobAuthority (a : PreannouncedJobAuthority) : Prop :=
+  a.derivedJobId ≠ "" ∧
+  a.derivedJobId = a.announcedJobId ∧
+  a.announcedJobId = a.activatedJobId ∧
+  a.activatedJobId = a.submittedJobId ∧
+  a.announcedRequestDigest ≠ "" ∧
+  a.announcedRequestDigest = a.activatedRequestDigest ∧
+  a.queuedSurvivedRestart = true ∧
+  a.conflictingReplayRejected = true
+
+theorem valid_preannouncement_preserves_exact_authority
+    (a : PreannouncedJobAuthority) (h : validPreannouncedJobAuthority a) :
+    a.derivedJobId = a.submittedJobId ∧
+    a.announcedRequestDigest = a.activatedRequestDigest ∧
+    a.queuedSurvivedRestart = true ∧
+    a.conflictingReplayRejected = true := by
+  rcases h with ⟨_, hda, haa, has, _, hd, hr, hc⟩
+  exact ⟨hda.trans (haa.trans has), hd, hr, hc⟩
+
+def conflictingPreannouncement : PreannouncedJobAuthority where
+  derivedJobId := "invoke-derived"
+  announcedJobId := "invoke-derived"
+  activatedJobId := "invoke-derived"
+  submittedJobId := "invoke-derived"
+  announcedRequestDigest := "request-a"
+  activatedRequestDigest := "request-b"
+  queuedSurvivedRestart := true
+  conflictingReplayRejected := false
+
+theorem conflicting_preannouncement_refused :
+    ¬ validPreannouncedJobAuthority conflictingPreannouncement := by
+  simp [validPreannouncedJobAuthority, conflictingPreannouncement]
+
 /-- Evidence that must exist before a Student job may be dispatched.  This is
 stronger than observing a correct binding in the eventual campaign trace: it
 rules out launching an unbound Student and attempting to repair the receipt
