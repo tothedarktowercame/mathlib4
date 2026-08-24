@@ -68,6 +68,10 @@ def contractJson : Json :=
         ("terminal-collection-attempts-per-role", Json.num 1),
         ("terminal-repair-attempts-per-role", Json.num 1),
         ("terminal-collection-covered-role-count", Json.num 7),
+        ("promotion-review-enums-normalized", Json.bool true),
+        ("promotion-approved-candidates-accounted", Json.bool true),
+        ("promotion-approved-unattached-refused", Json.bool true),
+        ("promotion-rejections-explicit", Json.bool true),
         ("role-terminal-budgets", Json.mkObj
           [("solver", Json.mkObj [("collection-attempts", Json.num 1),
                                    ("repair-attempts", Json.num 1)]),

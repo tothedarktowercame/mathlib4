@@ -678,6 +678,42 @@ theorem f24_promotion_procedure_refused :
     ¬ validPromotionEvidence f24PromotionEvidence := by
   simp [validPromotionEvidence, f24PromotionEvidence]
 
+/-- Promotion publication must account for every reviewed candidate. Approved
+IDs are exactly the IDs attached to the Student-visible snapshot; rejected IDs
+remain explicit rather than disappearing through a wire-format filter. -/
+structure PromotionPublicationEvidence where
+  reviewedMemoryIds : List String
+  approvedMemoryIds : List String
+  rejectedMemoryIds : List String
+  attachedMemoryIds : List String
+  deriving DecidableEq, Repr
+
+def validPromotionPublication (evidence : PromotionPublicationEvidence) : Prop :=
+  evidence.reviewedMemoryIds =
+      evidence.approvedMemoryIds ++ evidence.rejectedMemoryIds ∧
+  evidence.attachedMemoryIds = evidence.approvedMemoryIds ∧
+  evidence.reviewedMemoryIds.Nodup
+
+def f28DroppedSolverPromotion : PromotionPublicationEvidence where
+  reviewedMemoryIds := ["e-14c2c205", "e-4b95d2fd", "e-56018477", "e-925c0ab3"]
+  approvedMemoryIds := ["e-14c2c205", "e-4b95d2fd", "e-56018477", "e-925c0ab3"]
+  rejectedMemoryIds := []
+  attachedMemoryIds := []
+
+theorem f28_approved_but_unattached_promotion_refused :
+    ¬ validPromotionPublication f28DroppedSolverPromotion := by
+  simp [validPromotionPublication, f28DroppedSolverPromotion]
+
+def accountedSolverPromotion : PromotionPublicationEvidence where
+  reviewedMemoryIds := ["memory-1", "memory-2"]
+  approvedMemoryIds := ["memory-1"]
+  rejectedMemoryIds := ["memory-2"]
+  attachedMemoryIds := ["memory-1"]
+
+theorem accounted_solver_promotion_accepted :
+    validPromotionPublication accountedSolverPromotion := by
+  simp [validPromotionPublication, accountedSolverPromotion]
+
 structure CampaignLane where
   campaignId : String
   regulatorId : String
