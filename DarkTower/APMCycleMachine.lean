@@ -215,6 +215,61 @@ theorem unpreserved_student_reset_is_refused :
     ¬ validStudentAttemptWorkspaceTransition unpreservedStudentReset := by
   simp [validStudentAttemptWorkspaceTransition, unpreservedStudentReset]
 
+/-! A Student terminal is evidential only when the controller preserves the
+exact candidate before it certifies the phase receipt.  This applies equally
+to a normal typed submission and to a controller-authored missing-observation
+receipt: compilation without a durable receipt binding is not an observation. -/
+structure StudentTerminalCandidate where
+  attemptOrdinal : Nat
+  candidateHead : String
+  candidateRef : String
+  candidateDigest : String
+  problemBlob : String
+  leanExit : Nat
+  worktreeClean : Bool
+  persistedBeforeReceipt : Bool
+  receiptCandidateDigest : String
+  deriving DecidableEq, Repr
+
+def validStudentTerminalCandidate (candidate : StudentTerminalCandidate) : Prop :=
+  candidate.attemptOrdinal ∈ [1, 2, 3] ∧
+  candidate.candidateHead ≠ "" ∧ candidate.candidateRef ≠ "" ∧
+  candidate.candidateDigest ≠ "" ∧ candidate.problemBlob ≠ "" ∧
+  candidate.leanExit = 0 ∧ candidate.worktreeClean = true ∧
+  candidate.persistedBeforeReceipt = true ∧
+  candidate.receiptCandidateDigest = candidate.candidateDigest
+
+def f30CompiledButUnrecordedCandidate : StudentTerminalCandidate where
+  attemptOrdinal := 3
+  candidateHead := "5865822658658226586582265865822658658226"
+  candidateRef :=
+    "refs/apm/preserved-student-attempts/f30/a01J06/58658226"
+  candidateDigest := "f30-student-candidate"
+  problemBlob := "f30-student-main-blob"
+  leanExit := 0
+  worktreeClean := true
+  persistedBeforeReceipt := true
+  receiptCandidateDigest := ""
+
+theorem f30_compiling_candidate_without_receipt_binding_is_refused :
+    ¬ validStudentTerminalCandidate f30CompiledButUnrecordedCandidate := by
+  simp [validStudentTerminalCandidate, f30CompiledButUnrecordedCandidate]
+
+def certifiedStudentCandidate : StudentTerminalCandidate where
+  attemptOrdinal := 3
+  candidateHead := "student-head"
+  candidateRef := "refs/apm/student-candidates/f/p/attempt-3/student-head"
+  candidateDigest := "candidate-digest"
+  problemBlob := "problem-blob"
+  leanExit := 0
+  worktreeClean := true
+  persistedBeforeReceipt := true
+  receiptCandidateDigest := "candidate-digest"
+
+theorem certified_student_candidate_is_valid :
+    validStudentTerminalCandidate certifiedStudentCandidate := by
+  simp [validStudentTerminalCandidate, certifiedStudentCandidate]
+
 /-- A Guide can extend the Student shelf only through independent review. The
 next Student binds to the exact content-addressed union snapshot, never to the
 Guide's conversational report or unreviewed candidates. -/
