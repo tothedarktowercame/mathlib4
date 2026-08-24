@@ -135,6 +135,14 @@ def contractJson : Json :=
         ("guide-union-snapshot-content-addressed", Json.bool true),
         ("next-student-binds-latest-reviewed-snapshot", Json.bool true),
         ("candidate-pattern-binding-required", Json.bool true),
+        ("open-reviewed-corpus-search", Json.bool true),
+        ("search-capable-roles", Json.arr
+          #[Json.str "student", Json.str "scribe",
+            Json.str "promotion-proctor"]),
+        ("search-query-trace-persisted", Json.bool true),
+        ("search-results-content-addressed", Json.bool true),
+        ("student-open-search-distinct-from-proactive-snapshot", Json.bool true),
+        ("self-reported-query-is-search-evidence", Json.bool false),
         ("student-dispatch-witness-required", Json.bool true),
         ("student-dispatch-required-fields", Json.arr
           #[Json.str "attempt-ordinal", Json.str "promotion-receipt-id",

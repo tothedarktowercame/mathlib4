@@ -306,6 +306,55 @@ inductive LiveRole
 def allLiveRoles : List LiveRole :=
   [.solver, .student, .guide, .scribe, .proctor, .promotionProctor, .analyst]
 
+/-! APM memory search is an explicit, recorded capability.  Snapshot binding
+still records which promoted memories were proactively supplied, while open
+search ranges over the independently reviewed mathematics corpus. -/
+
+structure RoleSearchEvidence where
+  role : LiveRole
+  jobId : String
+  query : String
+  traceId : String
+  corpusScope : String
+  resultIds : List String
+  persisted : Bool
+  deriving DecidableEq, Repr
+
+def searchCapableRole : LiveRole → Bool
+  | .student | .scribe | .promotionProctor => true
+  | _ => false
+
+def validRoleSearch (evidence : RoleSearchEvidence) : Prop :=
+  searchCapableRole evidence.role = true ∧
+  evidence.jobId ≠ "" ∧ evidence.query ≠ "" ∧ evidence.traceId ≠ "" ∧
+  evidence.corpusScope = "reviewed-mathematics" ∧ evidence.persisted = true
+
+def f29NarratedButUnexecutedSearch : RoleSearchEvidence where
+  role := .student
+  jobId := "f29-student"
+  query := "Gauss-Lucas"
+  traceId := ""
+  corpusScope := "reviewed-mathematics"
+  resultIds := []
+  persisted := false
+
+theorem f29_narrated_search_is_not_execution_evidence :
+    ¬ validRoleSearch f29NarratedButUnexecutedSearch := by
+  simp [validRoleSearch, searchCapableRole, f29NarratedButUnexecutedSearch]
+
+def recordedOpenStudentSearch : RoleSearchEvidence where
+  role := .student
+  jobId := "student-job"
+  query := "cast normalization"
+  traceId := "search-trace"
+  corpusScope := "reviewed-mathematics"
+  resultIds := ["memory-outside-proactive-snapshot"]
+  persisted := true
+
+theorem recorded_open_student_search_is_valid :
+    validRoleSearch recordedOpenStudentSearch := by
+  simp [validRoleSearch, searchCapableRole, recordedOpenStudentSearch]
+
 def terminalLifecycleActions : List String := ["close-block", "close-campaign"]
 
 theorem terminal_lifecycle_actions_nonvacuous :
