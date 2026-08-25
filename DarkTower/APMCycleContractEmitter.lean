@@ -248,6 +248,7 @@ def contractJson : Json :=
         ("guide-interventions", Json.num 2),
         ("analyst-tenure-frames", Json.num 2),
         ("seat-turn-timeout-ms", Json.num 3600000),
+        ("student-turn-timeout-ms", Json.num 1800000),
         ("zai-request-timeout-ms", Json.num 300000)])]
 
 def emit : IO Unit := IO.println contractJson.compress
