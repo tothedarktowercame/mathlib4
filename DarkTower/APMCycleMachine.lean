@@ -411,6 +411,38 @@ theorem all_reject_promotion_pass_advances :
       allRejectReview = .advance := by
   rfl
 
+/-! The three theorems below are the general properties.  The two example
+theorems above compute on fixed literals, which shows the definitions reduce
+but would still hold if `promotionPassSuccessor` ignored its argument in every
+other case.  A predicate proved only against a literal the model invents is
+what let the earlier guide-snapshot obligation sit inert; state the quantified
+form as well. -/
+theorem unresolved_pass_never_advances
+    (receipt blob : String) (pass : ReviewPass) (h : resolved pass = false) :
+    promotionPassSuccessor receipt blob pass =
+      .awaitingApparatusRepair
+        { cause := .promotionPassUnresolved
+          lastValidReceipt := receipt
+          contractBlob := blob
+          persistedReview := pass } := by
+  simp [promotionPassSuccessor, h]
+
+theorem resolved_pass_always_advances
+    (receipt blob : String) (pass : ReviewPass) (h : resolved pass = true) :
+    promotionPassSuccessor receipt blob pass = .advance := by
+  simp [promotionPassSuccessor, h]
+
+/-- Zero approvals is a legitimate result: a pass of rejections advances at any
+length.  This is the property the campaign's role cards require and the one a
+resolution rule could most easily break. -/
+theorem rejections_only_pass_advances (receipt blob : String) (n : Nat) :
+    promotionPassSuccessor receipt blob
+      (List.replicate n (.judged .reject)) = .advance := by
+  apply resolved_pass_always_advances
+  induction n with
+  | zero => rfl
+  | succ k ih => simp [resolved, List.replicate, isJudgement] at ih ⊢
+
 theorem unchanged_contract_cannot_resume_review
     (hold : AwaitingApparatusRepair) (pass : ReviewPass)
     (mode : ReviewResumeMode) :
