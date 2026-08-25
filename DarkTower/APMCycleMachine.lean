@@ -270,6 +270,53 @@ theorem certified_student_candidate_is_valid :
     validStudentTerminalCandidate certifiedStudentCandidate := by
   simp [validStudentTerminalCandidate, certifiedStudentCandidate]
 
+/-! Candidate validation and Student observation are separate controller
+decisions. A rejected candidate remains durable evidence, but it cannot be
+certified and does not prevent a typed-missing observation receipt. -/
+inductive StudentCandidateDisposition
+  | certified
+  | rejectedEvidence
+  deriving DecidableEq, Repr
+
+def candidateMaySupplyCertifiedHead : StudentCandidateDisposition → Bool
+  | .certified => true
+  | .rejectedEvidence => false
+
+def candidateMaySupplyMissingObservation : StudentCandidateDisposition → Bool
+  | .certified | .rejectedEvidence => true
+
+theorem rejected_candidate_is_evidence_but_not_certification :
+    candidateMaySupplyCertifiedHead .rejectedEvidence = false ∧
+    candidateMaySupplyMissingObservation .rejectedEvidence = true := by
+  decide
+
+structure ControllerMemoryUse where
+  receiptId : String
+  snapshotId : String
+  snapshotDigest : String
+  accessibleIds : List String
+  surfacedIds : List String
+  searchReceiptIds : List String
+  deriving DecidableEq, Repr
+
+def validControllerMemoryUse (m : ControllerMemoryUse) : Prop :=
+  m.receiptId ≠ "" ∧ m.snapshotId ≠ "" ∧ m.snapshotDigest ≠ "" ∧
+  m.surfacedIds.all (fun id => id ∈ m.accessibleIds ∨ id ∈ m.searchReceiptIds)
+
+structure ScribeStudentInput where
+  jobId : String
+  memoryUse : ControllerMemoryUse
+  deriving DecidableEq, Repr
+
+def validScribeStudentInput (input : ScribeStudentInput) : Prop :=
+  input.jobId ≠ "" ∧ validControllerMemoryUse input.memoryUse
+
+theorem controller_memory_use_makes_missing_observation_scribe_compatible
+    (jobId : String) (memoryUse : ControllerMemoryUse)
+    (hJob : jobId ≠ "") (hMemory : validControllerMemoryUse memoryUse) :
+    validScribeStudentInput { jobId := jobId, memoryUse := memoryUse } := by
+  exact ⟨hJob, hMemory⟩
+
 /-- A Guide can extend the Student shelf only through independent review. The
 next Student binds to the exact content-addressed union snapshot, never to the
 Guide's conversational report or unreviewed candidates. -/
@@ -490,7 +537,7 @@ def receiptRequiredFields : String → List String
       ["receipt/id", "receipt/type", "receipt/frame-id", "receipt/problem-id",
        "receipt/attempt-ordinal", "receipt/job-id", "receipt/author",
        "receipt/reason", "receipt/repair-attempts", "receipt/memory-snapshot",
-       "receipt/harness-observed"]
+       "receipt/harness-observed", "receipt/memory-use"]
   | "guide-intervention" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/intervention-ordinal", "receipt/mode",
       "receipt/input-attempt-id", "receipt/effect", "receipt/channel-audit"]
@@ -582,6 +629,40 @@ def staleBaseRetirementMutant : WorkspaceRetirementBinding where
 theorem stale_base_cannot_substitute_for_terminal_head :
     ¬ validWorkspaceRetirementBinding staleBaseRetirementMutant := by
   simp [validWorkspaceRetirementBinding, staleBaseRetirementMutant]
+
+/-! Retirement is replayed from the persisted terminal certificate, not by
+re-observing a workspace that successful retirement is supposed to remove. -/
+structure FrameRetirementOrder where
+  terminalValidated : Bool
+  terminalPersisted : Bool
+  workspaceRemoved : Bool
+  replayUsesPersistedTerminal : Bool
+  deriving DecidableEq, Repr
+
+def validFrameRetirementOrder (order : FrameRetirementOrder) : Prop :=
+  order.workspaceRemoved = true →
+    order.terminalValidated = true ∧ order.terminalPersisted = true ∧
+    order.replayUsesPersistedTerminal = true
+
+def f34RemovalBeforeTerminalPersistence : FrameRetirementOrder where
+  terminalValidated := true
+  terminalPersisted := false
+  workspaceRemoved := true
+  replayUsesPersistedTerminal := false
+
+theorem removal_before_terminal_persistence_is_refused :
+    ¬ validFrameRetirementOrder f34RemovalBeforeTerminalPersistence := by
+  simp [validFrameRetirementOrder, f34RemovalBeforeTerminalPersistence]
+
+def persistedTerminalRetirementReplay : FrameRetirementOrder where
+  terminalValidated := true
+  terminalPersisted := true
+  workspaceRemoved := true
+  replayUsesPersistedTerminal := true
+
+theorem persisted_terminal_authorizes_retirement_replay :
+    validFrameRetirementOrder persistedTerminalRetirementReplay := by
+  simp [validFrameRetirementOrder, persistedTerminalRetirementReplay]
 
 inductive SupervisorDriveStatus where
   | awaitingTerminal

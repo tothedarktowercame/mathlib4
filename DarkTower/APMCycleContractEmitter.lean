@@ -154,6 +154,9 @@ def contractJson : Json :=
         ("terminal-lifecycle-actions-covered", Json.arr
           #[Json.str "close-block", Json.str "close-campaign"]),
         ("retirement-binds-recorded-terminal-head", Json.bool true),
+        ("frame-terminal-persisted-before-retirement", Json.bool true),
+        ("retirement-replay-uses-persisted-terminal", Json.bool true),
+        ("retired-workspace-absence-is-postcondition", Json.bool true),
         ("terminal-collection-is-supervisor-progress", Json.bool true),
         ("artifact-identity-from-authority-not-observation", Json.bool true),
         ("preflight-requires-positive-sorry-baseline", Json.bool true),
@@ -231,7 +234,10 @@ def contractJson : Json :=
         ("student-candidate-lean-validated", Json.bool true),
         ("student-candidate-persisted-before-receipt", Json.bool true),
         ("student-candidate-replay-idempotent", Json.bool true),
-        ("missing-observation-records-certified-candidate", Json.bool true)]),
+        ("rejected-student-candidate-evidence-only", Json.bool true),
+        ("missing-observation-records-certified-candidate", Json.bool false),
+        ("missing-observation-controller-memory-use-required", Json.bool true),
+        ("missing-observation-scribe-compatible", Json.bool true)]),
      ("analyst-policy", Json.mkObj
        [("outside-frame-order", Json.bool true),
         ("wake-after-terminal-only", Json.bool true),
