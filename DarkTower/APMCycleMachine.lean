@@ -328,6 +328,131 @@ inductive ReviewVerdict
   | cannotJudge
   deriving DecidableEq, Repr
 
+/-! A review request is constructed only after the controller has resolved
+the material that the reviewer will inspect.  `ReviewDispatch` is the raw
+construction record; `ValidReviewDispatch` is the proof-carrying value that
+may actually be sent. -/
+structure ReviewCandidateResolution where
+  candidateId : String
+  candidatePersisted : Bool
+  candidateFetchable : Bool
+  parentPatternId : String
+  parentPatternFetchable : Bool
+  deriving DecidableEq, Repr
+
+structure ReviewJobTraceResolution where
+  traceId : String
+  fetchable : Bool
+  deriving DecidableEq, Repr
+
+structure ReviewerInputResolution where
+  baseProblemBlob : String
+  baseProblemBlobFetchable : Bool
+  solverFinalHead : String
+  solverFinalHeadFetchable : Bool
+  jobTraces : List ReviewJobTraceResolution
+  deriving DecidableEq, Repr
+
+structure ReviewDispatch where
+  candidates : List ReviewCandidateResolution
+  reviewerInputs : ReviewerInputResolution
+  deriving DecidableEq, Repr
+
+def ReviewCandidateResolution.resolves
+    (candidate : ReviewCandidateResolution) : Prop :=
+  candidate.candidateId ≠ "" ∧
+  candidate.candidatePersisted = true ∧
+  candidate.candidateFetchable = true ∧
+  candidate.parentPatternId ≠ "" ∧
+  candidate.parentPatternFetchable = true
+
+def ReviewJobTraceResolution.resolves
+    (trace : ReviewJobTraceResolution) : Prop :=
+  trace.traceId ≠ "" ∧ trace.fetchable = true
+
+def ReviewerInputResolution.resolves
+    (inputs : ReviewerInputResolution) : Prop :=
+  inputs.baseProblemBlob ≠ "" ∧
+  inputs.baseProblemBlobFetchable = true ∧
+  inputs.solverFinalHead ≠ "" ∧
+  inputs.solverFinalHeadFetchable = true ∧
+  ∀ trace ∈ inputs.jobTraces, trace.resolves
+
+def ReviewDispatch.Valid (dispatch : ReviewDispatch) : Prop :=
+  dispatch.candidates ≠ [] ∧
+  (∀ candidate ∈ dispatch.candidates, candidate.resolves) ∧
+  dispatch.reviewerInputs.resolves
+
+/-- This is the only review-dispatch value the transition machine may send. -/
+structure ValidReviewDispatch extends ReviewDispatch where
+  valid : toReviewDispatch.Valid
+
+inductive ReviewApparatusFailureCause
+  | candidateNotPersisted
+  | candidateNotFetchable
+  | parentPatternNotFetchable
+  | baseProblemBlobNotFetchable
+  | solverFinalHeadNotFetchable
+  | jobTraceNotFetchable
+  deriving DecidableEq, Repr
+
+def ReviewApparatusFailureCause.occurs
+    (cause : ReviewApparatusFailureCause) (dispatch : ReviewDispatch) : Prop :=
+  match cause with
+  | .candidateNotPersisted =>
+      ∃ candidate ∈ dispatch.candidates,
+        candidate.candidatePersisted = false
+  | .candidateNotFetchable =>
+      ∃ candidate ∈ dispatch.candidates,
+        candidate.candidateFetchable = false
+  | .parentPatternNotFetchable =>
+      ∃ candidate ∈ dispatch.candidates,
+        candidate.parentPatternFetchable = false
+  | .baseProblemBlobNotFetchable =>
+      dispatch.reviewerInputs.baseProblemBlobFetchable = false
+  | .solverFinalHeadNotFetchable =>
+      dispatch.reviewerInputs.solverFinalHeadFetchable = false
+  | .jobTraceNotFetchable =>
+      ∃ trace ∈ dispatch.reviewerInputs.jobTraces, trace.fetchable = false
+
+theorem dispatch_with_unresolvable_candidate_is_invalid
+    (dispatch : ReviewDispatch) (candidate : ReviewCandidateResolution)
+    (member : candidate ∈ dispatch.candidates)
+    (unresolvable : ¬ candidate.resolves) : ¬ dispatch.Valid := by
+  intro valid
+  exact unresolvable (valid.2.1 candidate member)
+
+theorem dispatch_with_unresolved_reviewer_inputs_is_invalid
+    (dispatch : ReviewDispatch)
+    (unresolved : ¬ dispatch.reviewerInputs.resolves) : ¬ dispatch.Valid := by
+  intro valid
+  exact unresolved valid.2.2
+
+theorem valid_dispatch_excludes_apparatus_failure
+    (dispatch : ValidReviewDispatch) (cause : ReviewApparatusFailureCause) :
+    ¬ cause.occurs dispatch.toReviewDispatch := by
+  rcases dispatch.valid with ⟨_, candidatesResolve, inputsResolve⟩
+  rcases inputsResolve with ⟨_, baseFetchable, _, headFetchable, tracesResolve⟩
+  cases cause with
+  | candidateNotPersisted =>
+      rintro ⟨candidate, member, missing⟩
+      have := (candidatesResolve candidate member).2.1
+      simp_all
+  | candidateNotFetchable =>
+      rintro ⟨candidate, member, missing⟩
+      have := (candidatesResolve candidate member).2.2.1
+      simp_all
+  | parentPatternNotFetchable =>
+      rintro ⟨candidate, member, missing⟩
+      have := (candidatesResolve candidate member).2.2.2.2
+      simp_all
+  | baseProblemBlobNotFetchable => simp_all [ReviewApparatusFailureCause.occurs]
+  | solverFinalHeadNotFetchable => simp_all [ReviewApparatusFailureCause.occurs]
+  | jobTraceNotFetchable =>
+      rintro ⟨trace, member, missing⟩
+      have := (tracesResolve trace member).2
+      simp_all
+
 abbrev ReviewPass := List ReviewVerdict
 
 def isJudgement : ReviewVerdict → Bool

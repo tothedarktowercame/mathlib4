@@ -206,6 +206,16 @@ def contractJson : Json :=
             #[Json.str "approve", Json.str "reassign", Json.str "reject"]),
            ("apparatus-failures", Json.arr #[Json.str "cannot-judge"])]),
         ("promotion-pass-resolution-required", Json.bool true),
+        ("review-dispatch-resolution-required", Json.bool true),
+        ("review-dispatch-candidate-required", Json.arr
+          #[Json.str "persisted", Json.str "fetchable",
+            Json.str "parent-pattern-fetchable"]),
+        ("review-dispatch-reviewer-inputs-required", Json.arr
+          #[Json.str "base-problem-blob-fetchable",
+            Json.str "solver-final-head-fetchable",
+            Json.str "evidence-job-traces-fetchable"]),
+        ("unresolved-review-dispatch-action",
+          Json.str "hold-at-deposit-awaiting-apparatus-repair"),
         ("base-problem-blob-required", Json.bool true),
         ("problem-path-required", Json.bool true),
         ("solver-final-head-required", Json.bool true),
