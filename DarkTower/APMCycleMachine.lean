@@ -331,7 +331,28 @@ inductive ReviewVerdict
 /-! A review request is constructed only after the controller has resolved
 the material that the reviewer will inspect.  `ReviewDispatch` is the raw
 construction record; `ValidReviewDispatch` is the proof-carrying value that
-may actually be sent. -/
+may actually be sent.
+
+DECLARED RESIDUAL — `hole-review-dispatch-resolution-witness-v1.edn`, open.
+The resolution fields below are self-reported BOOLEANS: nothing here ties
+`candidatePersisted = true` to the candidate actually being persisted.  So
+`valid_dispatch_excludes_apparatus_failure` proves *if the controller says
+everything resolves, the enumerated failures do not occur* — sound up to this
+hole, and no further.  That is deliberately the same shape this model was
+written to remove (`TN-fable-F32-model` §2: Lean verifying that Clojure
+reports its own schema as satisfied), so it is named rather than left to be
+found.  Intended closure: content-addressed witnesses, as
+`TraceReviewSnapshot` already does by requiring `snapshotDigest =
+contentDigest`; a controller then cannot assert a resolution it did not
+perform.  Closes with the Clojure enforcement packet, which is where the
+resolution record acquires a producer.
+
+DECIDED, NOT YET DONE — `ReviewVerdict.cannotJudge` is to be retired.  Once
+dispatch validity holds, every documented cause of it is excluded by
+construction, and a reviewer holding resolved evidence can only approve,
+reassign or reject.  A reviewer-runtime failure remains possible but is an
+apparatus transition, not a verdict about a candidate, and belongs outside
+`ReviewVerdict` (codex-10's finding on this packet, concurred). -/
 structure ReviewCandidateResolution where
   candidateId : String
   candidatePersisted : Bool
