@@ -58,6 +58,15 @@ structure TraceReviewSnapshot where
   contentDigest : String
   deriving FromJson, Repr
 
+/-- Persisted review verdicts, grouped by the completed pass that produced
+them.  The wire strings are decoded into the cycle model's deliberately
+nested `ReviewVerdict` type below. -/
+structure TraceReviewPass where
+  phase : String
+  ordinal : Nat
+  verdicts : List String
+  deriving FromJson, Repr
+
 structure TraceCampaignLane where
   campaignId : String
   regulatorId : String
@@ -96,6 +105,7 @@ structure CampaignTrace where
   snapshotReviewer : String
   studentBindings : List TraceStudentBinding
   reviewSnapshots : List TraceReviewSnapshot
+  reviewPasses : List TraceReviewPass
   campaignLanes : List TraceCampaignLane
   phaseReceiptIds : List String
   problemOutcome : String
@@ -202,6 +212,21 @@ def memoryValid (trace : CampaignTrace) : Bool :=
   (trace.studentBindings.map (·.sessionId)).Nodup &&
   snapshotBindingChain trace.solverSnapshotDigest trace.studentBindings
     trace.reviewSnapshots
+
+def decodeReviewVerdict : String → Option ReviewVerdict
+  | "approve" => some (.judged .approve)
+  | "reassign" => some (.judged .reassign)
+  | "reject" => some (.judged .reject)
+  | "cannot-judge" => some .cannotJudge
+  | _ => none
+
+def traceReviewPassResolved (pass : TraceReviewPass) : Bool :=
+  match pass.verdicts.mapM decodeReviewVerdict with
+  | some verdicts => resolved verdicts
+  | none => false
+
+def reviewResolutionValid (trace : CampaignTrace) : Bool :=
+  !trace.reviewPasses.isEmpty && trace.reviewPasses.all traceReviewPassResolved
 
 theorem snapshot_chain_first_attempt_binds_solver
     (solver : String) (first : TraceStudentBinding)
@@ -369,6 +394,7 @@ def accepts (trace : CampaignTrace) : Bool :=
   receiptContinuous trace.steps &&
   dispatchLifecycleValid trace.steps &&
   memoryValid trace &&
+  reviewResolutionValid trace &&
   campaignIsolationValid trace &&
   terminalFrameValid trace &&
   analystValid trace &&
@@ -396,6 +422,11 @@ def checkFile (path : System.FilePath) : IO UInt32 := do
   let contents ← IO.FS.readFile path
   let json ← IO.ofExcept (Json.parse contents)
   let trace : CampaignTrace ← IO.ofExcept (fromJson? json)
+  IO.println s!"APM-TRACE-BINDING-CHAIN {if memoryValid trace then "VALID" else "INVALID"}"
+  IO.println s!"APM-TRACE-REVIEW-RESOLUTION {if reviewResolutionValid trace then "VALID" else "INVALID"}"
+  for pass in trace.reviewPasses do
+    if !traceReviewPassResolved pass then
+      IO.println s!"APM-TRACE-UNRESOLVED-PASS {pass.phase} {pass.ordinal}"
   if accepts trace then
     IO.println "APM-TRACE-ACCEPTED"
     pure 0
