@@ -314,6 +314,112 @@ theorem recovered_observation_is_observed_but_not_candidate_certification :
     candidateMaySupplyCertifiedHead .rejectedEvidence = false := by
   decide
 
+/-! Promotion review distinguishes a judgement about a candidate from a
+failure of the review apparatus to produce any judgement.  In particular,
+`cannotJudge` is not a fourth candidate judgement. -/
+inductive CandidateJudgement
+  | approve
+  | reassign
+  | reject
+  deriving DecidableEq, Repr
+
+inductive ReviewVerdict
+  | judged (judgement : CandidateJudgement)
+  | cannotJudge
+  deriving DecidableEq, Repr
+
+abbrev ReviewPass := List ReviewVerdict
+
+def isJudgement : ReviewVerdict → Bool
+  | .judged _ => true
+  | .cannotJudge => false
+
+/-- A promotion pass is resolved exactly when every candidate received a
+candidate judgement.  The number of approvals is deliberately irrelevant. -/
+def resolved (pass : ReviewPass) : Bool := pass.all isJudgement
+
+inductive ApparatusRepairCause
+  | terminalRepairExhausted
+  | promotionPassUnresolved
+  deriving DecidableEq, Repr
+
+structure AwaitingApparatusRepair where
+  cause : ApparatusRepairCause
+  lastValidReceipt : String
+  contractBlob : String
+  persistedReview : ReviewPass
+  deriving DecidableEq, Repr
+
+inductive PromotionPassSuccessor
+  | advance
+  | awaitingApparatusRepair (hold : AwaitingApparatusRepair)
+  deriving DecidableEq, Repr
+
+def promotionPassSuccessor (lastValidReceipt contractBlob : String)
+    (pass : ReviewPass) : PromotionPassSuccessor :=
+  if resolved pass then .advance
+  else .awaitingApparatusRepair
+    { cause := .promotionPassUnresolved
+      lastValidReceipt := lastValidReceipt
+      contractBlob := contractBlob
+      persistedReview := pass }
+
+/-- On repair, verdicts already made on the merits are immutable.  Only an
+apparatus-failure position may acquire a judgement. -/
+def preservesJudgements : ReviewPass → ReviewPass → Bool
+  | [], [] => true
+  | .judged old :: olds, new :: news =>
+      (new == .judged old) && preservesJudgements olds news
+  | .cannotJudge :: olds, _ :: news => preservesJudgements olds news
+  | _, _ => false
+
+inductive ReviewResumeMode
+  | revalidatePersisted
+  | appendOnlyRedispatch
+  deriving DecidableEq, Repr
+
+structure ReviewResume where
+  newContractBlob : String
+  successorReview : ReviewPass
+  mode : ReviewResumeMode
+  deriving DecidableEq, Repr
+
+def validReviewResume (hold : AwaitingApparatusRepair)
+    (resume : ReviewResume) : Prop :=
+  resume.newContractBlob ≠ "" ∧
+  resume.newContractBlob ≠ hold.contractBlob ∧
+  preservesJudgements hold.persistedReview resume.successorReview = true
+
+def mixedUnresolvedReview : ReviewPass :=
+  [.judged .approve, .cannotJudge, .judged .reject]
+
+def allRejectReview : ReviewPass :=
+  [.judged .reject, .judged .reject, .judged .reject]
+
+theorem unresolved_promotion_pass_does_not_advance :
+    promotionPassSuccessor "last-valid-receipt" "contract-v1"
+      mixedUnresolvedReview =
+      .awaitingApparatusRepair
+        { cause := .promotionPassUnresolved
+          lastValidReceipt := "last-valid-receipt"
+          contractBlob := "contract-v1"
+          persistedReview := mixedUnresolvedReview } := by
+  rfl
+
+theorem all_reject_promotion_pass_advances :
+    promotionPassSuccessor "last-valid-receipt" "contract-v1"
+      allRejectReview = .advance := by
+  rfl
+
+theorem unchanged_contract_cannot_resume_review
+    (hold : AwaitingApparatusRepair) (pass : ReviewPass)
+    (mode : ReviewResumeMode) :
+    ¬ validReviewResume hold
+      { newContractBlob := hold.contractBlob
+        successorReview := pass
+        mode := mode } := by
+  simp [validReviewResume]
+
 structure ControllerMemoryUse where
   receiptId : String
   snapshotId : String

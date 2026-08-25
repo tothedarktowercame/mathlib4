@@ -201,6 +201,11 @@ def contractJson : Json :=
             Json.str "accessible-memory-ids"])]),
      ("promotion-policy", Json.mkObj
        [("distinct-promotion-proctor", Json.bool true),
+        ("review-verdicts", Json.mkObj
+          [("judgements", Json.arr
+            #[Json.str "approve", Json.str "reassign", Json.str "reject"]),
+           ("apparatus-failures", Json.arr #[Json.str "cannot-judge"])]),
+        ("promotion-pass-resolution-required", Json.bool true),
         ("base-problem-blob-required", Json.bool true),
         ("problem-path-required", Json.bool true),
         ("solver-final-head-required", Json.bool true),
