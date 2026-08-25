@@ -174,10 +174,9 @@ publishes no change, or bind the newly published union. -/
 def snapshotBindingTail : String → List TraceStudentBinding →
     List TraceReviewSnapshot → Bool
   | _, [], [] => true
-  | previous, binding :: bindings, review :: reviews =>
+  | _previous, binding :: bindings, review :: reviews =>
       !binding.snapshotDigest.isEmpty && validReviewSnapshot review &&
-      (binding.snapshotDigest == previous ||
-       binding.snapshotDigest == review.snapshotDigest) &&
+      binding.snapshotDigest == review.snapshotDigest &&
       snapshotBindingTail binding.snapshotDigest bindings reviews
   | _, _, _ => false
 
@@ -212,13 +211,30 @@ theorem snapshot_chain_first_attempt_binds_solver
   simp [snapshotBindingChain] at h
   exact h.2.1
 
-theorem unchanged_snapshot_step_is_valid
+/-- The unchanged case, stated honestly: a Student may keep its predecessor
+digest exactly when the intervening review PUBLISHED that same digest, i.e.
+the review added nothing.  Keeping a predecessor that the review has moved past
+is not this case and is rejected below. -/
+theorem unchanged_review_publication_step_is_valid
     (previous : String) (binding : TraceStudentBinding)
     (review : TraceReviewSnapshot)
+    (hpub : review.snapshotDigest = previous)
     (hb : binding.snapshotDigest = previous)
     (hne : previous ≠ "") (hr : validReviewSnapshot review = true) :
     snapshotBindingTail previous [binding] [review] = true := by
-  simp [snapshotBindingTail, hb, hne, hr]
+  simp [snapshotBindingTail, hb, hpub, hne, hr]
+
+/-- The frozen-snapshot defect, refused by construction.  When a review
+publishes a NEW union and the Student keeps its predecessor anyway, the chain
+is invalid -- this is the guide-to-Student circuit that the F27 review found
+severed, and the reason a predecessor escape hatch cannot be permitted. -/
+theorem stale_binding_after_moved_review_is_rejected
+    (previous : String) (binding : TraceStudentBinding)
+    (review : TraceReviewSnapshot)
+    (hb : binding.snapshotDigest = previous)
+    (hmoved : review.snapshotDigest ≠ previous) :
+    snapshotBindingTail previous [binding] [review] = false := by
+  simp [snapshotBindingTail, hb, Ne.symm hmoved]
 
 theorem latest_review_snapshot_step_is_valid
     (previous : String) (binding : TraceStudentBinding)
@@ -232,10 +248,9 @@ theorem latest_review_snapshot_step_is_valid
 theorem out_of_chain_snapshot_step_is_rejected
     (previous : String) (binding : TraceStudentBinding)
     (review : TraceReviewSnapshot)
-    (hp : binding.snapshotDigest ≠ previous)
     (hr : binding.snapshotDigest ≠ review.snapshotDigest) :
     snapshotBindingTail previous [binding] [review] = false := by
-  simp [snapshotBindingTail, hp, hr]
+  simp [snapshotBindingTail, hr]
 
 theorem empty_solver_digest_rejects_snapshot_chain
     (bindings : List TraceStudentBinding)
