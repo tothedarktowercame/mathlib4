@@ -49,6 +49,15 @@ structure TraceStudentBinding where
   snapshotDigest : String
   deriving FromJson, Repr
 
+/-- The controller recomputes `contentDigest` from the published union body.
+Equality here is the trace-level witness that a named review snapshot is
+content-addressed rather than merely a nonempty identifier. -/
+structure TraceReviewSnapshot where
+  ordinal : Nat
+  snapshotDigest : String
+  contentDigest : String
+  deriving FromJson, Repr
+
 structure TraceCampaignLane where
   campaignId : String
   regulatorId : String
@@ -81,10 +90,12 @@ structure CampaignTrace where
   closed : Bool
   terminalLedgerDigest : String
   solverSnapshotDigest : String
+  solverSnapshotContentDigest : String
   snapshotAdmittedAfterSolveVerify : Bool
   snapshotDepositor : String
   snapshotReviewer : String
   studentBindings : List TraceStudentBinding
+  reviewSnapshots : List TraceReviewSnapshot
   campaignLanes : List TraceCampaignLane
   phaseReceiptIds : List String
   problemOutcome : String
@@ -153,16 +164,152 @@ def dispatchLifecycleValid (steps : List TraceStep) : Bool :=
   steps.all validDispatchStep &&
   (steps.map (·.jobId)).Nodup
 
+def validReviewSnapshot (snapshot : TraceReviewSnapshot) : Bool :=
+  !snapshot.snapshotDigest.isEmpty &&
+  snapshot.snapshotDigest == snapshot.contentDigest
+
+/-- After attempt one, the later bindings and completed guide reviews are
+zipped in protocol order.  A Student may keep its predecessor when a review
+publishes no change, or bind the newly published union. -/
+def snapshotBindingTail : String → List TraceStudentBinding →
+    List TraceReviewSnapshot → Bool
+  | _, [], [] => true
+  | previous, binding :: bindings, review :: reviews =>
+      !binding.snapshotDigest.isEmpty && validReviewSnapshot review &&
+      (binding.snapshotDigest == previous ||
+       binding.snapshotDigest == review.snapshotDigest) &&
+      snapshotBindingTail binding.snapshotDigest bindings reviews
+  | _, _, _ => false
+
+def snapshotBindingChain (solverDigest : String)
+    (bindings : List TraceStudentBinding)
+    (reviews : List TraceReviewSnapshot) : Bool :=
+  !solverDigest.isEmpty &&
+  match bindings with
+  | [] => false
+  | first :: rest =>
+      first.snapshotDigest == solverDigest &&
+      snapshotBindingTail first.snapshotDigest rest reviews
+
 def memoryValid (trace : CampaignTrace) : Bool :=
   !trace.solverSnapshotDigest.isEmpty &&
+  trace.solverSnapshotDigest == trace.solverSnapshotContentDigest &&
   trace.snapshotAdmittedAfterSolveVerify &&
   !trace.snapshotDepositor.isEmpty &&
   !trace.snapshotReviewer.isEmpty &&
   trace.snapshotDepositor != trace.snapshotReviewer &&
   trace.studentBindings.map (·.ordinal) == [1, 2, 3] &&
+  trace.reviewSnapshots.map (·.ordinal) == [1, 2] &&
   (trace.studentBindings.map (·.sessionId)).Nodup &&
-  trace.studentBindings.all
-    fun binding => binding.snapshotDigest == trace.solverSnapshotDigest
+  snapshotBindingChain trace.solverSnapshotDigest trace.studentBindings
+    trace.reviewSnapshots
+
+theorem snapshot_chain_first_attempt_binds_solver
+    (solver : String) (first : TraceStudentBinding)
+    (rest : List TraceStudentBinding) (reviews : List TraceReviewSnapshot)
+    (h : snapshotBindingChain solver (first :: rest) reviews = true) :
+    first.snapshotDigest = solver := by
+  simp [snapshotBindingChain] at h
+  exact h.2.1
+
+theorem unchanged_snapshot_step_is_valid
+    (previous : String) (binding : TraceStudentBinding)
+    (review : TraceReviewSnapshot)
+    (hb : binding.snapshotDigest = previous)
+    (hne : previous ≠ "") (hr : validReviewSnapshot review = true) :
+    snapshotBindingTail previous [binding] [review] = true := by
+  simp [snapshotBindingTail, hb, hne, hr]
+
+theorem latest_review_snapshot_step_is_valid
+    (previous : String) (binding : TraceStudentBinding)
+    (review : TraceReviewSnapshot)
+    (hb : binding.snapshotDigest = review.snapshotDigest)
+    (hne : review.snapshotDigest ≠ "")
+    (hr : validReviewSnapshot review = true) :
+    snapshotBindingTail previous [binding] [review] = true := by
+  simp [snapshotBindingTail, hb, hne, hr]
+
+theorem out_of_chain_snapshot_step_is_rejected
+    (previous : String) (binding : TraceStudentBinding)
+    (review : TraceReviewSnapshot)
+    (hp : binding.snapshotDigest ≠ previous)
+    (hr : binding.snapshotDigest ≠ review.snapshotDigest) :
+    snapshotBindingTail previous [binding] [review] = false := by
+  simp [snapshotBindingTail, hp, hr]
+
+theorem empty_solver_digest_rejects_snapshot_chain
+    (bindings : List TraceStudentBinding)
+    (reviews : List TraceReviewSnapshot) :
+    snapshotBindingChain "" bindings reviews = false := by
+  simp [snapshotBindingChain]
+
+theorem empty_first_binding_rejects_snapshot_chain
+    (solver session : String) (ordinal : Nat)
+    (rest : List TraceStudentBinding) (reviews : List TraceReviewSnapshot) :
+    snapshotBindingChain solver
+      ({ ordinal := ordinal, sessionId := session, snapshotDigest := "" } :: rest)
+      reviews = false := by
+  by_cases h : solver = ""
+  · simp [snapshotBindingChain, h]
+  · simp [snapshotBindingChain, h]
+
+theorem empty_later_binding_rejects_snapshot_step
+    (previous session : String) (ordinal : Nat)
+    (review : TraceReviewSnapshot) :
+    snapshotBindingTail previous
+      [{ ordinal := ordinal, sessionId := session, snapshotDigest := "" }]
+      [review] = false := by
+  simp [snapshotBindingTail]
+
+theorem empty_review_digest_rejects_snapshot_step
+    (previous : String) (binding : TraceStudentBinding)
+    (ordinal : Nat) :
+    snapshotBindingTail previous [binding]
+      [{ ordinal := ordinal, snapshotDigest := "", contentDigest := "" }] =
+      false := by
+  simp [snapshotBindingTail, validReviewSnapshot]
+
+theorem non_content_addressed_review_rejects_snapshot_step
+    (previous : String) (binding : TraceStudentBinding)
+    (ordinal : Nat) (published recomputed : String)
+    (h : published ≠ recomputed) :
+    snapshotBindingTail previous [binding]
+      [{ ordinal := ordinal, snapshotDigest := published,
+         contentDigest := recomputed }] = false := by
+  simp [snapshotBindingTail, validReviewSnapshot, h]
+
+def observedBindings (first second third : String) : List TraceStudentBinding :=
+  [{ ordinal := 1, sessionId := "session-1", snapshotDigest := first },
+   { ordinal := 2, sessionId := "session-2", snapshotDigest := second },
+   { ordinal := 3, sessionId := "session-3", snapshotDigest := third }]
+
+def observedReviews (first second : String) : List TraceReviewSnapshot :=
+  [{ ordinal := 1, snapshotDigest := first, contentDigest := first },
+   { ordinal := 2, snapshotDigest := second, contentDigest := second }]
+
+theorem f32_observed_snapshot_chain_is_valid :
+    snapshotBindingChain "597f2854"
+      (observedBindings "597f2854" "4a906871" "84b46007")
+      (observedReviews "4a906871" "84b46007") = true := by
+  rfl
+
+theorem f33_unchanged_guide_union_snapshot_chain_is_valid :
+    snapshotBindingChain "cb974c26"
+      (observedBindings "cb974c26" "cb974c26" "38647e2e")
+      (observedReviews "cb974c26" "38647e2e") = true := by
+  rfl
+
+theorem f34_observed_snapshot_chain_is_valid :
+    snapshotBindingChain "22872e59"
+      (observedBindings "22872e59" "4b80e3cb" "7747c992")
+      (observedReviews "4b80e3cb" "7747c992") = true := by
+  rfl
+
+theorem fabricated_out_of_chain_snapshot_is_rejected :
+    snapshotBindingChain "solver"
+      (observedBindings "solver" "unpublished" "review-2")
+      (observedReviews "review-1" "review-2") = false := by
+  rfl
 
 def campaignIsolationValid (trace : CampaignTrace) : Bool :=
   2 ≤ trace.campaignLanes.length &&
