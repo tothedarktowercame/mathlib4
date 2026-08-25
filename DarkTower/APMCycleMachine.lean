@@ -355,11 +355,157 @@ terminal value.  Every live role uses the same envelope; only the observational
 evidence schema varies by role and phase. -/
 
 inductive LiveRole
-  | solver | student | guide | scribe | proctor | promotionProctor | analyst
+  | solver | student | guide | scribe | zaiScribe | proctor
+  | promotionProctor | analyst
   deriving DecidableEq, Repr
 
 def allLiveRoles : List LiveRole :=
-  [.solver, .student, .guide, .scribe, .proctor, .promotionProctor, .analyst]
+  [.solver, .student, .guide, .scribe, .zaiScribe, .proctor,
+   .promotionProctor, .analyst]
+
+/-! Terminal submission authority is modeled at field granularity.  Content
+and semantic references may be authored by a role.  Controller accounting --
+job, dispatch, snapshot, search receipt, and surfaced-result identity -- may
+only be derived from persisted controller records. -/
+
+inductive SubmissionFieldKind
+  | content | semanticReference | controllerAccounting
+  deriving DecidableEq, Repr
+
+inductive SubmissionFieldSource
+  | role | controller
+  deriving DecidableEq, Repr
+
+structure SubmissionFieldRule where
+  name : String
+  kind : SubmissionFieldKind
+  source : SubmissionFieldSource
+  deriving DecidableEq, Repr
+
+def validSubmissionField (field : SubmissionFieldRule) : Bool :=
+  !(field.kind = .controllerAccounting && field.source = .role)
+
+def studentUsedIdsField : SubmissionFieldRule where
+  name := "evidence.memory-use.used-ids"
+  kind := .semanticReference
+  source := .role
+
+def studentSurfacedIdsField : SubmissionFieldRule where
+  name := "evidence.memory-use.surfaced-ids"
+  kind := .controllerAccounting
+  source := .controller
+
+def invalidRoleAuthoredSurfacedIds : SubmissionFieldRule where
+  name := "evidence.memory-use.surfaced-ids"
+  kind := .controllerAccounting
+  source := .role
+
+theorem student_used_ids_is_a_valid_semantic_claim :
+    validSubmissionField studentUsedIdsField = true := by rfl
+
+theorem role_authored_surfaced_ids_is_refused :
+    validSubmissionField invalidRoleAuthoredSurfacedIds = false := by
+  rfl
+
+def controllerDerivedSubmissionFields : List String :=
+  ["job-id", "dispatch-id", "agent-id", "frame-id", "problem-id", "phase",
+   "role", "attempt-ordinal", "submission-attempt", "fresh-session-nonce",
+   "memory-snapshot", "evidence.memory-use.receipt-id",
+   "evidence.memory-use.snapshot-id", "evidence.memory-use.snapshot-digest",
+   "evidence.memory-use.accessible-memory-ids",
+   "evidence.memory-use.surfaced-ids", "evidence.memory-use.queries",
+   "evidence.memory-search-receipt-ids"]
+
+def roleAuthoredSubmissionFields : LiveRole → List String
+  | .solver => ["command-own-exit", "outcome", "failure-account", "evidence"]
+  | .student => ["command-own-exit", "outcome", "failure-account",
+                  "evidence.memory-use.used-ids"]
+  | .guide => ["command-own-exit", "outcome", "failure-account", "evidence"]
+  | .scribe => ["command-own-exit", "outcome", "failure-account", "evidence"]
+  | .zaiScribe =>
+      ["command-own-exit", "outcome", "failure-account", "evidence"]
+  | .proctor => ["command-own-exit", "outcome", "failure-account", "evidence"]
+  | .promotionProctor =>
+      ["command-own-exit", "outcome", "failure-account", "evidence"]
+  | .analyst => ["command-own-exit", "outcome", "failure-account", "evidence"]
+
+def phaseRequires : Phase → List String
+  | .preflight => []
+  | .solve => ["preflight-receipt"]
+  | .verify => ["solve-receipt", "committed-proof"]
+  | .promoteSolver => ["solve-receipt", "verify-receipt"]
+  | .studentAttempt1 => ["preflight-receipt", "solver-memory-snapshot"]
+  | .guideIntervention1 => ["student-attempt-1-receipt", "memory-use-1-receipt"]
+  | .studentAttempt2 => ["guide-intervention-1-receipt", "solver-memory-snapshot"]
+  | .guideIntervention2 => ["student-attempt-2-receipt", "memory-use-2-receipt"]
+  | .studentAttempt3 => ["guide-intervention-2-receipt", "solver-memory-snapshot"]
+  | .scribeReduce =>
+      ["solve-receipt", "verify-receipt", "solver-promotion-receipt",
+       "student-attempt-1-receipt", "memory-use-1-receipt",
+       "student-attempt-2-receipt", "memory-use-2-receipt",
+       "student-attempt-3-receipt", "memory-use-3-receipt",
+       "guide-intervention-1-receipt", "guide-intervention-2-receipt"]
+  | .closeFrame =>
+      ["solve-receipt", "verify-receipt", "solver-promotion-receipt",
+       "student-attempt-1-receipt", "memory-use-1-receipt",
+       "student-attempt-2-receipt", "memory-use-2-receipt",
+       "student-attempt-3-receipt", "memory-use-3-receipt",
+       "guide-intervention-1-receipt", "guide-intervention-2-receipt",
+       "scribe-lane-receipt", "memory-disposition-receipt",
+       "promotion-review-receipt"]
+
+def phaseProduces : Phase → List String
+  | .preflight => ["preflight-receipt"]
+  | .solve => ["solve-receipt", "committed-proof"]
+  | .verify => ["verify-receipt"]
+  | .promoteSolver => ["solver-promotion-receipt", "solver-memory-snapshot"]
+  | .studentAttempt1 => ["student-attempt-1-receipt", "memory-use-1-receipt"]
+  | .guideIntervention1 => ["guide-intervention-1-receipt"]
+  | .studentAttempt2 => ["student-attempt-2-receipt", "memory-use-2-receipt"]
+  | .guideIntervention2 => ["guide-intervention-2-receipt"]
+  | .studentAttempt3 => ["student-attempt-3-receipt", "memory-use-3-receipt"]
+  | .scribeReduce =>
+      ["scribe-lane-receipt", "memory-disposition-receipt",
+       "promotion-review-receipt"]
+  | .closeFrame => ["frame-close-receipt", "frame-trace"]
+
+def receiptRequiredFields : String → List String
+  | "frame-preflight" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/result"]
+  | "frame-solve" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/final-head", "receipt/lean"]
+  | "frame-verify" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/solve-receipt-id",
+      "receipt/mathematical-sound?"]
+  | "solver-promotion" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/input-receipt-ids", "receipt/lanes",
+      "receipt/dispositions", "receipt/promotion-reviews", "receipt/snapshot-id",
+      "receipt/snapshot-digest", "receipt/snapshot-path",
+      "receipt/reviewed-memory-ids", "receipt/independent-review?"]
+  | "student-attempt" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/attempt-ordinal", "receipt/fresh-session-id",
+      "receipt/job-id", "receipt/outcome", "receipt/failure-account",
+      "receipt/memory-use", "receipt/memory-snapshot"]
+  | "student-observation-missing" =>
+      ["receipt/id", "receipt/type", "receipt/frame-id", "receipt/problem-id",
+       "receipt/attempt-ordinal", "receipt/job-id", "receipt/author",
+       "receipt/reason", "receipt/repair-attempts", "receipt/memory-snapshot",
+       "receipt/harness-observed"]
+  | "guide-intervention" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/intervention-ordinal", "receipt/mode",
+      "receipt/input-attempt-id", "receipt/effect", "receipt/channel-audit"]
+  | "scribe-reduce" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/input-receipt-ids", "receipt/lanes",
+      "receipt/dispositions", "receipt/promotion-reviews"]
+  | "frame-close" => ["receipt/id", "receipt/type", "receipt/frame-id",
+      "receipt/problem-id", "receipt/input-receipt-ids", "receipt/trace-id",
+      "receipt/result", "receipt/learning-outcome"]
+  | _ => []
+
+def receiptTypes : List String :=
+  ["frame-preflight", "frame-solve", "frame-verify", "solver-promotion",
+   "student-attempt", "student-observation-missing", "guide-intervention",
+   "scribe-reduce", "frame-close"]
 
 /-! APM memory search is an explicit, recorded capability.  Snapshot binding
 still records which promoted memories were proactively supplied, while open
@@ -376,7 +522,7 @@ structure RoleSearchEvidence where
   deriving DecidableEq, Repr
 
 def searchCapableRole : LiveRole → Bool
-  | .student | .scribe | .promotionProctor => true
+  | .student | .scribe | .zaiScribe | .promotionProctor => true
   | _ => false
 
 def validRoleSearch (evidence : RoleSearchEvidence) : Prop :=
@@ -525,7 +671,7 @@ theorem conversation_cannot_advance_a_valid_submission
     (submission : TypedRoleSubmission) (h : validTypedRoleSubmission submission) :
     submission.conversationalTerminalUsed = false := h.2.2.2.2.2.2.2.2.2
 
-theorem every_live_role_has_one_submission_schema : allLiveRoles.length = 7 := by
+theorem every_live_role_has_one_submission_schema : allLiveRoles.length = 8 := by
   rfl
 
 /-- Controller collection is a bounded persisted observation after the role's

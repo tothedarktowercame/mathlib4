@@ -33,6 +33,49 @@ def phaseName : Phase → String
 def phaseJson (phases : List Phase) : Json :=
   Json.arr (phases.map (Json.str ∘ phaseName)).toArray
 
+def stringArray (values : List String) : Json :=
+  Json.arr (values.map Json.str).toArray
+
+def liveRoleName : LiveRole → String
+  | .solver => "solver"
+  | .student => "student"
+  | .guide => "guide"
+  | .scribe => "scribe"
+  | .zaiScribe => "zai-scribe"
+  | .proctor => "proctor"
+  | .promotionProctor => "promotion-proctor"
+  | .analyst => "analyst"
+
+def phaseIoJson (phase : Phase) : Json :=
+  Json.mkObj
+    [("requires", stringArray (phaseRequires phase)),
+     ("produces", stringArray (phaseProduces phase))]
+
+def phasesJson : Json :=
+  Json.mkObj (canonicalContract.phases.map fun phase =>
+    (phaseName phase, phaseIoJson phase))
+
+def receiptSchemasJson : Json :=
+  Json.mkObj (receiptTypes.map fun receiptType =>
+    (receiptType, Json.mkObj
+      [("required", stringArray (receiptRequiredFields receiptType))]))
+
+def roleAuthoredFieldsJson : Json :=
+  Json.mkObj (allLiveRoles.map fun role =>
+    (liveRoleName role, stringArray (roleAuthoredSubmissionFields role)))
+
+def submissionSchemasJson : Json :=
+  Json.mkObj
+    [("schema-version", Json.num 1),
+     ("controller-derived-fields", stringArray controllerDerivedSubmissionFields),
+     ("role-authored-fields", roleAuthoredFieldsJson),
+     ("student-memory-use", Json.mkObj
+       [("role-authored-fields", stringArray ["used-ids"]),
+        ("controller-derived-fields", stringArray
+          ["receipt-id", "snapshot-id", "snapshot-digest",
+           "accessible-memory-ids", "surfaced-ids", "queries"])]),
+     ("self-reported-controller-identifiers-are-evidence", Json.bool false)]
+
 def transitionJson (phase : Phase) : Json :=
   Json.mkObj
     [("from", Json.str (phaseName phase)),
@@ -45,6 +88,9 @@ def contractJson : Json :=
     [("schema-version", Json.num 1),
      ("contract-id", Json.str canonicalContract.id),
      ("phase-order", phaseJson canonicalContract.phases),
+     ("phases", phasesJson),
+     ("receipt-schemas", receiptSchemasJson),
+     ("submission-schemas", submissionSchemasJson),
      ("transitions", Json.arr
        (canonicalContract.phases.map transitionJson).toArray),
      ("dispatch-policy", Json.mkObj
@@ -61,13 +107,13 @@ def contractJson : Json :=
         ("submission-persisted-before-advance", Json.bool true),
         ("conversation-is-receipt-authority", Json.bool false),
         ("submission-conflict-policy", Json.str "reject"),
-        ("submission-covered-role-count", Json.num 7),
+        ("submission-covered-role-count", Json.num 8),
         ("terminal-collection-required", Json.bool true),
         ("terminal-collection-persisted", Json.bool true),
         ("terminal-collection-before-missing-observation", Json.bool true),
         ("terminal-collection-attempts-per-role", Json.num 1),
         ("terminal-repair-attempts-per-role", Json.num 1),
-        ("terminal-collection-covered-role-count", Json.num 7),
+        ("terminal-collection-covered-role-count", Json.num 8),
         ("promotion-review-enums-normalized", Json.bool true),
         ("promotion-approved-candidates-accounted", Json.bool true),
         ("promotion-approved-unattached-refused", Json.bool true),
@@ -81,6 +127,8 @@ def contractJson : Json :=
                                   ("repair-attempts", Json.num 1)]),
            ("scribe", Json.mkObj [("collection-attempts", Json.num 1),
                                    ("repair-attempts", Json.num 1)]),
+           ("zai-scribe", Json.mkObj [("collection-attempts", Json.num 1),
+                                       ("repair-attempts", Json.num 1)]),
            ("proctor", Json.mkObj [("collection-attempts", Json.num 1),
                                     ("repair-attempts", Json.num 1)]),
            ("promotion-proctor", Json.mkObj
