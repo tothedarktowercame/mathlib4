@@ -282,12 +282,36 @@ def candidateMaySupplyCertifiedHead : StudentCandidateDisposition → Bool
   | .certified => true
   | .rejectedEvidence => false
 
-def candidateMaySupplyMissingObservation : StudentCandidateDisposition → Bool
-  | .certified | .rejectedEvidence => true
+def candidateMaySupplyCertifiedObservation : StudentCandidateDisposition → Bool
+  | .certified => true
+  | .rejectedEvidence => false
+
+/-- Candidate certification and recovery of the Student's completed observation
+are independent.  A rejected candidate may be retained as evidence only; a
+controller may recover the observation from the durable job trace. -/
+inductive StudentObservationDisposition
+  | typedStudentReceipt
+  | controllerRecovered
+  | genuinelyMissing
+  deriving DecidableEq, Repr
+
+def observationSatisfied : StudentObservationDisposition → Bool
+  | .typedStudentReceipt | .controllerRecovered => true
+  | .genuinelyMissing => false
+
+def observationForcesPartialLearning : StudentObservationDisposition → Bool
+  | .genuinelyMissing => true
+  | .typedStudentReceipt | .controllerRecovered => false
 
 theorem rejected_candidate_is_evidence_but_not_certification :
     candidateMaySupplyCertifiedHead .rejectedEvidence = false ∧
-    candidateMaySupplyMissingObservation .rejectedEvidence = true := by
+    candidateMaySupplyCertifiedObservation .rejectedEvidence = false := by
+  decide
+
+theorem recovered_observation_is_observed_but_not_candidate_certification :
+    observationSatisfied .controllerRecovered = true ∧
+    observationForcesPartialLearning .controllerRecovered = false ∧
+    candidateMaySupplyCertifiedHead .rejectedEvidence = false := by
   decide
 
 structure ControllerMemoryUse where
@@ -538,6 +562,12 @@ def receiptRequiredFields : String → List String
        "receipt/attempt-ordinal", "receipt/job-id", "receipt/author",
        "receipt/reason", "receipt/repair-attempts", "receipt/memory-snapshot",
        "receipt/harness-observed", "receipt/memory-use"]
+  | "student-observation-recovered" =>
+      ["receipt/id", "receipt/type", "receipt/frame-id", "receipt/problem-id",
+       "receipt/attempt-ordinal", "receipt/job-id", "receipt/author",
+       "receipt/reason", "receipt/repair-attempts", "receipt/memory-snapshot",
+       "receipt/harness-observed", "receipt/memory-use",
+       "receipt/candidate-disposition"]
   | "guide-intervention" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/intervention-ordinal", "receipt/mode",
       "receipt/input-attempt-id", "receipt/effect", "receipt/channel-audit"]
@@ -551,7 +581,8 @@ def receiptRequiredFields : String → List String
 
 def receiptTypes : List String :=
   ["frame-preflight", "frame-solve", "frame-verify", "solver-promotion",
-   "student-attempt", "student-observation-missing", "guide-intervention",
+   "student-attempt", "student-observation-missing",
+   "student-observation-recovered", "guide-intervention",
    "scribe-reduce", "frame-close"]
 
 /-! APM memory search is an explicit, recorded capability.  Snapshot binding
@@ -1135,6 +1166,41 @@ def validMissingObservationReceipt (r : MissingObservationReceipt) : Prop :=
   r.author = .controller ∧
   r.jobId ≠ "" ∧ r.reason = "typed-submission-missing" ∧
   r.contentDigest ≠ ""
+
+/-- A controller-authored recovery says that the Student completed an
+observable attempt even though typed-submission collection failed.  Candidate
+certification remains a separate field and may be false. -/
+structure RecoveredObservationReceipt where
+  receiptType : String
+  author : ObservationAuthor
+  phase : Phase
+  jobId : String
+  reason : String
+  durableObservation : Bool
+  candidateCertified : Bool
+  contentDigest : String
+  deriving DecidableEq, Repr
+
+def validRecoveredObservationReceipt (r : RecoveredObservationReceipt) : Prop :=
+  r.receiptType = "student-observation-recovered" ∧
+  r.author = .controller ∧ r.jobId ≠ "" ∧
+  r.reason = "typed-submission-collection-failed-but-observation-recovered" ∧
+  r.durableObservation = true ∧ r.contentDigest ≠ ""
+
+def rejectedF34Observation : RecoveredObservationReceipt where
+  receiptType := "student-observation-recovered"
+  author := .controller
+  phase := .studentAttempt3
+  jobId := "apm-role-239d06d913686c0d46d50e1fe86b9fe8c258eaaebde7cc1119fa6a33befad814"
+  reason := "typed-submission-collection-failed-but-observation-recovered"
+  durableObservation := true
+  candidateCertified := false
+  contentDigest := "f34-durable-observation"
+
+theorem f34_observation_recovered_without_certifying_candidate :
+    validRecoveredObservationReceipt rejectedF34Observation ∧
+    rejectedF34Observation.candidateCertified = false := by
+  simp [validRecoveredObservationReceipt, rejectedF34Observation]
 
 def f25ReferenceOutcome : TerminalOutcome where
   problem := .solved
