@@ -241,6 +241,9 @@ def contractJson : Json :=
             Json.str "evidence-job-traces-fetchable"]),
         ("unresolved-review-dispatch-action",
           Json.str "hold-at-deposit-awaiting-apparatus-repair"),
+        ("unresolved-review-resume-action", Json.str
+          "append-only-successor-after-contract-change"),
+        ("resolved-judgements-immutable-on-resume", Json.bool true),
         ("base-problem-blob-required", Json.bool true),
         ("problem-path-required", Json.bool true),
         ("solver-final-head-required", Json.bool true),
