@@ -32,9 +32,13 @@ mean 17.04 → 4.04, top-5 15 → 50). So the `par` below is eliminated in favou
 of `h2aDispatch`. It is left in the term because a plan that erases its
 own decision points cannot be audited afterwards.
 
-## Status: WRITTEN, NOT CHECKED
+## Status: TERMS ELABORATE; FULL BUILD UNRUN
 
-Mathlib is not built in this checkout, so this file has not been elaborated.
+Every definition below was elaborated (2026-08-26) against a faithful
+transcription of the `DarkTower.BV` inductive, using the `apm-lean` toolchain
+which carries a built Mathlib. All terms typecheck and `open BV` resolves as
+written; the terms use nothing from Mathlib, so that covers their content.
+The in-place build under this checkout's toolchain is unrun:
 `lake exe cache get && lake build DarkTower.HandoffCascade` settles it.
 -/
 

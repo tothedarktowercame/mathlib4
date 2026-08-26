@@ -11,16 +11,26 @@ patterns — which would make it a cascade."*
 This is that example, and it is the first cascade in the stack written at
 **policy grade**: `π` is the whole structure, not an atomic action.
 
-## Status: WRITTEN, NOT CHECKED
+## Status: TERMS ELABORATE; FULL BUILD UNRUN
 
 `Mathlib` is not built in this checkout (`.lake/build/lib/Mathlib/` is empty),
-so this file has not been elaborated. It uses only the four `DarkTower.BV`
-constructors and no tactics, but "it should typecheck" is not the same as "it
-typechecks". To check it:
+so `lake build` has not been run here.
+
+What HAS been checked (2026-08-26): every definition below was elaborated by a
+real Lean elaborator against a faithful transcription of the `DarkTower.BV`
+inductive, using the toolchain at `/home/joe/code/apm-lean` (v4.29.0-rc8, which
+carries a built Mathlib as a package). All terms typecheck and `open BV`
+resolves the constructors as written. The cascade terms use nothing from
+Mathlib, so that check covers their whole content.
+
+What has NOT been checked: that this file builds in-place under this checkout's
+v4.31.0-rc1 with `import DarkTower.BV`, which pulls `import Mathlib`. That is a
+question about the surrounding build, not about the terms. To settle it:
 
     lake exe cache get && lake build DarkTower.R8Cascade
 
-If elaboration fails, this docstring is wrong and the file is right to reject.
+(`cache get` fetches prebuilt oleans; per `AGENTS.md`, Mathlib is not to be
+rebuilt locally.)
 
 ## Why the connectives carry the argument
 
