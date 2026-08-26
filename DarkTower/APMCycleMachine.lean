@@ -321,6 +321,7 @@ inductive CandidateJudgement
   | approve
   | reassign
   | reject
+  | challenge
   deriving DecidableEq, Repr
 
 inductive ReviewVerdict
@@ -368,6 +369,129 @@ theorem nonapproval_does_not_require_exact_pattern_set
     (edgePatterns reviewPatterns : List String) :
     verdict.patternSetValid edgePatterns reviewPatterns := by
   cases verdict <;> simp_all [AttachmentReviewVerdict.patternSetValid]
+
+/-! Promotion is allowed to leave review only with materialized artifacts and
+one persisted disposition for every candidate.  These types model the
+controller-owned boundary: an agent may report an identifier, but only the
+identifier read back with the same content digest is usable by a successor. -/
+
+structure MaterializedArtifact where
+  artifactId : String
+  contentDigest : String
+  persistedContentDigest : String
+  readBackContentDigest : String
+  persistenceReceiptId : String
+  deriving DecidableEq, Repr
+
+def MaterializedArtifact.Valid (artifact : MaterializedArtifact) : Prop :=
+  artifact.artifactId ≠ "" ∧
+  artifact.contentDigest ≠ "" ∧
+  artifact.persistenceReceiptId ≠ "" ∧
+  artifact.persistedContentDigest = artifact.contentDigest ∧
+  artifact.readBackContentDigest = artifact.contentDigest
+
+inductive PromotionDispositionKind
+  | approve
+  | reassign
+  | reject
+  | challenge
+  | projectionInvalid
+  deriving DecidableEq, Repr
+
+structure PromotionDisposition where
+  candidate : MaterializedArtifact
+  reviewEvidence : MaterializedArtifact
+  kind : PromotionDispositionKind
+  edgePatterns : List String
+  reviewPatterns : List String
+  attachmentStatus : String
+  projectionFinding : String
+  deriving DecidableEq, Repr
+
+def PromotionDisposition.publishing (disposition : PromotionDisposition) : Bool :=
+  match disposition.kind with
+  | .approve | .reassign => true
+  | .reject | .challenge | .projectionInvalid => false
+
+def PromotionDisposition.Valid (disposition : PromotionDisposition) : Prop :=
+  disposition.candidate.Valid ∧
+  disposition.reviewEvidence.Valid ∧
+  disposition.reviewPatterns ≠ [] ∧
+  match disposition.kind with
+  | .approve =>
+      exactPatterns disposition.edgePatterns disposition.reviewPatterns ∧
+      disposition.attachmentStatus = "reviewed"
+  | .reassign =>
+      disposition.attachmentStatus = "reviewed"
+  | .reject =>
+      disposition.attachmentStatus = "proposed"
+  | .challenge =>
+      disposition.attachmentStatus = "challenged"
+  | .projectionInvalid =>
+      disposition.projectionFinding ≠ "" ∧
+      disposition.attachmentStatus ≠ "reviewed"
+
+structure CompletedReviewPass where
+  dispatchedCandidateIds : List String
+  dispositions : List PromotionDisposition
+  deriving DecidableEq, Repr
+
+def CompletedReviewPass.Valid (pass : CompletedReviewPass) : Prop :=
+  pass.dispatchedCandidateIds ≠ [] ∧
+  pass.dispatchedCandidateIds.Nodup ∧
+  (pass.dispositions.map (fun disposition =>
+      disposition.candidate.artifactId)).Perm pass.dispatchedCandidateIds ∧
+  ∀ disposition ∈ pass.dispositions, disposition.Valid
+
+theorem completed_pass_accounts_for_every_candidate
+    (pass : CompletedReviewPass) (valid : pass.Valid)
+    (candidateId : String) (member : candidateId ∈ pass.dispatchedCandidateIds) :
+    ∃ disposition ∈ pass.dispositions,
+      disposition.candidate.artifactId = candidateId := by
+  rcases valid with ⟨_, _, accounted, _⟩
+  have mapped : candidateId ∈ pass.dispositions.map
+      (fun disposition => disposition.candidate.artifactId) :=
+    accounted.mem_iff.mpr member
+  simpa using mapped
+
+theorem invalid_disposition_prevents_completed_pass
+    (pass : CompletedReviewPass) (disposition : PromotionDisposition)
+    (member : disposition ∈ pass.dispositions)
+    (invalid : ¬ disposition.Valid) : ¬ pass.Valid := by
+  intro valid
+  exact invalid (valid.2.2.2 disposition member)
+
+theorem rejected_disposition_is_nonpublishing
+    (disposition : PromotionDisposition)
+    (kind : disposition.kind = .reject) : disposition.publishing = false := by
+  simp [PromotionDisposition.publishing, kind]
+
+theorem approved_disposition_is_publishing
+    (disposition : PromotionDisposition)
+    (kind : disposition.kind = .approve) : disposition.publishing = true := by
+  simp [PromotionDisposition.publishing, kind]
+
+structure CertifiedPromotionPass where
+  reviewPass : CompletedReviewPass
+  snapshot : MaterializedArtifact
+  publishedCandidateIds : List String
+  deriving DecidableEq, Repr
+
+def CertifiedPromotionPass.Valid (pass : CertifiedPromotionPass) : Prop :=
+  pass.reviewPass.Valid ∧ pass.snapshot.Valid ∧
+  pass.publishedCandidateIds.Nodup ∧
+  (pass.reviewPass.dispositions.filter
+      (fun disposition => disposition.publishing)).map
+      (fun disposition => disposition.candidate.artifactId) =
+    pass.publishedCandidateIds
+
+theorem valid_certification_publishes_exactly_the_merit_dispositions
+    (pass : CertifiedPromotionPass) (valid : pass.Valid) :
+    (pass.reviewPass.dispositions.filter
+        (fun disposition => disposition.publishing)).map
+        (fun disposition => disposition.candidate.artifactId) =
+      pass.publishedCandidateIds := by
+  exact valid.2.2.2
 
 /-! A review request is constructed only after the controller has resolved
 the material that the reviewer will inspect.  `ReviewDispatch` is the raw
@@ -877,7 +1001,8 @@ def receiptRequiredFields : String → List String
       "receipt/problem-id", "receipt/input-receipt-ids", "receipt/lanes",
       "receipt/dispositions", "receipt/promotion-reviews", "receipt/snapshot-id",
       "receipt/snapshot-digest", "receipt/snapshot-path",
-      "receipt/reviewed-memory-ids", "receipt/independent-review?"]
+      "receipt/reviewed-memory-ids", "receipt/independent-review?",
+      "receipt/promotion-pass-witness"]
   | "student-attempt" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/attempt-ordinal", "receipt/fresh-session-id",
       "receipt/job-id", "receipt/outcome", "receipt/failure-account",
@@ -898,7 +1023,8 @@ def receiptRequiredFields : String → List String
       "receipt/input-attempt-id", "receipt/effect", "receipt/channel-audit"]
   | "scribe-reduce" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/input-receipt-ids", "receipt/lanes",
-      "receipt/dispositions", "receipt/promotion-reviews"]
+      "receipt/dispositions", "receipt/promotion-reviews",
+      "receipt/promotion-pass-witness"]
   | "frame-close" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/input-receipt-ids", "receipt/trace-id",
       "receipt/result", "receipt/learning-outcome"]

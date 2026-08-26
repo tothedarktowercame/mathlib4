@@ -203,7 +203,8 @@ def contractJson : Json :=
        [("distinct-promotion-proctor", Json.bool true),
         ("review-verdicts", Json.mkObj
           [("judgements", Json.arr
-            #[Json.str "approve", Json.str "reassign", Json.str "reject"]),
+            #[Json.str "approve", Json.str "reassign", Json.str "reject",
+              Json.str "challenge"]),
            ("apparatus-failures", Json.arr #[Json.str "cannot-judge"])]),
         ("promotion-pass-resolution-required", Json.bool true),
         ("exact-pattern-set-required-for", Json.arr #[Json.str "approve"]),
@@ -211,6 +212,22 @@ def contractJson : Json :=
           [("reassign", Json.str "replace"),
            ("reject", Json.str "retain-proposed"),
            ("challenge", Json.str "retain-challenged")]),
+        ("completed-pass-required", Json.bool true),
+        ("completed-pass-candidate-accounting", Json.str "exactly-once"),
+        ("materialized-artifact-required-fields", Json.arr
+          #[Json.str "artifact-id", Json.str "content-digest",
+            Json.str "persisted-content-digest",
+            Json.str "read-back-content-digest",
+            Json.str "persistence-receipt-id"]),
+        ("materialized-artifact-digests-must-match", Json.bool true),
+        ("review-evidence-materialized-before-disposition", Json.bool true),
+        ("nonpublishing-dispositions", Json.arr
+          #[Json.str "reject", Json.str "challenge",
+            Json.str "projection-invalid"]),
+        ("promotion-successor-validation", Json.str
+          "before-snapshot-publication-and-certification"),
+        ("certified-pass-snapshot-materialized", Json.bool true),
+        ("certified-pass-published-candidates-exact", Json.bool true),
         ("review-dispatch-resolution-required", Json.bool true),
         ("review-dispatch-candidate-required", Json.arr
           #[Json.str "persisted", Json.str "fetchable",
