@@ -48,16 +48,26 @@ abbrev Temperature := Nat
 
 abbrev Selector := Temperature → List Entry → Option Action
 
-/-- R14's uncompromised requirement.  For a deterministic selector this is
-the finite behavioural form of positive information from temperature to the
-selected action: the channel is not constant. -/
+/-- R14's uncompromised requirement.  For a deterministic selector this is the
+finite behavioural form of positive information from temperature to the
+selected action: the channel is not constant.
+
+Stated precisely, since the informal reading is easy to overclaim:
+non-constancy is equivalent to the *existence* of a temperature distribution
+under which the mutual information is positive, not to its being positive under
+every input law.  A constant channel carries zero bits under every law, which is
+the direction this file uses. -/
 def governs (s : Selector) : Prop :=
   ∃ entries τ₁ τ₂, s τ₁ entries ≠ s τ₂ entries
 
 /-- A selection record can mention temperature even when its action is
-temperature-independent. -/
+temperature-independent.  `reportedScores` stands for the live record's
+`:controller-ranking` scores, which are literally `-G/τ`, and for
+`:softmax-weights`: quantities computed from τ, written down, and then not
+used to choose. -/
 structure SelectionRecord where
   temperature : Temperature
+  reportedScores : List Int
   action : Option Action
   deriving DecidableEq, Repr
 
@@ -99,10 +109,22 @@ def argmaxScore : Selector := fun τ entries =>
 def habitPrior : Selector := fun τ entries =>
   (argmaxBy (commitmentScore τ) entries).map Entry.action
 
-/-- The live trace record reads and reports temperature, even though
-`modeOnly` does not let it govern the action. -/
+def cautiousAction : Action := ⟨"cautious"⟩
+def habitualAction : Action := ⟨"habitual"⟩
+
+/-- At encoded temperature `0` (actual temperature 1), cautious scores `0`
+and habitual scores `-1`; at encoded temperature `2` (actual temperature 3),
+habitual scores `1` and wins. -/
+def switchingEntries : List Entry :=
+  [ { action := cautiousAction, g := 0, l := 0 },
+    { action := habitualAction, g := 2, l := 1 } ]
+
+/-- The live trace record computes and reports the temperature-scaled scores,
+even though `modeOnly` does not let them govern the action. -/
 def liveRecord : RecordEmitter := fun τ entries =>
-  { temperature := τ, action := modeOnly τ entries }
+  { temperature := τ
+    reportedScores := entries.map (commitmentScore τ)
+    action := modeOnly τ entries }
 
 /-- A selector is constant in temperature for every fixed ranking. -/
 def temperatureInvariant (s : Selector) : Prop :=
@@ -124,12 +146,13 @@ theorem commitmentScore_zero_prior (τ : Temperature) (entry : Entry) :
 
 /-- With one score term and zero habit prior, multiplication by temperature
 vanishes before argmax; this is not merely an unused selector argument. -/
+theorem argmax_score_temperature_invariant : temperatureInvariant argmaxScore := by
+  intro τ₁ τ₂ entries
+  simp only [argmaxScore, commitmentScore_zero_prior]
+
 theorem single_term_argmax_annihilates_temperature : ¬ governs argmaxScore := by
-  have hinvariant : temperatureInvariant argmaxScore := by
-    intro τ₁ τ₂ entries
-    simp only [argmaxScore, commitmentScore_zero_prior]
   rintro ⟨entries, τ₁, τ₂, h⟩
-  exact h (hinvariant τ₁ τ₂ entries)
+  exact h (argmax_score_temperature_invariant τ₁ τ₂ entries)
 
 /-- Deterministic data processing at the R8/R14 seam: if the final selector is
 temperature-invariant, changing any two gains (and hence their effective
@@ -142,24 +165,46 @@ theorem repairing_r8_changes_no_action
       s (effectiveTemperature g₂) entries :=
   hs _ _ _
 
+/-- The scheduling result applied to the live selector rather than to an
+arbitrary invariant one.  No repair to the incoming gain — R8's slices 4 and 5
+included — can move a selected action on this path. -/
+theorem live_gain_repair_changes_no_action
+    (effectiveTemperature : Nat → Temperature) (g₁ g₂ : Nat) (entries : List Entry) :
+    modeOnly (effectiveTemperature g₁) entries =
+      modeOnly (effectiveTemperature g₂) entries :=
+  repairing_r8_changes_no_action modeOnly
+    (fun τ₁ τ₂ es => mode_only_ignores_temperature τ₁ τ₂ es)
+    effectiveTemperature g₁ g₂ entries
+
+/-- The same for the default argmax branch, where the invariance is algebraic
+rather than syntactic. -/
+theorem default_branch_gain_repair_changes_no_action
+    (effectiveTemperature : Nat → Temperature) (g₁ g₂ : Nat) (entries : List Entry) :
+    argmaxScore (effectiveTemperature g₁) entries =
+      argmaxScore (effectiveTemperature g₂) entries :=
+  repairing_r8_changes_no_action argmaxScore argmax_score_temperature_invariant
+    effectiveTemperature g₁ g₂ entries
+
 /-- The reading is perfect and the action channel is severed: the live record
-is temperature-sensitive while the live selector fails R14. -/
+is temperature-sensitive while the live selector fails R14.  The witness is a
+non-empty ranking, so the sensitivity is in the scores rather than in the bare
+presence of a temperature field. -/
 theorem record_sensitivity_is_not_governance :
     governsTheRecord liveRecord ∧ ¬ governs modeOnly := by
   constructor
-  · refine ⟨[], 0, 1, ?_⟩
+  · refine ⟨switchingEntries, 0, 2, ?_⟩
     decide
   · exact live_selector_does_not_govern
 
-def cautiousAction : Action := ⟨"cautious"⟩
-def habitualAction : Action := ⟨"habitual"⟩
-
-/-- At encoded temperature `0` (actual temperature 1), cautious scores `0`
-and habitual scores `-1`; at encoded temperature `2` (actual temperature 3),
-habitual scores `1` and wins. -/
-def switchingEntries : List Entry :=
-  [ { action := cautiousAction, g := 0, l := 0 },
-    { action := habitualAction, g := 2, l := 1 } ]
+/-- The finding in one statement, on one fixed ranking: the reported scores
+move with temperature and the selected action does not.  This is what
+"computed, recorded, and then discarded at the final step" means formally. -/
+theorem scores_move_action_does_not :
+    (liveRecord 0 switchingEntries).reportedScores ≠
+      (liveRecord 2 switchingEntries).reportedScores ∧
+    (liveRecord 0 switchingEntries).action =
+      (liveRecord 2 switchingEntries).action := by
+  constructor <;> decide
 
 /-- Non-vacuity: the habit-prior branch has a ranking whose winner genuinely
 changes with temperature. -/
@@ -171,7 +216,10 @@ theorem habit_prior_governs : governs habitPrior := by
 #print axioms live_selector_does_not_govern
 #print axioms single_term_argmax_annihilates_temperature
 #print axioms repairing_r8_changes_no_action
+#print axioms live_gain_repair_changes_no_action
+#print axioms default_branch_gain_repair_changes_no_action
 #print axioms record_sensitivity_is_not_governance
+#print axioms scores_move_action_does_not
 #print axioms habit_prior_governs
 
 end DarkTower.WarMachine.CommitmentTemperature
