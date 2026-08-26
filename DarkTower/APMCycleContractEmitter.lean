@@ -203,15 +203,13 @@ def contractJson : Json :=
        [("distinct-promotion-proctor", Json.bool true),
         ("review-verdicts", Json.mkObj
           [("judgements", Json.arr
-            #[Json.str "approve", Json.str "reassign", Json.str "reject",
-              Json.str "challenge"]),
+            #[Json.str "approve", Json.str "reassign", Json.str "reject"]),
            ("apparatus-failures", Json.arr #[Json.str "cannot-judge"])]),
         ("promotion-pass-resolution-required", Json.bool true),
         ("exact-pattern-set-required-for", Json.arr #[Json.str "approve"]),
         ("nonapproval-pattern-actions", Json.mkObj
           [("reassign", Json.str "replace"),
-           ("reject", Json.str "retain-proposed"),
-           ("challenge", Json.str "retain-challenged")]),
+           ("reject", Json.str "retain-proposed")]),
         ("completed-pass-required", Json.bool true),
         ("completed-pass-candidate-accounting", Json.str "exactly-once"),
         ("materialized-artifact-required-fields", Json.arr
@@ -222,8 +220,13 @@ def contractJson : Json :=
         ("materialized-artifact-digests-must-match", Json.bool true),
         ("review-evidence-materialized-before-disposition", Json.bool true),
         ("nonpublishing-dispositions", Json.arr
-          #[Json.str "reject", Json.str "challenge",
-            Json.str "projection-invalid"]),
+          #[Json.str "reject"]),
+        ("projection-failure-action", Json.str
+          "hold-at-review-awaiting-apparatus-repair"),
+        ("projection-repair-reuses-persisted-judgement", Json.bool true),
+        ("projection-repair-redispatches-reviewer", Json.bool false),
+        ("projection-repair-exhaustion-action", Json.str
+          "park-frame-and-continue-queue"),
         ("promotion-successor-validation", Json.str
           "before-snapshot-publication-and-certification"),
         ("certified-pass-snapshot-materialized", Json.bool true),

@@ -217,7 +217,6 @@ def decodeReviewVerdict : String → Option ReviewVerdict
   | "approve" => some (.judged .approve)
   | "reassign" => some (.judged .reassign)
   | "reject" => some (.judged .reject)
-  | "challenge" => some (.judged .challenge)
   | "cannot-judge" => some .cannotJudge
   | _ => none
 

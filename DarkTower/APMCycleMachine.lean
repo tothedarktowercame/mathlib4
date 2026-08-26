@@ -321,7 +321,6 @@ inductive CandidateJudgement
   | approve
   | reassign
   | reject
-  | challenge
   deriving DecidableEq, Repr
 
 inductive ReviewVerdict
@@ -394,8 +393,6 @@ inductive PromotionDispositionKind
   | approve
   | reassign
   | reject
-  | challenge
-  | projectionInvalid
   deriving DecidableEq, Repr
 
 structure PromotionDisposition where
@@ -405,13 +402,12 @@ structure PromotionDisposition where
   edgePatterns : List String
   reviewPatterns : List String
   attachmentStatus : String
-  projectionFinding : String
   deriving DecidableEq, Repr
 
 def PromotionDisposition.publishing (disposition : PromotionDisposition) : Bool :=
   match disposition.kind with
   | .approve | .reassign => true
-  | .reject | .challenge | .projectionInvalid => false
+  | .reject => false
 
 def PromotionDisposition.Valid (disposition : PromotionDisposition) : Prop :=
   disposition.candidate.Valid ∧
@@ -425,11 +421,53 @@ def PromotionDisposition.Valid (disposition : PromotionDisposition) : Prop :=
       disposition.attachmentStatus = "reviewed"
   | .reject =>
       disposition.attachmentStatus = "proposed"
-  | .challenge =>
-      disposition.attachmentStatus = "challenged"
-  | .projectionInvalid =>
-      disposition.projectionFinding ≠ "" ∧
-      disposition.attachmentStatus ≠ "reviewed"
+
+/-! A failed attachment projection is not a disposition about the candidate.
+It is an apparatus observation which prevents construction of a completed
+review pass until the persisted judgement can be projected and read back. -/
+
+structure PromotionProjectionFailure where
+  candidateId : String
+  reviewEvidenceId : String
+  operation : String
+  finding : String
+  deriving DecidableEq, Repr
+
+def PromotionProjectionFailure.Valid
+    (failure : PromotionProjectionFailure) : Prop :=
+  failure.candidateId ≠ "" ∧
+  failure.reviewEvidenceId ≠ "" ∧
+  failure.operation ≠ "" ∧
+  failure.finding ≠ ""
+
+inductive PromotionProjectionOutcome
+  | materialized (disposition : PromotionDisposition)
+  | apparatusFailure (failure : PromotionProjectionFailure)
+  deriving DecidableEq, Repr
+
+def PromotionProjectionOutcome.completed
+    (outcome : PromotionProjectionOutcome) : Bool :=
+  match outcome with
+  | .materialized _ => true
+  | .apparatusFailure _ => false
+
+theorem projection_failure_is_not_a_completed_disposition
+    (failure : PromotionProjectionFailure) :
+    (PromotionProjectionOutcome.apparatusFailure failure).completed = false := by
+  rfl
+
+def ProjectionBatchCompleted
+    (outcomes : List PromotionProjectionOutcome) : Prop :=
+  ∀ outcome ∈ outcomes, outcome.completed = true
+
+theorem projection_failure_prevents_completed_batch
+    (outcomes : List PromotionProjectionOutcome)
+    (failure : PromotionProjectionFailure)
+    (member : PromotionProjectionOutcome.apparatusFailure failure ∈ outcomes) :
+    ¬ ProjectionBatchCompleted outcomes := by
+  intro completed
+  have := completed _ member
+  simp [PromotionProjectionOutcome.completed] at this
 
 structure CompletedReviewPass where
   dispatchedCandidateIds : List String
@@ -652,6 +690,7 @@ def resolved (pass : ReviewPass) : Bool := pass.all isJudgement
 inductive ApparatusRepairCause
   | terminalRepairExhausted
   | promotionPassUnresolved
+  | promotionProjectionFailed
   deriving DecidableEq, Repr
 
 structure AwaitingApparatusRepair where
@@ -659,6 +698,7 @@ structure AwaitingApparatusRepair where
   lastValidReceipt : String
   contractBlob : String
   persistedReview : ReviewPass
+  projectionFailure : Option PromotionProjectionFailure := none
   deriving DecidableEq, Repr
 
 inductive PromotionPassSuccessor
@@ -673,7 +713,35 @@ def promotionPassSuccessor (lastValidReceipt contractBlob : String)
     { cause := .promotionPassUnresolved
       lastValidReceipt := lastValidReceipt
       contractBlob := contractBlob
-      persistedReview := pass }
+      persistedReview := pass
+      projectionFailure := none }
+
+def projectionFailureSuccessor (lastValidReceipt contractBlob : String)
+    (pass : ReviewPass) (failure : PromotionProjectionFailure) :
+    PromotionPassSuccessor :=
+  .awaitingApparatusRepair
+    { cause := .promotionProjectionFailed
+      lastValidReceipt := lastValidReceipt
+      contractBlob := contractBlob
+      persistedReview := pass
+      projectionFailure := some failure }
+
+structure ProjectionRepair where
+  persistedReview : ReviewPass
+  reviewerRedispatched : Bool
+  projectionReadBack : Bool
+  deriving DecidableEq, Repr
+
+inductive ProjectionRepairExhaustionSuccessor
+  | parkedFrameQueueContinues
+  deriving DecidableEq, Repr
+
+def projectionRepairExhausted : ProjectionRepairExhaustionSuccessor :=
+  .parkedFrameQueueContinues
+
+theorem exhausted_projection_repair_parks_frame_and_continues_queue :
+    projectionRepairExhausted = .parkedFrameQueueContinues := by
+  rfl
 
 /-- On repair, verdicts already made on the merits are immutable.  Only an
 apparatus-failure position may acquire a judgement. -/
@@ -683,6 +751,20 @@ def preservesJudgements : ReviewPass → ReviewPass → Bool
       (new == .judged old) && preservesJudgements olds news
   | .cannotJudge :: olds, _ :: news => preservesJudgements olds news
   | _, _ => false
+
+def validProjectionRepair (hold : AwaitingApparatusRepair)
+    (repair : ProjectionRepair) : Prop :=
+  hold.cause = .promotionProjectionFailed ∧
+  repair.persistedReview = hold.persistedReview ∧
+  repair.reviewerRedispatched = false ∧
+  repair.projectionReadBack = true
+
+theorem valid_projection_repair_preserves_persisted_judgement
+    (hold : AwaitingApparatusRepair) (repair : ProjectionRepair)
+    (valid : validProjectionRepair hold repair) :
+    repair.persistedReview = hold.persistedReview ∧
+    repair.reviewerRedispatched = false := by
+  exact ⟨valid.2.1, valid.2.2.1⟩
 
 inductive ReviewResumeMode
   | revalidatePersisted
@@ -714,7 +796,8 @@ theorem unresolved_promotion_pass_does_not_advance :
         { cause := .promotionPassUnresolved
           lastValidReceipt := "last-valid-receipt"
           contractBlob := "contract-v1"
-          persistedReview := mixedUnresolvedReview } := by
+          persistedReview := mixedUnresolvedReview
+          projectionFailure := none } := by
   rfl
 
 theorem all_reject_promotion_pass_advances :
@@ -735,8 +818,21 @@ theorem unresolved_pass_never_advances
         { cause := .promotionPassUnresolved
           lastValidReceipt := receipt
           contractBlob := blob
-          persistedReview := pass } := by
+          persistedReview := pass
+          projectionFailure := none } := by
   simp [promotionPassSuccessor, h]
+
+theorem projection_failure_never_advances
+    (receipt blob : String) (pass : ReviewPass)
+    (failure : PromotionProjectionFailure) :
+    projectionFailureSuccessor receipt blob pass failure =
+      .awaitingApparatusRepair
+        { cause := .promotionProjectionFailed
+          lastValidReceipt := receipt
+          contractBlob := blob
+          persistedReview := pass
+          projectionFailure := some failure } := by
+  rfl
 
 theorem resolved_pass_always_advances
     (receipt blob : String) (pass : ReviewPass) (h : resolved pass = true) :
