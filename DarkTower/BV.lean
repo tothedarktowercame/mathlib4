@@ -118,13 +118,21 @@ inductive Cong : BV A -> BV A -> Prop where
 /--
 One-step BV rewriting.
 
-The rules here are deliberately minimal.  `ai_down` eliminates a dual atomic
-pair, `medial` interleaves sequence with `copar`/`par`, `switch` moves sequence
-through an alternative, and `cong` allows structural congruence as a step.
+The rules here are deliberately minimal.  `ai_down` introduces a dual atomic
+pair from the unit, `medial` interleaves sequence with `copar`/`par`, `switch`
+distributes `copar` through one side of `par`, and `cong` allows structural
+congruence as a step.
+
+All rules are oriented DOWNWARD, in the calculus-of-structures convention: a
+derivation runs from premise to conclusion, so a proof of `S` is a derivation
+from the unit to `S`.  (Joe, 2026-08-26: keep `ai_down` in line with canonical
+sources.  Guglielmi gives `ai↓ : S{◦} → S[a, ā]`; an earlier version here had it
+reversed, as reduction TO the unit, which inverted `Provable` with it.)
 -/
 inductive Step : BV A -> BV A -> Prop where
-  /-- Atomic interaction (`ai↓`), oriented as reduction to the unit. -/
-  | ai_down (a : A) : Step (par (atom a) (dualAtom a)) unit
+/-- Atomic interaction, canonical `ai↓ : S{◦} → S[a, ā]` — the unit introduces
+  a dual atomic pair. -/
+  | ai_down (a : A) : Step unit (par (atom a) (dualAtom a))
   /--
   Medial: sequentially composed `copar` pairs step to a `copar` of `par` pairs.
   This is the schematic deep-inference move used here as the BV heart rule.
@@ -142,12 +150,13 @@ inductive Derives : BV A → BV A → Prop where
   | refl (S : BV A) : Derives S S
   | tail {S T U : BV A} : Derives S T → Step T U → Derives S U
 
-/-- A structure is provable when it reduces to the unit. -/
-def Provable (S : BV A) : Prop := Derives S unit
+/-- A structure is provable when it is derivable FROM the unit — the
+calculus-of-structures reading, matching `ai_down`'s canonical orientation. -/
+def Provable (S : BV A) : Prop := Derives unit S
 
 /-- The smallest interaction proof: an atom paired with its formal dual. -/
 theorem dual_pair_provable (a : A) : Provable (par (atom a) (dualAtom a)) :=
-  Derives.tail (Derives.refl _) (Step.ai_down a)
+  Derives.tail (Derives.refl unit) (Step.ai_down a)
 
 /-- Sanity check: sequence associativity is structural congruence. -/
 theorem seq_assoc_cong (S T U : BV A) :
