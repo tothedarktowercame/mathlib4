@@ -1,0 +1,177 @@
+/-
+Copyright (c) 2026 Joseph Corneli. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+-/
+
+/-!
+# War Machine commitment temperature
+
+This standalone outline states the temperature-out face of R14.  The required
+channel is behavioural: for some fixed ranking, changing commitment
+temperature changes the selected action.  Merely copying the temperature into
+a record is explicitly weaker and is refused below.
+
+The enacting path modelled here is the live
+`:selection-boundary :strategic-recommendation` path.  Its selected action is
+the first controller entry (`policy.clj:238`) and is later installed from
+`strategic-action` (`war_machine.clj:4476,4527`); temperature changes reported
+scores but not that action.  The default argmax branch has the same invariance.
+The habit-prior branch has nonzero capacity because its score is
+`-G + τL`; three records under that mode exist in `futon2/data/wm-trace/`, but
+whether they are live decisions or shadow calculations is not established.
+
+`G` is an opaque ordered controller score.  Nothing here defines or validates
+`G(π)`.  The selector is deterministic; sampling from `P(π)`, one proposed
+repair, is not modelled.  This file states no emitter, Clojure contract,
+mutation test, or running-system repair.
+
+The `Temperature` value `t : Nat` encodes the positive integer temperature
+`t + 1`.  Thus all score comparisons use integer arithmetic and never divide.
+This continues `GainChain.gainAdvances`: repairing the incoming gain cannot
+alter an action while the final temperature-to-action edge remains constant.
+-/
+
+namespace DarkTower.WarMachine.CommitmentTemperature
+
+structure Action where
+  id : String
+  deriving DecidableEq, Repr
+
+structure Entry where
+  action : Action
+  g : Int
+  l : Int
+  deriving DecidableEq, Repr
+
+/-- `t` represents the strictly positive integer temperature `t + 1`. -/
+abbrev Temperature := Nat
+
+abbrev Selector := Temperature → List Entry → Option Action
+
+/-- R14's uncompromised requirement.  For a deterministic selector this is
+the finite behavioural form of positive information from temperature to the
+selected action: the channel is not constant. -/
+def governs (s : Selector) : Prop :=
+  ∃ entries τ₁ τ₂, s τ₁ entries ≠ s τ₂ entries
+
+/-- A selection record can mention temperature even when its action is
+temperature-independent. -/
+structure SelectionRecord where
+  temperature : Temperature
+  action : Option Action
+  deriving DecidableEq, Repr
+
+abbrev RecordEmitter := Temperature → List Entry → SelectionRecord
+
+/-- The weakening to refuse: temperature changes the record, with no
+requirement that it change the selected action. -/
+def governsTheRecord (r : RecordEmitter) : Prop :=
+  ∃ entries τ₁ τ₂, r τ₁ entries ≠ r τ₂ entries
+
+/-- The positive integer represented by a temperature code. -/
+def temperatureValue (τ : Temperature) : Int := Int.ofNat (τ + 1)
+
+/-- The habit-prior comparison after multiplying the divided score by the
+positive temperature: `-G + τL`. -/
+def commitmentScore (τ : Temperature) (entry : Entry) : Int :=
+  -entry.g + temperatureValue τ * entry.l
+
+/-- Stable left-biased argmax for an integer score. -/
+def argmaxBy (score : Entry → Int) : List Entry → Option Entry
+  | [] => none
+  | entry :: entries =>
+      some (entries.foldl
+        (fun best candidate => if score best < score candidate then candidate else best)
+        entry)
+
+/-- The live strategic-recommendation boundary: choose the first entry. -/
+def modeOnly : Selector :=
+  fun _ entries => entries.head?.map Entry.action
+
+/-- The default single-term argmax.  It deliberately goes through the
+temperature-bearing score formula after setting every habit prior to zero, so
+its invariance is the algebraic fact `τ * 0 = 0`. -/
+def argmaxScore : Selector := fun τ entries =>
+  (argmaxBy (fun entry => commitmentScore τ { entry with l := 0 }) entries).map
+    Entry.action
+
+/-- The only modelled branch in which temperature can change the winner. -/
+def habitPrior : Selector := fun τ entries =>
+  (argmaxBy (commitmentScore τ) entries).map Entry.action
+
+/-- The live trace record reads and reports temperature, even though
+`modeOnly` does not let it govern the action. -/
+def liveRecord : RecordEmitter := fun τ entries =>
+  { temperature := τ, action := modeOnly τ entries }
+
+/-- A selector is constant in temperature for every fixed ranking. -/
+def temperatureInvariant (s : Selector) : Prop :=
+  ∀ τ₁ τ₂ entries, s τ₁ entries = s τ₂ entries
+
+theorem mode_only_ignores_temperature :
+    ∀ τ₁ τ₂ entries, modeOnly τ₁ entries = modeOnly τ₂ entries := by
+  intro τ₁ τ₂ entries
+  rfl
+
+/-- The headline finding: the live selector does not satisfy R14. -/
+theorem live_selector_does_not_govern : ¬ governs modeOnly := by
+  rintro ⟨entries, τ₁, τ₂, h⟩
+  exact h (mode_only_ignores_temperature τ₁ τ₂ entries)
+
+theorem commitmentScore_zero_prior (τ : Temperature) (entry : Entry) :
+    commitmentScore τ { entry with l := 0 } = -entry.g := by
+  simp [commitmentScore]
+
+/-- With one score term and zero habit prior, multiplication by temperature
+vanishes before argmax; this is not merely an unused selector argument. -/
+theorem single_term_argmax_annihilates_temperature : ¬ governs argmaxScore := by
+  have hinvariant : temperatureInvariant argmaxScore := by
+    intro τ₁ τ₂ entries
+    simp only [argmaxScore, commitmentScore_zero_prior]
+  rintro ⟨entries, τ₁, τ₂, h⟩
+  exact h (hinvariant τ₁ τ₂ entries)
+
+/-- Deterministic data processing at the R8/R14 seam: if the final selector is
+temperature-invariant, changing any two gains (and hence their effective
+temperatures) changes no selected action. -/
+theorem repairing_r8_changes_no_action
+    (s : Selector) (hs : temperatureInvariant s)
+    (effectiveTemperature : Nat → Temperature)
+    (g₁ g₂ : Nat) (entries : List Entry) :
+    s (effectiveTemperature g₁) entries =
+      s (effectiveTemperature g₂) entries :=
+  hs _ _ _
+
+/-- The reading is perfect and the action channel is severed: the live record
+is temperature-sensitive while the live selector fails R14. -/
+theorem record_sensitivity_is_not_governance :
+    governsTheRecord liveRecord ∧ ¬ governs modeOnly := by
+  constructor
+  · refine ⟨[], 0, 1, ?_⟩
+    decide
+  · exact live_selector_does_not_govern
+
+def cautiousAction : Action := ⟨"cautious"⟩
+def habitualAction : Action := ⟨"habitual"⟩
+
+/-- At encoded temperature `0` (actual temperature 1), cautious scores `0`
+and habitual scores `-1`; at encoded temperature `2` (actual temperature 3),
+habitual scores `1` and wins. -/
+def switchingEntries : List Entry :=
+  [ { action := cautiousAction, g := 0, l := 0 },
+    { action := habitualAction, g := 2, l := 1 } ]
+
+/-- Non-vacuity: the habit-prior branch has a ranking whose winner genuinely
+changes with temperature. -/
+theorem habit_prior_governs : governs habitPrior := by
+  refine ⟨switchingEntries, 0, 2, ?_⟩
+  decide
+
+#print axioms mode_only_ignores_temperature
+#print axioms live_selector_does_not_govern
+#print axioms single_term_argmax_annihilates_temperature
+#print axioms repairing_r8_changes_no_action
+#print axioms record_sensitivity_is_not_governance
+#print axioms habit_prior_governs
+
+end DarkTower.WarMachine.CommitmentTemperature
