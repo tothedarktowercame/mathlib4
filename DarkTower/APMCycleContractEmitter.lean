@@ -201,6 +201,53 @@ def contractJson : Json :=
             Json.str "accessible-memory-ids"])]),
      ("promotion-policy", Json.mkObj
        [("distinct-promotion-proctor", Json.bool true),
+        ("review-verdicts", Json.mkObj
+          [("judgements", Json.arr
+            #[Json.str "approve", Json.str "reassign", Json.str "reject"]),
+           ("apparatus-failures", Json.arr #[Json.str "cannot-judge"])]),
+        ("promotion-pass-resolution-required", Json.bool true),
+        ("exact-pattern-set-required-for", Json.arr #[Json.str "approve"]),
+        ("nonapproval-pattern-actions", Json.mkObj
+          [("reassign", Json.str "replace"),
+           ("reject", Json.str "retain-proposed")]),
+        ("completed-pass-required", Json.bool true),
+        ("completed-pass-candidate-accounting", Json.str "exactly-once"),
+        ("materialized-artifact-required-fields", Json.arr
+          #[Json.str "artifact-id", Json.str "content-digest",
+            Json.str "persisted-content-digest",
+            Json.str "read-back-content-digest",
+            Json.str "persistence-receipt-id"]),
+        ("materialized-artifact-digests-must-match", Json.bool true),
+        ("review-evidence-materialized-before-disposition", Json.bool true),
+        ("nonpublishing-dispositions", Json.arr
+          #[Json.str "reject"]),
+        ("projection-failure-action", Json.str
+          "hold-at-review-awaiting-apparatus-repair"),
+        ("projection-repair-reuses-persisted-judgement", Json.bool true),
+        ("projection-repair-redispatches-reviewer", Json.bool false),
+        ("projection-repair-max-attempts", Json.num 1),
+        ("projection-repair-exhaustion-action", Json.str
+          "park-frame-and-continue-queue"),
+        ("projection-repair-exhaustion-decision-owner", Json.str
+          "claude-supervisor"),
+        ("projection-repair-exhaustion-bell-required", Json.bool true),
+        ("promotion-successor-validation", Json.str
+          "before-snapshot-publication-and-certification"),
+        ("certified-pass-snapshot-materialized", Json.bool true),
+        ("certified-pass-published-candidates-exact", Json.bool true),
+        ("review-dispatch-resolution-required", Json.bool true),
+        ("review-dispatch-candidate-required", Json.arr
+          #[Json.str "persisted", Json.str "fetchable",
+            Json.str "parent-pattern-fetchable"]),
+        ("review-dispatch-reviewer-inputs-required", Json.arr
+          #[Json.str "base-problem-blob-fetchable",
+            Json.str "solver-final-head-fetchable",
+            Json.str "evidence-job-traces-fetchable"]),
+        ("unresolved-review-dispatch-action",
+          Json.str "hold-at-deposit-awaiting-apparatus-repair"),
+        ("unresolved-review-resume-action", Json.str
+          "append-only-successor-after-contract-change"),
+        ("resolved-judgements-immutable-on-resume", Json.bool true),
         ("base-problem-blob-required", Json.bool true),
         ("problem-path-required", Json.bool true),
         ("solver-final-head-required", Json.bool true),

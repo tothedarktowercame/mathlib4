@@ -314,6 +314,600 @@ theorem recovered_observation_is_observed_but_not_candidate_certification :
     candidateMaySupplyCertifiedHead .rejectedEvidence = false := by
   decide
 
+/-! Promotion review distinguishes a judgement about a candidate from a
+failure of the review apparatus to produce any judgement.  In particular,
+`cannotJudge` is not a fourth candidate judgement. -/
+inductive CandidateJudgement
+  | approve
+  | reassign
+  | reject
+  deriving DecidableEq, Repr
+
+inductive ReviewVerdict
+  | judged (judgement : CandidateJudgement)
+  | cannotJudge
+  deriving DecidableEq, Repr
+
+/-! Pattern-set equality constrains only approval.  Reassignment replaces the
+set, while rejection and challenge leave the proposed attachment unchanged. -/
+inductive AttachmentReviewVerdict
+  | approve
+  | reassign
+  | reject
+  | challenge
+  deriving DecidableEq, Repr
+
+/-- Faithful model of the controller's `exact-patterns?`, which compares
+`(count …)` and `(set …)` rather than the sequences themselves.  It therefore
+accepts a reordering, and this definition must too: modelling the check as
+list equality would state a constraint stronger than the one the machine
+enforces. -/
+def exactPatterns (expected actual : List String) : Prop :=
+  expected.length = actual.length ∧ ∀ p, p ∈ expected ↔ p ∈ actual
+
+def AttachmentReviewVerdict.patternSetValid
+    (verdict : AttachmentReviewVerdict)
+    (edgePatterns reviewPatterns : List String) : Prop :=
+  match verdict with
+  | .approve => exactPatterns edgePatterns reviewPatterns
+  | .reassign | .reject | .challenge => True
+
+theorem approval_requires_exact_pattern_set
+    (edgePatterns reviewPatterns : List String) :
+    AttachmentReviewVerdict.patternSetValid .approve edgePatterns reviewPatterns ↔
+      exactPatterns edgePatterns reviewPatterns := by
+  rfl
+
+/-- The order-insensitivity is deliberate, not an oversight in the model. -/
+theorem exactPatterns_of_perm {expected actual : List String}
+    (perm : expected.Perm actual) : exactPatterns expected actual :=
+  ⟨perm.length_eq, fun _ => perm.mem_iff⟩
+
+theorem nonapproval_does_not_require_exact_pattern_set
+    (verdict : AttachmentReviewVerdict) (notApprove : verdict ≠ .approve)
+    (edgePatterns reviewPatterns : List String) :
+    verdict.patternSetValid edgePatterns reviewPatterns := by
+  cases verdict <;> simp_all [AttachmentReviewVerdict.patternSetValid]
+
+/-! Promotion is allowed to leave review only with materialized artifacts and
+one persisted disposition for every candidate.  These types model the
+controller-owned boundary: an agent may report an identifier, but only the
+identifier read back with the same content digest is usable by a successor. -/
+
+structure MaterializedArtifact where
+  artifactId : String
+  contentDigest : String
+  persistedContentDigest : String
+  readBackContentDigest : String
+  persistenceReceiptId : String
+  deriving DecidableEq, Repr
+
+def MaterializedArtifact.Valid (artifact : MaterializedArtifact) : Prop :=
+  artifact.artifactId ≠ "" ∧
+  artifact.contentDigest ≠ "" ∧
+  artifact.persistenceReceiptId ≠ "" ∧
+  artifact.persistedContentDigest = artifact.contentDigest ∧
+  artifact.readBackContentDigest = artifact.contentDigest
+
+inductive PromotionDispositionKind
+  | approve
+  | reassign
+  | reject
+  deriving DecidableEq, Repr
+
+structure PromotionDisposition where
+  candidate : MaterializedArtifact
+  reviewEvidence : MaterializedArtifact
+  kind : PromotionDispositionKind
+  edgePatterns : List String
+  reviewPatterns : List String
+  attachmentStatus : String
+  deriving DecidableEq, Repr
+
+def PromotionDisposition.publishing (disposition : PromotionDisposition) : Bool :=
+  match disposition.kind with
+  | .approve | .reassign => true
+  | .reject => false
+
+def PromotionDisposition.Valid (disposition : PromotionDisposition) : Prop :=
+  disposition.candidate.Valid ∧
+  disposition.reviewEvidence.Valid ∧
+  disposition.reviewPatterns ≠ [] ∧
+  match disposition.kind with
+  | .approve =>
+      exactPatterns disposition.edgePatterns disposition.reviewPatterns ∧
+      disposition.attachmentStatus = "reviewed"
+  | .reassign =>
+      disposition.attachmentStatus = "reviewed"
+  | .reject =>
+      disposition.attachmentStatus = "proposed"
+
+/-! A failed attachment projection is not a disposition about the candidate.
+It is an apparatus observation which prevents construction of a completed
+review pass until the persisted judgement can be projected and read back. -/
+
+structure PromotionProjectionFailure where
+  candidateId : String
+  reviewEvidenceId : String
+  operation : String
+  finding : String
+  deriving DecidableEq, Repr
+
+def PromotionProjectionFailure.Valid
+    (failure : PromotionProjectionFailure) : Prop :=
+  failure.candidateId ≠ "" ∧
+  failure.reviewEvidenceId ≠ "" ∧
+  failure.operation ≠ "" ∧
+  failure.finding ≠ ""
+
+inductive PromotionProjectionOutcome
+  | materialized (disposition : PromotionDisposition)
+  | apparatusFailure (failure : PromotionProjectionFailure)
+  deriving DecidableEq, Repr
+
+def PromotionProjectionOutcome.completed
+    (outcome : PromotionProjectionOutcome) : Bool :=
+  match outcome with
+  | .materialized _ => true
+  | .apparatusFailure _ => false
+
+theorem projection_failure_is_not_a_completed_disposition
+    (failure : PromotionProjectionFailure) :
+    (PromotionProjectionOutcome.apparatusFailure failure).completed = false := by
+  rfl
+
+def ProjectionBatchCompleted
+    (outcomes : List PromotionProjectionOutcome) : Prop :=
+  ∀ outcome ∈ outcomes, outcome.completed = true
+
+theorem projection_failure_prevents_completed_batch
+    (outcomes : List PromotionProjectionOutcome)
+    (failure : PromotionProjectionFailure)
+    (member : PromotionProjectionOutcome.apparatusFailure failure ∈ outcomes) :
+    ¬ ProjectionBatchCompleted outcomes := by
+  intro completed
+  have := completed _ member
+  simp [PromotionProjectionOutcome.completed] at this
+
+structure CompletedReviewPass where
+  dispatchedCandidateIds : List String
+  dispositions : List PromotionDisposition
+  deriving DecidableEq, Repr
+
+def CompletedReviewPass.Valid (pass : CompletedReviewPass) : Prop :=
+  pass.dispatchedCandidateIds ≠ [] ∧
+  pass.dispatchedCandidateIds.Nodup ∧
+  (pass.dispositions.map (fun disposition =>
+      disposition.candidate.artifactId)).Perm pass.dispatchedCandidateIds ∧
+  ∀ disposition ∈ pass.dispositions, disposition.Valid
+
+theorem completed_pass_accounts_for_every_candidate
+    (pass : CompletedReviewPass) (valid : pass.Valid)
+    (candidateId : String) (member : candidateId ∈ pass.dispatchedCandidateIds) :
+    ∃ disposition ∈ pass.dispositions,
+      disposition.candidate.artifactId = candidateId := by
+  rcases valid with ⟨_, _, accounted, _⟩
+  have mapped : candidateId ∈ pass.dispositions.map
+      (fun disposition => disposition.candidate.artifactId) :=
+    accounted.mem_iff.mpr member
+  simpa using mapped
+
+theorem invalid_disposition_prevents_completed_pass
+    (pass : CompletedReviewPass) (disposition : PromotionDisposition)
+    (member : disposition ∈ pass.dispositions)
+    (invalid : ¬ disposition.Valid) : ¬ pass.Valid := by
+  intro valid
+  exact invalid (valid.2.2.2 disposition member)
+
+theorem rejected_disposition_is_nonpublishing
+    (disposition : PromotionDisposition)
+    (kind : disposition.kind = .reject) : disposition.publishing = false := by
+  simp [PromotionDisposition.publishing, kind]
+
+theorem approved_disposition_is_publishing
+    (disposition : PromotionDisposition)
+    (kind : disposition.kind = .approve) : disposition.publishing = true := by
+  simp [PromotionDisposition.publishing, kind]
+
+structure CertifiedPromotionPass where
+  reviewPass : CompletedReviewPass
+  snapshot : MaterializedArtifact
+  publishedCandidateIds : List String
+  deriving DecidableEq, Repr
+
+def CertifiedPromotionPass.Valid (pass : CertifiedPromotionPass) : Prop :=
+  pass.reviewPass.Valid ∧ pass.snapshot.Valid ∧
+  pass.publishedCandidateIds.Nodup ∧
+  (pass.reviewPass.dispositions.filter
+      (fun disposition => disposition.publishing)).map
+      (fun disposition => disposition.candidate.artifactId) =
+    pass.publishedCandidateIds
+
+theorem valid_certification_publishes_exactly_the_merit_dispositions
+    (pass : CertifiedPromotionPass) (valid : pass.Valid) :
+    (pass.reviewPass.dispositions.filter
+        (fun disposition => disposition.publishing)).map
+        (fun disposition => disposition.candidate.artifactId) =
+      pass.publishedCandidateIds := by
+  exact valid.2.2.2
+
+/-! A review request is constructed only after the controller has resolved
+the material that the reviewer will inspect.  `ReviewDispatch` is the raw
+construction record; `ValidReviewDispatch` is the proof-carrying value that
+may actually be sent.
+
+DECLARED RESIDUAL — `hole-review-dispatch-resolution-witness-v1.edn`, open.
+The resolution fields below are self-reported BOOLEANS: nothing here ties
+`candidatePersisted = true` to the candidate actually being persisted.  So
+`valid_dispatch_excludes_apparatus_failure` proves *if the controller says
+everything resolves, the enumerated failures do not occur* — sound up to this
+hole, and no further.  That is deliberately the same shape this model was
+written to remove (`TN-fable-F32-model` §2: Lean verifying that Clojure
+reports its own schema as satisfied), so it is named rather than left to be
+found.  Intended closure: content-addressed witnesses, as
+`TraceReviewSnapshot` already does by requiring `snapshotDigest =
+contentDigest`; a controller then cannot assert a resolution it did not
+perform.  Closes with the Clojure enforcement packet, which is where the
+resolution record acquires a producer.
+
+DECIDED, NOT YET DONE — `ReviewVerdict.cannotJudge` is to be retired.  Once
+dispatch validity holds, every documented cause of it is excluded by
+construction, and a reviewer holding resolved evidence can only approve,
+reassign or reject.  A reviewer-runtime failure remains possible but is an
+apparatus transition, not a verdict about a candidate, and belongs outside
+`ReviewVerdict` (codex-10's finding on this packet, concurred). -/
+structure ReviewCandidateResolution where
+  candidateId : String
+  candidatePersisted : Bool
+  candidateFetchable : Bool
+  parentPatternId : String
+  parentPatternFetchable : Bool
+  deriving DecidableEq, Repr
+
+structure ReviewJobTraceResolution where
+  traceId : String
+  fetchable : Bool
+  deriving DecidableEq, Repr
+
+structure ReviewerInputResolution where
+  baseProblemBlob : String
+  baseProblemBlobFetchable : Bool
+  solverFinalHead : String
+  solverFinalHeadFetchable : Bool
+  jobTraces : List ReviewJobTraceResolution
+  deriving DecidableEq, Repr
+
+structure ReviewDispatch where
+  candidates : List ReviewCandidateResolution
+  reviewerInputs : ReviewerInputResolution
+  deriving DecidableEq, Repr
+
+def ReviewCandidateResolution.resolves
+    (candidate : ReviewCandidateResolution) : Prop :=
+  candidate.candidateId ≠ "" ∧
+  candidate.candidatePersisted = true ∧
+  candidate.candidateFetchable = true ∧
+  candidate.parentPatternId ≠ "" ∧
+  candidate.parentPatternFetchable = true
+
+def ReviewJobTraceResolution.resolves
+    (trace : ReviewJobTraceResolution) : Prop :=
+  trace.traceId ≠ "" ∧ trace.fetchable = true
+
+def ReviewerInputResolution.resolves
+    (inputs : ReviewerInputResolution) : Prop :=
+  inputs.baseProblemBlob ≠ "" ∧
+  inputs.baseProblemBlobFetchable = true ∧
+  inputs.solverFinalHead ≠ "" ∧
+  inputs.solverFinalHeadFetchable = true ∧
+  ∀ trace ∈ inputs.jobTraces, trace.resolves
+
+def ReviewDispatch.Valid (dispatch : ReviewDispatch) : Prop :=
+  dispatch.candidates ≠ [] ∧
+  (∀ candidate ∈ dispatch.candidates, candidate.resolves) ∧
+  dispatch.reviewerInputs.resolves
+
+/-- This is the only review-dispatch value the transition machine may send. -/
+structure ValidReviewDispatch extends ReviewDispatch where
+  valid : toReviewDispatch.Valid
+
+inductive ReviewApparatusFailureCause
+  | candidateNotPersisted
+  | candidateNotFetchable
+  | parentPatternNotFetchable
+  | baseProblemBlobNotFetchable
+  | solverFinalHeadNotFetchable
+  | jobTraceNotFetchable
+  deriving DecidableEq, Repr
+
+def ReviewApparatusFailureCause.occurs
+    (cause : ReviewApparatusFailureCause) (dispatch : ReviewDispatch) : Prop :=
+  match cause with
+  | .candidateNotPersisted =>
+      ∃ candidate ∈ dispatch.candidates,
+        candidate.candidatePersisted = false
+  | .candidateNotFetchable =>
+      ∃ candidate ∈ dispatch.candidates,
+        candidate.candidateFetchable = false
+  | .parentPatternNotFetchable =>
+      ∃ candidate ∈ dispatch.candidates,
+        candidate.parentPatternFetchable = false
+  | .baseProblemBlobNotFetchable =>
+      dispatch.reviewerInputs.baseProblemBlobFetchable = false
+  | .solverFinalHeadNotFetchable =>
+      dispatch.reviewerInputs.solverFinalHeadFetchable = false
+  | .jobTraceNotFetchable =>
+      ∃ trace ∈ dispatch.reviewerInputs.jobTraces, trace.fetchable = false
+
+theorem dispatch_with_unresolvable_candidate_is_invalid
+    (dispatch : ReviewDispatch) (candidate : ReviewCandidateResolution)
+    (member : candidate ∈ dispatch.candidates)
+    (unresolvable : ¬ candidate.resolves) : ¬ dispatch.Valid := by
+  intro valid
+  exact unresolvable (valid.2.1 candidate member)
+
+theorem dispatch_with_unresolved_reviewer_inputs_is_invalid
+    (dispatch : ReviewDispatch)
+    (unresolved : ¬ dispatch.reviewerInputs.resolves) : ¬ dispatch.Valid := by
+  intro valid
+  exact unresolved valid.2.2
+
+theorem valid_dispatch_excludes_apparatus_failure
+    (dispatch : ValidReviewDispatch) (cause : ReviewApparatusFailureCause) :
+    ¬ cause.occurs dispatch.toReviewDispatch := by
+  rcases dispatch.valid with ⟨_, candidatesResolve, inputsResolve⟩
+  rcases inputsResolve with ⟨_, baseFetchable, _, headFetchable, tracesResolve⟩
+  cases cause with
+  | candidateNotPersisted =>
+      rintro ⟨candidate, member, missing⟩
+      have := (candidatesResolve candidate member).2.1
+      simp_all
+  | candidateNotFetchable =>
+      rintro ⟨candidate, member, missing⟩
+      have := (candidatesResolve candidate member).2.2.1
+      simp_all
+  | parentPatternNotFetchable =>
+      rintro ⟨candidate, member, missing⟩
+      have := (candidatesResolve candidate member).2.2.2.2
+      simp_all
+  | baseProblemBlobNotFetchable => simp_all [ReviewApparatusFailureCause.occurs]
+  | solverFinalHeadNotFetchable => simp_all [ReviewApparatusFailureCause.occurs]
+  | jobTraceNotFetchable =>
+      rintro ⟨trace, member, missing⟩
+      have := (tracesResolve trace member).2
+      simp_all
+
+abbrev ReviewPass := List ReviewVerdict
+
+def isJudgement : ReviewVerdict → Bool
+  | .judged _ => true
+  | .cannotJudge => false
+
+/-- A promotion pass is resolved exactly when every candidate received a
+candidate judgement.  The number of approvals is deliberately irrelevant. -/
+def resolved (pass : ReviewPass) : Bool := pass.all isJudgement
+
+inductive ApparatusRepairCause
+  | terminalRepairExhausted
+  | promotionPassUnresolved
+  | promotionProjectionFailed
+  deriving DecidableEq, Repr
+
+structure AwaitingApparatusRepair where
+  cause : ApparatusRepairCause
+  lastValidReceipt : String
+  contractBlob : String
+  persistedReview : ReviewPass
+  projectionFailure : Option PromotionProjectionFailure := none
+  deriving DecidableEq, Repr
+
+inductive PromotionPassSuccessor
+  | advance
+  | awaitingApparatusRepair (hold : AwaitingApparatusRepair)
+  deriving DecidableEq, Repr
+
+def promotionPassSuccessor (lastValidReceipt contractBlob : String)
+    (pass : ReviewPass) : PromotionPassSuccessor :=
+  if resolved pass then .advance
+  else .awaitingApparatusRepair
+    { cause := .promotionPassUnresolved
+      lastValidReceipt := lastValidReceipt
+      contractBlob := contractBlob
+      persistedReview := pass
+      projectionFailure := none }
+
+def projectionFailureSuccessor (lastValidReceipt contractBlob : String)
+    (pass : ReviewPass) (failure : PromotionProjectionFailure) :
+    PromotionPassSuccessor :=
+  .awaitingApparatusRepair
+    { cause := .promotionProjectionFailed
+      lastValidReceipt := lastValidReceipt
+      contractBlob := contractBlob
+      persistedReview := pass
+      projectionFailure := some failure }
+
+structure ProjectionRepair where
+  persistedReview : ReviewPass
+  reviewerRedispatched : Bool
+  projectionReadBack : Bool
+  deriving DecidableEq, Repr
+
+structure ProjectionRepairPolicy where
+  maxAttempts : Nat
+  deriving DecidableEq, Repr
+
+def ProjectionRepairPolicy.Valid (policy : ProjectionRepairPolicy) : Prop :=
+  0 < policy.maxAttempts
+
+def projectionRepairExhausted (policy : ProjectionRepairPolicy)
+    (attempts : Nat) : Bool :=
+  0 < policy.maxAttempts && policy.maxAttempts ≤ attempts
+
+inductive ApparatusDecisionOwner
+  | claudeSupervisor
+  deriving DecidableEq, Repr
+
+structure ApparatusRepairPark where
+  cause : ApparatusRepairCause
+  attempts : Nat
+  maxAttempts : Nat
+  decisionOwner : ApparatusDecisionOwner
+  decisionBellRequired : Bool
+  deriving DecidableEq, Repr
+
+inductive ProjectionRepairExhaustionSuccessor
+  | parkedFrameQueueContinues (park : ApparatusRepairPark)
+  deriving DecidableEq, Repr
+
+def projectionRepairExhaustionSuccessor (policy : ProjectionRepairPolicy)
+    (attempts : Nat) : Option ProjectionRepairExhaustionSuccessor :=
+  if projectionRepairExhausted policy attempts then
+    some (.parkedFrameQueueContinues
+      { cause := .promotionProjectionFailed
+        attempts := attempts
+        maxAttempts := policy.maxAttempts
+        decisionOwner := .claudeSupervisor
+        decisionBellRequired := true })
+  else
+    none
+
+theorem projection_repair_before_bound_cannot_park
+    (policy : ProjectionRepairPolicy) (attempts : Nat)
+    (h : attempts < policy.maxAttempts) :
+    projectionRepairExhaustionSuccessor policy attempts = none := by
+  simp [projectionRepairExhaustionSuccessor, projectionRepairExhausted,
+    Nat.not_le.mpr h]
+
+theorem exhausted_projection_repair_parks_for_claude_and_continues_queue
+    (policy : ProjectionRepairPolicy) (attempts : Nat)
+    (valid : policy.Valid) (exhausted : policy.maxAttempts ≤ attempts) :
+    projectionRepairExhaustionSuccessor policy attempts =
+      some (.parkedFrameQueueContinues
+        { cause := .promotionProjectionFailed
+          attempts := attempts
+          maxAttempts := policy.maxAttempts
+          decisionOwner := .claudeSupervisor
+          decisionBellRequired := true }) := by
+  have nonzero : policy.maxAttempts ≠ 0 := Nat.ne_of_gt valid
+  simp [projectionRepairExhaustionSuccessor, projectionRepairExhausted,
+    nonzero, exhausted]
+
+/-- On repair, verdicts already made on the merits are immutable.  Only an
+apparatus-failure position may acquire a judgement. -/
+def preservesJudgements : ReviewPass → ReviewPass → Bool
+  | [], [] => true
+  | .judged old :: olds, new :: news =>
+      (new == .judged old) && preservesJudgements olds news
+  | .cannotJudge :: olds, _ :: news => preservesJudgements olds news
+  | _, _ => false
+
+def validProjectionRepair (hold : AwaitingApparatusRepair)
+    (repair : ProjectionRepair) : Prop :=
+  hold.cause = .promotionProjectionFailed ∧
+  repair.persistedReview = hold.persistedReview ∧
+  repair.reviewerRedispatched = false ∧
+  repair.projectionReadBack = true
+
+theorem valid_projection_repair_preserves_persisted_judgement
+    (hold : AwaitingApparatusRepair) (repair : ProjectionRepair)
+    (valid : validProjectionRepair hold repair) :
+    repair.persistedReview = hold.persistedReview ∧
+    repair.reviewerRedispatched = false := by
+  exact ⟨valid.2.1, valid.2.2.1⟩
+
+inductive ReviewResumeMode
+  | revalidatePersisted
+  | appendOnlyRedispatch
+  deriving DecidableEq, Repr
+
+structure ReviewResume where
+  newContractBlob : String
+  successorReview : ReviewPass
+  mode : ReviewResumeMode
+  deriving DecidableEq, Repr
+
+def validReviewResume (hold : AwaitingApparatusRepair)
+    (resume : ReviewResume) : Prop :=
+  resume.newContractBlob ≠ "" ∧
+  resume.newContractBlob ≠ hold.contractBlob ∧
+  preservesJudgements hold.persistedReview resume.successorReview = true
+
+def mixedUnresolvedReview : ReviewPass :=
+  [.judged .approve, .cannotJudge, .judged .reject]
+
+def allRejectReview : ReviewPass :=
+  [.judged .reject, .judged .reject, .judged .reject]
+
+theorem unresolved_promotion_pass_does_not_advance :
+    promotionPassSuccessor "last-valid-receipt" "contract-v1"
+      mixedUnresolvedReview =
+      .awaitingApparatusRepair
+        { cause := .promotionPassUnresolved
+          lastValidReceipt := "last-valid-receipt"
+          contractBlob := "contract-v1"
+          persistedReview := mixedUnresolvedReview
+          projectionFailure := none } := by
+  rfl
+
+theorem all_reject_promotion_pass_advances :
+    promotionPassSuccessor "last-valid-receipt" "contract-v1"
+      allRejectReview = .advance := by
+  rfl
+
+/-! The three theorems below are the general properties.  The two example
+theorems above compute on fixed literals, which shows the definitions reduce
+but would still hold if `promotionPassSuccessor` ignored its argument in every
+other case.  A predicate proved only against a literal the model invents is
+what let the earlier guide-snapshot obligation sit inert; state the quantified
+form as well. -/
+theorem unresolved_pass_never_advances
+    (receipt blob : String) (pass : ReviewPass) (h : resolved pass = false) :
+    promotionPassSuccessor receipt blob pass =
+      .awaitingApparatusRepair
+        { cause := .promotionPassUnresolved
+          lastValidReceipt := receipt
+          contractBlob := blob
+          persistedReview := pass
+          projectionFailure := none } := by
+  simp [promotionPassSuccessor, h]
+
+theorem projection_failure_never_advances
+    (receipt blob : String) (pass : ReviewPass)
+    (failure : PromotionProjectionFailure) :
+    projectionFailureSuccessor receipt blob pass failure =
+      .awaitingApparatusRepair
+        { cause := .promotionProjectionFailed
+          lastValidReceipt := receipt
+          contractBlob := blob
+          persistedReview := pass
+          projectionFailure := some failure } := by
+  rfl
+
+theorem resolved_pass_always_advances
+    (receipt blob : String) (pass : ReviewPass) (h : resolved pass = true) :
+    promotionPassSuccessor receipt blob pass = .advance := by
+  simp [promotionPassSuccessor, h]
+
+/-- Zero approvals is a legitimate result: a pass of rejections advances at any
+length.  This is the property the campaign's role cards require and the one a
+resolution rule could most easily break. -/
+theorem rejections_only_pass_advances (receipt blob : String) (n : Nat) :
+    promotionPassSuccessor receipt blob
+      (List.replicate n (.judged .reject)) = .advance := by
+  apply resolved_pass_always_advances
+  induction n with
+  | zero => rfl
+  | succ k ih => simp [resolved, List.replicate, isJudgement] at ih ⊢
+
+theorem unchanged_contract_cannot_resume_review
+    (hold : AwaitingApparatusRepair) (pass : ReviewPass)
+    (mode : ReviewResumeMode) :
+    ¬ validReviewResume hold
+      { newContractBlob := hold.contractBlob
+        successorReview := pass
+        mode := mode } := by
+  simp [validReviewResume]
+
 structure ControllerMemoryUse where
   receiptId : String
   snapshotId : String
@@ -481,7 +1075,9 @@ theorem role_authored_surfaced_ids_is_refused :
 def controllerDerivedSubmissionFields : List String :=
   ["job-id", "dispatch-id", "agent-id", "frame-id", "problem-id", "phase",
    "role", "attempt-ordinal", "submission-attempt", "fresh-session-nonce",
-   "memory-snapshot", "evidence.memory-use.receipt-id",
+   "memory-snapshot", "memory-cascade",
+   "evidence.memory-cascade.used-via-cascade",
+   "evidence.memory-use.receipt-id",
    "evidence.memory-use.snapshot-id", "evidence.memory-use.snapshot-digest",
    "evidence.memory-use.accessible-memory-ids",
    "evidence.memory-use.surfaced-ids", "evidence.memory-use.queries",
@@ -552,7 +1148,8 @@ def receiptRequiredFields : String → List String
       "receipt/problem-id", "receipt/input-receipt-ids", "receipt/lanes",
       "receipt/dispositions", "receipt/promotion-reviews", "receipt/snapshot-id",
       "receipt/snapshot-digest", "receipt/snapshot-path",
-      "receipt/reviewed-memory-ids", "receipt/independent-review?"]
+      "receipt/reviewed-memory-ids", "receipt/independent-review?",
+      "receipt/promotion-pass-witness"]
   | "student-attempt" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/attempt-ordinal", "receipt/fresh-session-id",
       "receipt/job-id", "receipt/outcome", "receipt/failure-account",
@@ -573,7 +1170,8 @@ def receiptRequiredFields : String → List String
       "receipt/input-attempt-id", "receipt/effect", "receipt/channel-audit"]
   | "scribe-reduce" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/input-receipt-ids", "receipt/lanes",
-      "receipt/dispositions", "receipt/promotion-reviews"]
+      "receipt/dispositions", "receipt/promotion-reviews",
+      "receipt/promotion-pass-witness"]
   | "frame-close" => ["receipt/id", "receipt/type", "receipt/frame-id",
       "receipt/problem-id", "receipt/input-receipt-ids", "receipt/trace-id",
       "receipt/result", "receipt/learning-outcome"]

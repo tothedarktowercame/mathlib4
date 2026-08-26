@@ -1,0 +1,98 @@
+import DarkTower.APMCycleMachine
+
+/-! Non-vacuity witnesses for the executable APM behavioural bridge. -/
+
+namespace DarkTower.APMQualification
+
+open DarkTower.APMCycleMachine
+
+def modelledInvariantClasses : List String :=
+  ["ordering", "ledger-receipts", "dispatch", "memory", "isolation",
+   "terminal", "analyst"]
+
+theorem invariant_classes_nonempty : modelledInvariantClasses.length = 7 := by decide
+
+theorem canonical_cycle_has_all_phases : canonicalPhaseOrder.length = 11 := by decide
+
+theorem solved_problem_partial_frame_is_admissible :
+    validOutcome .solved .framePartial := by trivial
+
+theorem close_json_wire_boundary_nonvacuous :
+    validCloseWireResult "closed" := json_closed_result_is_accepted
+
+theorem partial_json_wire_boundary_nonvacuous :
+    validCloseWireResult "partial" := partial_json_result_is_accepted
+
+theorem reused_student_session_mutation_is_killed :
+    ¬ validSessionRotation f25ReusedStudentSession :=
+  f25_reused_student_session_refused
+
+theorem unpreserved_student_reset_mutation_is_killed :
+    ¬ validStudentAttemptWorkspaceTransition unpreservedStudentReset :=
+  unpreserved_student_reset_is_refused
+
+theorem unreviewed_guide_snapshot_mutation_is_killed :
+    ¬ validGuideSnapshotTransition unreviewedGuideSnapshot :=
+  unreviewed_guide_snapshot_is_refused
+
+theorem partial_terminal_analyst_wake_nonvacuous :
+    analystWakeEligibleFrameResult "partial" :=
+  partial_terminal_frame_wakes_analyst
+
+theorem terminal_lifecycle_handler_set_nonvacuous :
+    terminalLifecycleActions.length = 2 :=
+  terminal_lifecycle_actions_nonvacuous
+
+theorem stale_base_retirement_mutation_is_killed :
+    ¬ validWorkspaceRetirementBinding staleBaseRetirementMutant :=
+  stale_base_cannot_substitute_for_terminal_head
+
+theorem collected_terminal_output_cannot_skip_certification :
+    supervisorMayAdvance .terminalCollected = false :=
+  terminal_collection_is_progress_but_not_certification
+
+theorem preflight_identity_remains_controller_owned
+    (x : PreflightAuthorityObservation)
+    (h : validPreflightAuthorityObservation x) :
+    x.authorityRevision ≠ "" ∧ x.authorityBlob ≠ "" :=
+  artifact_identity_is_not_an_agent_observation x h
+
+theorem multi_sorry_preflight_is_nonvacuous :
+    validPreflightSorryBaseline 0 3 0 :=
+  three_sorries_are_a_valid_nonvacuous_preflight_baseline
+
+theorem solved_fixture_cannot_masquerade_as_unresolved_preflight :
+    ¬ validPreflightSorryBaseline 0 0 0 :=
+  zero_sorries_are_not_an_unresolved_preflight_baseline
+
+theorem blocking_preflight_diagnostic_is_killed :
+    ¬ validPreflightSorryBaseline 0 1 1 :=
+  blocking_warnings_refuse_preflight
+
+theorem activation_before_intent_mutation_is_killed :
+    ¬ validDurableCoordinatorIntent activationBeforeIntentMutant :=
+  activation_before_persisted_intent_is_refused
+
+theorem directory_discovery_mutation_is_killed :
+    ¬ validCoordinatorRegistryEntry directoryHeuristicRegistryMutant :=
+  directory_heuristic_is_not_canonical_registration
+
+theorem fresh_coordinator_retry_mutation_is_killed :
+    ¬ validCoordinatorRegistryEntry freshCoordinatorRetryMutant :=
+  retry_beyond_bound_is_refused
+
+def analystWitness : List AnalystWake :=
+  [{frameId := "f1", terminal := true, ordinal := 1,
+    seriesInputVersion := 1, appendOnly := true,
+    proposalType := none, proposalDigest := none,
+    successorHandoff := false, mutatesInFlight := false},
+   {frameId := "f2", terminal := true, ordinal := 2,
+    seriesInputVersion := 2, appendOnly := true,
+    proposalType := some "regime-proposal",
+    proposalDigest := some "content-addressed-proposal",
+    successorHandoff := true, mutatesInFlight := false}]
+
+theorem analyst_tenure_nonvacuous : validAnalystTenure analystWitness := by
+  simp [validAnalystTenure, analystWitness]
+
+end DarkTower.APMQualification
