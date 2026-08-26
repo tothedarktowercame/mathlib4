@@ -732,16 +732,65 @@ structure ProjectionRepair where
   projectionReadBack : Bool
   deriving DecidableEq, Repr
 
-inductive ProjectionRepairExhaustionSuccessor
-  | parkedFrameQueueContinues
+structure ProjectionRepairPolicy where
+  maxAttempts : Nat
   deriving DecidableEq, Repr
 
-def projectionRepairExhausted : ProjectionRepairExhaustionSuccessor :=
-  .parkedFrameQueueContinues
+def ProjectionRepairPolicy.Valid (policy : ProjectionRepairPolicy) : Prop :=
+  0 < policy.maxAttempts
 
-theorem exhausted_projection_repair_parks_frame_and_continues_queue :
-    projectionRepairExhausted = .parkedFrameQueueContinues := by
-  rfl
+def projectionRepairExhausted (policy : ProjectionRepairPolicy)
+    (attempts : Nat) : Bool :=
+  0 < policy.maxAttempts && policy.maxAttempts ≤ attempts
+
+inductive ApparatusDecisionOwner
+  | claudeSupervisor
+  deriving DecidableEq, Repr
+
+structure ApparatusRepairPark where
+  cause : ApparatusRepairCause
+  attempts : Nat
+  maxAttempts : Nat
+  decisionOwner : ApparatusDecisionOwner
+  decisionBellRequired : Bool
+  deriving DecidableEq, Repr
+
+inductive ProjectionRepairExhaustionSuccessor
+  | parkedFrameQueueContinues (park : ApparatusRepairPark)
+  deriving DecidableEq, Repr
+
+def projectionRepairExhaustionSuccessor (policy : ProjectionRepairPolicy)
+    (attempts : Nat) : Option ProjectionRepairExhaustionSuccessor :=
+  if projectionRepairExhausted policy attempts then
+    some (.parkedFrameQueueContinues
+      { cause := .promotionProjectionFailed
+        attempts := attempts
+        maxAttempts := policy.maxAttempts
+        decisionOwner := .claudeSupervisor
+        decisionBellRequired := true })
+  else
+    none
+
+theorem projection_repair_before_bound_cannot_park
+    (policy : ProjectionRepairPolicy) (attempts : Nat)
+    (h : attempts < policy.maxAttempts) :
+    projectionRepairExhaustionSuccessor policy attempts = none := by
+  simp [projectionRepairExhaustionSuccessor, projectionRepairExhausted,
+    Nat.not_le.mpr h]
+
+theorem exhausted_projection_repair_parks_for_claude_and_continues_queue
+    (policy : ProjectionRepairPolicy) (attempts : Nat)
+    (valid : policy.Valid) (exhausted : policy.maxAttempts ≤ attempts) :
+    projectionRepairExhaustionSuccessor policy attempts =
+      some (.parkedFrameQueueContinues
+        { cause := .promotionProjectionFailed
+          attempts := attempts
+          maxAttempts := policy.maxAttempts
+          decisionOwner := .claudeSupervisor
+          decisionBellRequired := true }) := by
+  have nonzero : policy.maxAttempts ≠ 0 := Nat.ne_of_gt valid
+  simp [projectionRepairExhaustionSuccessor, projectionRepairExhausted,
+    nonzero, exhausted]
 
 /-- On repair, verdicts already made on the merits are immutable.  Only an
 apparatus-failure position may acquire a judgement. -/

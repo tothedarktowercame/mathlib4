@@ -225,8 +225,12 @@ def contractJson : Json :=
           "hold-at-review-awaiting-apparatus-repair"),
         ("projection-repair-reuses-persisted-judgement", Json.bool true),
         ("projection-repair-redispatches-reviewer", Json.bool false),
+        ("projection-repair-max-attempts", Json.num 1),
         ("projection-repair-exhaustion-action", Json.str
           "park-frame-and-continue-queue"),
+        ("projection-repair-exhaustion-decision-owner", Json.str
+          "claude-supervisor"),
+        ("projection-repair-exhaustion-bell-required", Json.bool true),
         ("promotion-successor-validation", Json.str
           "before-snapshot-publication-and-certification"),
         ("certified-pass-snapshot-materialized", Json.bool true),
