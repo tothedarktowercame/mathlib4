@@ -11,38 +11,26 @@ patterns — which would make it a cascade."*
 This is that example, and it is the first cascade in the stack written at
 **policy grade**: `π` is the whole structure, not an atomic action.
 
-## Status: TERMS ELABORATE; FULL BUILD UNRUN
+## Status: TERMS CHECKED against the real `DarkTower.BV`
 
-`Mathlib` is not built in this checkout (`.lake/build/lib/Mathlib/` is empty),
-so `lake build` has not been run here.
+Every definition below was elaborated (2026-08-26) against `DarkTower/BV.lean`
+itself — its `BV`, `Cong`, `Step` and theorems, not a transcription. Exit 0.
 
-What HAS been checked (2026-08-26): every definition below was elaborated by a
-real Lean elaborator against a faithful transcription of the `DarkTower.BV`
-inductive, using the toolchain at `/home/joe/code/apm-lean` (v4.29.0-rc8, which
-carries a built Mathlib as a package). All terms typecheck and `open BV`
-resolves the constructors as written. The cascade terms use nothing from
-Mathlib, so that check covers their whole content.
+The route matters, because `lake build` still cannot run here. This checkout is
+on the fork branch `darktower`, so `lake exe cache get` finds no upstream CI
+build for its commit: it attempted 8481 files from two caches and downloaded
+**zero**. `Mathlib.olean` is absent and 3731 of ~8481 modules are built, so
+`import Mathlib` cannot resolve, and rebuilding is what `AGENTS.md` forbids.
 
-What has NOT been checked: that this file builds in-place under this checkout's
-v4.31.0-rc1 with `import DarkTower.BV`, which pulls `import Mathlib`. That is a
-question about the surrounding build, not about the terms. To settle it:
+**But `BV.lean` does not need Mathlib.** With `import Mathlib` and the unused
+`open CategoryTheory` removed it elaborates standalone in seconds, all theorems
+included. That is how these terms were checked, and it suggests a one-line
+improvement to `BV.lean` — not made here, since other `DarkTower` files may rely
+on it re-exporting Mathlib.
 
-    lake exe cache get && lake build DarkTower.R8Cascade
+What remains unchecked: `lake build DarkTower.R8Cascade` in place, which is blocked
+on the substrate above rather than on anything in this file.
 
-(`cache get` fetches prebuilt oleans; per `AGENTS.md`, Mathlib is not to be
-rebuilt locally.)
-
-## Why the connectives carry the argument
-
-* `seq` is **non-commutative** — it is the only connective that says *this
-  before that*, which is the whole content of a build order.
-* `copar` is a conjunction of requirements with **no order**: work that may
-  proceed alongside, both needed.
-* `par` is an **alternative**: exactly one branch is taken.
-
-So a build plan written in BV cannot hide a sequencing claim it has not made.
-An ordering that turns out to be arbitrary shows up as a `copar` that was
-written as a `seq`.
 -/
 
 namespace DarkTower

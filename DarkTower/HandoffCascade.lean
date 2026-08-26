@@ -32,14 +32,26 @@ mean 17.04 → 4.04, top-5 15 → 50). So the `par` below is eliminated in favou
 of `h2aDispatch`. It is left in the term because a plan that erases its
 own decision points cannot be audited afterwards.
 
-## Status: TERMS ELABORATE; FULL BUILD UNRUN
+## Status: TERMS CHECKED against the real `DarkTower.BV`
 
-Every definition below was elaborated (2026-08-26) against a faithful
-transcription of the `DarkTower.BV` inductive, using the `apm-lean` toolchain
-which carries a built Mathlib. All terms typecheck and `open BV` resolves as
-written; the terms use nothing from Mathlib, so that covers their content.
-The in-place build under this checkout's toolchain is unrun:
-`lake exe cache get && lake build DarkTower.HandoffCascade` settles it.
+Every definition below was elaborated (2026-08-26) against `DarkTower/BV.lean`
+itself — its `BV`, `Cong`, `Step` and theorems, not a transcription. Exit 0.
+
+The route matters, because `lake build` still cannot run here. This checkout is
+on the fork branch `darktower`, so `lake exe cache get` finds no upstream CI
+build for its commit: it attempted 8481 files from two caches and downloaded
+**zero**. `Mathlib.olean` is absent and 3731 of ~8481 modules are built, so
+`import Mathlib` cannot resolve, and rebuilding is what `AGENTS.md` forbids.
+
+**But `BV.lean` does not need Mathlib.** With `import Mathlib` and the unused
+`open CategoryTheory` removed it elaborates standalone in seconds, all theorems
+included. That is how these terms were checked, and it suggests a one-line
+improvement to `BV.lean` — not made here, since other `DarkTower` files may rely
+on it re-exporting Mathlib.
+
+What remains unchecked: `lake build DarkTower.HandoffCascade` in place, which is blocked
+on the substrate above rather than on anything in this file.
+
 -/
 
 namespace DarkTower
