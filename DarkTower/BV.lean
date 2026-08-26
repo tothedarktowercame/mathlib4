@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # System BV structures
 
@@ -24,14 +22,16 @@ Grounding:
 * Categorical BV models, often called BV-categories, are the intended semantic
   direction for a later pass.
 
+Atoms have an explicit formal-dual constructor rather than requiring the
+parameter type `A` to carry an involution.  This preserves existing users of
+`atom` while making De Morgan duality and atomic interaction intrinsic.
+
 TODO: defer cut-elimination, decidability of derivability, and the full
-splitting theorem.  This file only records syntax, structural congruence, and
-the primitive one-step rules needed by the typed-hole algebra.
+splitting theorem.  This file records syntax, structural congruence, primitive
+one-step rules, and finite reduction to the unit.
 -/
 
 namespace DarkTower
-
-open CategoryTheory
 
 universe u
 
@@ -41,6 +41,10 @@ inductive BV (A : Type u) where
   | unit : BV A
   /-- An atomic hole-pattern label. -/
   | atom : A -> BV A
+  /-- The formal dual of an atomic label.  Formal dual atoms preserve the
+  existing atom type and its users without requiring a global involution on
+  `A`. -/
+  | dualAtom : A -> BV A
   /-- Non-commutative sequential composition. -/
   | seq : BV A -> BV A -> BV A
   /-- Commutative conjunction/cotensor of structures. -/
@@ -51,6 +55,19 @@ inductive BV (A : Type u) where
 namespace BV
 
 variable {A : Type u}
+
+/-- De Morgan duality.  Atoms and formal dual atoms exchange, `par` and
+`copar` exchange, and the self-dual noncommutative `seq` retains its order. -/
+def dual : BV A → BV A
+  | unit => unit
+  | atom a => dualAtom a
+  | dualAtom a => atom a
+  | seq S T => seq (dual S) (dual T)
+  | copar S T => par (dual S) (dual T)
+  | par S T => copar (dual S) (dual T)
+
+@[simp] theorem dual_dual (S : BV A) : dual (dual S) = S := by
+  induction S <;> simp [dual, *]
 
 /--
 Structural congruence for BV structures.
@@ -101,11 +118,13 @@ inductive Cong : BV A -> BV A -> Prop where
 /--
 One-step BV rewriting.
 
-The rules here are deliberately minimal.  `medial` interleaves sequence with
-`copar`/`par`, `switch` moves sequence through an alternative, and `cong` allows
-a structural congruence step to be used as a one-step move.
+The rules here are deliberately minimal.  `ai_down` eliminates a dual atomic
+pair, `medial` interleaves sequence with `copar`/`par`, `switch` moves sequence
+through an alternative, and `cong` allows structural congruence as a step.
 -/
 inductive Step : BV A -> BV A -> Prop where
+  /-- Atomic interaction (`ai↓`), oriented as reduction to the unit. -/
+  | ai_down (a : A) : Step (par (atom a) (dualAtom a)) unit
   /--
   Medial: sequentially composed `copar` pairs step to a `copar` of `par` pairs.
   This is the schematic deep-inference move used here as the BV heart rule.
@@ -116,6 +135,18 @@ inductive Step : BV A -> BV A -> Prop where
   | switch (S T U : BV A) : Step (seq S (par T U)) (par (seq S T) U)
   /-- Structural congruence can be used as a one-step move. -/
   | cong {S T : BV A} : Cong S T -> Step S T
+
+/-- A BV derivation is the reflexive-transitive closure of primitive steps. -/
+inductive Derives : BV A → BV A → Prop where
+  | refl (S : BV A) : Derives S S
+  | tail {S T U : BV A} : Derives S T → Step T U → Derives S U
+
+/-- A structure is provable when it reduces to the unit. -/
+def Provable (S : BV A) : Prop := Derives S unit
+
+/-- The smallest interaction proof: an atom paired with its formal dual. -/
+theorem dual_pair_provable (a : A) : Provable (par (atom a) (dualAtom a)) :=
+  Derives.tail (Derives.refl _) (Step.ai_down a)
 
 /-- Sanity check: sequence associativity is structural congruence. -/
 theorem seq_assoc_cong (S T U : BV A) :
