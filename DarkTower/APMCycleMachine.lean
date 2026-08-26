@@ -337,18 +337,31 @@ inductive AttachmentReviewVerdict
   | challenge
   deriving DecidableEq, Repr
 
+/-- Faithful model of the controller's `exact-patterns?`, which compares
+`(count …)` and `(set …)` rather than the sequences themselves.  It therefore
+accepts a reordering, and this definition must too: modelling the check as
+list equality would state a constraint stronger than the one the machine
+enforces. -/
+def exactPatterns (expected actual : List String) : Prop :=
+  expected.length = actual.length ∧ ∀ p, p ∈ expected ↔ p ∈ actual
+
 def AttachmentReviewVerdict.patternSetValid
     (verdict : AttachmentReviewVerdict)
     (edgePatterns reviewPatterns : List String) : Prop :=
   match verdict with
-  | .approve => edgePatterns = reviewPatterns
+  | .approve => exactPatterns edgePatterns reviewPatterns
   | .reassign | .reject | .challenge => True
 
 theorem approval_requires_exact_pattern_set
     (edgePatterns reviewPatterns : List String) :
     AttachmentReviewVerdict.patternSetValid .approve edgePatterns reviewPatterns ↔
-      edgePatterns = reviewPatterns := by
+      exactPatterns edgePatterns reviewPatterns := by
   rfl
+
+/-- The order-insensitivity is deliberate, not an oversight in the model. -/
+theorem exactPatterns_of_perm {expected actual : List String}
+    (perm : expected.Perm actual) : exactPatterns expected actual :=
+  ⟨perm.length_eq, fun _ => perm.mem_iff⟩
 
 theorem nonapproval_does_not_require_exact_pattern_set
     (verdict : AttachmentReviewVerdict) (notApprove : verdict ≠ .approve)
