@@ -16,7 +16,7 @@ substitution; BV supplies a small algebra of hole-pattern shapes over the atoms.
 
 Grounding:
 * Guglielmi, *A System of Interaction and Structure* (arXiv:cs/9910023), is the
-  definitional source for system BV and its medial/deep-inference rules.
+  definitional source for system BV `{ai↓, s, q↓}` and its deep-inference rules.
 * Guglielmi, *Deep Inference*, is the overview reference for inference inside
   structures rather than only at the root.
 * Categorical BV models, often called BV-categories, are the intended semantic
@@ -121,8 +121,7 @@ One-step BV rewriting.
 System BV is `{ai↓, s, q↓}` (Guglielmi, arXiv:cs/9910023).  `ai_down`
 introduces a dual atomic pair from the unit, `switch` distributes `copar`
 through one side of `par`, `q_down` takes `par` inside `seq` to `seq` inside
-`par`, and `cong` allows structural congruence as a step.  `medial` is NOT a BV
-rule and is flagged below.
+`par`, and `cong` allows structural congruence as a step.
 
 All rules are oriented DOWNWARD, in the calculus-of-structures convention: a
 derivation runs from premise to conclusion, so a proof of `S` is a derivation
@@ -144,21 +143,13 @@ inductive Step : BV A -> BV A -> Prop where
   Par inside seq becomes seq inside par. -/
   | q_down (R T R' T' : BV A) :
       Step (seq (par R T) (par R' T')) (par (seq R R') (seq T T'))
-  /--
-  NOT A BV RULE — retained pending a ruling, not endorsed.
+  /-- Switch (`s`), verbatim from Guglielmi (arXiv:cs/9910023, Def. 3.2.3):
 
-  This was labelled "the BV heart rule". It is not: Guglielmi's BV is
-  `{ai↓, s, q↓}`, and the word "medial" does not occur anywhere in
-  arXiv:cs/9910023 (medial belongs to SKS, the system *with* additives).
-  Its shape is neither `q↓` nor `q↑` — it takes `copar` inside `seq` to `par`
-  inside `copar`, where `q↓` takes `par` inside `seq` to `seq` inside `par`.
+      S([R,T], R′)
+      ────────────  s
+      S[(R,R′), T]
 
-  Kept so `atom_medial` still elaborates while Joe decides whether to drop both.
-  (claude-13, 2026-08-26, after reading the source.)
-  -/
-  | medial (S T U V : BV A) :
-      Step (seq (copar S U) (copar T V)) (copar (par S T) (par U V))
-  /-- Switch: tensor/coproduct distributes through one side of `par`. -/
+  `copar` distributes through one side of `par`. -/
   | switch (R U T : BV A) :
       Step (copar (par R U) T) (par (copar R T) U)
   /-- Structural congruence can be used as a one-step move. -/
@@ -192,22 +183,14 @@ theorem atom_q_down (a b c d : A) :
          (par (seq (atom a) (atom c)) (seq (atom b) (atom d))) :=
   Step.q_down _ _ _ _
 
-/-- Sanity check: a concrete atom-level medial step. Retained with `medial`
-itself; see the flag on that constructor. -/
-theorem atom_medial (a b c d : A) :
-    Step
-      (seq (copar (atom a) (atom c)) (copar (atom b) (atom d)))
-      (copar (par (atom a) (atom b)) (par (atom c) (atom d))) :=
-  Step.medial (atom a) (atom b) (atom c) (atom d)
-
 /-- Sanity check: structural congruence embeds as a step. -/
 theorem seq_assoc_step (S T U : BV A) :
     Step (seq (seq S T) U) (seq S (seq T U)) :=
   Step.cong (seq_assoc_cong S T U)
 
 #check BV.Cong.seq_assoc
-#check BV.Step.medial
-#check BV.atom_medial
+#check BV.Step.q_down
+#check BV.atom_q_down
 
 end BV
 
