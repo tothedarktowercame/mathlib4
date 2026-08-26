@@ -131,8 +131,9 @@ inductive Step : BV A -> BV A -> Prop where
   -/
   | medial (S T U V : BV A) :
       Step (seq (copar S U) (copar T V)) (copar (par S T) (par U V))
-  /-- Switch: a sequence whose right side is an alternative can distribute one step. -/
-  | switch (S T U : BV A) : Step (seq S (par T U)) (par (seq S T) U)
+  /-- Switch: tensor/coproduct distributes through one side of `par`. -/
+  | switch (R U T : BV A) :
+      Step (copar (par R U) T) (par (copar R T) U)
   /-- Structural congruence can be used as a one-step move. -/
   | cong {S T : BV A} : Cong S T -> Step S T
 
