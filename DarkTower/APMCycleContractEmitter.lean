@@ -206,6 +206,11 @@ def contractJson : Json :=
             #[Json.str "approve", Json.str "reassign", Json.str "reject"]),
            ("apparatus-failures", Json.arr #[Json.str "cannot-judge"])]),
         ("promotion-pass-resolution-required", Json.bool true),
+        ("exact-pattern-set-required-for", Json.arr #[Json.str "approve"]),
+        ("nonapproval-pattern-actions", Json.mkObj
+          [("reassign", Json.str "replace"),
+           ("reject", Json.str "retain-proposed"),
+           ("challenge", Json.str "retain-challenged")]),
         ("review-dispatch-resolution-required", Json.bool true),
         ("review-dispatch-candidate-required", Json.arr
           #[Json.str "persisted", Json.str "fetchable",

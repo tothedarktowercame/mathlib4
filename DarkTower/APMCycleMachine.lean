@@ -328,6 +328,34 @@ inductive ReviewVerdict
   | cannotJudge
   deriving DecidableEq, Repr
 
+/-! Pattern-set equality constrains only approval.  Reassignment replaces the
+set, while rejection and challenge leave the proposed attachment unchanged. -/
+inductive AttachmentReviewVerdict
+  | approve
+  | reassign
+  | reject
+  | challenge
+  deriving DecidableEq, Repr
+
+def AttachmentReviewVerdict.patternSetValid
+    (verdict : AttachmentReviewVerdict)
+    (edgePatterns reviewPatterns : List String) : Prop :=
+  match verdict with
+  | .approve => edgePatterns = reviewPatterns
+  | .reassign | .reject | .challenge => True
+
+theorem approval_requires_exact_pattern_set
+    (edgePatterns reviewPatterns : List String) :
+    AttachmentReviewVerdict.patternSetValid .approve edgePatterns reviewPatterns ↔
+      edgePatterns = reviewPatterns := by
+  rfl
+
+theorem nonapproval_does_not_require_exact_pattern_set
+    (verdict : AttachmentReviewVerdict) (notApprove : verdict ≠ .approve)
+    (edgePatterns reviewPatterns : List String) :
+    verdict.patternSetValid edgePatterns reviewPatterns := by
+  cases verdict <;> simp_all [AttachmentReviewVerdict.patternSetValid]
+
 /-! A review request is constructed only after the controller has resolved
 the material that the reviewer will inspect.  `ReviewDispatch` is the raw
 construction record; `ValidReviewDispatch` is the proof-carrying value that
