@@ -1075,7 +1075,9 @@ theorem role_authored_surfaced_ids_is_refused :
 def controllerDerivedSubmissionFields : List String :=
   ["job-id", "dispatch-id", "agent-id", "frame-id", "problem-id", "phase",
    "role", "attempt-ordinal", "submission-attempt", "fresh-session-nonce",
-   "memory-snapshot", "evidence.memory-use.receipt-id",
+   "memory-snapshot", "memory-cascade",
+   "evidence.memory-cascade.used-via-cascade",
+   "evidence.memory-use.receipt-id",
    "evidence.memory-use.snapshot-id", "evidence.memory-use.snapshot-digest",
    "evidence.memory-use.accessible-memory-ids",
    "evidence.memory-use.surfaced-ids", "evidence.memory-use.queries",
