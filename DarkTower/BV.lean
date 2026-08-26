@@ -118,10 +118,11 @@ inductive Cong : BV A -> BV A -> Prop where
 /--
 One-step BV rewriting.
 
-The rules here are deliberately minimal.  `ai_down` introduces a dual atomic
-pair from the unit, `medial` interleaves sequence with `copar`/`par`, `switch`
-distributes `copar` through one side of `par`, and `cong` allows structural
-congruence as a step.
+System BV is `{ai↓, s, q↓}` (Guglielmi, arXiv:cs/9910023).  `ai_down`
+introduces a dual atomic pair from the unit, `switch` distributes `copar`
+through one side of `par`, `q_down` takes `par` inside `seq` to `seq` inside
+`par`, and `cong` allows structural congruence as a step.  `medial` is NOT a BV
+rule and is flagged below.
 
 All rules are oriented DOWNWARD, in the calculus-of-structures convention: a
 derivation runs from premise to conclusion, so a proof of `S` is a derivation
@@ -133,9 +134,27 @@ inductive Step : BV A -> BV A -> Prop where
 /-- Atomic interaction, canonical `ai↓ : S{◦} → S[a, ā]` — the unit introduces
   a dual atomic pair. -/
   | ai_down (a : A) : Step unit (par (atom a) (dualAtom a))
+  /-- Seq (`q↓`), system BV's third rule, verbatim from Guglielmi
+  (arXiv:cs/9910023, Definition 3.2.3):
+
+      S⟨[R,T], [R′,T′]⟩
+      ─────────────────  q↓
+      S[⟨R,R′⟩, ⟨T,T′⟩]
+
+  Par inside seq becomes seq inside par. -/
+  | q_down (R T R' T' : BV A) :
+      Step (seq (par R T) (par R' T')) (par (seq R R') (seq T T'))
   /--
-  Medial: sequentially composed `copar` pairs step to a `copar` of `par` pairs.
-  This is the schematic deep-inference move used here as the BV heart rule.
+  NOT A BV RULE — retained pending a ruling, not endorsed.
+
+  This was labelled "the BV heart rule". It is not: Guglielmi's BV is
+  `{ai↓, s, q↓}`, and the word "medial" does not occur anywhere in
+  arXiv:cs/9910023 (medial belongs to SKS, the system *with* additives).
+  Its shape is neither `q↓` nor `q↑` — it takes `copar` inside `seq` to `par`
+  inside `copar`, where `q↓` takes `par` inside `seq` to `seq` inside `par`.
+
+  Kept so `atom_medial` still elaborates while Joe decides whether to drop both.
+  (claude-13, 2026-08-26, after reading the source.)
   -/
   | medial (S T U V : BV A) :
       Step (seq (copar S U) (copar T V)) (copar (par S T) (par U V))
@@ -167,7 +186,14 @@ theorem seq_assoc_cong (S T U : BV A) :
 theorem par_comm_cong (S T : BV A) : Cong (par S T) (par T S) :=
   Cong.par_comm S T
 
-/-- Sanity check: a concrete atom-level medial step. -/
+/-- A concrete atom-level `q↓` step: the real BV seq rule at atoms. -/
+theorem atom_q_down (a b c d : A) :
+    Step (seq (par (atom a) (atom b)) (par (atom c) (atom d)))
+         (par (seq (atom a) (atom c)) (seq (atom b) (atom d))) :=
+  Step.q_down _ _ _ _
+
+/-- Sanity check: a concrete atom-level medial step. Retained with `medial`
+itself; see the flag on that constructor. -/
 theorem atom_medial (a b c d : A) :
     Step
       (seq (copar (atom a) (atom c)) (copar (atom b) (atom d)))
