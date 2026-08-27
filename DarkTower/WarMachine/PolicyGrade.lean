@@ -14,6 +14,15 @@ The model contains no probability, no preferences `C`, and no expected free
 energy.  S-G1 is also out of scope: it concerns the provenance of a predicted
 distribution, whereas this module concerns naming discipline over a finished
 run.
+
+Two limitations, recorded rather than repaired.  `Wiring` does not itself
+witness that its values are re-orderings of the *same* components; that a family
+really is one policy under two wirings is an obligation on whoever builds it,
+discharged here by the two orders having been measured on one collection.  And a
+score that no re-wiring moves may belong to a robust policy rather than a
+degenerate one.  S-G4 refuses the *name* in both cases, because the measurement
+supplies no evidence that the wiring produced the number — a condition on the
+measurement, not a verdict on the policy.
 -/
 
 namespace DarkTower.WarMachine.PolicyGrade
@@ -33,6 +42,24 @@ def sustainedSingleAction {Action Score : Type}
 def wiringSensitive {Wiring Score : Type} [DecidableEq Score]
     (scoreUnder : Wiring → Score) : Prop :=
   ∃ wiring₁ wiring₂, scoreUnder wiring₁ ≠ scoreUnder wiring₂
+
+/-- **S-G4 forces a policy space with more than one point.**  A score cannot be
+sensitive to a choice of wiring that does not exist. -/
+theorem wiringSensitive_needs_two_wirings {Wiring Score : Type} [DecidableEq Score]
+    (scoreUnder : Wiring → Score) (h : wiringSensitive scoreUnder) :
+    ∃ wiring₁ wiring₂ : Wiring, wiring₁ ≠ wiring₂ := by
+  have ⟨wiring₁, wiring₂, hne⟩ := h
+  exact ⟨wiring₁, wiring₂, fun hEq => hne (congrArg scoreUnder hEq)⟩
+
+/-- Consequently a singleton-indexed family fails S-G4 whatever it scores.  This
+is what carries the hardcoded cases below: the modelling commitment is that a
+hardcoded policy admits exactly one wiring, and the refusal is then a theorem
+rather than a second commitment. -/
+theorem singleton_wiring_fails_sg4 {Score : Type} [DecidableEq Score]
+    (scoreUnder : Unit → Score) : ¬ wiringSensitive scoreUnder := by
+  intro h
+  have ⟨wiring₁, wiring₂, hne⟩ := wiringSensitive_needs_two_wirings scoreUnder h
+  cases wiring₁; cases wiring₂; exact hne rfl
 
 /-- A finished run earns policy grade only when it passes both S-G2 and S-G4. -/
 def earnsPolicyGrade {Action Wiring Score : Type} [DecidableEq Score]
@@ -88,8 +115,9 @@ theorem grim_trigger_snatcher_passes_sg2_fails_sg4 :
       .abstain (by simp [grimTriggerSnatcher])
     cases same
   constructor
-  · simp [wiringSensitive, hardcodedSnatcherScore]
-  · simp [earnsPolicyGrade, wiringSensitive, hardcodedSnatcherScore]
+  · exact singleton_wiring_fails_sg4 hardcodedSnatcherScore
+  · intro h
+    exact singleton_wiring_fails_sg4 hardcodedSnatcherScore h.2.2
 
 /-- The two measured precedence orders of the same twelve patterns. -/
 inductive PatternWiring where
@@ -125,6 +153,8 @@ theorem pattern_driven_g4_snatcher_earns_policy_grade :
     cases same
   · exact ⟨.observed, .onePromoted, by decide⟩
 
+#print axioms wiringSensitive_needs_two_wirings
+#print axioms singleton_wiring_fails_sg4
 #print axioms grim_trigger_sharer_refused_by_sg2
 #print axioms grim_trigger_snatcher_passes_sg2_fails_sg4
 #print axioms pattern_driven_g4_snatcher_earns_policy_grade
