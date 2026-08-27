@@ -19,6 +19,12 @@ Clause descriptions, predicate names, implementation paths and reserved-family
 names are strings because `GainChain` does not represent source metadata as
 data.
 
+**The `reserved` list is this document declaring its own boundary.**  R5 asks a
+criterion set to name at least one outcome it does not cover; four families are
+named as outside, each with a typed reason.  A single top-level
+`warMachineCompliant` conjunction could not do this — a conjunction has nowhere
+to put a boundary, and would report a property of its own conjunct list.
+
 **No `holds` field is emitted, deliberately.**  A contract states what must be
 true; whether it *was* true on a given run is a verdict, and verdicts about runs
 belong to the trace checker, not to the contract document
@@ -153,12 +159,44 @@ def policyGradeClauseJson : Json :=
      ("clojure-locus", Json.mkObj
        [("absent", Json.str "no-clojure-mirror-yet")])]
 
+/-- Why a family is outside the contract, as a **type** rather than a bare
+listing.  R5's own requirement applied to this document: an outcome outside the
+criterion set is reported as `uncovered`, never as silence — and a list of names
+with no reason is silence about the reason.  The three kinds below are not the
+same thing, and the earlier flat list said they were. -/
+inductive OutsideReason where
+  /-- A WM counterpart exists only as prose, so there is nothing to model against. -/
+  | prosOnly
+  /-- The requirement already holds; reserved for want of a repair to state,
+  not for want of reach. -/
+  | alreadyHolds
+  /-- Specified in an excursion and not yet built. -/
+  | designedUnbuilt
+  deriving DecidableEq, Repr
+
+def outsideReasonName : OutsideReason → String
+  | .prosOnly => "wm-counterpart-is-prose-only"
+  | .alreadyHolds => "already-holds"
+  | .designedUnbuilt => "designed-unbuilt"
+
+def reservedJson' (id : Nat) (name : String) (reason : OutsideReason)
+    (note : String) : Json :=
+  Json.mkObj
+    [("id", Json.num id),
+     ("name", Json.str name),
+     ("outside-reason", Json.str (outsideReasonName reason)),
+     ("note", Json.str note)]
+
 def reservedJson : Json :=
   Json.arr #[
-    Json.mkObj [("id", Json.num 3), ("name", Json.str "self-contained-record")],
-    Json.mkObj [("id", Json.num 6), ("name", Json.str "separated-powers")],
-    Json.mkObj [("id", Json.num 7), ("name", Json.str "pinned-exit")],
-    Json.mkObj [("id", Json.num 9), ("name", Json.str "candidate-space-membership")]]
+    reservedJson' 3 "self-contained-record" .prosOnly
+      "the SCALE-MATCH PIN is enforced by care rather than by code (\u00a72.1, family 3)",
+    reservedJson' 6 "separated-powers" .alreadyHolds
+      "author \u2260 reviewer holds in the WM today; E-R6 addresses candidate-space membership, which is family 9",
+    reservedJson' 7 "pinned-exit" .alreadyHolds
+      "the act-gate holds today",
+    reservedJson' 9 "candidate-space-membership" .designedUnbuilt
+      "specified in E-R6-red-ring-fill; no Lean module yet"]
 
 def contractJson : Json :=
   Json.mkObj
