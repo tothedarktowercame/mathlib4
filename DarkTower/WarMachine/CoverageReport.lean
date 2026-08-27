@@ -44,10 +44,21 @@ inductive Report where
   | absent
   deriving DecidableEq, Repr
 
-/-- The declaration is total, including at outcomes outside the set. -/
+/-- **The set names at least one outcome it does not cover.**
+
+An earlier draft stated totality — `∀ outcome, covers o = true ∨ covers o =
+false` — which is `∀ b : Bool, b = true ∨ b = false` and therefore provable of
+every criterion set whatsoever.  Totality is already forced by the type
+`Outcome → Bool`, so there was nothing to state and the conjunct was decoration.
+
+The content R5 actually asks for is a **boundary**: a criterion set that covers
+everything has no non-coverage to report, and *stating the boundary* is the whole
+requirement.  A set claiming total coverage is the failure mode, not the
+satisfied case — Klarna measured four real metrics at scale and none of them
+reported what they did not cover. -/
 def declaresCoverage {Outcome : Type} [DecidableEq Outcome]
     (criteria : CriterionSet Outcome) : Prop :=
-  ∀ outcome, criteria.covers outcome = true ∨ criteria.covers outcome = false
+  ∃ outcome, criteria.covers outcome = false
 
 /-- Adapt criterion membership to family 5's declared-domain predicate. -/
 def criterionSelection {Outcome : Type} [DecidableEq Outcome]
@@ -203,8 +214,7 @@ outcome and explicitly reports both outcomes outside its coverage. -/
 theorem coverage_reported_nonvacuous :
     coverageReported customerCriteria reportingEvaluation := by
   constructor
-  · intro outcome
-    cases outcome <;> simp [customerCriteria]
+  · exact ⟨CustomerOutcome.warmCustomerPays, rfl⟩   -- the boundary it names
   constructor
   · intro outcome h
     cases outcome <;> simp [customerCriteria, reportingEvaluation] at h ⊢
