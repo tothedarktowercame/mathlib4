@@ -29,6 +29,21 @@ The `Temperature` value `t : Nat` encodes the positive integer temperature
 `t + 1`.  Thus all score comparisons use integer arithmetic and never divide.
 This continues `GainChain.gainAdvances`: repairing the incoming gain cannot
 alter an action while the final temperature-to-action edge remains constant.
+
+## Fixture polarities
+
+* accepting — `habit_prior_governs`
+* refusing-broken — `live_selector_does_not_govern`
+* refusing-plausible-fix — `record_sensitivity_is_not_governance` (making the
+  emitted record move with τ looks like restoring governance and does not)
+
+## Vocabulary
+
+This module defines its own vocabulary (`Selector`, `governs`,
+`factorsThroughDiscard`) rather than adapting to a `GainChain` family, because
+its subject is a selector's dependence on a parameter rather than the presence,
+domain, or durability of a fold occurrence.  Its contract entry is family 8,
+which has no APM source.
 -/
 
 namespace DarkTower.WarMachine.CommitmentTemperature

@@ -45,6 +45,17 @@ the first draft named but did not constrain:
 
 `foldCompliant` is separated from `gainChainSound` for the same reason: an
 out-of-domain mission cannot move the gain, and must still leave a record.
+
+## Fixture polarities
+
+Named so that a missing one is visible.  The plausible-fix witness is the one
+that matters: it is what stops the naive repair, and nothing else would notice
+its absence.
+
+* accepting — `gain_chain_sound_nonvacuous`
+* refusing-broken — `two_clocks_break_threaded_identity`
+* refusing-plausible-fix — `substitution_2026_07_08_narrows_domain_is_refused`
+  (swapping in a producer looks like a repair and narrows the declared domain)
 -/
 
 namespace DarkTower.WarMachine.GainChain

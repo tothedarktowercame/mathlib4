@@ -25,6 +25,14 @@ absence.
 The model rules out silent non-coverage and the naive repair that merely adds
 one criterion.  It does not model probability, entropy, kernels, the quality
 of a score, or whether a declared criterion is the right one.
+
+## Fixture polarities
+
+* accepting — `coverage_reported_nonvacuous`
+* refusing-broken — `warm_customer_pays_uncovered_and_unrecorded_is_refused`
+* refusing-plausible-fix — `adding_a_channel_does_not_satisfy_coverage` (adding
+  the one known missing outcome is the tempting repair and leaves the next one
+  silent)
 -/
 
 namespace DarkTower.WarMachine.CoverageReport

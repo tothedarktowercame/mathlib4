@@ -23,6 +23,19 @@ score that no re-wiring moves may belong to a robust policy rather than a
 degenerate one.  S-G4 refuses the *name* in both cases, because the measurement
 supplies no evidence that the wiring produced the number — a condition on the
 measurement, not a verdict on the policy.
+
+## Fixture polarities
+
+* accepting — `pattern_driven_g4_snatcher_earns_policy_grade`
+* refusing-broken — `grim_trigger_sharer_refused_by_sg2`
+* refusing-plausible-fix — `grim_trigger_snatcher_passes_sg2_fails_sg4` (making
+  the actions differ is the obvious way to satisfy S-G2 and is not enough)
+
+## Vocabulary
+
+This module defines its own vocabulary deliberately: it is naming discipline
+over a finished run, not a requirement about a fold occurrence, so it adapts to
+no `GainChain` family and imports nothing.
 -/
 
 namespace DarkTower.WarMachine.PolicyGrade
