@@ -212,6 +212,73 @@ theorem habit_prior_governs : governs habitPrior := by
   refine ⟨switchingEntries, 0, 2, ?_⟩
   decide
 
+/-!
+## The Markov-category form of the requirement
+
+In a Markov category every object carries a commutative comonoid — copy `Δ` and
+discard `ε` — and a morphism is independent of an input exactly when it
+**factors through that input's discard**.  Stated that way, R14's requirement
+needs no probability measure on τ at all, which is what the `governs` docstring
+above has to caveat.
+
+This section states the finite, dependency-free case.  `Mathlib`'s
+`Probability/Kernel/Category/Stoch.lean` carries the measure-theoretic version
+(`Δ[X]`, `ε[X]`, `Deterministic`); it is not imported here because this file is
+deliberately standalone.  The trigger for reaching for it is repair option (a),
+sampling `P(π)`, which is a genuine stochastic morphism.  The determinism
+distinction is the one that matters there: the softmax is a stochastic morphism
+and `argmax` is a deterministic one that forgets it.
+-/
+
+/-- A selector **factors through the discard of the temperature** when it equals
+a morphism that never receives τ.  This is `ε_τ` in the finite case, with the
+witness `c` exhibited. -/
+def factorsThroughDiscard (s : Selector) : Prop :=
+  ∃ c : List Entry → Option Action, ∀ τ entries, s τ entries = c entries
+
+/-- The categorical form is not a weaker gloss on the operational one: factoring
+through discard and temperature-invariance are the same condition. -/
+theorem factorsThroughDiscard_iff_temperatureInvariant (s : Selector) :
+    factorsThroughDiscard s ↔ temperatureInvariant s := by
+  constructor
+  · rintro ⟨c, hc⟩ τ₁ τ₂ entries
+    rw [hc, hc]
+  · intro h
+    exact ⟨fun entries => s 0 entries, fun τ entries => h τ 0 entries⟩
+
+/-- **R14's requirement, restated:** the temperature governs exactly when the
+selector does *not* factor through the discard of τ. -/
+theorem not_governs_iff_factorsThroughDiscard (s : Selector) :
+    ¬ governs s ↔ factorsThroughDiscard s := by
+  rw [factorsThroughDiscard_iff_temperatureInvariant]
+  constructor
+  · intro h τ₁ τ₂ entries
+    exact Classical.byContradiction fun hne => h ⟨entries, τ₁, τ₂, hne⟩
+  · rintro h ⟨entries, τ₁, τ₂, hne⟩
+    exact hne (h τ₁ τ₂ entries)
+
+/-- **Data processing as the counit law.**  A discard absorbs everything
+upstream of it — `f ; ε = ε` — so if the selector factors through the discard of
+τ, the whole chain `g → τ_eff → action` factors through the discard of `g`.
+This is `repairing_r8_changes_no_action` obtained structurally, by composition,
+rather than by instantiating an invariance hypothesis. -/
+theorem discard_absorbs_upstream
+    (s : Selector) (h : factorsThroughDiscard s)
+    (effectiveTemperature : Nat → Temperature) :
+    ∃ c : List Entry → Option Action,
+      ∀ g entries, s (effectiveTemperature g) entries = c entries := by
+  obtain ⟨c, hc⟩ := h
+  exact ⟨c, fun g entries => hc _ entries⟩
+
+/-- The live selector, in the categorical vocabulary. -/
+theorem live_selector_factors_through_discard : factorsThroughDiscard modeOnly :=
+  (factorsThroughDiscard_iff_temperatureInvariant modeOnly).mpr
+    (fun τ₁ τ₂ entries => mode_only_ignores_temperature τ₁ τ₂ entries)
+
+#print axioms factorsThroughDiscard_iff_temperatureInvariant
+#print axioms not_governs_iff_factorsThroughDiscard
+#print axioms discard_absorbs_upstream
+#print axioms live_selector_factors_through_discard
 #print axioms mode_only_ignores_temperature
 #print axioms live_selector_does_not_govern
 #print axioms single_term_argmax_annihilates_temperature
