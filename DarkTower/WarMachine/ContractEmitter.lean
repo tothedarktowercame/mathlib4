@@ -3,6 +3,7 @@ Copyright (c) 2026 Joseph Corneli. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import DarkTower.WarMachine.GainChain
+import DarkTower.WarMachine.CoverageReport
 import Lean.Data.Json
 
 /-!
@@ -84,6 +85,20 @@ def compliancePropertyJson : Json :=
        ["threadedIdentity", "inhabitedHandle", "durableBeforeFold",
         "typedAbsence", "dischargedPrecondition"])]
 
+/-- R5's executable clause.  Predicate names, clause descriptions, and the
+Clojure source locus are literals because Lean declarations do not retain this
+source metadata as runtime data.  The conjunct list follows the definition of
+`CoverageReport.coverageReported`. -/
+def coverageClauseJson : Json :=
+  Json.mkObj
+    [("id", Json.str "R5"),
+     ("name", Json.str "coverage-reported"),
+     ("lean-predicate", Json.str "coverageReported"),
+     ("conjuncts", stringArray
+       ["declaresCoverage", "outsideIsTyped", "inhabitedHandle",
+        "typedAbsence", "declaredDomain"]),
+     ("clojure-locus", Json.str "futon2/src/futon2/aif/coverage_check.clj")]
+
 def reservedJson : Json :=
   Json.arr #[
     Json.mkObj [("id", Json.num 3), ("name", Json.str "self-contained-record")],
@@ -96,6 +111,7 @@ def contractJson : Json :=
      ("families", familiesJson),
      ("chain-property", chainPropertyJson),
      ("compliance-property", compliancePropertyJson),
+     ("coverage-clause", coverageClauseJson),
      ("reserved", reservedJson)]
 
 def emit : IO Unit := IO.println contractJson.compress
