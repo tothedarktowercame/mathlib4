@@ -7,11 +7,11 @@ import DarkTower.WarMachine.CoverageReport
 import Lean.Data.Json
 
 /-!
-# Executable contract emitter for the War Machine gain chain
+# Executable contract emitter for the War Machine
 
-The generated JSON names the record-shaped requirement families stated by
-`GainChain`.  The Clojure consumer may validate this document and observations
-against it; it must not maintain a separate family table.
+The generated JSON names every War Machine requirement module.  The Clojure
+consumer may validate this document and observations against it; it must not
+maintain a separate family table.
 
 Clause descriptions, predicate names, implementation paths and reserved-family
 names are strings because `GainChain` does not represent source metadata as
@@ -68,7 +68,11 @@ def familiesJson : Json :=
        "domain mismatch is distinct from missing data",
        "the selected producer's data precondition is discharged",
        "producer substitution does not narrow the declared domain"]
-      "futon2/src/futon2/aif/fold_realized.clj; futon2/src/futon2/aif/actuator_a3.clj"]
+      "futon2/src/futon2/aif/fold_realized.clj; futon2/src/futon2/aif/actuator_a3.clj",
+    familyJson 8 "temperature-governance" "governs / factorsThroughDiscard"
+      ["a temperature-governed selector has one fixed ranking and two temperatures that select different actions",
+       "a selector that factors through discarding temperature is not temperature-governed"]
+      "futon2/src/futon2/aif/policy.clj"]
 
 def chainPropertyJson : Json :=
   Json.mkObj
@@ -99,19 +103,35 @@ def coverageClauseJson : Json :=
         "typedAbsence", "declaredDomain"]),
      ("clojure-locus", Json.str "futon2/src/futon2/aif/coverage_check.clj")]
 
+/-- Naming discipline for `G(π)`, separate from the numbered requirement
+families.  The locus is an object carrying typed absence rather than a string:
+a consumer cannot mistake an absent mirror for a present but blank path. -/
+def policyGradeClauseJson : Json :=
+  Json.mkObj
+    [("id", Json.str "G-naming"),
+     ("name", Json.str "policy-grade"),
+     ("lean-predicate", Json.str "earnsPolicyGrade"),
+     ("conjuncts", stringArray
+       ["scoreUnderObservedWiring", "notSustainedSingleAction",
+        "wiringSensitive"]),
+     ("clojure-locus", Json.mkObj
+       [("absent", Json.str "no-clojure-mirror-yet")])]
+
 def reservedJson : Json :=
   Json.arr #[
     Json.mkObj [("id", Json.num 3), ("name", Json.str "self-contained-record")],
     Json.mkObj [("id", Json.num 6), ("name", Json.str "separated-powers")],
-    Json.mkObj [("id", Json.num 7), ("name", Json.str "pinned-exit")]]
+    Json.mkObj [("id", Json.num 7), ("name", Json.str "pinned-exit")],
+    Json.mkObj [("id", Json.num 9), ("name", Json.str "candidate-space-membership")]]
 
 def contractJson : Json :=
   Json.mkObj
-    [("contract-version", Json.str "wm-contract-v1"),
+    [("contract-version", Json.str "wm-contract-v2"),
      ("families", familiesJson),
      ("chain-property", chainPropertyJson),
      ("compliance-property", compliancePropertyJson),
      ("coverage-clause", coverageClauseJson),
+     ("policy-grade-clause", policyGradeClauseJson),
      ("reserved", reservedJson)]
 
 def emit : IO Unit := IO.println contractJson.compress
