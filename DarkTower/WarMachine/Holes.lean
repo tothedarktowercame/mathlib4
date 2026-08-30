@@ -230,10 +230,16 @@ structure Workflow (Role Handoff : Type*) where
 structure R2Tick (Channel Value : Type*) where
   observation : Channel → Option Value
 
-/-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · Every tick observation has exactly the declared channel keys. -/
-def r2ObservationKeysAreChannels :
-  ∀ {Channel Value : Type*} (tick : R2Tick Channel Value),
-    {channel | (tick.observation channel).isSome} = Set.univ := sorry
+/-- CLOSED-BY-RECORD · owner: P-R2 §solved 1 · holder: claude-15 · A tick is well-formed against the DECLARED channel list (declaration order, `observation.clj:18–32`) — never against the keys it happens to carry (review fix: the earlier `= Set.univ` form was vacuous or refuted depending on where `Channel` came from; claude-20 2026-08-30). -/
+def r2WellFormed {Channel Value : Type*} (declared : List Channel)
+    (tick : R2Tick Channel Value) : Prop :=
+  ∀ channel, (tick.observation channel).isSome ↔ channel ∈ declared
+
+/-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · Record contract as a census: over the corpus, exactly `illFormed` ticks fail the declared list — the run is the fixture, and on wm-trace it is a REFUTATION of the universal (two 05-18 records lack `:annotation-health`; expected illFormed = 2). -/
+def r2ContractCensus :
+  ∀ {Channel Value : Type*} (declared : List Channel) (corpus : List (R2Tick Channel Value))
+    [DecidablePred (r2WellFormed declared)] (illFormed : Nat),
+    (corpus.filter (fun tick => decide (¬ r2WellFormed declared tick))).length = illFormed := sorry
 
 inductive R8Disposition where
   | missingFComputable
@@ -241,31 +247,42 @@ inductive R8Disposition where
   | insufficientInputs
   deriving DecidableEq, Repr
 
-structure R8Tick (Belief Observation Precision : Type*) where
-  muPre : Option Belief
-  observation : Option Observation
-  precision : Option Precision
+inductive FreeEnergyShape where
+  | gMap          -- `:free-energy` holds {:G-total …}         (760 forms, files 05-18 … 07-09)
+  | controllerMap -- `:free-energy` holds {:controller-score …} (32 forms, files 07-14 … 07-21, 08-30)
+  deriving DecidableEq, Repr
+
+/-- Field names follow the artefact's keys (`:prediction-errors`, `:precision-state`, `:variational-free-energy`, `:selection-gain`), so clause-2 signature comparison against the Clojure census is literal (review fix, claude-20 2026-08-30). -/
+structure R8Tick (Errors Precision Gain : Type*) where
+  predictionErrors : Option Errors
+  precisionState : Option Precision
   storedF : Option ℝ
+  selectionGain : Option Gain
+  freeEnergyShape : FreeEnergyShape
+  fileDate : Nat   -- YYYYMMDD of the trace file
 
 /-- CLOSED-BY-RECORD · owner: P-R8 §solved 1 · holder: claude-15 · R8 records exactly missing-computable, stored, or insufficient-inputs. -/
-def r8Disposition {Belief Observation Precision : Type*}
-    (tick : R8Tick Belief Observation Precision) : R8Disposition :=
-  match tick.muPre, tick.observation, tick.precision, tick.storedF with
-  | some _, some _, some _, none => .missingFComputable
-  | some _, some _, some _, some _ => .storedF
-  | _, _, _, _ => .insufficientInputs
+def r8Disposition {Errors Precision Gain : Type*}
+    (tick : R8Tick Errors Precision Gain) : R8Disposition :=
+  match tick.predictionErrors, tick.precisionState, tick.storedF with
+  | some _, some _, none => .missingFComputable
+  | some _, some _, some _ => .storedF
+  | _, _, _ => .insufficientInputs
 
-/-- HOLE · owner: P-R8 §solved 1 · holder: claude-15 · With inputs, stored F agrees with recomputation within epsilon; otherwise the typed disposition says why. -/
-def r8StoredFRecomputes :
-  ∀ {Belief Observation Precision : Type*}
-    (F : Belief → Observation → Precision → ℝ) (ε : ℝ)
-    (tick : R8Tick Belief Observation Precision),
-    0 ≤ ε →
-    match tick.muPre, tick.observation, tick.precision, tick.storedF with
-    | some belief, some observation, some precision, some stored =>
-        r8Disposition tick = .storedF ∧
-          |stored - F belief observation precision| ≤ ε
-    | some _, some _, some _, none => r8Disposition tick = .missingFComputable
-    | _, _, _, _ => r8Disposition tick = .insufficientInputs := sorry
+/-- HOLE · owner: P-R8 §solved 1 (census) · holder: claude-15 · The three-disposition census over the corpus; expected 755 / 32 / 5 over 792 forms (P-R8@HEAD); the run is the fixture. -/
+def r8Census :
+  ∀ {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Precision Gain))
+    (nMissing nStored nInsufficient : Nat),
+    (corpus.filter (fun t => decide (r8Disposition t = .missingFComputable))).length = nMissing ∧
+    (corpus.filter (fun t => decide (r8Disposition t = .storedF))).length = nStored ∧
+    (corpus.filter (fun t => decide (r8Disposition t = .insufficientInputs))).length = nInsufficient := sorry
+
+/-- HOLE · owner: P-R8 §solved 1 (iii), by era · holder: claude-15 · Four facts co-move at one boundary: a form stores F ↔ it carries `:selection-gain` ↔ its `:free-energy` is the controller map ↔ its file date ≥ the boundary (2026-07-14). Precision scale is the proximate driver of the F gap and is NOT stated here; cause is untested. The stored-F recompute identity (the earlier hole here) is tautological on this corpus and was retired as evidence on 2026-08-30. -/
+def r8EraBoundary :
+  ∀ {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Precision Gain)) (boundary : Nat),
+    ∀ t ∈ corpus,
+      (t.storedF.isSome ↔ t.selectionGain.isSome) ∧
+      (t.storedF.isSome ↔ t.freeEnergyShape = .controllerMap) ∧
+      (t.storedF.isSome ↔ boundary ≤ t.fileDate) := sorry
 
 end DarkTower.WarMachine.Holes
