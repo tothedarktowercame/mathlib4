@@ -1,5 +1,6 @@
 import Mathlib.Data.Real.Basic
 import DarkTower.WarMachine.CascadeOrder
+import DarkTower.Contract.Emit
 
 /-!
 # War Machine formalisation holes
@@ -14,6 +15,8 @@ open Set
 universe u v w
 
 namespace DarkTower.WarMachine.Holes
+
+open DarkTower.Contract.Emit
 
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2.1d · holder: claude-15 · decided 2026-08-30 · A pattern has an antecedent and a guarded consequent. -/
 structure Pattern (State Action : Type*) where
@@ -59,7 +62,7 @@ inductive Vertex where
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a · holder: claude-15 · An outcome is an observation indexed by its vertex. -/
 abbrev Outcome (Obs : Vertex → Type*) := Sigma Obs
 
-/-- HOLE · owner: P-validated-R5 §2a · holder: claude-15 · Preferences are declared per PRAGMATIC vertex only — the evidence vertex has no C (review fix: D1b had dropped the vertex index). -/
+/-- HOLE · owner: P-validated-R5 §2a · holder: claude-15 · evidence: REFUSED — this is an implementation, not a law, and the record fixes no observation that selects C · falsifier: REFUSED for the same reason · Preferences are declared per PRAGMATIC vertex only. -/
 def C {Obs : Vertex → Type*} (v : Vertex) (_pragmatic : v ≠ Vertex.evidence) : Obs v → ℝ := sorry
 
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: claude-15 · Policy grade is pragmatic risk minus epistemic gain. -/
@@ -79,7 +82,14 @@ def nonDegenerate {Policy : Type*} (policies : List Policy)
     IsArgminOn policies (G pragmatic epistemic) πG ∧
     IsArgminOn policies pragmatic πP ∧ πG ≠ πP
 
-/-- HOLE · owner: P-validated-R5 §2a′ · holder: claude-15 · For some declared prior, removing the epistemic term changes the selected minimiser. -/
+structure AblationRow (Policy : Type*) where
+  argminG : List Policy
+  argminRisk : List Policy
+  moved : Bool
+
+abbrev AblationTable (Prior Policy : Type*) := Prior → AblationRow Policy
+
+/-- HOLE · owner: P-validated-R5 §2a′ · holder: claude-15 · evidence: AblationTable · falsifier: no prior has moved = true · For some declared prior, removing the epistemic term changes the selected minimiser. -/
 def nonDegenerateAblationLaw {Prior Policy : Type*} (policies : List Policy)
     (grade pragmatic : Prior → Policy → ℝ) :
     ∃ prior πGrade πPragmatic,
@@ -103,30 +113,41 @@ structure FindResult (P : Type*) where
   receipts : P → Option Receipt
   absence : Option TypedAbsence
 
-/-- HOLE · owner: P-validated-R5 §3e find · holder: claude-15 · Find maps a structured tension and repository to selected patterns, receipts, or typed absence. -/
+structure FindReceiptRow (Scenario P : Type*) where
+  scenario : Scenario
+  repository : Set P
+  selected : Set P
+  receipted : Set P
+  nonSelfCertifying : Set P
+  zeroMass : Set P
+  absence : Option TypedAbsence
+
+abbrev FindReceiptTable (Scenario P : Type*) := List (FindReceiptRow Scenario P)
+
+/-- HOLE · owner: P-validated-R5 §3e find · holder: claude-15 · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Find maps a structured tension and repository to selected patterns, receipts, or typed absence. -/
 def find {State P : Type*} : Tension State → Repository P → FindResult P := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e F1 · holder: claude-15 · Find returns only repository patterns and records typed absence when selection is empty. -/
+/-- HOLE · owner: P-validated-R5 §3e F1 · holder: claude-15 · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · Find returns only repository patterns and records typed absence when selection is empty. -/
 def findF1Containment :
   ∀ {State P : Type*} (tension : Tension State) (repo : Repository P),
     (find tension repo).selected ⊆ repo.patterns ∧
     ((find tension repo).selected = ∅ →
       (find tension repo).absence = some .noPatternAddressesThisTension) := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e F2 · holder: claude-15 · Every selected pattern carries a receipt. -/
+/-- HOLE · owner: P-validated-R5 §3e F2 · holder: claude-15 · evidence: FindReceiptTable · falsifier: a selected pattern has no receipt · Every selected pattern carries a receipt. -/
 def findF2Receipted :
   ∀ {State P : Type*} (tension : Tension State) (repo : Repository P) p,
     p ∈ (find tension repo).selected →
       ∃ receipt, (find tension repo).receipts p = some receipt := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e F3 · holder: claude-15 · Every receipt cites text or authored edges and is never justified by a score alone. -/
+/-- HOLE · owner: P-validated-R5 §3e F3 · holder: claude-15 · evidence: FindReceiptTable · falsifier: a selected pattern has only score evidence · Every receipt cites text or authored edges and is never justified by a score alone. -/
 def findF3NonSelfCertifying :
   ∀ {State P : Type*} (tension : Tension State) (repo : Repository P) p,
     p ∈ (find tension repo).selected →
       ∃ receipt, (find tension repo).receipts p = some receipt ∧
         receipt.nonSelfCertifying := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e F4 · holder: claude-15 · Every tension has a repository pattern that find does not return. -/
+/-- HOLE · owner: P-validated-R5 §3e F4 · holder: claude-15 · evidence: FindReceiptTable · falsifier: a scenario has no zero-mass repository pattern · Every tension has a repository pattern that find does not return. -/
 def findF4Falsifiable :
   ∀ {State P : Type*} (tension : Tension State) (repo : Repository P),
     ∃ p, p ∈ repo.patterns ∧ p ∉ (find tension repo).selected := sorry
@@ -141,26 +162,39 @@ def fastForward {P : Type*} (selected : Set P) (standsOn : P → P → Prop)
     (u v : P) : Prop :=
   u ∈ selected ∧ v ∈ selected ∧ ReachOutside selected standsOn u v
 
-/-- HOLE · owner: P-validated-R5 §3e organise · holder: claude-15 · Organise turns selected patterns and authored relations into a cascade. -/
+structure CascadeDiff (P Score : Type*) where
+  selected : Set P
+  nodes : Set P
+  addedByOrganise : Set P
+  authoredEdges : P → P → Prop
+  organisedEdges : P → P → Prop
+  precedenceBefore : List P
+  precedenceAfter : List P
+  actingOrderBefore : List P
+  actingOrderAfter : List P
+  scoreBefore : Score
+  scoreAfter : Score
+
+/-- HOLE · owner: P-validated-R5 §3e organise · holder: claude-15 · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Organise turns selected patterns and authored relations into a cascade. -/
 def organise {P : Type*} : Set P → Repository P → Cascade P := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e O1 · holder: claude-15 · Cascade nodes are exactly selected nodes plus the separately recorded additions. -/
+/-- HOLE · owner: P-validated-R5 §3e O1 · holder: claude-15 · evidence: CascadeDiff · falsifier: nodes differ from selected union recorded additions · Cascade nodes are exactly selected nodes plus the separately recorded additions. -/
 def organiseO1NodesRecorded :
   ∀ {P : Type*} (selected : Set P) (repo : Repository P),
     (organise selected repo).nodes =
       selected ∪ (organise selected repo).addedByOrganise := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e O2 · holder: claude-15 · Every organised edge is supported by authored reachability. -/
+/-- HOLE · owner: P-validated-R5 §3e O2 · holder: claude-15 · evidence: CascadeDiff · falsifier: an organised edge lacks authored reachability · Every organised edge is supported by authored reachability. -/
 def organiseO2AuthoredReachability :
   ∀ {P : Type*} (selected : Set P) (repo : Repository P) u v,
     (organise selected repo).edges u v → Reach repo.standsOn u v := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e O3 · holder: claude-15 · Organised edges are exactly fast-forwards between selected nodes. -/
+/-- HOLE · owner: P-validated-R5 §3e O3 · holder: claude-15 · evidence: CascadeDiff · falsifier: organised edges differ from selected-endpoint fast-forwards · Organised edges are exactly fast-forwards between selected nodes. -/
 def organiseO3FastForward :
   ∀ {P : Type*} (selected : Set P) (repo : Repository P) u v,
     (organise selected repo).edges u v ↔ fastForward selected repo.standsOn u v := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e O4 and S-G4 · holder: claude-15 · The same collection under different precedence changes acting order or score. -/
+/-- HOLE · owner: P-validated-R5 §3e O4 and S-G4 · holder: claude-15 · evidence: CascadeDiff · falsifier: changed precedence changes neither acting order nor score · The same collection under different precedence changes acting order or score. -/
 def organiseO4PrecedenceGovernance {P Score : Type*}
     (actingOrder : Cascade P → List P) (score : Cascade P → Score) :
     ∃ c₁ c₂ : Cascade P,
@@ -206,11 +240,6 @@ def r9CheckerSound {Part : Type*} [DecidableEq Part] (decide? : Part → Set Par
       independenceVerdict (some claim) witness decide? ≠ .independent) ∧
     (independenceVerdict (some claim) witness decide? = .independent → independent claim witness)
 
-/-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: claude-15 · evidence: VerdictTable (row, declaration, verdict) · falsifier: some row with producer inside the declared part receives `independent` · The Clojure checker R9-D2 ships is sound in the sense above; if its recorded verdicts show a self-producer judged independent, the checker is broken. -/
-def r9WmCheckerSound :
-  ∀ {Part : Type*} [DecidableEq Part] (clojureDecide : Part → Set Part → Bool),
-    r9CheckerSound clojureDecide := sorry
-
 /-- HOLE · owner: P-R9 §solved 3 (claude-13's load-bearing lemma, ratified 2026-08-30) · holder: claude-15 · evidence: a proof term · falsifier: `independenceVerdict` decides membership itself and ignores `decide?` · The checker argument is load-bearing: there is an UNSOUND `decide?` under which a self-producer is judged `independent` — so a wrong checker can be detected, and the Lean definition does not bypass its own argument. -/
 def r9VerdictConsultsChecker :
   ∀ {Part : Type*} [DecidableEq Part] (claim : Claim Part) (w : Witness Part),
@@ -219,13 +248,33 @@ def r9VerdictConsultsChecker :
       ¬ (∀ p S, decide? p S = true ↔ p ∈ S) ∧
       independenceVerdict (some claim) w decide? = .independent := sorry
 
-/-- HOLE · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: claude-15 · Over the thirteen closed rows of OBLIGATIONS.md@6c288174: run (i), ledger alone (no declaration) → all `unknown`; run (ii), the paper's own admission as the declaration (sec-discussion.tex:238) → all `self`. The gap is the node's finding. -/
+/-- Fixture scaffolding: one recorded verdict row of the shipped checker — which row, which declaration source it was judged under, whether the closer named by that declaration is inside the declared producing part, and the verdict. -/
+structure VerdictRow where
+  row : String
+  declarationSource : String      -- "paper:sec-discussion.tex:238" or "row-text:O14"
+  inDeclaredPart : Bool
+  verdict : IndependenceVerdict
+  deriving DecidableEq, Repr
+
+abbrev VerdictTable := List VerdictRow
+
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 3 · holder: claude-15 · Soundness of a RECORDED table: no row whose closer is inside the declared part is judged `independent`; a row judged `independent` has its closer outside. Decidable; false exactly when the checker is broken. (Replaces r9WmCheckerSound, which quantified over every checker and was false for `fun _ _ => false` — claude-13, 2026-08-30, fourth member of the family.) -/
+def r9VerdictsSound (table : VerdictTable) : Prop :=
+  ∀ r ∈ table, (r.inDeclaredPart = true → r.verdict ≠ .independent) ∧
+               (r.verdict = .independent → r.inDeclaredPart = false)
+
+/-- HOLE · owner: P-R9 §solved 2 (fixture) · holder: claude-15 · evidence: the VerdictTable the R9-D2 run writes (run (i): 13 rows, ledger alone; run (ii): 13 rows, per-row declarations) · falsifier: a row missing or a verdict absent · Transcribed from the run by the adapter. -/
+def wmVerdictsLedgerAlone : VerdictTable := sorry
+def wmVerdictsDeclared : VerdictTable := sorry
+
+/-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: claude-15 · evidence: wmVerdictsDeclared · falsifier: a row with inDeclaredPart = true judged independent · The shipped checker's recorded verdicts are sound. Moves by `decide` once the table is transcribed; false if the checker is broken. -/
+def r9WmVerdictsSound : r9VerdictsSound wmVerdictsDeclared := sorry
+
+/-- HOLE · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: claude-15 · evidence: both tables · falsifier: run (i) not all `unknown`; run (ii) any row ≠ `self` under the declaration that places commissioned agents inside the author's part — the three named-agent rows (O7, O14, O15) are where this can fail · Registered: 13 unknown / 13 self. -/
 def r9TwoRunCensus :
-  ∀ {Part : Type*} [DecidableEq Part] (rows : List (Witness Part))
-    (paperDeclaration : Claim Part) (decide? : Part → Set Part → Bool),
-    rows.length = 13 →
-    (∀ w ∈ rows, independenceVerdict none w decide? = .unknown) ∧
-    (∀ w ∈ rows, independenceVerdict (some paperDeclaration) w decide? = .self) := sorry
+    wmVerdictsLedgerAlone.length = 13 ∧ wmVerdictsDeclared.length = 13 ∧
+    (∀ r ∈ wmVerdictsLedgerAlone, r.verdict = .unknown) ∧
+    (∀ r ∈ wmVerdictsDeclared, r.verdict = .self) := sorry
 
 /-- HOLE · owner: P-R9 S1 · holder: claude-15 · Evidence used to value a policy must be an independent L2 witness. -/
 def valueEvidenceRequiresL2 :
@@ -283,12 +332,15 @@ def r2ContractCensus {Channel Value : Type*} (corpus : List (R2Tick Channel Valu
     (wellFormed? : R2Tick Channel Value → Bool) : Nat :=
   (corpus.filter (fun tick => !wellFormed? tick)).length
 
-/-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · evidence: IllFormedList (the failing tick ids) · falsifier: the census is not 2 · On wm-trace (53 files, 792 forms, filter stated in P-R2) the census against the declared 14-channel list is 2 — the two 05-18 records; the run is the fixture and this CAN be false. -/
+/-- Fixture scaffolding: a wm-trace tick as a Lean literal — for each of the 14 declared channels, present or not (order = declaration order, `observation.clj:18–32`). The adapter (P-lean-clojure-adapter, AD-D2/D3) transcribes the run into this type. -/
+abbrev R2TickLit := R2Tick (Fin 14) Unit
+
+/-- HOLE · owner: P-R2 §solved 1 (fixture) · holder: claude-15 · evidence: the corpus itself, transcribed · falsifier: digest ≠ the content pin stated in P-R8/P-R2 · The 792 wm-trace forms as a Lean literal — filled by the adapter from the run, never by hand. -/
+def wmTraceR2 : List R2TickLit := sorry
+
+/-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · evidence: IllFormedList (the failing tick ids) · falsifier: the census over the transcribed corpus is not 2 · Against the declared 14 channels the census is 2 (the two 05-18 records). Stated about the FIXTURE CONSTANT, not a universally bound corpus (family fix, 2026-08-30: a ∀-corpus form is false for every other list). Moves by `decide` once `wmTraceR2` is transcribed. -/
 def r2ContractCensusWmTrace :
-  ∀ {Channel Value : Type*} (declared : List Channel) (wmTrace : List (R2Tick Channel Value))
-    (wellFormed? : R2Tick Channel Value → Bool)
-    (_sound : ∀ tick, wellFormed? tick = true ↔ r2WellFormed declared tick),
-    r2ContractCensus wmTrace wellFormed? = 2 := sorry
+    r2ContractCensus wmTraceR2 (fun tick => decide (∀ c : Fin 14, (tick.observation c).isSome)) = 2 := sorry
 
 inductive FreeEnergyShape where
   | gMap          -- `:free-energy` holds {:G-total …}         (760 forms, files 05-18 … 07-09)
@@ -325,17 +377,20 @@ def r8Census {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Preci
    (corpus.filter (fun t => decide (r8Disposition t = R8Disposition.storedF))).length,
    (corpus.filter (fun t => decide (r8Disposition t = R8Disposition.insufficientInputs))).length)
 
-/-- HOLE · owner: P-R8 §solved 1 (census) · holder: claude-15 · evidence: the triple with tick ids per disposition · falsifier: the triple is not (755, 32, 5) · On wm-trace (filter stated in P-R8) the census is 755 / 32 / 5 over 792 forms; the run is the fixture and this CAN be false. -/
-def r8CensusWmTrace :
-  ∀ {Errors Precision Gain : Type*} (wmTrace : List (R8Tick Errors Precision Gain)),
-    wmTrace.length = 792 → r8Census wmTrace = (755, 32, 5) := sorry
+/-- Fixture scaffolding: a wm-trace form as a Lean literal with the fields the R8 laws read. -/
+abbrev R8TickLit := R8Tick Unit Unit Unit
+
+/-- HOLE · owner: P-R8 §solved 1 (fixture) · holder: claude-15 · evidence: the corpus itself, transcribed · falsifier: digest ≠ c434950f2e6a7e9b (53 files / 792 forms, content pin) · The 792 forms as a Lean literal — filled by the adapter from the run. -/
+def wmTraceR8 : List R8TickLit := sorry
+
+/-- HOLE · owner: P-R8 §solved 1 (census) · holder: claude-15 · evidence: the triple with tick ids per disposition · falsifier: the census over the transcribed corpus is not (755, 32, 5) · Stated about the fixture constant (family fix, 2026-08-30). Moves by `decide` once `wmTraceR8` is transcribed. -/
+def r8CensusWmTrace : r8Census wmTraceR8 = (755, 32, 5) := sorry
 
 /-- HOLE · owner: P-R8 §solved 1 (iii), by era · holder: claude-15 · evidence: EraTable · falsifier: a post-boundary form without stored F, or a pre-boundary form with one (non-interleaving fails) · CORRECTED 2026-08-30 (claude-13 via claude-20): `:free-energy`, `:variational-free-energy` and `:selection-gain` are three keys of ONE unconditional map literal (`war_machine.clj:4664–4687`), so conjuncts 1–2 are a write-site identity, not two facts; the only CONTINGENT conjunct is 3 — the stored-F forms are a contiguous date suffix (non-interleaving), and since the boundary 20260714 was read off the data, "0 violations at that boundary" tests contiguity, not the date. Precision scale remains the proximate driver of the F gap; cause untested. -/
 def r8EraBoundary :
-  ∀ {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Precision Gain)) (boundary : Nat),
-    ∀ t ∈ corpus,
+    ∀ t ∈ wmTraceR8,
       (t.storedF.isSome ↔ t.selectionGain.isSome) ∧
       (t.storedF.isSome ↔ t.freeEnergyShape = .controllerMap) ∧
-      (t.storedF.isSome ↔ boundary ≤ t.fileDate) := sorry
+      (t.storedF.isSome ↔ 20260714 ≤ t.fileDate) := sorry
 
 end DarkTower.WarMachine.Holes
