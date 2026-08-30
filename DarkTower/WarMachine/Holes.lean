@@ -506,7 +506,7 @@ def bayesianModelReduction (A aPrime a : List ℝ) : List ℝ :=
 def modelUncertaintyAndEIG : Prop := sorry
 
 /-- HOLE · owner: sec-glossary.tex:48 · P-glossary-mathematics · holder: claude-15 · evidence: REFUSED — G-D1 says the glossary's π is a scored cascade while Holes.Policy is an information-state function · falsifier: REFUSED pending Joe's grain decision · This declaration records the unresolved cascade-policy grain without changing Policy. -/
-def CascadePolicy : Type := sorry
+def cascadeGrainPi : Type := sorry
 
 structure WitnessLayerRow where
   row : String
@@ -581,7 +581,7 @@ private def holeDeclarations : List Declaration :=
    mkHole "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics" "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
    mkHole "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics" "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
    mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "Outcome/Q(o∣π) and parameter kernel are missing",
-   mkRefused "CascadePolicy" "sec-glossary.tex:48 · P-glossary-mathematics" "glossary π and Holes.Policy have unresolved grains",
+   mkRefused "cascadeGrainPi" "sec-glossary.tex:48 · P-glossary-mathematics" "glossary π and Holes.Policy have unresolved grains",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
    mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "AblationTable" "no prior has moved = true",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
