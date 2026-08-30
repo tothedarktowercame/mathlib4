@@ -529,7 +529,7 @@ def wmPreferenceStack2026_08_30 : List PreferenceLayerRecord :=
    ⟨"capability-zone-load", .learnedFromOperator, "wm-outer-loop, implementation Joseph Corneli", "substrate-2 2026-08-30: 242 records, 14 classes, max as-of 2026-07-18", true, "efe.clj:586-614"⟩,
    ⟨"live-goal-outcomes", .corpusDerived, "futon2.aif.c-vector/entries-from-corpus", "substrate-2 :7071 2026-08-30: signature -1131096431, 36 capabilities, 293 sorries", true, "efe.clj:655-665,725-733"⟩,
    ⟨"c-vector-overlays", .scriptProduced, "futon6/scripts/c_vector.bb", "2026-06-26 overlay snapshots (three sha256 pins in the record)", true, "c_vector.clj:227-240,633-640"⟩,
-   ⟨"habit-prior", .learnedFromOperator, "unknown operator whose selections are recorded in wm-trace", "wm-trace-2026-08-30.edn sha256 6da3ccda…", false, "policy/select-action ln E(π) seam (live since 2026-07-13 flip); R14 supplies τ beside it"⟩]
+   ⟨"habit-prior", .learnedFromOperator, "unknown operator whose selections are recorded in wm-trace", "wm-trace-2026-08-30.edn sha256 6da3ccda…", false, "policy/select-action ln E(π) seam (since 2026-07-13 flip): computed and recorded with declared :counterfactual-only authority — orders the counterfactual, does not choose (policy.clj:234-270); R14 supplies τ beside it"⟩]
 
 /-- CLOSED-BY-RECORD · owner: R19-preference-stack.edn @ dc1dac8 · holder: claude-15 · No declaration naming the situation this stack models exists; the observed purpose is the fold's own behaviour. -/
 def wmStackDeclaredPurpose : Option String := none
