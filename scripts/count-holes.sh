@@ -1,27 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root=$(cd "$(dirname "$0")/.." && pwd)
-holes="$root/DarkTower/WarMachine/Holes.lean"
-others=$(find "$root/DarkTower/WarMachine" -maxdepth 1 -name '*.lean' ! -name 'Holes.lean' -print)
-records=("P-validated-R5" "P-R9" "delivery-lifecycle")
-total_body=0
-total_sorry=0
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+holes_file="$repo_root/DarkTower/WarMachine/Holes.lean"
+
+records=("P-validated-R5" "P-R9" "P-R2" "P-R8" "delivery-lifecycle")
+hole_total=0
+closed_total=0
 
 for record in "${records[@]}"; do
-  sorry=$(awk -v record="$record" '
-    /\/-- HOLE · owner:/ {owned = index($0, "owner: " record) > 0; next}
-    owned && /:= sorry/ {count++; owned = 0}
-    END {print count + 0}
-  ' "$holes")
-  declared=$(rg -l "owner: $record" "$holes" $others 2>/dev/null | wc -l)
-  declarations=$(rg -c "owner: $record" "$holes" $others 2>/dev/null |
-    awk -F: '{sum += $NF} END {print sum + 0}')
-  body=$((declarations - sorry))
-  total_body=$((total_body + body))
-  total_sorry=$((total_sorry + sorry))
-  printf '%s declared-with-body: %d  declared-with-sorry: %d\n' "$record" "$body" "$sorry"
-  : "$declared"
+  holes=$(grep -F -c "HOLE · owner: $record" "$holes_file" || true)
+  closed=$(grep -F -c "CLOSED-BY-RECORD · owner: $record" "$holes_file" || true)
+  printf '%s declared-with-body: %d\n' "$record" "$closed"
+  printf '%s declared-with-sorry: %d\n' "$record" "$holes"
+  closed_total=$((closed_total + closed))
+  hole_total=$((hole_total + holes))
 done
 
-printf 'total declared-with-body: %d  declared-with-sorry: %d\n' "$total_body" "$total_sorry"
+printf 'total declared-with-body: %d\n' "$closed_total"
+printf 'total declared-with-sorry: %d\n' "$hole_total"
