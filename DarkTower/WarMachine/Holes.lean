@@ -411,7 +411,7 @@ def r8Census {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Preci
 /-- Fixture scaffolding: a wm-trace form as a Lean literal with the fields the R8 laws read. -/
 abbrev R8TickLit := R8Tick Unit Unit Unit
 
-/-- HOLE · owner: P-R8 §solved 1 (fixture) · holder: claude-15 · evidence: the corpus itself, transcribed · falsifier: digest ≠ c434950f2e6a7e9b (53 files / 792 forms, content pin) · The 792 forms as a Lean literal — filled by the adapter from the run. -/
+/-- HOLE · owner: P-R8 §solved 1 (fixture) · holder: claude-15 · evidence: the corpus itself, transcribed · falsifier: the digest recomputed by the method stated in P-R8 §content-pin (`:sha256-over-newline-joined-sorted-form-sha256`, published by `checks/r8_f_contract.clj`) differs from the value recorded there for the same 53 files / 792 forms — today `c9add16a…`; a value without its method is not a pin (claude-20 / codex-12, 2026-08-30) · The 792 forms as a Lean literal — filled by the adapter from the run. -/
 def wmTraceR8 : List R8TickLit := sorry
 
 /-- HOLE · owner: P-R8 §solved 1 (census) · holder: claude-15 · evidence: the triple with tick ids per disposition · falsifier: the census over the transcribed corpus is not (755, 32, 5) · Stated about the fixture constant (family fix, 2026-08-30). Moves by `decide` once `wmTraceR8` is transcribed. -/
