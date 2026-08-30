@@ -211,6 +211,14 @@ def r9WmCheckerSound :
   ∀ {Part : Type*} [DecidableEq Part] (clojureDecide : Part → Set Part → Bool),
     r9CheckerSound clojureDecide := sorry
 
+/-- HOLE · owner: P-R9 §solved 3 (claude-13's load-bearing lemma, ratified 2026-08-30) · holder: claude-15 · evidence: a proof term · falsifier: `independenceVerdict` decides membership itself and ignores `decide?` · The checker argument is load-bearing: there is an UNSOUND `decide?` under which a self-producer is judged `independent` — so a wrong checker can be detected, and the Lean definition does not bypass its own argument. -/
+def r9VerdictConsultsChecker :
+  ∀ {Part : Type*} [DecidableEq Part] (claim : Claim Part) (w : Witness Part),
+    w.producer ∈ claim.producingPart →
+    ∃ decide? : Part → Set Part → Bool,
+      ¬ (∀ p S, decide? p S = true ↔ p ∈ S) ∧
+      independenceVerdict (some claim) w decide? = .independent := sorry
+
 /-- HOLE · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: claude-15 · Over the thirteen closed rows of OBLIGATIONS.md@6c288174: run (i), ledger alone (no declaration) → all `unknown`; run (ii), the paper's own admission as the declaration (sec-discussion.tex:238) → all `self`. The gap is the node's finding. -/
 def r9TwoRunCensus :
   ∀ {Part : Type*} [DecidableEq Part] (rows : List (Witness Part))
