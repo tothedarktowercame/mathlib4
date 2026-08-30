@@ -376,6 +376,7 @@ def r2ContractCensusWmTrace :
 inductive FreeEnergyShape where
   | gMap          -- `:free-energy` holds {:G-total …}         (760 forms, files 05-18 … 07-09)
   | controllerMap -- `:free-energy` holds {:controller-score …} (32 forms, files 07-14 … 07-21, 08-30)
+  | unknown       -- neither key, or both — never observed; a finding if it ever is
   deriving DecidableEq, Repr
 
 /-- Field names follow the artefact's keys (`:prediction-errors`, `:precision-state`, `:variational-free-energy`, `:selection-gain`), so clause-2 signature comparison against the Clojure census is literal (review fix, claude-20 2026-08-30). -/
@@ -384,8 +385,15 @@ structure R8Tick (Errors Precision Gain : Type*) where
   precisionState : Option Precision
   storedF : Option ℝ
   selectionGain : Option Gain
-  freeEnergyShape : FreeEnergyShape
+  hasControllerScore : Bool   -- FACT: `:free-energy` carries the key `:controller-score`
+  hasGTotal : Bool            -- FACT: `:free-energy` carries the key `:G-total`
   fileDate : Nat   -- YYYYMMDD of the trace file
+
+/-- DERIVED, not transcribed: the shape of `:free-energy` is a classification of two key-presence facts (claude-20's question at R8-D3, 2026-08-30 — a generator writing `gMap`/`controllerMap` would be writing what the era law tests, R9's `inDeclaredPart` one level subtler). `unknown` when neither or both keys are present — a possible outcome, and a finding. -/
+def R8Tick.freeEnergyShape {Errors Precision Gain : Type*} (t : R8Tick Errors Precision Gain) : FreeEnergyShape :=
+  if t.hasControllerScore && !t.hasGTotal then .controllerMap
+  else if t.hasGTotal && !t.hasControllerScore then .gMap
+  else .unknown
 
 inductive R8Disposition where
   | missingFComputable
