@@ -248,13 +248,23 @@ def r9VerdictConsultsChecker :
       ¬ (∀ p S, decide? p S = true ↔ p ∈ S) ∧
       independenceVerdict (some claim) w decide? = .independent := sorry
 
-/-- Fixture scaffolding: one recorded verdict row of the shipped checker — which row, which declaration source it was judged under, whether the closer named by that declaration is inside the declared producing part, and the verdict. -/
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (declaration source) · holder: claude-15 · Where a row's declaration of the producing part came from: the paper's sentence (sec-discussion.tex:238) or the row's own text naming a closer. A sum type, so "per-row" is per-row in fact — a free string let every row be labelled "paper:…" (claude-13's 5th read via claude-20, ratified 2026-08-30). -/
+inductive DeclarationSource where
+  | paperSentence
+  | rowText (id : String)
+  deriving DecidableEq, Repr
+
+/-- Fixture scaffolding: one recorded verdict row — the FACTS from the artefact (producer, declared part) and the checker's verdict. Membership is COMPUTED below, never transcribed: a transcribed `inDeclaredPart` let the transcriber set both sides of the soundness implication (R9's own subject matter recreated inside its contract — claude-13, 2026-08-30). -/
 structure VerdictRow where
   row : String
-  declarationSource : String      -- "paper:sec-discussion.tex:238" or "row-text:O14"
-  inDeclaredPart : Bool
+  declarationSource : DeclarationSource
+  producer : String
+  declaredPart : List String
   verdict : IndependenceVerdict
   deriving DecidableEq, Repr
+
+/-- Derived, not transcribed. -/
+def VerdictRow.inDeclaredPart (r : VerdictRow) : Bool := r.producer ∈ r.declaredPart
 
 abbrev VerdictTable := List VerdictRow
 
@@ -263,6 +273,10 @@ def r9VerdictsSound (table : VerdictTable) : Prop :=
   ∀ r ∈ table, (r.inDeclaredPart = true → r.verdict ≠ .independent) ∧
                (r.verdict = .independent → r.inDeclaredPart = false)
 
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (per-row declarations) · holder: claude-15 · Exactly the three rows that name a specific closer (O7, O14, O15 — R9-D1b) carry a row-text declaration; every other row carries the paper's sentence. -/
+def r9PerRowDeclarations (t : VerdictTable) : Prop :=
+  ∀ r ∈ t, (r.row ∈ ["O7", "O14", "O15"]) ↔ (∃ id, r.declarationSource = .rowText id)
+
 /-- HOLE · owner: P-R9 §solved 2 (fixture) · holder: claude-15 · evidence: the VerdictTable the R9-D2 run writes (run (i): 13 rows, ledger alone; run (ii): 13 rows, per-row declarations) · falsifier: a row missing or a verdict absent · Transcribed from the run by the adapter. -/
 def wmVerdictsLedgerAlone : VerdictTable := sorry
 /-- HOLE · owner: P-R9 §solved 2 (fixture) · holder: claude-15 · evidence: VerdictTable · falsifier: a row missing or a verdict absent · The declared-part run transcribed by the adapter. -/
@@ -270,6 +284,9 @@ def wmVerdictsDeclared : VerdictTable := sorry
 
 /-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: claude-15 · evidence: wmVerdictsDeclared · falsifier: a row with inDeclaredPart = true judged independent · The shipped checker's recorded verdicts are sound. Moves by `decide` once the table is transcribed; false if the checker is broken. -/
 def r9WmVerdictsSound : r9VerdictsSound wmVerdictsDeclared := sorry
+
+/-- HOLE · owner: P-R9 §solved 2 (per-row declarations) · holder: claude-15 · evidence: wmVerdictsDeclared · falsifier: a named-agent row under the paper's sentence, or an unnamed row under row text · The run-(ii) table's declaration sources are per-row in fact. -/
+def r9WmPerRowDeclarations : r9PerRowDeclarations wmVerdictsDeclared := sorry
 
 /-- HOLE · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: claude-15 · evidence: both tables · falsifier: run (i) not all `unknown`; run (ii) any row ≠ `self` under the declaration that places commissioned agents inside the author's part — the three named-agent rows (O7, O14, O15) are where this can fail · Registered: 13 unknown / 13 self. -/
 def r9TwoRunCensus :
@@ -459,7 +476,7 @@ private def closedDeclarations : List Declaration :=
    ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
    ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
    ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
-   ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"),
+   ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"), ("DeclarationSource", "P-R9 §solved 2 (declaration source)"), ("r9PerRowDeclarations", "P-R9 §solved 2 (per-row declarations)"),
    ("Delivery", "delivery-lifecycle §0.6"), ("Handoff", "delivery-lifecycle §0.10"),
    ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
@@ -483,6 +500,7 @@ private def holeDeclarations : List Declaration :=
    mkHole "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
    mkHole "r9WmVerdictsSound" "P-R9 §solved 3" "VerdictTable" "self producer judged independent",
    mkHole "r9TwoRunCensus" "P-R9 §solved 2" "VerdictTable" "either thirteen-row census differs",
+   mkHole "r9WmPerRowDeclarations" "P-R9 §solved 2 (per-row declarations)" "VerdictTable" "a named-agent row under the paper sentence, or an unnamed row under row text",
    mkHole "valueEvidenceRequiresL2" "P-R9 S1" "WitnessLayerTable" "value evidence uses L1",
    mkHole "wmTraceR2" "P-R2 §solved 1" "List R2TickLit" "fixture digest differs",
    mkHole "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
