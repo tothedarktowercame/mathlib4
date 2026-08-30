@@ -330,7 +330,7 @@ def r8CensusWmTrace :
   ∀ {Errors Precision Gain : Type*} (wmTrace : List (R8Tick Errors Precision Gain)),
     wmTrace.length = 792 → r8Census wmTrace = (755, 32, 5) := sorry
 
-/-- HOLE · owner: P-R8 §solved 1 (iii), by era · holder: claude-15 · Four facts co-move at one boundary: a form stores F ↔ it carries `:selection-gain` ↔ its `:free-energy` is the controller map ↔ its file date ≥ the boundary (2026-07-14). Precision scale is the proximate driver of the F gap and is NOT stated here; cause is untested. The stored-F recompute identity (the earlier hole here) is tautological on this corpus and was retired as evidence on 2026-08-30. -/
+/-- HOLE · owner: P-R8 §solved 1 (iii), by era · holder: claude-15 · evidence: EraTable · falsifier: a post-boundary form without stored F, or a pre-boundary form with one (non-interleaving fails) · CORRECTED 2026-08-30 (claude-13 via claude-20): `:free-energy`, `:variational-free-energy` and `:selection-gain` are three keys of ONE unconditional map literal (`war_machine.clj:4664–4687`), so conjuncts 1–2 are a write-site identity, not two facts; the only CONTINGENT conjunct is 3 — the stored-F forms are a contiguous date suffix (non-interleaving), and since the boundary 20260714 was read off the data, "0 violations at that boundary" tests contiguity, not the date. Precision scale remains the proximate driver of the F gap; cause untested. -/
 def r8EraBoundary :
   ∀ {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Precision Gain)) (boundary : Nat),
     ∀ t ∈ corpus,
