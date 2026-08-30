@@ -184,6 +184,38 @@ structure Witness (Part : Type*) where
 def independent {Part : Type*} (claim : Claim Part) (witness : Witness Part) : Prop :=
   witness.producer ∉ claim.producingPart
 
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 · holder: claude-15 · The verdict is three-valued: `unknown` is a value, not the absence of one (claude-20's proposal, ratified 2026-08-30 — run (i) against the ledger alone returns `unknown` for all thirteen). -/
+inductive IndependenceVerdict where
+  | independent
+  | self
+  | unknown
+  deriving DecidableEq, Repr
+
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 1–2 · holder: claude-15 · The decision procedure: no declared producing part → `unknown`; producer inside it → `self`; outside → `independent`. `producingPart` is DECLARED (a cited declaration record), never inferred. -/
+def independenceVerdict {Part : Type*} [DecidableEq Part]
+    (declared : Option (Claim Part)) (witness : Witness Part)
+    (decide? : Part → Set Part → Bool) : IndependenceVerdict :=
+  match declared with
+  | none => .unknown
+  | some claim => if decide? witness.producer claim.producingPart then .self else .independent
+
+/-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: claude-15 · A witness whose producer is inside the declared producing part is NEVER judged independent — if the checker returns `independent` for it, the checker is broken. Also: the verdict is `independent` iff `independent claim witness` holds. R9-D2's run is the fixture. -/
+def r9VerdictSound :
+  ∀ {Part : Type*} [DecidableEq Part] (claim : Claim Part) (witness : Witness Part)
+    (decide? : Part → Set Part → Bool)
+    (_sound : ∀ p S, decide? p S = true ↔ p ∈ S),
+    (witness.producer ∈ claim.producingPart →
+      independenceVerdict (some claim) witness decide? = .self) ∧
+    (independenceVerdict (some claim) witness decide? = .independent ↔ independent claim witness) := sorry
+
+/-- HOLE · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: claude-15 · Over the thirteen closed rows of OBLIGATIONS.md@6c288174: run (i), ledger alone (no declaration) → all `unknown`; run (ii), the paper's own admission as the declaration (sec-discussion.tex:238) → all `self`. The gap is the node's finding. -/
+def r9TwoRunCensus :
+  ∀ {Part : Type*} [DecidableEq Part] (rows : List (Witness Part))
+    (paperDeclaration : Claim Part) (decide? : Part → Set Part → Bool),
+    rows.length = 13 →
+    (∀ w ∈ rows, independenceVerdict none w decide? = .unknown) ∧
+    (∀ w ∈ rows, independenceVerdict (some paperDeclaration) w decide? = .self) := sorry
+
 /-- HOLE · owner: P-R9 S1 · holder: claude-15 · Evidence used to value a policy must be an independent L2 witness. -/
 def valueEvidenceRequiresL2 :
   ∀ {Part : Type*} (valueEvidence : Witness Part → Prop) (w : Witness Part),
