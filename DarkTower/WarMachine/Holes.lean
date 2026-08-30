@@ -578,6 +578,17 @@ structure TickRunRecord where
 /-- HOLE · owner: Joe 2026-08-31 · holder: claude-15 · evidence: TickRunWitness · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord — CURRENTLY FIRING: the standalone entry throws "War Machine requires the shared reason-bearing selector" (AUD-D3 gate blocker), so the machine cannot yet demonstrate one unattended tick · The machine can run at least once on demand, leaving a receipt. -/
 def wmRunsOnce : Prop := sorry
 
+/-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("a map that assembles and joins appropriately, so we can see exactly what happened as the machine ran, and get evidence that that matched the specification") · holder: claude-15 · One hop of the route a tick actually took: the tracer tag conj'd onto the flowing map at a node boundary, reassembled pairwise into hops. The wiring diagram (control-map-edges.edn, Figure 4 as data) is the specification the route is judged against. -/
+structure RouteHop where
+  fromNode : String
+  toNode : String
+  via : String        -- the function at the boundary
+  at_ : String
+  deriving DecidableEq
+
+/-- HOLE · owner: Joe 2026-08-31 · holder: claude-15 · evidence: RouteTraceWitness · falsifier: a completed run whose reassembled route contains a hop absent from the wiring specification, or whose route is empty — either way the organisation vertex has no evidence · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification; the route may be a simple cycle or complex, and which drawn edges actually fired is part of the receipt. -/
+def wmRunConformsToWiring : Prop := sorry
+
 structure WitnessLayerRow where
   row : String
   layer : Layer
@@ -657,7 +668,7 @@ private def closedDeclarations : List Declaration :=
    ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
    ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
    ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"), ("ShapeTally", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.meanPrecision", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.uniform", "P-R8 §solved 1 (iii) evidence"), ("DeclarationSource", "P-R9 §solved 2 (declaration source)"), ("r9PerRowDeclarations", "P-R9 §solved 2 (per-row declarations)"),
-   ("TickRunRecord", "Joe 2026-08-31 · runs-once receipt"),
+   ("TickRunRecord", "Joe 2026-08-31 · runs-once receipt"), ("RouteHop", "Joe 2026-08-31 · route tracer"),
    ("PreferenceSource", "P-R19-preferences-open §principle"), ("PreferenceLayerRecord", "P-R19-preferences-open §tetrahedron"),
    ("wmPreferenceStack2026_08_30", "R19-preference-stack.edn @ dc1dac8"), ("wmStackDeclaredPurpose", "R19-preference-stack.edn @ dc1dac8"),
    ("preferenceStackRecorded", "P-R19-preferences-open §gate"), ("PreferenceLayer", "P-R19-preferences-open §principle"),
@@ -702,7 +713,8 @@ private def holeDeclarations : List Declaration :=
    mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
    mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet",
-   mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; currently firing (selector-seam blocker)"]
+   mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; currently firing (selector-seam blocker)",
+   mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "RouteTraceWitness" "a completed run with an empty route, or a hop absent from control-map-edges.edn"]
 
 def registry : Registry :=
   {schemaVersion := 1, contractId := "wm-holes", moduleName := "DarkTower.WarMachine.Holes",
