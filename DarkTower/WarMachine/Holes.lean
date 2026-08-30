@@ -566,8 +566,10 @@ def machineHasNoC : Prop := sorry
 /-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("we should specify that it should be able to run at least once, and then we should get evidence of that") · holder: claude-15 · What one completed tick leaves behind: the receipt is the evidence, and each field is one of the standing invariants made concrete for a single run. On-demand ticks (run one, like the APM machine's clicks) are first-class; a scheduler is one caller among others. -/
 structure TickRunRecord where
   startedAt : String
-  basisCount : Nat          -- I_data_current: the store basis the tick read at
-  basisMaxAt : String
+  storeBasisCount : Nat     -- I_data_current: the STORE's count at tick time (the pin)
+  storeBasisMaxAt : String
+  entriesRead : Nat         -- the sample the tick actually consumed (limit-capped fetch)
+  entriesLimit : Nat        -- the cap under which entriesRead was taken — the unit of the sample
   inputsRead : Nat          -- I_absent_is_loud: input-status travelled
   inputIssues : Nat
   preferenceLayers : Nat    -- the C stack was named (R19)
