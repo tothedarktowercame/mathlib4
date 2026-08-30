@@ -33,8 +33,11 @@ structure Repository (P : Type*) where
   standsOn : P → P → Prop
   acyclic : acyclicDescent standsOn
 
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e · holder: claude-15 · A tension is a context with a want and a however (review fix: D1b had only the context). -/
 structure Tension (State : Type*) where
-  state : State
+  context : State
+  want : Prop
+  however : Prop
 
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §3d · holder: claude-15 · decided 2026-08-30 · Information state is exactly state, history, repository, and tension. -/
 structure InformationState (State History Repo Tension : Type*) where
@@ -56,8 +59,8 @@ inductive Vertex where
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a · holder: claude-15 · An outcome is an observation indexed by its vertex. -/
 abbrev Outcome (Obs : Vertex → Type*) := Sigma Obs
 
-/-- HOLE · owner: P-validated-R5 §2a · holder: claude-15 · A declared preference distribution assigns mass to outcomes. -/
-def C {O : Type*} : O → ℝ := sorry
+/-- HOLE · owner: P-validated-R5 §2a · holder: claude-15 · Preferences are declared per PRAGMATIC vertex only — the evidence vertex has no C (review fix: D1b had dropped the vertex index). -/
+def C {Obs : Vertex → Type*} (v : Vertex) (_pragmatic : v ≠ Vertex.evidence) : Obs v → ℝ := sorry
 
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: claude-15 · Policy grade is pragmatic risk minus epistemic gain. -/
 def G {Policy : Type*} (risk eig : Policy → ℝ) : Policy → ℝ :=
@@ -158,8 +161,8 @@ def organiseO3FastForward :
     (organise selected repo).edges u v ↔ fastForward selected repo.standsOn u v := sorry
 
 /-- HOLE · owner: P-validated-R5 §3e O4 and S-G4 · holder: claude-15 · The same collection under different precedence changes acting order or score. -/
-def organiseO4PrecedenceGovernance :
-  ∀ {P Score : Type*} (actingOrder : Cascade P → List P) (score : Cascade P → Score),
+def organiseO4PrecedenceGovernance {P Score : Type*}
+    (actingOrder : Cascade P → List P) (score : Cascade P → Score) :
     ∃ c₁ c₂ : Cascade P,
       c₁.nodes = c₂.nodes ∧ c₁.addedByOrganise = c₂.addedByOrganise ∧
       c₁.edges = c₂.edges ∧ c₁.precedence ≠ c₂.precedence ∧
@@ -186,23 +189,43 @@ def valueEvidenceRequiresL2 :
   ∀ {Part : Type*} (valueEvidence : Witness Part → Prop) (w : Witness Part),
     valueEvidence w → w.layer = Layer.L2 := sorry
 
-/-- CLOSED-BY-RECORD · owner: delivery-lifecycle §0.6 · holder: claude-15 · Delivery records destination, payload, acknowledgement URL, and disposition. -/
-structure Delivery (Destination Payload AckUrl Disposition : Type*) where
-  destination : Destination
-  payload : Payload
-  ackUrl : AckUrl
-  disposition : Disposition
+inductive DeliveryGuarantee where
+  | exactlyOnce
+  | atLeastOnce
+  deriving DecidableEq, Repr
 
-/-- CLOSED-BY-RECORD · owner: delivery-lifecycle §0.10 · holder: claude-15 · A handoff records its source, destination, delivery, and acknowledgement. -/
-structure Handoff (Source Destination Delivery Ack : Type*) where
-  source : Source
-  destination : Destination
-  delivery : Delivery
-  acknowledgement : Ack
+structure Retry where
+  cap : Nat
+  sameIdentity : Bool
 
-/-- CLOSED-BY-RECORD · owner: delivery-lifecycle §0.10 · holder: claude-15 · A workflow is an ordered collection of handoffs. -/
-structure Workflow (Handoff : Type*) where
-  handoffs : List Handoff
+/-- CLOSED-BY-RECORD · owner: delivery-lifecycle §0.6 · holder: claude-15 · Delivery := {from, to, payload : Schema, guarantee, atomic-with, retry, timeout-ms, idem-key, receipt : Schema} (review fix: D1b's field list was not the record's). -/
+structure Delivery (Role Schema Write Key : Type*) where
+  «from» : Role
+  «to» : Role
+  payload : Schema
+  guarantee : DeliveryGuarantee
+  atomicWith : List Write
+  retry : Retry
+  timeoutMs : Nat
+  idemKey : Key
+  receipt : Schema
+
+/-- CLOSED-BY-RECORD · owner: delivery-lifecycle §0.10 · holder: claude-15 · Handoff := {artefact, from, to, at, iteration, awaiting, deadline, receipt} (review fix: D1b's field list was not the record's). -/
+structure Handoff (Artefact Role Time JobId Deadline Receipt : Type*) where
+  artefact : Artefact
+  «from» : Role
+  «to» : Role
+  «at» : Time
+  iteration : Nat
+  awaiting : List JobId
+  deadline : Deadline
+  receipt : Receipt
+
+/-- CLOSED-BY-RECORD · owner: delivery-lifecycle §0.10 · holder: claude-15 · Workflow := {holder : Role, iteration, history : List Handoff} — provenance is `history` (review fix: D1b had only the list). -/
+structure Workflow (Role Handoff : Type*) where
+  holder : Role
+  iteration : Nat
+  history : List Handoff
 
 structure R2Tick (Channel Value : Type*) where
   observation : Channel → Option Value
