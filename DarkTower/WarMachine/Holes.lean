@@ -333,15 +333,28 @@ def r2ContractCensus {Channel Value : Type*} (corpus : List (R2Tick Channel Valu
     (wellFormed? : R2Tick Channel Value → Bool) : Nat :=
   (corpus.filter (fun tick => !wellFormed? tick)).length
 
+/-- CLOSED-BY-RECORD · owner: P-R2 §solved 1 (Channel) · holder: claude-15 · The fourteen declared channels as NAMED constructors in declaration order (`observation.clj:18–32`) — identity and order, not arity (claude-13's R2-D2 read via claude-20, ratified 2026-08-30: `Fin 14` could not say "these names in this order"; falsifier: a fifteenth key in any tick). -/
+inductive Channel where
+  | loopHealth | supportCoverage | attackCoverage | missionHealth | stackPct | consultingPct
+  | portfolioPct | mathematicsPct | activeRepoRatio | sorryCountNorm | couplingDensity
+  | ticksFiringRatio | depositingSignal | annotationHealth
+  deriving DecidableEq, Repr
+
+/-- The fourteen channels in declaration order — the list a census iterates (no typeclass needed). -/
+def Channel.all : List Channel :=
+  [.loopHealth, .supportCoverage, .attackCoverage, .missionHealth, .stackPct, .consultingPct,
+   .portfolioPct, .mathematicsPct, .activeRepoRatio, .sorryCountNorm, .couplingDensity,
+   .ticksFiringRatio, .depositingSignal, .annotationHealth]
+
 /-- Fixture scaffolding: a wm-trace tick as a Lean literal — for each of the 14 declared channels, present or not (order = declaration order, `observation.clj:18–32`). The adapter (P-lean-clojure-adapter, AD-D2/D3) transcribes the run into this type. -/
-abbrev R2TickLit := R2Tick (Fin 14) Unit
+abbrev R2TickLit := R2Tick Channel Unit
 
 /-- HOLE · owner: P-R2 §solved 1 (fixture) · holder: claude-15 · evidence: the corpus itself, transcribed · falsifier: digest ≠ the content pin stated in P-R8/P-R2 · The 792 wm-trace forms as a Lean literal — filled by the adapter from the run, never by hand. -/
 def wmTraceR2 : List R2TickLit := sorry
 
 /-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · evidence: IllFormedList (the failing tick ids) · falsifier: the census over the transcribed corpus is not 2 · Against the declared 14 channels the census is 2 (the two 05-18 records). Stated about the FIXTURE CONSTANT, not a universally bound corpus (family fix, 2026-08-30: a ∀-corpus form is false for every other list). Moves by `decide` once `wmTraceR2` is transcribed. -/
 def r2ContractCensusWmTrace :
-    r2ContractCensus wmTraceR2 (fun tick => decide (∀ c : Fin 14, (tick.observation c).isSome)) = 2 := sorry
+    r2ContractCensus wmTraceR2 (fun tick => Channel.all.all (fun c => (tick.observation c).isSome)) = 2 := sorry
 
 inductive FreeEnergyShape where
   | gMap          -- `:free-energy` holds {:G-total …}         (760 forms, files 05-18 … 07-09)
@@ -440,7 +453,7 @@ private def mkRefused (name owner reason : String) : Declaration :=
    holder := "claude-15", decided := "2026-08-30", falsifier := some s!"REFUSED: {reason}"}
 
 private def closedDeclarations : List Declaration :=
-  [("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
+  [("Channel", "P-R2 §solved 1 (Channel)"), ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
    ("Tension", "P-validated-R5 §3e"), ("InformationState", "P-validated-R5 §3d"),
    ("Policy", "P-validated-R5 §3"), ("Outcome", "P-validated-R5 §2a"),
    ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
