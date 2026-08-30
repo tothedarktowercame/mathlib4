@@ -265,6 +265,7 @@ def r9VerdictsSound (table : VerdictTable) : Prop :=
 
 /-- HOLE · owner: P-R9 §solved 2 (fixture) · holder: claude-15 · evidence: the VerdictTable the R9-D2 run writes (run (i): 13 rows, ledger alone; run (ii): 13 rows, per-row declarations) · falsifier: a row missing or a verdict absent · Transcribed from the run by the adapter. -/
 def wmVerdictsLedgerAlone : VerdictTable := sorry
+/-- HOLE · owner: P-R9 §solved 2 (fixture) · holder: claude-15 · evidence: VerdictTable · falsifier: a row missing or a verdict absent · The declared-part run transcribed by the adapter. -/
 def wmVerdictsDeclared : VerdictTable := sorry
 
 /-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: claude-15 · evidence: wmVerdictsDeclared · falsifier: a row with inDeclaredPart = true judged independent · The shipped checker's recorded verdicts are sound. Moves by `decide` once the table is transcribed; false if the checker is broken. -/
@@ -393,4 +394,94 @@ def r8EraBoundary :
       (t.storedF.isSome ↔ t.freeEnergyShape = .controllerMap) ∧
       (t.storedF.isSome ↔ 20260714 ≤ t.fileDate) := sorry
 
+structure WitnessLayerRow where
+  row : String
+  layer : Layer
+  usedAsValueEvidence : Bool
+
+abbrev WitnessLayerTable := List WitnessLayerRow
+
+structure IllFormedTick where
+  tickId : String
+  missingChannels : List String
+  unexpectedChannels : List String
+
+abbrev IllFormedList := List IllFormedTick
+
+structure R8DispositionEvidence where
+  missingFComputableTickIds : List String
+  storedFTickIds : List String
+  insufficientInputsTickIds : List String
+
+inductive Era where | before | after
+
+structure EraSummary where
+  count : Nat
+  storedF : Bool
+  selectionGain : Bool
+  shape : FreeEnergyShape
+  meanPrecision : ℝ
+
+structure EraTable where
+  boundary : Nat
+  perEra : Era → EraSummary
+
+private def mkClosed (name owner : String) : Declaration :=
+  {name, kind := .closed, signature := s!"see {name} in the source module", owner,
+   holder := "claude-15", decided := "2026-08-30"}
+
+private def mkHole (name owner evidence falsifier : String) : Declaration :=
+  {name, kind := .hole, signature := s!"see {name} in the source module", owner,
+   holder := "claude-15", decided := "2026-08-30", evidence := some evidence,
+   falsifier := some falsifier}
+
+private def mkRefused (name owner reason : String) : Declaration :=
+  {name, kind := .hole, signature := s!"see {name} in the source module", owner,
+   holder := "claude-15", decided := "2026-08-30", falsifier := some s!"REFUSED: {reason}"}
+
+private def closedDeclarations : List Declaration :=
+  [("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
+   ("Tension", "P-validated-R5 §3e"), ("InformationState", "P-validated-R5 §3d"),
+   ("Policy", "P-validated-R5 §3"), ("Outcome", "P-validated-R5 §2a"),
+   ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
+   ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
+   ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
+   ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"),
+   ("Delivery", "delivery-lifecycle §0.6"), ("Handoff", "delivery-lifecycle §0.10"),
+   ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
+   ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
+   ("r8Census", "P-R8 §solved 1")].map fun p => mkClosed p.1 p.2
+
+private def holeDeclarations : List Declaration :=
+  [mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
+   mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "AblationTable" "no prior has moved = true",
+   mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
+   mkHole "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
+   mkHole "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
+   mkHole "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
+   mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "no zero-mass pattern",
+   mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
+   mkHole "organiseO1NodesRecorded" "P-validated-R5 §3e O1" "CascadeDiff" "nodes mismatch or additions unrecorded",
+   mkHole "organiseO2AuthoredReachability" "P-validated-R5 §3e O2" "CascadeDiff" "edge lacks authored reachability",
+   mkHole "organiseO3FastForward" "P-validated-R5 §3e O3" "CascadeDiff" "edges differ from fast-forward",
+   mkHole "organiseO4PrecedenceGovernance" "P-validated-R5 §3e O4 and S-G4" "CascadeDiff" "precedence changes neither order nor score",
+   mkHole "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
+   mkHole "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
+   mkHole "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
+   mkHole "r9WmVerdictsSound" "P-R9 §solved 3" "VerdictTable" "self producer judged independent",
+   mkHole "r9TwoRunCensus" "P-R9 §solved 2" "VerdictTable" "either thirteen-row census differs",
+   mkHole "valueEvidenceRequiresL2" "P-R9 S1" "WitnessLayerTable" "value evidence uses L1",
+   mkHole "wmTraceR2" "P-R2 §solved 1" "List R2TickLit" "fixture digest differs",
+   mkHole "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
+   mkHole "wmTraceR8" "P-R8 §solved 1" "List R8TickLit" "fixture digest differs",
+   mkHole "r8CensusWmTrace" "P-R8 §solved 1" "R8DispositionEvidence" "triple differs from (755,32,5)",
+   mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era"]
+
+def registry : Registry :=
+  {schemaVersion := 1, contractId := "wm-holes", moduleName := "DarkTower.WarMachine.Holes",
+   declarations := closedDeclarations ++ holeDeclarations}
+
 end DarkTower.WarMachine.Holes
+
+def main : IO Unit :=
+  DarkTower.Contract.Emit.emit DarkTower.WarMachine.Holes.registry
