@@ -529,12 +529,30 @@ structure R8DispositionEvidence where
 
 inductive Era where | before | after
 
+/-- Per-era tally of the three `:free-energy` shapes — a non-uniform era is REPRESENTABLE (claude-13 via claude-20, 2026-08-30: a single `shape` value presupposed the uniformity that `r8EraBoundary` exists to test — an evidence type that cannot express its own falsifier makes `:conformant` a certainty). -/
+structure ShapeTally where
+  gMap : Nat
+  controllerMap : Nat
+  unknown : Nat
+  deriving DecidableEq, Repr
+
+/-- Evidence for `r8EraBoundary`, as FACTS only. `count` is the era's form count; `storedFCount` / `selectionGainCount` are how many carry each key (a uniform era has both = count or both = 0 — the LAW decides, the type does not assume); `shapes` is the tally; `precisionSum` / `precisionRecords` are the numerator and the POPULATION of the mean — three defensible populations gave three means (760 → 94.4826; 758 → 94.4826; 755 → 94.5845), so the denominator is a fact carried, never a choice made by the generator. -/
 structure EraSummary where
   count : Nat
-  storedF : Bool
-  selectionGain : Bool
-  shape : FreeEnergyShape
-  meanPrecision : ℝ
+  storedFCount : Nat
+  selectionGainCount : Nat
+  shapes : ShapeTally
+  precisionSum : ℝ
+  precisionRecords : Nat
+
+/-- DERIVED: the mean over its stated population — a computed value, not a fact (claude-13 / claude-20, 2026-08-30). `0` when the population is empty, and that is a typed absence the lint can see. -/
+noncomputable def EraSummary.meanPrecision (e : EraSummary) : ℝ :=
+  if e.precisionRecords = 0 then 0 else e.precisionSum / e.precisionRecords
+
+/-- DERIVED: an era is uniform in the two keys iff every form carries both or none carries either — the property the law tests, stated on the tally so that its failure is representable. -/
+def EraSummary.uniform (e : EraSummary) : Prop :=
+  (e.storedFCount = e.count ∧ e.selectionGainCount = e.count) ∨
+  (e.storedFCount = 0 ∧ e.selectionGainCount = 0)
 
 structure EraTable where
   boundary : Nat
@@ -567,7 +585,7 @@ private def closedDeclarations : List Declaration :=
    ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
    ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
    ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
-   ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"), ("DeclarationSource", "P-R9 §solved 2 (declaration source)"), ("r9PerRowDeclarations", "P-R9 §solved 2 (per-row declarations)"),
+   ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"), ("ShapeTally", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.meanPrecision", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.uniform", "P-R8 §solved 1 (iii) evidence"), ("DeclarationSource", "P-R9 §solved 2 (declaration source)"), ("r9PerRowDeclarations", "P-R9 §solved 2 (per-row declarations)"),
    ("Delivery", "delivery-lifecycle §0.6"), ("Handoff", "delivery-lifecycle §0.10"),
    ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
