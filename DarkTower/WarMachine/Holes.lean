@@ -238,8 +238,10 @@ def r2WellFormed {Channel Value : Type*} (declared : List Channel)
 /-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · Record contract as a census: over the corpus, exactly `illFormed` ticks fail the declared list — the run is the fixture, and on wm-trace it is a REFUTATION of the universal (two 05-18 records lack `:annotation-health`; expected illFormed = 2). -/
 def r2ContractCensus :
   ∀ {Channel Value : Type*} (declared : List Channel) (corpus : List (R2Tick Channel Value))
-    [DecidablePred (r2WellFormed declared)] (illFormed : Nat),
-    (corpus.filter (fun tick => decide (¬ r2WellFormed declared tick))).length = illFormed := sorry
+    (wellFormed? : R2Tick Channel Value → Bool)
+    (_sound : ∀ tick, wellFormed? tick = true ↔ r2WellFormed declared tick)
+    (illFormed : Nat),
+    (corpus.filter (fun tick => !wellFormed? tick)).length = illFormed := sorry
 
 inductive R8Disposition where
   | missingFComputable
