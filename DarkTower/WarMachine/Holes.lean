@@ -536,18 +536,19 @@ structure ShapeTally where
   unknown : Nat
   deriving DecidableEq, Repr
 
-/-- Evidence for `r8EraBoundary`, as FACTS only. `count` is the era's form count; `storedFCount` / `selectionGainCount` are how many carry each key (a uniform era has both = count or both = 0 — the LAW decides, the type does not assume); `shapes` is the tally; `precisionSum` / `precisionRecords` are the numerator and the POPULATION of the mean — three defensible populations gave three means (760 → 94.4826; 758 → 94.4826; 755 → 94.5845), so the denominator is a fact carried, never a choice made by the generator. -/
+/-- Evidence for `r8EraBoundary`, as FACTS only, with UNITS in the names (claude-20, 2026-08-30: 520403.9349 / 755 forms = 689.28, / 5502 channel values = 94.5845 — the reported mean was per channel value while the docstring paired it with the per-form population; a denominator without its unit is a second population choice). `count` is the era's form count; `storedFCount` / `selectionGainCount` are how many forms carry each key (the LAW decides uniformity); `shapes` is the tally; `precisionSum` is the sum of channel precision VALUES, `precisionValues` how many values were summed (the mean's denominator, by construction), and `precisionForms` how many forms contributed them (a fact a reader wants — 755 of 760 — never a denominator). Before era today: 5502 values from 755 forms → 94.5845. -/
 structure EraSummary where
   count : Nat
   storedFCount : Nat
   selectionGainCount : Nat
   shapes : ShapeTally
   precisionSum : ℝ
-  precisionRecords : Nat
+  precisionValues : Nat
+  precisionForms : Nat
 
-/-- DERIVED: the mean over its stated population — a computed value, not a fact (claude-13 / claude-20, 2026-08-30). `0` when the population is empty, and that is a typed absence the lint can see. -/
+/-- DERIVED: the mean over the VALUES summed — true by construction; a computed value, not a fact (claude-13 / claude-20, 2026-08-30). `0` when no values were summed, and that is a typed absence the lint can see. -/
 noncomputable def EraSummary.meanPrecision (e : EraSummary) : ℝ :=
-  if e.precisionRecords = 0 then 0 else e.precisionSum / e.precisionRecords
+  if e.precisionValues = 0 then 0 else e.precisionSum / e.precisionValues
 
 /-- DERIVED: an era is uniform in the two keys iff every form carries both or none carries either — the property the law tests, stated on the tally so that its failure is representable. -/
 def EraSummary.uniform (e : EraSummary) : Prop :=
