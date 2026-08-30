@@ -199,14 +199,17 @@ def independenceVerdict {Part : Type*} [DecidableEq Part]
   | none => .unknown
   | some claim => if decide? witness.producer claim.producingPart then .self else .independent
 
-/-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: claude-15 · A witness whose producer is inside the declared producing part is NEVER judged independent — if the checker returns `independent` for it, the checker is broken. Also: the verdict is `independent` iff `independent claim witness` holds. R9-D2's run is the fixture. -/
-def r9VerdictSound :
-  ∀ {Part : Type*} [DecidableEq Part] (claim : Claim Part) (witness : Witness Part)
-    (decide? : Part → Set Part → Bool)
-    (_sound : ∀ p S, decide? p S = true ↔ p ∈ S),
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 3 · holder: claude-15 · What it means for a membership checker to be SOUND for verdicts: a witness whose producer is inside the declared part is never judged `independent`, and `independent` is returned only when the Prop holds. Stated as a predicate on a GIVEN checker — no soundness hypothesis, so it can be false of a broken one (review fix, same family as r2ContractCensus: the earlier form assumed `_sound` and could not fail). -/
+def r9CheckerSound {Part : Type*} [DecidableEq Part] (decide? : Part → Set Part → Bool) : Prop :=
+  ∀ (claim : Claim Part) (witness : Witness Part),
     (witness.producer ∈ claim.producingPart →
-      independenceVerdict (some claim) witness decide? = .self) ∧
-    (independenceVerdict (some claim) witness decide? = .independent ↔ independent claim witness) := sorry
+      independenceVerdict (some claim) witness decide? ≠ .independent) ∧
+    (independenceVerdict (some claim) witness decide? = .independent → independent claim witness)
+
+/-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: claude-15 · evidence: VerdictTable (row, declaration, verdict) · falsifier: some row with producer inside the declared part receives `independent` · The Clojure checker R9-D2 ships is sound in the sense above; if its recorded verdicts show a self-producer judged independent, the checker is broken. -/
+def r9WmCheckerSound :
+  ∀ {Part : Type*} [DecidableEq Part] (clojureDecide : Part → Set Part → Bool),
+    r9CheckerSound clojureDecide := sorry
 
 /-- HOLE · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: claude-15 · Over the thirteen closed rows of OBLIGATIONS.md@6c288174: run (i), ledger alone (no declaration) → all `unknown`; run (ii), the paper's own admission as the declaration (sec-discussion.tex:238) → all `self`. The gap is the node's finding. -/
 def r9TwoRunCensus :
@@ -267,19 +270,17 @@ def r2WellFormed {Channel Value : Type*} (declared : List Channel)
     (tick : R2Tick Channel Value) : Prop :=
   ∀ channel, (tick.observation channel).isSome ↔ channel ∈ declared
 
-/-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · Record contract as a census: over the corpus, exactly `illFormed` ticks fail the declared list — the run is the fixture, and on wm-trace it is a REFUTATION of the universal (two 05-18 records lack `:annotation-health`; expected illFormed = 2). -/
-def r2ContractCensus :
-  ∀ {Channel Value : Type*} (declared : List Channel) (corpus : List (R2Tick Channel Value))
-    (wellFormed? : R2Tick Channel Value → Bool)
-    (_sound : ∀ tick, wellFormed? tick = true ↔ r2WellFormed declared tick)
-    (illFormed : Nat),
-    (corpus.filter (fun tick => !wellFormed? tick)).length = illFormed := sorry
+/-- CLOSED-BY-RECORD · owner: P-R2 §solved 1 · holder: claude-15 · The census is a COMPUTED value: how many ticks of a corpus fail the declared list (review fix, codex-1 via claude-20 2026-08-30: the earlier form universally quantified the answer and was false for every instantiation). -/
+def r2ContractCensus {Channel Value : Type*} (corpus : List (R2Tick Channel Value))
+    (wellFormed? : R2Tick Channel Value → Bool) : Nat :=
+  (corpus.filter (fun tick => !wellFormed? tick)).length
 
-inductive R8Disposition where
-  | missingFComputable
-  | storedF
-  | insufficientInputs
-  deriving DecidableEq, Repr
+/-- HOLE · owner: P-R2 §solved 1 · holder: claude-15 · evidence: IllFormedList (the failing tick ids) · falsifier: the census is not 2 · On wm-trace (53 files, 792 forms, filter stated in P-R2) the census against the declared 14-channel list is 2 — the two 05-18 records; the run is the fixture and this CAN be false. -/
+def r2ContractCensusWmTrace :
+  ∀ {Channel Value : Type*} (declared : List Channel) (wmTrace : List (R2Tick Channel Value))
+    (wellFormed? : R2Tick Channel Value → Bool)
+    (_sound : ∀ tick, wellFormed? tick = true ↔ r2WellFormed declared tick),
+    r2ContractCensus wmTrace wellFormed? = 2 := sorry
 
 inductive FreeEnergyShape where
   | gMap          -- `:free-energy` holds {:G-total …}         (760 forms, files 05-18 … 07-09)
@@ -295,6 +296,12 @@ structure R8Tick (Errors Precision Gain : Type*) where
   freeEnergyShape : FreeEnergyShape
   fileDate : Nat   -- YYYYMMDD of the trace file
 
+inductive R8Disposition where
+  | missingFComputable
+  | storedF
+  | insufficientInputs
+  deriving DecidableEq, Repr
+
 /-- CLOSED-BY-RECORD · owner: P-R8 §solved 1 · holder: claude-15 · R8 records exactly missing-computable, stored, or insufficient-inputs. -/
 def r8Disposition {Errors Precision Gain : Type*}
     (tick : R8Tick Errors Precision Gain) : R8Disposition :=
@@ -303,13 +310,17 @@ def r8Disposition {Errors Precision Gain : Type*}
   | some _, some _, some _ => .storedF
   | _, _, _ => .insufficientInputs
 
-/-- HOLE · owner: P-R8 §solved 1 (census) · holder: claude-15 · The three-disposition census over the corpus; expected 755 / 32 / 5 over 792 forms (P-R8@HEAD); the run is the fixture. -/
-def r8Census :
-  ∀ {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Precision Gain))
-    (nMissing nStored nInsufficient : Nat),
-    (corpus.filter (fun t => decide (r8Disposition t = .missingFComputable))).length = nMissing ∧
-    (corpus.filter (fun t => decide (r8Disposition t = .storedF))).length = nStored ∧
-    (corpus.filter (fun t => decide (r8Disposition t = .insufficientInputs))).length = nInsufficient := sorry
+/-- CLOSED-BY-RECORD · owner: P-R8 §solved 1 (census) · holder: claude-15 · The three-disposition census as a COMPUTED triple (same review fix as r2ContractCensus). -/
+def r8Census {Errors Precision Gain : Type*} (corpus : List (R8Tick Errors Precision Gain)) :
+    Nat × Nat × Nat :=
+  ((corpus.filter (fun t => decide (r8Disposition t = R8Disposition.missingFComputable))).length,
+   (corpus.filter (fun t => decide (r8Disposition t = R8Disposition.storedF))).length,
+   (corpus.filter (fun t => decide (r8Disposition t = R8Disposition.insufficientInputs))).length)
+
+/-- HOLE · owner: P-R8 §solved 1 (census) · holder: claude-15 · evidence: the triple with tick ids per disposition · falsifier: the triple is not (755, 32, 5) · On wm-trace (filter stated in P-R8) the census is 755 / 32 / 5 over 792 forms; the run is the fixture and this CAN be false. -/
+def r8CensusWmTrace :
+  ∀ {Errors Precision Gain : Type*} (wmTrace : List (R8Tick Errors Precision Gain)),
+    wmTrace.length = 792 → r8Census wmTrace = (755, 32, 5) := sorry
 
 /-- HOLE · owner: P-R8 §solved 1 (iii), by era · holder: claude-15 · Four facts co-move at one boundary: a form stores F ↔ it carries `:selection-gain` ↔ its `:free-energy` is the controller map ↔ its file date ≥ the boundary (2026-07-14). Precision scale is the proximate driver of the F gap and is NOT stated here; cause is untested. The stored-F recompute identity (the earlier hole here) is tautological on this corpus and was retired as evidence on 2026-08-30. -/
 def r8EraBoundary :
