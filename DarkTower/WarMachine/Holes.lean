@@ -563,6 +563,21 @@ def preferenceStackLiveRecorded : Prop := sorry
 /-- HOLE · owner: P-R19-preferences-open §principle · holder: claude-15 · evidence: REFUSED — a meta-claim about the spine's definition; no in-language census of free preference constants exists yet · falsifier: REFUSED for the same reason · No preference value is free in the spine; C is a parameter everywhere. -/
 def machineHasNoC : Prop := sorry
 
+/-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("we should specify that it should be able to run at least once, and then we should get evidence of that") · holder: claude-15 · What one completed tick leaves behind: the receipt is the evidence, and each field is one of the standing invariants made concrete for a single run. On-demand ticks (run one, like the APM machine's clicks) are first-class; a scheduler is one caller among others. -/
+structure TickRunRecord where
+  startedAt : String
+  basisCount : Nat          -- I_data_current: the store basis the tick read at
+  basisMaxAt : String
+  inputsRead : Nat          -- I_absent_is_loud: input-status travelled
+  inputIssues : Nat
+  preferenceLayers : Nat    -- the C stack was named (R19)
+  traceWritten : Bool       -- the emission has a consumer path (I_evidence_consumed)
+  selectorSeam : String     -- "live" or the declared stub — never silent
+  deriving DecidableEq
+
+/-- HOLE · owner: Joe 2026-08-31 · holder: claude-15 · evidence: TickRunWitness · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord — CURRENTLY FIRING: the standalone entry throws "War Machine requires the shared reason-bearing selector" (AUD-D3 gate blocker), so the machine cannot yet demonstrate one unattended tick · The machine can run at least once on demand, leaving a receipt. -/
+def wmRunsOnce : Prop := sorry
+
 structure WitnessLayerRow where
   row : String
   layer : Layer
@@ -642,6 +657,7 @@ private def closedDeclarations : List Declaration :=
    ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
    ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
    ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"), ("ShapeTally", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.meanPrecision", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.uniform", "P-R8 §solved 1 (iii) evidence"), ("DeclarationSource", "P-R9 §solved 2 (declaration source)"), ("r9PerRowDeclarations", "P-R9 §solved 2 (per-row declarations)"),
+   ("TickRunRecord", "Joe 2026-08-31 · runs-once receipt"),
    ("PreferenceSource", "P-R19-preferences-open §principle"), ("PreferenceLayerRecord", "P-R19-preferences-open §tetrahedron"),
    ("wmPreferenceStack2026_08_30", "R19-preference-stack.edn @ dc1dac8"), ("wmStackDeclaredPurpose", "R19-preference-stack.edn @ dc1dac8"),
    ("preferenceStackRecorded", "P-R19-preferences-open §gate"), ("PreferenceLayer", "P-R19-preferences-open §principle"),
@@ -685,7 +701,8 @@ private def holeDeclarations : List Declaration :=
    mkHole "r8CensusWmTrace" "P-R8 §solved 1" "R8DispositionEvidence" "triple differs from (755,32,5)",
    mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
-   mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet"]
+   mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet",
+   mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; currently firing (selector-seam blocker)"]
 
 def registry : Registry :=
   {schemaVersion := 1, contractId := "wm-holes", moduleName := "DarkTower.WarMachine.Holes",
