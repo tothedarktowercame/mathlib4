@@ -508,6 +508,61 @@ def modelUncertaintyAndEIG : Prop := sorry
 /-- HOLE · owner: sec-glossary.tex:48 · P-glossary-mathematics · holder: claude-15 · evidence: REFUSED — G-D1 says the glossary's π is a scored cascade while Holes.Policy is an information-state function · falsifier: REFUSED pending Joe's grain decision · This declaration records the unresolved cascade-policy grain without changing Policy. -/
 def cascadeGrainPi : Type := sorry
 
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: claude-15 · How a preference layer was determined; open — new constructors are expected (delegate = a company or domain's own harness). -/
+inductive PreferenceSource where
+  | operatorDeclared | learnedFromOperator | corpusDerived | delegateSupplied | scriptProduced
+  deriving DecidableEq
+
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §tetrahedron · holder: claude-15 · The data half of a layer: what R19-D1 records per stratum. The fixture carries facts; laws derive. `site` is folded-at when folded, enters-at otherwise. -/
+structure PreferenceLayerRecord where
+  id : String
+  source : PreferenceSource
+  author : String
+  basis : String
+  folded : Bool
+  site : String
+  deriving DecidableEq
+
+/-- CLOSED-BY-RECORD · owner: R19-preference-stack.edn @ dc1dac8 (gated b7cc268) · holder: claude-15 · The machine as it runs today: five sources, four folded; declared purpose is honestly absent — this stack is what accumulated. -/
+def wmPreferenceStack2026_08_30 : List PreferenceLayerRecord :=
+  [⟨"floor", .operatorDeclared, "Joseph Corneli", "preferences.clj sha256 22ae618a…", true, "efe.clj:601-614,725-733"⟩,
+   ⟨"capability-zone-load", .learnedFromOperator, "wm-outer-loop, implementation Joseph Corneli", "substrate-2 2026-08-30: 242 records, 14 classes, max as-of 2026-07-18", true, "efe.clj:586-614"⟩,
+   ⟨"live-goal-outcomes", .corpusDerived, "futon2.aif.c-vector/entries-from-corpus", "substrate-2 :7071 2026-08-30: signature -1131096431, 36 capabilities, 293 sorries", true, "efe.clj:655-665,725-733"⟩,
+   ⟨"c-vector-overlays", .scriptProduced, "futon6/scripts/c_vector.bb", "2026-06-26 overlay snapshots (three sha256 pins in the record)", true, "c_vector.clj:227-240,633-640"⟩,
+   ⟨"habit-prior", .learnedFromOperator, "unknown operator whose selections are recorded in wm-trace", "wm-trace-2026-08-30.edn sha256 6da3ccda…", false, "policy/select-action ln E(π) seam (live since 2026-07-13 flip); R14 supplies τ beside it"⟩]
+
+/-- CLOSED-BY-RECORD · owner: R19-preference-stack.edn @ dc1dac8 · holder: claude-15 · No declaration naming the situation this stack models exists; the observed purpose is the fold's own behaviour. -/
+def wmStackDeclaredPurpose : Option String := none
+
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §gate · holder: claude-15 · Every recorded layer names a non-empty author and basis — decided against the fixture, kernel `decide`. -/
+theorem preferenceStackRecorded :
+    (wmPreferenceStack2026_08_30.all fun l => l.author != "" && l.basis != "") = true := by decide
+
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: claude-15 · The semantic layer: a preference with provenance and its own composition rule. `prefers` is ln P(o) up to a constant on this layer alone. -/
+structure PreferenceLayer (Outcome : Type*) where
+  record : PreferenceLayerRecord
+  prefers : Outcome → ℝ
+  compose : ℝ → ℝ → ℝ
+
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: claude-15 · C for one deployment is the fold of an ordered layer stack; the machine never holds a C of its own. The habit prior connects to `softmax`'s `habit` argument — no new name. -/
+def foldC {Outcome : Type*} (base : Outcome → ℝ)
+    (layers : List (PreferenceLayer Outcome)) : Outcome → ℝ :=
+  layers.foldl (fun acc l o => l.compose (acc o) (l.prefers o)) base
+
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §tetrahedron · holder: claude-15 · A stack is admissible only with its purpose stated at the strata level, evidence of fit, a falsifier, and a holder — the R19 tetrahedron's organisation and mass. -/
+structure PreferenceStack (Outcome : Type*) where
+  layers : List (PreferenceLayer Outcome)
+  purpose : String
+  evidence : List String
+  falsifier : String
+  holder : String
+
+/-- HOLE · owner: P-R19-preferences-open §gate · holder: claude-15 · evidence: PreferenceStackWitness · falsifier: a C value in a live trace with no layer record behind it · Every running instance's C is the fold of a recorded stack. -/
+def preferenceStackLiveRecorded : Prop := sorry
+
+/-- HOLE · owner: P-R19-preferences-open §principle · holder: claude-15 · evidence: REFUSED — a meta-claim about the spine's definition; no in-language census of free preference constants exists yet · falsifier: REFUSED for the same reason · No preference value is free in the spine; C is a parameter everywhere. -/
+def machineHasNoC : Prop := sorry
+
 structure WitnessLayerRow where
   row : String
   layer : Layer
@@ -587,6 +642,10 @@ private def closedDeclarations : List Declaration :=
    ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
    ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
    ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"), ("ShapeTally", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.meanPrecision", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.uniform", "P-R8 §solved 1 (iii) evidence"), ("DeclarationSource", "P-R9 §solved 2 (declaration source)"), ("r9PerRowDeclarations", "P-R9 §solved 2 (per-row declarations)"),
+   ("PreferenceSource", "P-R19-preferences-open §principle"), ("PreferenceLayerRecord", "P-R19-preferences-open §tetrahedron"),
+   ("wmPreferenceStack2026_08_30", "R19-preference-stack.edn @ dc1dac8"), ("wmStackDeclaredPurpose", "R19-preference-stack.edn @ dc1dac8"),
+   ("preferenceStackRecorded", "P-R19-preferences-open §gate"), ("PreferenceLayer", "P-R19-preferences-open §principle"),
+   ("foldC", "P-R19-preferences-open §principle"), ("PreferenceStack", "P-R19-preferences-open §tetrahedron"),
    ("Delivery", "delivery-lifecycle §0.6"), ("Handoff", "delivery-lifecycle §0.10"),
    ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
@@ -624,7 +683,9 @@ private def holeDeclarations : List Declaration :=
    mkHole "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
    mkHole "wmTraceR8" "P-R8 §solved 1" "List R8TickLit" "fixture digest differs",
    mkHole "r8CensusWmTrace" "P-R8 §solved 1" "R8DispositionEvidence" "triple differs from (755,32,5)",
-   mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era"]
+   mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
+   mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
+   mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet"]
 
 def registry : Registry :=
   {schemaVersion := 1, contractId := "wm-holes", moduleName := "DarkTower.WarMachine.Holes",
