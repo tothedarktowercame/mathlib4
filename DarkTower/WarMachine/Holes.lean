@@ -53,6 +53,12 @@ structure HaveWantArrowComposition {Endpoint : Type*}
     (left right : HaveWantArrow Endpoint) : Prop where
   endpointMatch : left.target = right.source
 
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:66 · P-glossary-mathematics · holder: by-record · evidence: FoldWitness · falsifier: a fold without explicit policy holes elaborates · The common fold boundary is an implementation-specific typed wiring, an optional coverage-score delta (`none` means abstention), and an explicit list of policy holes. -/
+structure Fold (Wiring PolicyHole : Type*) where
+  wiring : Wiring
+  coverageScoreDelta : Option ℝ
+  policyHoles : List PolicyHole
+
 structure Repository (P : Type*) where
   patterns : Set P
   standsOn : P → P → Prop
@@ -6647,6 +6653,8 @@ private def closedDeclarations : List Declaration :=
       "AmbiguityWitness" "expected observation entropy disagrees with the kernel-derived value",
       mkWitnessedClosed "HaveWantArrow" "sec-glossary.tex:70 · P-glossary-mathematics"
       "HaveWantArrowWitness" "a composition whose left want differs from the right have elaborates",
+      mkWitnessedClosed "Fold" "sec-glossary.tex:66 · P-glossary-mathematics"
+      "FoldWitness" "a fold without explicit policy holes elaborates",
       mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
