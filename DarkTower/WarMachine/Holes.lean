@@ -178,25 +178,18 @@ abbrev FindReceiptTable (Scenario P : Type*) := List (FindReceiptRow Scenario P)
 /-- HOLE · owner: P-validated-R5 §3e find · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Find maps a structured tension and repository to selected patterns, receipts, or typed absence. -/
 def find {State P : Type*} : Tension State → Repository P → FindResult P := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e F1 · holder: by-record · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · Find returns only repository patterns and records typed absence when selection is empty. -/
-def findF1Containment :
-  ∀ {State P : Type*} (tension : Tension State) (repo : Repository P),
-    (find tension repo).selected ⊆ repo.patterns ∧
-    ((find tension repo).selected = ∅ →
-      (find tension repo).absence = some .noPatternAddressesThisTension) := sorry
+/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F1 · holder: by-record · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: selection stays inside the recorded repository and an empty selection carries typed absence. -/
+def findF1Containment {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
+  row.selected ⊆ row.repository ∧
+    (row.selected = ∅ → row.absence = some .noPatternAddressesThisTension)
 
-/-- HOLE · owner: P-validated-R5 §3e F2 · holder: by-record · evidence: FindReceiptTable · falsifier: a selected pattern has no receipt · Every selected pattern carries a receipt. -/
-def findF2Receipted :
-  ∀ {State P : Type*} (tension : Tension State) (repo : Repository P) p,
-    p ∈ (find tension repo).selected →
-      ∃ receipt, (find tension repo).receipts p = some receipt := sorry
+/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F2 · holder: by-record · evidence: FindReceiptTable · falsifier: a selected pattern has no receipt · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the recorded receipted set. -/
+def findF2Receipted {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
+  row.selected ⊆ row.receipted
 
-/-- HOLE · owner: P-validated-R5 §3e F3 · holder: by-record · evidence: FindReceiptTable · falsifier: a selected pattern has only score evidence · Every receipt cites text or authored edges and is never justified by a score alone. -/
-def findF3NonSelfCertifying :
-  ∀ {State P : Type*} (tension : Tension State) (repo : Repository P) p,
-    p ∈ (find tension repo).selected →
-      ∃ receipt, (find tension repo).receipts p = some receipt ∧
-        receipt.nonSelfCertifying := sorry
+/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F3 · holder: by-record · evidence: FindReceiptTable · falsifier: a selected pattern has only score evidence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the set whose receipt cites text or authored edges and is not score-alone. -/
+def findF3NonSelfCertifying {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
+  row.selected ⊆ row.nonSelfCertifying
 
 /-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F4 · holder: by-record · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. The predicate is defined, while its pinned row remains deliberately tracked as an evidence obligation. -/
 def findF4Falsifiable {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
