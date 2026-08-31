@@ -6216,7 +6216,7 @@ abbrev ParameterPosteriorKernel (PolicyIndex : Type*) (Obs : Vertex → Type*)
 abbrev TransitionKernel (State Action : Type*) :=
   ProbabilityKernel (State × Action) State
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7,37 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The normalized policy prior `E : 1 ⇝ Π`. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7,37 · P-glossary-mathematics · holder: by-record · evidence: PolicyPriorKernelWitness · falsifier: the proposed prior is conditioned on state rather than Unit, or its policy masses are not a distribution · The normalized policy prior `E : 1 ⇝ Π`; its Unit domain prevents contextual likelihoods from masquerading as the prior. -/
 abbrev PolicyPriorKernel (PolicyIndex : Type*) :=
   ProbabilityKernel Unit PolicyIndex
 
@@ -6697,7 +6697,6 @@ private def closedDeclarations : List Declaration :=
       mkClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics",
-      mkClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics",
       mkClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"]
   ++ [mkClosed "observationEntropy" "sec-glossary.tex:21,25 · P-glossary-mathematics",
       mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
@@ -6727,6 +6726,8 @@ private def closedDeclarations : List Declaration :=
       "ObservationKernelWitness" "a row has negative mass or its declared masses do not sum to one",
       mkWitnessedClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics"
       "PredictiveOutcomeRiskWitness" "predictive support contains an outcome with zero preference mass, or KL disagrees with the reference",
+      mkWitnessedClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics"
+      "PolicyPriorKernelWitness" "the prior is conditioned on state rather than Unit, or its policy masses are not a distribution",
       mkWitnessedClosed "ControlVocabulary" "sec-glossary.tex:35 · P-glossary-mathematics"
       "ControlVocabularyWitness" "a policy containing a control outside its vocabulary elaborates",
       mkWitnessedClosed "aliveness" "sec-glossary.tex:50 · P-glossary-mathematics"
