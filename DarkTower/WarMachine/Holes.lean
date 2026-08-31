@@ -6457,7 +6457,7 @@ def machineHasNoC : freePreferenceConstants ≠ [] := by
   rw [freePreferenceConstants_eq]
   decide
 
-/-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("we should specify that it should be able to run at least once, and then we should get evidence of that") · holder: by-record · What one completed tick leaves behind: the receipt is the evidence, and each field is one of the standing invariants made concrete for a single run. On-demand ticks (run one, like the APM machine's clicks) are first-class; a scheduler is one caller among others. -/
+/-- CLOSED-BY-RECORD · owner: record: futon2:holes/problems/BUILD-packets/WM-RUN1.md · Joe 2026-08-31 · runs-once receipt · holder: by-record · What one completed tick leaves behind: the receipt is the evidence, and each field is one of the standing invariants made concrete for a single run. On-demand ticks (run one, like the APM machine's clicks) are first-class; a scheduler is one caller among others. -/
 structure TickRunRecord where
   runId : String            -- generated at tick start; stable across receipt reserialisation
   startedAt : String
@@ -6475,7 +6475,7 @@ structure TickRunRecord where
 /-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_runs_once_witness.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord · OWNER AMENDMENT 2026-08-31: the original annotation said "CURRENTLY FIRING: selector-seam blocker". That was true of the earlier diagnostic standalone report, but a nine-hop tick subsequently completed through the explicitly recorded bounded stub. Futon3c remains absent from Futon2's local classpath; the production operator loop instead uses the live Agency HTTP selector. Original claim retained here as history, not current state. · The machine can run at least once on demand, leaving a receipt. C114 considered and declined narrowing: a theorem over the receipt would prove a pinned instance, not that the world-level event occurred. -/
 def wmRunsOnce : Prop := sorry
 
-/-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("a map that assembles and joins appropriately, so we can see exactly what happened as the machine ran, and get evidence that that matched the specification") · holder: by-record · One hop of the route a tick actually took: the tracer tag conj'd onto the flowing map at a node boundary, reassembled pairwise into hops. The wiring diagram (control-map-edges.edn, Figure 4 as data) is the specification the route is judged against. -/
+/-- CLOSED-BY-RECORD · owner: record: futon2:holes/problems/BUILD-packets/WM-RUN2.md · Joe 2026-08-31 · route tracer · holder: by-record · One hop of the route a tick actually took: the tracer tag conj'd onto the flowing map at a node boundary, reassembled pairwise into hops. The wiring diagram (control-map-edges.edn, Figure 4 as data) is the specification the route is judged against. -/
 structure RouteHop where
   fromNode : String
   toNode : String
@@ -6570,7 +6570,7 @@ private def closedDeclarations : List Declaration :=
    ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
    ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
    ("r9CheckerSound", "P-R9 §solved 3"), ("r9VerdictsSound", "P-R9 §solved 3"), ("ShapeTally", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.meanPrecision", "P-R8 §solved 1 (iii) evidence"), ("EraSummary.uniform", "P-R8 §solved 1 (iii) evidence"), ("DeclarationSource", "P-R9 §solved 2 (declaration source)"), ("r9PerRowDeclarations", "P-R9 §solved 2 (per-row declarations)"),
-   ("TickRunRecord", "Joe 2026-08-31 · runs-once receipt"), ("RouteHop", "Joe 2026-08-31 · route tracer"),
+   ("TickRunRecord", "record: futon2:holes/problems/BUILD-packets/WM-RUN1.md · Joe 2026-08-31 · runs-once receipt"), ("RouteHop", "record: futon2:holes/problems/BUILD-packets/WM-RUN2.md · Joe 2026-08-31 · route tracer"),
    ("PreferenceSource", "P-R19-preferences-open §principle"), ("PreferenceLayerRecord", "P-R19-preferences-open §tetrahedron"),
    ("wmPreferenceStack2026_08_30", "R19-preference-stack.edn @ dc1dac8"), ("wmStackDeclaredPurpose", "R19-preference-stack.edn @ dc1dac8"),
    ("preferenceStackRecorded", "P-R19-preferences-open §gate"), ("PreferenceLayer", "P-R19-preferences-open §principle"),
