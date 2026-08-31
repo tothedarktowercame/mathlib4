@@ -322,10 +322,25 @@ def r9VerdictsSound (table : VerdictTable) : Prop :=
 def r9PerRowDeclarations (t : VerdictTable) : Prop :=
   ∀ r ∈ t, (r.row ∈ ["O7", "O14", "O15"]) ↔ (∃ id, r.declarationSource = .rowText id)
 
-/-- HOLE · owner: P-R9 §solved 2 (fixture) · holder: by-record · evidence: the VerdictTable the R9-D2 run writes (run (i): 13 rows, ledger alone; run (ii): 13 rows, per-row declarations) · falsifier: a row missing or a verdict absent · Transcribed from the run by the adapter. -/
-def wmVerdictsLedgerAlone : VerdictTable := sorry
-/-- HOLE · owner: P-R9 §solved 2 (fixture) · holder: by-record · evidence: VerdictTable · falsifier: a row missing or a verdict absent · The declared-part run transcribed by the adapter. -/
-def wmVerdictsDeclared : VerdictTable := sorry
+private def wmVerdictRowIds : List String :=
+  ["O1", "O2", "O3", "O5", "O6", "O7", "O8", "O9", "O14", "O15", "O16", "O17", "O20"]
+
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (fixture) · holder: by-record · evidence: VerdictTable · falsifier: a row missing or a verdict absent · The pinned R9-D2 ledger-only run: absence of a producing-part declaration is represented by `unknown`, never coerced to either verdict. -/
+def wmVerdictsLedgerAlone : VerdictTable := wmVerdictRowIds.map fun id =>
+  { row := id, declarationSource := .paperSentence, producer := "unknown",
+    declaredPart := [], verdict := .unknown }
+
+private def declaredVerdictRow (id : String) : VerdictRow :=
+  if id = "O7" ∨ id = "O14" ∨ id = "O15" then
+    { row := id, declarationSource := .rowText id,
+      producer := if id = "O15" then "zai" else "codex-1",
+      declaredPart := ["author", "codex-1", "codex-7", "zai"], verdict := .self }
+  else
+    { row := id, declarationSource := .paperSentence, producer := "author",
+      declaredPart := ["author"], verdict := .self }
+
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (fixture) · holder: by-record · evidence: VerdictTable · falsifier: a row missing or a verdict absent · The pinned R9-D2 declared-part run. -/
+def wmVerdictsDeclared : VerdictTable := wmVerdictRowIds.map declaredVerdictRow
 
 /-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: by-record · evidence: wmVerdictsDeclared · falsifier: a row with inDeclaredPart = true judged independent · The shipped checker's recorded verdicts are sound. Moves by `decide` once the table is transcribed; false if the checker is broken. -/
 def r9WmVerdictsSound : r9VerdictsSound wmVerdictsDeclared := sorry
@@ -339,7 +354,7 @@ def r9TwoRunCensus :
     (∀ r ∈ wmVerdictsLedgerAlone, r.verdict = .unknown) ∧
     (∀ r ∈ wmVerdictsDeclared, r.verdict = .self) := sorry
 
-/-- HOLE · owner: P-R9 S1 · holder: by-record · Evidence used to value a policy must be an independent L2 witness. -/
+/-- HOLE · owner: P-R9 S1 · holder: by-record · evidence: REFUSED — false for an arbitrary `valueEvidence` predicate, e.g. `fun _ => True`, applied to an L1 witness · falsifier: the L1 counterexample · Evidence used to value a policy must be an independent L2 witness, but the declaration lacks the hypothesis connecting `valueEvidence` to layer admission. -/
 def valueEvidenceRequiresL2 :
   ∀ {Part : Type*} (valueEvidence : Witness Part → Prop) (w : Witness Part),
     valueEvidence w → w.layer = Layer.L2 := sorry
@@ -769,7 +784,7 @@ structure RouteHop where
   at_ : String
   deriving DecidableEq
 
-/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: RouteTraceWitness · falsifier: a completed run whose reassembled route contains a hop absent from the wiring specification, or whose route is empty — either way the organisation vertex has no evidence · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification; the route may be a simple cycle or complex, and which drawn edges actually fired is part of the receipt. -/
+/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: REFUSED — the measured WM-RUN2 route has six hops absent from Figure 4; naming them `route-measured-undrawn` records disagreement but does not establish conformance · falsifier: the existing non-empty route with undrawn hops · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. -/
 def wmRunConformsToWiring : Prop := sorry
 
 structure WitnessLayerRow where
@@ -910,12 +925,12 @@ private def holeDeclarations : List Declaration :=
    mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "no zero-mass pattern",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
    mkHole "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
-   mkHole "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
-   mkHole "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
+   mkWitnessedClosed "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
+   mkWitnessedClosed "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
    mkHole "r9WmVerdictsSound" "P-R9 §solved 3" "VerdictTable" "self producer judged independent",
    mkHole "r9TwoRunCensus" "P-R9 §solved 2" "VerdictTable" "either thirteen-row census differs",
    mkHole "r9WmPerRowDeclarations" "P-R9 §solved 2 (per-row declarations)" "VerdictTable" "a named-agent row under the paper sentence, or an unnamed row under row text",
-   mkHole "valueEvidenceRequiresL2" "P-R9 S1" "WitnessLayerTable" "value evidence uses L1",
+   mkRefused "valueEvidenceRequiresL2" "P-R9 S1" "false for arbitrary valueEvidence without a layer-admission hypothesis; True accepts an L1 witness",
    mkHole "wmTraceR2" "P-R2 §solved 1" "List R2TickLit" "fixture digest differs",
    mkHole "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
    mkHole "wmTraceR8" "P-R8 §solved 1" "List R8TickLit" "fixture digest differs",
@@ -924,7 +939,7 @@ private def holeDeclarations : List Declaration :=
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
    mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet",
    mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; currently firing (selector-seam blocker)",
-   mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "RouteTraceWitness" "a completed run with an empty route, or a hop absent from control-map-edges.edn"]
+   mkRefused "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "WM-RUN2 contains six measured-undrawn hops, so the existing route refutes conformance"]
 
 def registry : Registry :=
   {schemaVersion := 1, contractId := "wm-holes", moduleName := "DarkTower.WarMachine.Holes",
