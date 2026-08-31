@@ -455,6 +455,31 @@ structure ProbabilityKernel (S O : Type*) where
   nonnegative : ∀ s o, 0 ≤ mass s o
   normalised : ∀ s, ((support s).map (mass s)).sum = 1
 
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–29 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · `Q(o∣π)` is a normalized finite-support predictive distribution over vertex-tagged outcomes for each policy. -/
+abbrev PredictiveOutcomeKernel (PolicyIndex : Type*) (Obs : Vertex → Type*) :=
+  ProbabilityKernel PolicyIndex (Outcome Obs)
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · `Q(θ∣π)` is the normalized parameter prior predicted by a policy. -/
+abbrev ParameterPriorKernel (PolicyIndex Parameter : Type*) :=
+  ProbabilityKernel PolicyIndex Parameter
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · `Q(θ∣o,π)` is the normalized parameter posterior conditioned jointly on the observed outcome and policy. -/
+abbrev ParameterPosteriorKernel (PolicyIndex : Type*) (Obs : Vertex → Type*)
+    (Parameter : Type*) :=
+  ProbabilityKernel (PolicyIndex × Outcome Obs) Parameter
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The controlled state transition `B : S×U ⇝ S`. -/
+abbrev TransitionKernel (State Action : Type*) :=
+  ProbabilityKernel (State × Action) State
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7,37 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The normalized policy prior `E : 1 ⇝ Π`. -/
+abbrev PolicyPriorKernel (PolicyIndex : Type*) :=
+  ProbabilityKernel Unit PolicyIndex
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–23 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · Preferred outcomes `C` as a normalized distribution, distinct from the existing vertex-local pragmatic cost function. -/
+abbrev PreferenceDistribution (Obs : Vertex → Type*) :=
+  ProbabilityKernel Unit (Outcome Obs)
+
 structure NonnegativeReal where
   value : ℝ
   nonnegative : 0 ≤ value
@@ -747,6 +772,12 @@ private def closedDeclarations : List Declaration :=
    ("BeliefState", "sec-glossary.tex:9 · P-glossary-mathematics"),
    ("observationKernelRowMass", "sec-glossary.tex:27 · P-glossary-mathematics"),
    ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
+  ++ [mkClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics",
+      mkClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics",
+      mkClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics",
+      mkClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"]
   ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
       "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser"]
 
