@@ -99,13 +99,54 @@ structure AblationRow (Policy : Type*) where
 
 abbrev AblationTable (Prior Policy : Type*) := Prior → AblationRow Policy
 
-/-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former declaration asserted the existential for every carrier and graders, and was false for empty/singleton policies or identical graders. This is now the nonempty-policy predicate a concrete ablation must establish. -/
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former declaration asserted an existential for every carrier and graders, and was false for empty/singleton policies or identical graders. This predicate requires both argmins to exist and their complete minimizer sets to be disjoint; merely choosing two members of one tied minimizer set no longer counts as movement. -/
 def nonDegenerateAblationLaw {Prior Policy : Type*} (policies : List Policy)
     (grade pragmatic : Prior → Policy → ℝ) : Prop :=
-    policies ≠ [] ∧ ∃ prior πGrade πPragmatic,
-      IsArgminOn policies (grade prior) πGrade ∧
-      IsArgminOn policies (pragmatic prior) πPragmatic ∧
-      πGrade ≠ πPragmatic
+    policies ≠ [] ∧ ∃ prior,
+      (∃ πGrade, IsArgminOn policies (grade prior) πGrade) ∧
+      (∃ πPragmatic, IsArgminOn policies (pragmatic prior) πPragmatic) ∧
+      ∀ πGrade πPragmatic,
+        IsArgminOn policies (grade prior) πGrade →
+        IsArgminOn policies (pragmatic prior) πPragmatic →
+        πGrade ≠ πPragmatic
+
+inductive RecordedSnatchPolicy where
+  | grim | patterns | exchangeFirst | probeOneToken | alwaysAbstain
+  deriving DecidableEq, Repr
+
+def recordedSnatchPolicies : List RecordedSnatchPolicy :=
+  [.grim, .patterns, .exchangeFirst, .probeOneToken, .alwaysAbstain]
+
+/-- The recorded IEEE-754 doubles, interpreted exactly as their dyadic-rational values. -/
+def recordedSnatchG : RecordedSnatchPolicy → ℝ
+  | .grim | .probeOneToken => 2075861046811937 / 140737488355328
+  | .patterns | .exchangeFirst => 1220889258267895 / 70368744177664
+  | .alwaysAbstain => 4222137547668389 / 281474976710656
+
+def recordedSnatchRisk : RecordedSnatchPolicy → ℝ
+  | .grim | .probeOneToken => 8486449631976525 / 562949953421312
+  | .patterns | .exchangeFirst => 4975059755435969 / 281474976710656
+  | .alwaysAbstain => 4222137547668389 / 281474976710656
+
+/-- The exact recorded table has G minimizers `{grim, probeOneToken}` and the unique pragmatic-risk minimizer `alwaysAbstain`; the two minimizer sets are disjoint. -/
+theorem wmRecordedAblationNonDegenerate :
+    nonDegenerateAblationLaw recordedSnatchPolicies
+      (fun _ : Unit => recordedSnatchG) (fun _ : Unit => recordedSnatchRisk) := by
+  refine ⟨by simp [recordedSnatchPolicies], (), ?_, ?_, ?_⟩
+  · exact ⟨.grim, by
+      norm_num [IsArgminOn, recordedSnatchPolicies, recordedSnatchG]⟩
+  · exact ⟨.alwaysAbstain, by
+      norm_num [IsArgminOn, recordedSnatchPolicies, recordedSnatchRisk]⟩
+  · intro πG πP hG hP
+    have hg : πG = .grim ∨ πG = .probeOneToken := by
+      cases πG <;> norm_num [IsArgminOn, recordedSnatchPolicies,
+        recordedSnatchG] at hG
+      all_goals simp
+    have hp : πP = .alwaysAbstain := by
+      cases πP <;> norm_num [IsArgminOn, recordedSnatchPolicies,
+        recordedSnatchRisk] at hP
+      all_goals simp
+    rcases hg with rfl | rfl <;> rw [hp] <;> decide
 
 inductive TypedAbsence where
   | noPatternAddressesThisTension
@@ -919,11 +960,12 @@ private def closedDeclarations : List Declaration :=
       mkWitnessedClosed "organiseO4PrecedenceGovernance" "P-validated-R5 §3e O4 and S-G4"
       "CascadeDiff" "precedence changes neither order nor score",
       mkClosed "valueEvidenceRequiresL2" "P-R9 S1",
-      mkClosed "nonDegenerateAblationLaw" "P-validated-R5 §2a′"]
+      ]
 
 private def holeDeclarations : List Declaration :=
   [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
+   mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "ExactDyadicAblationTable" "recorded G and pragmatic minimizer sets overlap",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
    mkHole "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
    mkHole "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
