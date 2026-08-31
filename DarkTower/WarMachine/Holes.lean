@@ -484,8 +484,21 @@ structure NonnegativeReal where
   value : ℝ
   nonnegative : 0 ≤ value
 
-/-- HOLE · owner: sec-glossary.tex:7 · P-glossary-mathematics · holder: by-record · evidence: GenerativeModelWitness · falsifier: the proposed joint does not factor as observation × transition × policy prior · A generative model is the joint P(o,s,π). -/
-def GenerativeModel (Observation State PolicyIndex : Type*) : Type := sorry
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7 · P-glossary-mathematics · holder: by-record · evidence: GenerativeModelWitness · falsifier: the proposed joint does not factor as observation × transition × policy prior · A finite generative model shares one hidden-state carrier across observation and transition kernels and includes a normalized policy prior.  The shared type makes a differently wired state space unrepresentable. -/
+structure GenerativeModel (Obs : Vertex → Type*) (State Action PolicyIndex : Type*) where
+  observation : ProbabilityKernel State (Outcome Obs)
+  transition : TransitionKernel State Action
+  policyPrior : PolicyPriorKernel PolicyIndex
+
+/-- The one-step joint factor required by the model: observation likelihood ×
+controlled transition probability × policy prior. -/
+def generativeFactorMass {Obs : Vertex → Type*} {State Action PolicyIndex : Type*}
+    (model : GenerativeModel Obs State Action PolicyIndex)
+    (state : State) (action : Action) (nextState : State)
+    (outcome : Outcome Obs) (policy : PolicyIndex) : ℝ :=
+  model.observation.mass nextState outcome *
+    model.transition.mass (state, action) nextState *
+      model.policyPrior.mass () policy
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The observation model is a finite-support Markov kernel A : S ⇝ O; normalisation is a field, not an external shape check. -/
 abbrev observationKernel (State Observation : Type*) := ProbabilityKernel State Observation
@@ -635,7 +648,7 @@ def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
 def bayesianModelReduction (A aPrime a : List ℝ) : List ℝ :=
   (A.zip (aPrime.zip a)).map fun x => x.1 + x.2.1 - x.2.2
 
-/-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: REFUSED — G-D1 says Outcome/Q(o∣π) and the parameter kernel are missing · falsifier: REFUSED until those carriers are decided · The live posterior-spread bonus may not be promoted to canonical EIG. -/
+/-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: REFUSED — canonical EIG is now defined, but no theorem identifies the live aggregate posterior-spread bonus with it · falsifier: REFUSED unless the live bonus is shown equal to outcome-weighted posterior-to-prior KL · The live posterior-spread bonus may not be promoted to canonical EIG. -/
 def modelUncertaintyAndEIG : Prop := sorry
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:48 · P-glossary-mathematics · holder: by-record · π is the pattern-language cascade scored as one policy; the state-to-action result of inference is `DecisionRule`. -/
@@ -831,17 +844,19 @@ private def closedDeclarations : List Declaration :=
   ++ [mkClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics",
       mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
       mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
-      mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"]
+      mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkClosed "generativeFactorMass" "sec-glossary.tex:7 · P-glossary-mathematics"]
   ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
       "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
       mkWitnessedClosed "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"
       "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
       mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
-      "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG"]
+      "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
+      mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
+      "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior"]
 
 private def holeDeclarations : List Declaration :=
-  [mkHole "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics" "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
-   mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "Outcome/Q(o∣π) and parameter kernel are missing",
+  [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
    mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "AblationTable" "no prior has moved = true",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
