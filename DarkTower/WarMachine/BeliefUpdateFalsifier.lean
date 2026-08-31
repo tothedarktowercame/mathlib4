@@ -28,7 +28,8 @@ example : beliefUpdate learningRate kernel prior observation precision posterior
   constructor
   · rfl
   · simp [variationalFreeEnergy, predictionError, posterior, precision,
-      observation, Channel.all]
+      observation, prior, Channel.all, div_eq_mul_inv]
+    repeat apply add_nonneg <;> norm_num
 
 /-- Negative control: the shape-correct prior is not an update.  The C16
 runner mutates this negation away and requires Lean to reject the result. -/

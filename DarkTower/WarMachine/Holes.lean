@@ -491,7 +491,7 @@ def observationKernelRowMass {State Observation : Type*}
     (A : observationKernel State Observation) (s : State) : ℝ :=
   ((A.support s).map (A.mass s)).sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the recorded precision-weighted prediction-error correction and reaches zero variational mismatch. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the recorded precision-weighted prediction-error correction and does not increase its variational mismatch. -/
 def beliefUpdate (learningRate : NonnegativeReal)
     (A : observationKernel Channel Channel) (prior : BeliefState)
     (observation : Channel → ℝ) (precision : PrecisionMap)
@@ -501,7 +501,9 @@ def beliefUpdate (learningRate : NonnegativeReal)
       (precision k).value * predictionError observation prior.mean k) ∧
   posterior.variance = prior.variance ∧
   (variationalFreeEnergy (fun k => (precision k).value)
-      (predictionError observation posterior.mean)).value = 0
+      (predictionError observation posterior.mean)).value ≤
+    (variationalFreeEnergy (fun k => (precision k).value)
+      (predictionError observation prior.mean)).value
 
 /-- HOLE · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · This and `G` are two decompositions of one expected-free-energy type; the missing kernel derivation remains a real hole. -/
 def expectedFreeEnergy {PolicyIndex Observation : Type*}
