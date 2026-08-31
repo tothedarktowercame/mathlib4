@@ -577,8 +577,30 @@ theorem G_eq_expectedFreeEnergy {PolicyIndex : Type*} {Obs : Vertex → Type*}
   rw [risk_eq π, ambiguity_eq π]
   ring
 
-/-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ExpectedInformationGainWitness · falsifier: posterior-to-prior KL does not equal the recorded expected gain · Canonical EIG requires the outcome and parameter-posterior kernels. -/
-def expectedInformationGain (PolicyIndex : Type*) : Type := sorry
+/-- Expected information gain is kept distinct from free-energy values and from
+the live engineering posterior-spread bonus. -/
+structure ExpectedInformationGainValue where
+  value : ℝ
+
+/-- The information gained about parameters from one outcome: posterior-to-
+prior KL over the posterior kernel's declared support. -/
+def parameterInformationGain {PolicyIndex Parameter : Type*} {Obs : Vertex → Type*}
+    (prior : ParameterPriorKernel PolicyIndex Parameter)
+    (posterior : ParameterPosteriorKernel PolicyIndex Obs Parameter)
+    (_positivePrior : ∀ π o θ, θ ∈ posterior.support (π, o) → 0 < prior.mass π θ)
+    (π : PolicyIndex) (o : Outcome Obs) : ℝ :=
+  (posterior.support (π, o)).map (fun θ =>
+    posterior.mass (π, o) θ * Real.log (posterior.mass (π, o) θ / prior.mass π θ)) |>.sum
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ExpectedInformationGainWitness · falsifier: posterior-to-prior KL disagrees with recorded EIG · Canonical EIG is the predictive-outcome expectation of posterior-to-prior parameter KL. -/
+def expectedInformationGain {PolicyIndex Parameter : Type*} {Obs : Vertex → Type*}
+    (Q : PredictiveOutcomeKernel PolicyIndex Obs)
+    (prior : ParameterPriorKernel PolicyIndex Parameter)
+    (posterior : ParameterPosteriorKernel PolicyIndex Obs Parameter)
+    (positivePrior : ∀ π o θ, θ ∈ posterior.support (π, o) → 0 < prior.mass π θ)
+    (π : PolicyIndex) : ExpectedInformationGainValue :=
+  ⟨(Q.support π).map (fun o =>
+      Q.mass π o * parameterInformationGain prior posterior positivePrior π o) |>.sum⟩
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: LogMultivariateBetaWitness · falsifier: the analytic value disagrees with the Dirichlet normaliser · The logarithm of the Dirichlet normaliser.  Its subtype excludes an empty vector and every zero or negative concentration, where the Dirichlet distribution is not defined. -/
 def logMultivariateBeta
@@ -807,15 +829,18 @@ private def closedDeclarations : List Declaration :=
       mkClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics",
       mkClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"]
   ++ [mkClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics",
-      mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"]
+      mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
+      mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"]
   ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
       "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
       mkWitnessedClosed "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"
-      "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value"]
+      "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
+      mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
+      "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG"]
 
 private def holeDeclarations : List Declaration :=
   [mkHole "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics" "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
-   mkHole "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics" "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
    mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "Outcome/Q(o∣π) and parameter kernel are missing",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
    mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "AblationTable" "no prior has moved = true",
