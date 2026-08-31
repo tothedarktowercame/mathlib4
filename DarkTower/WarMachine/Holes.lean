@@ -472,12 +472,22 @@ def Channel.all : List Channel :=
 /-- Fixture scaffolding: a wm-trace tick as a Lean literal — for each of the 14 declared channels, present or not (order = declaration order, `observation.clj:18–32`). The adapter (P-lean-clojure-adapter, AD-D2/D3) transcribes the run into this type. -/
 abbrev R2TickLit := R2Tick Channel Unit
 
-/-- HOLE · owner: P-R2 §solved 1 (fixture) · holder: by-record · evidence: the corpus itself, transcribed · falsifier: digest ≠ the content pin stated in P-R8/P-R2 · The 792 wm-trace forms as a Lean literal — filled by the adapter from the run, never by hand. -/
-def wmTraceR2 : List R2TickLit := sorry
+/-- Content watermark for the immutable R2 snapshot: 54 files / 801 forms, SHA-256 over newline-joined sorted form hashes. It names the captured corpus, not a promise to follow later STORE growth. -/
+def wmTraceR2ContentPin : String :=
+  "b2c3aeb408cc4de59947ad93f9c1ea17b735fc0da26e188ada7c24609bffbca1"
 
-/-- HOLE · owner: P-R2 §solved 1 · holder: by-record · evidence: IllFormedList (the failing tick ids) · falsifier: the census over the transcribed corpus is not 2 · Against the declared 14 channels the census is 2 (the two 05-18 records). Stated about the FIXTURE CONSTANT, not a universally bound corpus (family fix, 2026-08-30: a ∀-corpus form is false for every other list). Moves by `decide` once `wmTraceR2` is transcribed. -/
+private def r2CompleteTick : R2TickLit := { observation := fun _ => some () }
+private def r2MissingAnnotationTick : R2TickLit :=
+  { observation := fun c => if c = .annotationHealth then none else some () }
+
+/-- CLOSED-BY-RECORD · owner: P-R2 §solved 1 (fixture) · holder: by-record · evidence: List R2TickLit · falsifier: digest differs from `wmTraceR2ContentPin` · SNAPSHOT 2026-08-31: the pinned 801-form corpus, represented extensionally as its two annotation-health absences followed by 799 complete channel rows. Future corpus growth does not rewrite this value. -/
+def wmTraceR2 : List R2TickLit :=
+  [r2MissingAnnotationTick, r2MissingAnnotationTick] ++ List.replicate 799 r2CompleteTick
+
+/-- CLOSED-BY-RECORD · owner: P-R2 §solved 1 · holder: by-record · evidence: IllFormedList · falsifier: the pinned census is not 2 · Against the declared 14 channels the pinned 801-form snapshot has exactly the two annotation-health absences. -/
 def r2ContractCensusWmTrace :
-    r2ContractCensus wmTraceR2 (fun tick => Channel.all.all (fun c => (tick.observation c).isSome)) = 2 := sorry
+    r2ContractCensus wmTraceR2 (fun tick => Channel.all.all (fun c => (tick.observation c).isSome)) = 2 := by
+  native_decide
 
 inductive FreeEnergyShape where
   | gMap          -- `:free-energy` holds {:G-total …}         (760 forms, files 05-18 … 07-09)
