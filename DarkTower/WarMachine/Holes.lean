@@ -544,10 +544,38 @@ def beliefUpdate (learningRate sensorNoiseFloor : NonnegativeReal)
     (variationalFreeEnergy (fun k => (precision k).value)
       (predictionError observation prior.mean)).value
 
-/-- HOLE · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · This and `G` are two decompositions of one expected-free-energy type; the missing kernel derivation remains a real hole. -/
-def expectedFreeEnergy {PolicyIndex Observation : Type*}
-    (outcomeKernel : PolicyIndex → Observation → ℝ)
-    (risk ambiguity : PolicyIndex → ℝ) : PolicyIndex → ExpectedFreeEnergyValue := sorry
+/-- The risk term `KL[Q(o∣π)‖C]`, over the predictive kernel's declared finite
+support.  Strict positivity of `C` on that support keeps the real-valued formula
+inside its domain; a zero preferred mass would require an extended-real score. -/
+def predictiveOutcomeRisk {PolicyIndex : Type*} {Obs : Vertex → Type*}
+    (Q : PredictiveOutcomeKernel PolicyIndex Obs) (Cdist : PreferenceDistribution Obs)
+    (_positivePreference : ∀ π o, o ∈ Q.support π → 0 < Cdist.mass () o)
+    (π : PolicyIndex) : ℝ :=
+  (Q.support π).map (fun o => Q.mass π o * Real.log (Q.mass π o / Cdist.mass () o)) |>.sum
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · Expected free energy is predictive-outcome risk plus expected ambiguity. -/
+def expectedFreeEnergy {PolicyIndex : Type*} {Obs : Vertex → Type*}
+    (Q : PredictiveOutcomeKernel PolicyIndex Obs) (Cdist : PreferenceDistribution Obs)
+    (positivePreference : ∀ π o, o ∈ Q.support π → 0 < Cdist.mass () o)
+    (ambiguity : PolicyIndex → ℝ) : PolicyIndex → ExpectedFreeEnergyValue :=
+  fun π => ⟨predictiveOutcomeRisk Q Cdist positivePreference π + ambiguity π⟩
+
+/-- The two decompositions agree exactly under their bridge assumptions: `G`'s
+risk is the kernel-derived KL and its epistemic gain is negative ambiguity. -/
+theorem G_eq_expectedFreeEnergy {PolicyIndex : Type*} {Obs : Vertex → Type*}
+    (risk eig : PolicyIndex → ℝ)
+    (Q : PredictiveOutcomeKernel PolicyIndex Obs) (Cdist : PreferenceDistribution Obs)
+    (positivePreference : ∀ π o, o ∈ Q.support π → 0 < Cdist.mass () o)
+    (ambiguity : PolicyIndex → ℝ)
+    (risk_eq : ∀ π, risk π = predictiveOutcomeRisk Q Cdist positivePreference π)
+    (ambiguity_eq : ∀ π, ambiguity π = -eig π) :
+  ∀ π, G risk eig π = expectedFreeEnergy Q Cdist positivePreference ambiguity π := by
+  intro π
+  change ExpectedFreeEnergyValue.mk (risk π - eig π) =
+    ExpectedFreeEnergyValue.mk (predictiveOutcomeRisk Q Cdist positivePreference π + ambiguity π)
+  congr 1
+  rw [risk_eq π, ambiguity_eq π]
+  ring
 
 /-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ExpectedInformationGainWitness · falsifier: posterior-to-prior KL does not equal the recorded expected gain · Canonical EIG requires the outcome and parameter-posterior kernels. -/
 def expectedInformationGain (PolicyIndex : Type*) : Type := sorry
@@ -778,12 +806,15 @@ private def closedDeclarations : List Declaration :=
       mkClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics",
       mkClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics",
       mkClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"]
+  ++ [mkClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics",
+      mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"]
   ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
-      "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser"]
+      "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
+      mkWitnessedClosed "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"
+      "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value"]
 
 private def holeDeclarations : List Declaration :=
   [mkHole "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics" "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
-   mkHole "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics" "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
    mkHole "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics" "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
    mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "Outcome/Q(o∣π) and parameter kernel are missing",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",

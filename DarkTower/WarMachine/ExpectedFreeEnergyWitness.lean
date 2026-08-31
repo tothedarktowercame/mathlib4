@@ -1,0 +1,45 @@
+import DarkTower.WarMachine.Holes
+
+namespace DarkTower.WarMachine.ExpectedFreeEnergyWitness
+
+open Holes
+
+inductive TestObservation : Vertex → Type
+  | evidenceDatum : TestObservation .evidence
+
+inductive TestPolicy
+  | inspect
+
+private def datum : Outcome TestObservation := ⟨.evidence, .evidenceDatum⟩
+
+private def Q : PredictiveOutcomeKernel TestPolicy TestObservation where
+  support := fun _ => [datum]
+  mass := fun _ _ => 1
+  nonnegative := by intros; norm_num
+  normalised := by intros; norm_num
+
+private def Cdist : PreferenceDistribution TestObservation where
+  support := fun _ => [datum]
+  mass := fun _ _ => 1
+  nonnegative := by intros; norm_num
+  normalised := by intros; norm_num
+
+private theorem positivePreference :
+    ∀ π o, o ∈ Q.support π → 0 < Cdist.mass () o := by
+  intros
+  norm_num [Cdist]
+
+/-- Independently, a one-point predictive and preferred distribution has KL
+zero; adding ambiguity 2 therefore gives expected free energy 2. -/
+theorem onePointFixture :
+    expectedFreeEnergy Q Cdist positivePreference (fun _ => 2) .inspect = ⟨2⟩ := by
+  norm_num [expectedFreeEnergy, predictiveOutcomeRisk, Q, Cdist]
+
+/-- The same fixture witnesses the decomposition bridge: risk `0` minus
+epistemic gain `-2` equals KL `0` plus ambiguity `2`. -/
+theorem decompositionFixture :
+    G (fun _ : TestPolicy => 0) (fun _ => -2) .inspect =
+      expectedFreeEnergy Q Cdist positivePreference (fun _ => 2) .inspect := by
+  norm_num [G, expectedFreeEnergy, predictiveOutcomeRisk, Q, Cdist]
+
+end DarkTower.WarMachine.ExpectedFreeEnergyWitness
