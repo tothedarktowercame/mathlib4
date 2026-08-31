@@ -6220,7 +6220,7 @@ abbrev TransitionKernel (State Action : Type*) :=
 abbrev PolicyPriorKernel (PolicyIndex : Type*) :=
   ProbabilityKernel Unit PolicyIndex
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–23 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · Preferred outcomes `C` as a normalized distribution, distinct from the existing vertex-local pragmatic cost function. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–23 · P-glossary-mathematics · holder: by-record · evidence: PreferenceDistributionWitness · falsifier: a state-conditioned kernel or vertex-local pragmatic cost is accepted as the unconditioned preferred-outcome distribution · Preferred outcomes `C` as a normalized distribution, distinct from the existing vertex-local pragmatic cost function. -/
 abbrev PreferenceDistribution (Obs : Vertex → Type*) :=
   ProbabilityKernel Unit (Outcome Obs)
 
@@ -6694,7 +6694,8 @@ private def closedDeclarations : List Declaration :=
       mkClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics",
-      mkClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"]
+      mkWitnessedClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"
+      "PreferenceDistributionWitness" "a state-conditioned kernel or vertex-local pragmatic cost is accepted as the unconditioned preferred-outcome distribution"]
   ++ [mkClosed "observationEntropy" "sec-glossary.tex:21,25 · P-glossary-mathematics",
       mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
       mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
