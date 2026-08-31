@@ -6225,7 +6225,20 @@ def predictiveOutcomeRisk {PolicyIndex : Type*} {Obs : Vertex → Type*}
     (π : PolicyIndex) : ℝ :=
   (Q.support π).map (fun o => Q.mass π o * Real.log (Q.mass π o / Cdist.mass () o)) |>.sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · Expected free energy is predictive-outcome risk plus expected ambiguity. -/
+/-- Shannon entropy, in nats, of one finite observation-kernel row.  Mathlib's
+`Real.log 0 = 0` gives the standard zero-mass convention `0 * log 0 = 0`. -/
+def observationEntropy {State Observation : Type*}
+    (A : observationKernel State Observation) (s : State) : ℝ :=
+  -((A.support s).map (fun o => A.mass s o * Real.log (A.mass s o))).sum
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21,25 · P-glossary-mathematics · holder: by-record · evidence: AmbiguityWitness · falsifier: expected observation entropy disagrees with the kernel-derived value · Ambiguity is expected observation entropy: the predicted state mass weights the entropy of that state's observation-model row. -/
+def ambiguity {PolicyIndex State Observation : Type*}
+    (predictedState : ProbabilityKernel PolicyIndex State)
+    (A : observationKernel State Observation) (π : PolicyIndex) : ℝ :=
+  (predictedState.support π).map
+    (fun s => predictedState.mass π s * observationEntropy A s) |>.sum
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · Expected free energy is predictive-outcome risk plus expected ambiguity.  The ambiguity argument is an explicit estimator seam; the canonical kernel-derived estimator is `ambiguity` above. -/
 def expectedFreeEnergy {PolicyIndex : Type*} {Obs : Vertex → Type*}
     (Q : PredictiveOutcomeKernel PolicyIndex Obs) (Cdist : PreferenceDistribution Obs)
     (positivePreference : ∀ π o, o ∈ Q.support π → 0 < Cdist.mass () o)
@@ -6597,6 +6610,7 @@ private def closedDeclarations : List Declaration :=
       mkClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics",
       mkClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"]
   ++ [mkClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics",
+      mkClosed "observationEntropy" "sec-glossary.tex:21,25 · P-glossary-mathematics",
       mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
       mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics",
@@ -6607,6 +6621,8 @@ private def closedDeclarations : List Declaration :=
       "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
       mkWitnessedClosed "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"
       "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
+      mkWitnessedClosed "ambiguity" "sec-glossary.tex:21,25 · P-glossary-mathematics"
+      "AmbiguityWitness" "expected observation entropy disagrees with the kernel-derived value",
       mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
