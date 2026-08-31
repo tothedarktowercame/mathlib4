@@ -6307,8 +6307,55 @@ def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
 def bayesianModelReduction (A aPrime a : List ℝ) : List ℝ :=
   (A.zip (aPrime.zip a)).map fun x => x.1 + x.2.1 - x.2.2
 
-/-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: REFUSED — canonical EIG is now defined, but no theorem identifies the live aggregate posterior-spread bonus with it · falsifier: REFUSED unless the live bonus is shown equal to outcome-weighted posterior-to-prior KL · The live posterior-spread bonus may not be promoted to canonical EIG. -/
-def modelUncertaintyAndEIG : Prop := sorry
+/-- The live engineering quantity: a sum of current posterior standard
+deviations.  It has no policy, predicted-outcome, or simulated-update input. -/
+def modelUncertaintyBonus (posteriorStddevs : List NonnegativeReal) : NonnegativeReal :=
+  ⟨(posteriorStddevs.map (·.value)).sum, by
+    induction posteriorStddevs with
+    | nil => simp
+    | cons x xs ih =>
+      simpa using add_nonneg x.nonnegative ih⟩
+
+private inductive EIGCounterPolicy where | only
+private inductive EIGCounterParameter where | only
+private def EIGCounterObs : Vertex → Type := fun _ => Unit
+private def eigCounterOutcome : Outcome EIGCounterObs := ⟨.evidence, ()⟩
+
+private def eigCounterPredictive :
+    PredictiveOutcomeKernel EIGCounterPolicy EIGCounterObs :=
+  { support := fun _ => [eigCounterOutcome]
+    mass := fun _ _ => 1
+    nonnegative := by intros; norm_num
+    normalised := by intros; norm_num }
+
+private def eigCounterPrior :
+    ParameterPriorKernel EIGCounterPolicy EIGCounterParameter :=
+  { support := fun _ => [.only]
+    mass := fun _ _ => 1
+    nonnegative := by intros; norm_num
+    normalised := by intros; norm_num }
+
+private def eigCounterPosterior :
+    ParameterPosteriorKernel EIGCounterPolicy EIGCounterObs EIGCounterParameter :=
+  { support := fun _ => [.only]
+    mass := fun _ _ => 1
+    nonnegative := by intros; norm_num
+    normalised := by intros; norm_num }
+
+private theorem eigCounterPositivePrior :
+    ∀ π o θ, θ ∈ eigCounterPosterior.support (π, o) →
+      0 < eigCounterPrior.mass π θ := by
+  intros
+  norm_num [eigCounterPrior]
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · COUNTEREXAMPLE 2026-08-31: the former refusal asked whether the live aggregate posterior-spread bonus equals canonical outcome-weighted posterior-to-prior KL.  In the normalized one-policy/one-outcome/one-parameter model with identical point-mass prior and posterior, canonical EIG is zero, while a positive recorded posterior standard deviation gives live bonus one.  Therefore no unconditional identification exists; promoting the live bonus to canonical EIG is permanently refuted. -/
+def modelUncertaintyAndEIG :
+    (modelUncertaintyBonus [⟨1, by norm_num⟩]).value ≠
+      (expectedInformationGain eigCounterPredictive eigCounterPrior
+        eigCounterPosterior eigCounterPositivePrior .only).value := by
+  norm_num [modelUncertaintyBonus, expectedInformationGain,
+    parameterInformationGain, eigCounterPredictive, eigCounterPrior,
+    eigCounterPosterior, eigCounterOutcome]
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:48 · P-glossary-mathematics · holder: by-record · π is the pattern-language cascade scored as one policy; the state-to-action result of inference is `DecisionRule`. -/
 abbrev cascadeGrainPi (P : Type*) := Cascade P
@@ -6505,6 +6552,8 @@ private def closedDeclarations : List Declaration :=
       mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
       mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkClosed "modelUncertaintyBonus" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkClosed "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "generativeFactorMass" "sec-glossary.tex:7 · P-glossary-mathematics",
       mkClosed "wmCascadeDiffFixture" "P-validated-R5 §3e O1–O4"]
   ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
@@ -6527,8 +6576,7 @@ private def closedDeclarations : List Declaration :=
       ]
 
 private def holeDeclarations : List Declaration :=
-  [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
-   mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
+  [mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
    mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "ExactDyadicAblationTable" "recorded G and pragmatic minimizer sets overlap",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
    mkHole "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
