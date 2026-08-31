@@ -59,6 +59,22 @@ structure Fold (Wiring PolicyHole : Type*) where
   coverageScoreDelta : Option ℝ
   policyHoles : List PolicyHole
 
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:66 · P-glossary-mathematics · holder: by-record · evidence: FoldEscrowRecordWitness · falsifier: a reconstructible prompt/digest pair is admitted to the non-reconstructible quarantine · The escrow envelope keeps prompt inputs, the stored digest, and the authored turn together; arming and fold output remain typed payloads rather than ambient state. -/
+structure FoldEscrowRecord (PromptInputs Digest Turn Arming FoldOutput : Type*) where
+  promptInputs : PromptInputs
+  storedDigest : Digest
+  turn : Turn
+  arming : Arming
+  foldOutput : FoldOutput
+
+/-- Reconstructibility is equality between the stored digest and the digest of
+the prompt reconstructed solely from the envelope's recorded inputs. -/
+def FoldEscrowRecord.reconstructible
+    {PromptInputs Digest Turn Arming FoldOutput Prompt : Type*}
+    (record : FoldEscrowRecord PromptInputs Digest Turn Arming FoldOutput)
+    (reconstruct : PromptInputs → Prompt) (digest : Prompt → Digest) : Prop :=
+  digest (reconstruct record.promptInputs) = record.storedDigest
+
 structure Repository (P : Type*) where
   patterns : Set P
   standsOn : P → P → Prop
@@ -6655,6 +6671,9 @@ private def closedDeclarations : List Declaration :=
       "HaveWantArrowWitness" "a composition whose left want differs from the right have elaborates",
       mkWitnessedClosed "Fold" "sec-glossary.tex:66 · P-glossary-mathematics"
       "FoldWitness" "a fold without explicit policy holes elaborates",
+      mkWitnessedClosed "FoldEscrowRecord" "sec-glossary.tex:66 · P-glossary-mathematics"
+      "FoldEscrowRecordWitness" "a reconstructible prompt/digest pair is admitted to the non-reconstructible quarantine",
+      mkClosed "FoldEscrowRecord.reconstructible" "sec-glossary.tex:66 · P-glossary-mathematics",
       mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
