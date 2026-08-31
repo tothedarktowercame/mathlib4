@@ -6348,7 +6348,7 @@ private theorem eigCounterPositivePrior :
   intros
   norm_num [eigCounterPrior]
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · COUNTEREXAMPLE 2026-08-31: the former refusal asked whether the live aggregate posterior-spread bonus equals canonical outcome-weighted posterior-to-prior KL.  In the normalized one-policy/one-outcome/one-parameter model with identical point-mass prior and posterior, canonical EIG is zero, while a positive recorded posterior standard deviation gives live bonus one.  Therefore no unconditional identification exists; promoting the live bonus to canonical EIG is permanently refuted. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: proof term · falsifier: the normalized point-mass counterexample no longer elaborates, or the collapsed equality elaborates · COUNTEREXAMPLE 2026-08-31: the former refusal asked whether the live aggregate posterior-spread bonus equals canonical outcome-weighted posterior-to-prior KL.  In the normalized one-policy/one-outcome/one-parameter model with identical point-mass prior and posterior, canonical EIG is zero, while a positive recorded posterior standard deviation gives live bonus one.  Therefore no unconditional identification exists; promoting the live bonus to canonical EIG is permanently refuted. -/
 def modelUncertaintyAndEIG :
     (modelUncertaintyBonus [⟨1, by norm_num⟩]).value ≠
       (expectedInformationGain eigCounterPredictive eigCounterPrior
@@ -6601,7 +6601,6 @@ private def closedDeclarations : List Declaration :=
       mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "modelUncertaintyBonus" "sec-glossary.tex:29 · P-glossary-mathematics",
-      mkClosed "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "generativeFactorMass" "sec-glossary.tex:7 · P-glossary-mathematics",
       mkClosed "wmCascadeDiffFixture" "P-validated-R5 §3e O1–O4"]
   ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
@@ -6612,6 +6611,8 @@ private def closedDeclarations : List Declaration :=
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
       "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
+      mkWitnessedClosed "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics"
+      "proof term" "the normalized point-mass counterexample no longer elaborates, or the collapsed equality elaborates",
       mkWitnessedClosed "organiseO1NodesRecorded" "P-validated-R5 §3e O1"
       "CascadeDiff" "nodes mismatch or additions unrecorded",
       mkWitnessedClosed "organiseO2AuthoredReachability" "P-validated-R5 §3e O2"
