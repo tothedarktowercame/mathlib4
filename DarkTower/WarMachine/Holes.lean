@@ -33,6 +33,26 @@ structure Cascade (P : Type*) where
   acyclic : acyclicDescent edges
   precedence : List P
 
+/-- The three serialized lifecycle states of one endpoint-keyed have→want
+arrow type. These are states of one arrow, not three arrow kinds. -/
+inductive HaveWantArrowState where
+  | correlated
+  | open
+  | constructed
+  deriving DecidableEq
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:70 · P-glossary-mathematics · holder: by-record · evidence: HaveWantArrowWitness · falsifier: a composition whose left want differs from the right have elaborates · A Demonstration Foundry arrow is identified by its exact `(have, want)` endpoint pair; its lifecycle state does not change that identity. -/
+structure HaveWantArrow (Endpoint : Type*) where
+  source : Endpoint
+  target : Endpoint
+  state : HaveWantArrowState
+
+/-- A serialized-arrow composition exists only when the first arrow's wanted
+endpoint is exactly the second arrow's available endpoint. -/
+structure HaveWantArrowComposition {Endpoint : Type*}
+    (left right : HaveWantArrow Endpoint) : Prop where
+  endpointMatch : left.target = right.source
+
 structure Repository (P : Type*) where
   patterns : Set P
   standsOn : P → P → Prop
@@ -6577,6 +6597,8 @@ private def closedDeclarations : List Declaration :=
    ("softmax", "sec-glossary.tex:39 · P-glossary-mathematics"),
    ("bayesianModelReduction", "sec-glossary.tex:54 · P-glossary-mathematics"),
    ("Channel", "P-R2 §solved 1 (Channel)"), ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
+   ("HaveWantArrowState", "sec-glossary.tex:70 · P-glossary-mathematics"),
+   ("HaveWantArrowComposition", "sec-glossary.tex:70 · P-glossary-mathematics"),
    ("Tension", "P-validated-R5 §3e"), ("InformationState", "P-validated-R5 §3d"),
    ("DecisionRule", "P-validated-R5 §3"), ("Outcome", "P-validated-R5 §2a"),
    ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
@@ -6623,6 +6645,8 @@ private def closedDeclarations : List Declaration :=
       "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
       mkWitnessedClosed "ambiguity" "sec-glossary.tex:21,25 · P-glossary-mathematics"
       "AmbiguityWitness" "expected observation entropy disagrees with the kernel-derived value",
+      mkWitnessedClosed "HaveWantArrow" "sec-glossary.tex:70 · P-glossary-mathematics"
+      "HaveWantArrowWitness" "a composition whose left want differs from the right have elaborates",
       mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
