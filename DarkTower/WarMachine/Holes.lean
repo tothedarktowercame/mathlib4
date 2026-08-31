@@ -492,14 +492,27 @@ def observationKernelRowMass {State Observation : Type*}
     (A : observationKernel State Observation) (s : State) : ℝ :=
   ((A.support s).map (A.mass s)).sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the recorded precision-weighted prediction-error correction and does not increase its variational mismatch. Its variance remains a required carrier but is unconstrained here pending a recorded update rate, sensor-noise floor, and evidence-class precision mapping. -/
-def beliefUpdate (learningRate : NonnegativeReal)
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the precision-weighted prediction-error correction and an evidence-weighted EMA of squared error plus sensor-noise floor. `none` is loud unknown provenance: both mean and variance pass through. Defaults remain external parameters recorded by C32. -/
+def beliefUpdate (learningRate sensorNoiseFloor : NonnegativeReal)
+    (evidenceWeight : Channel → Option NonnegativeReal)
     (A : observationKernel Channel Channel) (prior : BeliefState)
     (observation : Channel → ℝ) (precision : PrecisionMap)
     (posterior : BeliefState) : Prop :=
-  posterior.mean = (fun k =>
-    prior.mean k + learningRate.value * observationKernelRowMass A k *
-      (precision k).value * predictionError observation prior.mean k) ∧
+  learningRate.value ≤ 1 ∧
+  (∀ k w, evidenceWeight k = some w → w.value ≤ 1) ∧
+  (∀ k, posterior.mean k =
+    match evidenceWeight k with
+    | none => prior.mean k
+    | some w => prior.mean k + learningRate.value * w.value *
+        observationKernelRowMass A k * (precision k).value *
+          predictionError observation prior.mean k) ∧
+  (∀ k, (posterior.variance k).value =
+    match evidenceWeight k with
+    | none => (prior.variance k).value
+    | some w =>
+        (1 - learningRate.value * w.value) * (prior.variance k).value +
+          learningRate.value * w.value *
+            ((predictionError observation prior.mean k) ^ 2 + sensorNoiseFloor.value)) ∧
   (variationalFreeEnergy (fun k => (precision k).value)
       (predictionError observation posterior.mean)).value ≤
     (variationalFreeEnergy (fun k => (precision k).value)
