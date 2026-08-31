@@ -546,7 +546,7 @@ def r2ContractCensus {Channel Value : Type*} (corpus : List (R2Tick Channel Valu
     (wellFormed? : R2Tick Channel Value → Bool) : Nat :=
   (corpus.filter (fun tick => !wellFormed? tick)).length
 
-/-- CLOSED-BY-RECORD · owner: P-R2 §solved 1 (Channel) · holder: by-record · The fourteen declared channels as NAMED constructors in declaration order (`observation.clj:18–32`) — identity and order, not arity (claude-13's R2-D2 read via claude-20, ratified 2026-08-30: `Fin 14` could not say "these names in this order"; falsifier: a fifteenth key in any tick). -/
+/-- CLOSED-BY-RECORD · owner: P-R2 §solved 1 (Channel) · holder: by-record · evidence: ChannelWitness · falsifier: the declared names or order differ from the 14-channel record · The fourteen declared channels as NAMED constructors in declaration order (`observation.clj:18–32`) — identity and order, not arity. Presence/typed absence belongs to a measurement at a channel, not to channel identity. -/
 inductive Channel where
   | loopHealth | supportCoverage | attackCoverage | missionHealth | stackPct | consultingPct
   | portfolioPct | mathematicsPct | activeRepoRatio | sorryCountNorm | couplingDensity
@@ -6661,7 +6661,7 @@ private def closedDeclarations : List Declaration :=
    ("bayesFactorThreshold", "sec-glossary.tex:60 · P-glossary-mathematics"),
    ("softmax", "sec-glossary.tex:39 · P-glossary-mathematics"),
    ("bayesianModelReduction", "sec-glossary.tex:54 · P-glossary-mathematics"),
-   ("Channel", "P-R2 §solved 1 (Channel)"), ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
+   ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
    ("HaveWantArrowState", "sec-glossary.tex:70 · P-glossary-mathematics"),
    ("HaveWantArrowComposition", "sec-glossary.tex:70 · P-glossary-mathematics"),
    ("ControlPolicy", "sec-glossary.tex:35 · P-glossary-mathematics"),
@@ -6721,6 +6721,8 @@ private def closedDeclarations : List Declaration :=
       mkClosed "FoldEscrowRecord.reconstructible" "sec-glossary.tex:66 · P-glossary-mathematics",
       mkWitnessedClosed "BeliefState" "sec-glossary.tex:9 · P-glossary-mathematics"
       "BeliefStateWitness" "a declared channel lacks its mean or nonnegative variance",
+      mkWitnessedClosed "Channel" "P-R2 §solved 1 (Channel)"
+      "ChannelWitness" "the declared names or order differ from the 14-channel record",
       mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
       "ObservationKernelWitness" "a row has negative mass or its declared masses do not sum to one",
       mkWitnessedClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics"
