@@ -326,7 +326,7 @@ def r9CheckerSound {Part : Type*} [DecidableEq Part] (decide? : Part → Set Par
       independenceVerdict (some claim) witness decide? ≠ .independent) ∧
     (independenceVerdict (some claim) witness decide? = .independent → independent claim witness)
 
-/-- HOLE · owner: P-R9 §solved 3 (claude-13's load-bearing lemma, ratified 2026-08-30) · holder: by-record · evidence: a proof term · falsifier: `independenceVerdict` decides membership itself and ignores `decide?` · The checker argument is load-bearing: there is an UNSOUND `decide?` under which a self-producer is judged `independent` — so a wrong checker can be detected, and the Lean definition does not bypass its own argument. -/
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 3 (claude-13's load-bearing lemma, ratified 2026-08-30) · holder: by-record · evidence: a proof term · falsifier: `independenceVerdict` decides membership itself and ignores `decide?` · The checker argument is load-bearing: there is an UNSOUND `decide?` under which a self-producer is judged `independent` — so a wrong checker can be detected, and the Lean definition does not bypass its own argument. -/
 def r9VerdictConsultsChecker :
   ∀ {Part : Type*} [DecidableEq Part] (claim : Claim Part) (w : Witness Part),
     w.producer ∈ claim.producingPart →
@@ -389,7 +389,7 @@ private def declaredVerdictRow (id : String) : VerdictRow :=
 /-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (fixture) · holder: by-record · evidence: VerdictTable · falsifier: a row missing or a verdict absent · The pinned R9-D2 declared-part run. -/
 def wmVerdictsDeclared : VerdictTable := wmVerdictRowIds.map declaredVerdictRow
 
-/-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: by-record · evidence: wmVerdictsDeclared · falsifier: a row with inDeclaredPart = true judged independent · The shipped checker's recorded verdicts are sound. Moves by `decide` once the table is transcribed; false if the checker is broken. -/
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 3 (falsifier) · holder: by-record · evidence: wmVerdictsDeclared · falsifier: a row with inDeclaredPart = true judged independent · The shipped checker's recorded verdicts are sound. Proved directly over the source table; false if the checker is broken. -/
 def r9WmVerdictsSound : r9VerdictsSound wmVerdictsDeclared := by
   simp [r9VerdictsSound, wmVerdictsDeclared, wmVerdictRowIds,
     declaredVerdictRow, VerdictRow.inDeclaredPart]
@@ -6538,14 +6538,14 @@ private def holeDeclarations : List Declaration :=
    mkHole "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
    mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
-   mkHole "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
+   mkWitnessedClosed "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
    mkWitnessedClosed "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
    mkWitnessedClosed "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
-   mkHole "r9WmVerdictsSound" "P-R9 §solved 3" "VerdictTable" "self producer judged independent",
+   mkWitnessedClosed "r9WmVerdictsSound" "P-R9 §solved 3" "VerdictTable" "self producer judged independent",
    mkHole "r9TwoRunCensus" "P-R9 §solved 2" "VerdictTable" "either thirteen-row census differs",
    mkHole "r9WmPerRowDeclarations" "P-R9 §solved 2 (per-row declarations)" "VerdictTable" "a named-agent row under the paper sentence, or an unnamed row under row text",
-   mkHole "wmTraceR2" "P-R2 §solved 1" "List R2TickLit" "fixture digest differs",
-   mkHole "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
+   mkWitnessedClosed "wmTraceR2" "P-R2 §solved 1" "List R2TickLit" "fixture digest differs",
+   mkWitnessedClosed "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
    mkWitnessedClosed "wmTraceR8" "P-R8 §solved 1" "R8PinnedSnapshot" "fixture digest differs",
    mkWitnessedClosed "r8CensusWmTrace" "P-R8 §solved 1" "R8DispositionEvidence" "triple differs from (755,32,5)",
    mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
