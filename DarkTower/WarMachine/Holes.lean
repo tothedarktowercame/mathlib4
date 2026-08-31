@@ -6301,7 +6301,7 @@ def beliefUpdate (learningRate sensorNoiseFloor : NonnegativeReal)
     (variationalFreeEnergy (fun k => (precision k).value)
       (predictionError observation prior.mean)).value
 
-/-- The risk term `KL[Q(o∣π)‖C]`, over the predictive kernel's declared finite
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–23 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeRiskWitness · falsifier: predictive support contains an outcome with zero preference mass, or the KL value disagrees with the reference · The risk term `KL[Q(o∣π)‖C]`, over the predictive kernel's declared finite
 support.  Strict positivity of `C` on that support keeps the real-valued formula
 inside its domain; a zero preferred mass would require an extended-real score. -/
 def predictiveOutcomeRisk {PolicyIndex : Type*} {Obs : Vertex → Type*}
@@ -6699,8 +6699,7 @@ private def closedDeclarations : List Declaration :=
       mkClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics",
       mkClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics",
       mkClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"]
-  ++ [mkClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics",
-      mkClosed "observationEntropy" "sec-glossary.tex:21,25 · P-glossary-mathematics",
+  ++ [mkClosed "observationEntropy" "sec-glossary.tex:21,25 · P-glossary-mathematics",
       mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
       mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics",
@@ -6724,6 +6723,8 @@ private def closedDeclarations : List Declaration :=
       "BeliefStateWitness" "a declared channel lacks its mean or nonnegative variance",
       mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
       "ObservationKernelWitness" "a row has negative mass or its declared masses do not sum to one",
+      mkWitnessedClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics"
+      "PredictiveOutcomeRiskWitness" "predictive support contains an outcome with zero preference mass, or KL disagrees with the reference",
       mkWitnessedClosed "ControlVocabulary" "sec-glossary.tex:35 · P-glossary-mathematics"
       "ControlVocabularyWitness" "a policy containing a control outside its vocabulary elaborates",
       mkWitnessedClosed "aliveness" "sec-glossary.tex:50 · P-glossary-mathematics"
