@@ -6393,7 +6393,7 @@ def modelReductionFreeEnergyChange
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:60 · P-glossary-mathematics · holder: by-record · A reduction passes exactly when ΔF ≤ -3. -/
 def bayesFactorThreshold (change : ModelReductionFreeEnergyChange) : Prop := change.value ≤ -3
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:39 · P-glossary-mathematics · holder: by-record · Q(π) ∝ exp(ln E(π) − G(π)/τ): both the log habit prior and grade term are retained. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:39 · P-glossary-mathematics · holder: by-record · evidence: SoftmaxWitness · falsifier: weights fail to normalise or higher expected free energy receives higher probability at positive temperature · Q(π) ∝ exp(ln E(π) − G(π)/τ): both the log habit prior and grade term are retained. -/
 def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
     (habit : PolicyIndex → ℝ) (grade : PolicyIndex → ExpectedFreeEnergyValue) (tau : ℝ)
     (policies : List PolicyIndex) : List ℝ :=
@@ -6656,7 +6656,6 @@ private def mkRefused (name owner reason : String) : Declaration :=
 private def closedDeclarations : List Declaration :=
   ([("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
    ("bayesFactorThreshold", "sec-glossary.tex:60 · P-glossary-mathematics"),
-   ("softmax", "sec-glossary.tex:39 · P-glossary-mathematics"),
    ("bayesianModelReduction", "sec-glossary.tex:54 · P-glossary-mathematics"),
    ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
    ("HaveWantArrowState", "sec-glossary.tex:70 · P-glossary-mathematics"),
@@ -6723,6 +6722,8 @@ private def closedDeclarations : List Declaration :=
       "PrecisionWitness" "swapping precision with its signed prediction error preserves variational F, or a signed error map is accepted as precision",
       mkWitnessedClosed "predictionError" "sec-glossary.tex:15 · P-glossary-mathematics"
       "PredictionErrorWitness" "prediction error equals either operand or uses the reversed sign",
+      mkWitnessedClosed "softmax" "sec-glossary.tex:39 · P-glossary-mathematics"
+      "SoftmaxWitness" "weights fail to normalise or higher expected free energy receives higher probability at positive temperature",
       mkWitnessedClosed "Channel" "P-R2 §solved 1 (Channel)"
       "ChannelWitness" "the declared names or order differ from the 14-channel record",
       mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
