@@ -6372,9 +6372,12 @@ def expectedInformationGain {PolicyIndex Parameter : Type*} {Obs : Vertex → Ty
   ⟨(Q.support π).map (fun o =>
       Q.mass π o * parameterInformationGain prior posterior positivePrior π o) |>.sum⟩
 
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:56 · P-glossary-mathematics · holder: by-record · evidence: DirichletConcentrationsWitness · falsifier: an empty vector or a zero/negative concentration is accepted · A nonempty vector of strictly positive Dirichlet concentration parameters. -/
+def DirichletConcentrations := {xs : List ℝ // xs ≠ [] ∧ ∀ x ∈ xs, 0 < x}
+
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: LogMultivariateBetaWitness · falsifier: the analytic value disagrees with the Dirichlet normaliser · The logarithm of the Dirichlet normaliser.  Its subtype excludes an empty vector and every zero or negative concentration, where the Dirichlet distribution is not defined. -/
 def logMultivariateBeta
-    (concentrations : {xs : List ℝ // xs ≠ [] ∧ ∀ x ∈ xs, 0 < x}) : ℝ :=
+    (concentrations : DirichletConcentrations) : ℝ :=
   (concentrations.val.map fun x => Real.log (Real.Gamma x)).sum -
     Real.log (Real.Gamma concentrations.val.sum)
 
@@ -6726,6 +6729,8 @@ private def closedDeclarations : List Declaration :=
       "BayesFactorThresholdWitness" "a change above -3 passes, or a variational-free-energy value is accepted as BMR evidence",
       mkWitnessedClosed "bayesianModelReduction" "sec-glossary.tex:54 · P-glossary-mathematics"
       "BayesianModelReductionWitness" "the reduced posterior fails to preserve the accumulated count vector A-a under the new prior a'",
+      mkWitnessedClosed "DirichletConcentrations" "sec-glossary.tex:56 · P-glossary-mathematics"
+      "DirichletConcentrationsWitness" "an empty vector or a zero/negative concentration is accepted",
       mkWitnessedClosed "Channel" "P-R2 §solved 1 (Channel)"
       "ChannelWitness" "the declared names or order differ from the 14-channel record",
       mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
