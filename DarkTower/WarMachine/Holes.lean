@@ -354,10 +354,15 @@ def r9TwoRunCensus :
     (∀ r ∈ wmVerdictsLedgerAlone, r.verdict = .unknown) ∧
     (∀ r ∈ wmVerdictsDeclared, r.verdict = .self) := sorry
 
-/-- HOLE · owner: P-R9 S1 · holder: by-record · evidence: REFUSED — false for an arbitrary `valueEvidence` predicate, e.g. `fun _ => True`, applied to an L1 witness · falsifier: the L1 counterexample · Evidence used to value a policy must be an independent L2 witness, but the declaration lacks the hypothesis connecting `valueEvidence` to layer admission. -/
-def valueEvidenceRequiresL2 :
-  ∀ {Part : Type*} (valueEvidence : Witness Part → Prop) (w : Witness Part),
-    valueEvidence w → w.layer = Layer.L2 := sorry
+/-- A value-evidence predicate carrying the admission law that excludes L1. -/
+structure ValueEvidencePolicy (Part : Type*) where
+  accepts : Witness Part → Prop
+  l2Only : ∀ w, accepts w → w.layer = Layer.L2
+
+/-- CLOSED-BY-RECORD · owner: P-R9 S1 · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former theorem quantified over an unconstrained predicate and was false (`fun _ => True` accepts L1). The missing L2 admission hypothesis now travels in `ValueEvidencePolicy` and cannot be omitted at a call site. -/
+def valueEvidenceRequiresL2 {Part : Type*} (policy : ValueEvidencePolicy Part)
+    (w : Witness Part) (accepted : policy.accepts w) : w.layer = Layer.L2 :=
+  policy.l2Only w accepted
 
 inductive DeliveryGuarantee where
   | exactlyOnce
@@ -912,7 +917,8 @@ private def closedDeclarations : List Declaration :=
       mkWitnessedClosed "organiseO3FastForward" "P-validated-R5 §3e O3"
       "CascadeDiff" "edges differ from fast-forward",
       mkWitnessedClosed "organiseO4PrecedenceGovernance" "P-validated-R5 §3e O4 and S-G4"
-      "CascadeDiff" "precedence changes neither order nor score"]
+      "CascadeDiff" "precedence changes neither order nor score",
+      mkClosed "valueEvidenceRequiresL2" "P-R9 S1"]
 
 private def holeDeclarations : List Declaration :=
   [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
@@ -930,7 +936,6 @@ private def holeDeclarations : List Declaration :=
    mkHole "r9WmVerdictsSound" "P-R9 §solved 3" "VerdictTable" "self producer judged independent",
    mkHole "r9TwoRunCensus" "P-R9 §solved 2" "VerdictTable" "either thirteen-row census differs",
    mkHole "r9WmPerRowDeclarations" "P-R9 §solved 2 (per-row declarations)" "VerdictTable" "a named-agent row under the paper sentence, or an unnamed row under row text",
-   mkRefused "valueEvidenceRequiresL2" "P-R9 S1" "false for arbitrary valueEvidence without a layer-admission hypothesis; True accepts an L1 witness",
    mkHole "wmTraceR2" "P-R2 §solved 1" "List R2TickLit" "fixture digest differs",
    mkHole "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
    mkHole "wmTraceR8" "P-R8 §solved 1" "List R8TickLit" "fixture digest differs",
