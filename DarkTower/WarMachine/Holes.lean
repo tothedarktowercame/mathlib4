@@ -394,14 +394,18 @@ def r9WmVerdictsSound : r9VerdictsSound wmVerdictsDeclared := by
   simp [r9VerdictsSound, wmVerdictsDeclared, wmVerdictRowIds,
     declaredVerdictRow, VerdictRow.inDeclaredPart]
 
-/-- HOLE · owner: P-R9 §solved 2 (per-row declarations) · holder: by-record · evidence: wmVerdictsDeclared · falsifier: a named-agent row under the paper's sentence, or an unnamed row under row text · The run-(ii) table's declaration sources are per-row in fact. -/
-def r9WmPerRowDeclarations : r9PerRowDeclarations wmVerdictsDeclared := sorry
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (per-row declarations) · holder: by-record · evidence: wmVerdictsDeclared · falsifier: a named-agent row under the paper's sentence, or an unnamed row under row text · The run-(ii) source table's declaration sources are per-row in fact. -/
+def r9WmPerRowDeclarations : r9PerRowDeclarations wmVerdictsDeclared := by
+  simp [r9PerRowDeclarations, wmVerdictsDeclared, wmVerdictRowIds,
+    declaredVerdictRow]
 
-/-- HOLE · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: by-record · evidence: both tables · falsifier: run (i) not all `unknown`; run (ii) any row ≠ `self` under the declaration that places commissioned agents inside the author's part — the three named-agent rows (O7, O14, O15) are where this can fail · Registered: 13 unknown / 13 self. -/
+/-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (the two runs, R9-D1b) · holder: by-record · evidence: both tables · falsifier: run (i) not all `unknown`; run (ii) any row ≠ `self` under the declaration that places commissioned agents inside the author's part — the three named-agent rows (O7, O14, O15) are where this can fail · Proved over the compact source tables: 13 unknown / 13 self. -/
 def r9TwoRunCensus :
     wmVerdictsLedgerAlone.length = 13 ∧ wmVerdictsDeclared.length = 13 ∧
     (∀ r ∈ wmVerdictsLedgerAlone, r.verdict = .unknown) ∧
-    (∀ r ∈ wmVerdictsDeclared, r.verdict = .self) := sorry
+    (∀ r ∈ wmVerdictsDeclared, r.verdict = .self) := by
+  simp [wmVerdictsLedgerAlone, wmVerdictsDeclared, wmVerdictRowIds,
+    declaredVerdictRow]
 
 /-- A value-evidence predicate carrying the admission law that excludes L1. -/
 structure ValueEvidencePolicy (Part : Type*) where
@@ -6096,12 +6100,13 @@ def wmTraceR8 : List R8TickLit :=
 def r8CensusWmTrace : r8Census wmTraceR8 = (755, 32, 5) := by
   native_decide
 
-/-- HOLE · owner: P-R8 §solved 1 (iii), by era · holder: by-record · evidence: EraTable · falsifier: a post-boundary form without stored F, or a pre-boundary form with one (non-interleaving fails) · CORRECTED 2026-08-30 (claude-13 via claude-20): `:free-energy`, `:variational-free-energy` and `:selection-gain` are three keys of ONE unconditional map literal (`war_machine.clj:4664–4687`), so conjuncts 1–2 are a write-site identity, not two facts; the only CONTINGENT conjunct is 3 — the stored-F forms are a contiguous date suffix (non-interleaving), and since the boundary 20260714 was read off the data, "0 violations at that boundary" tests contiguity, not the date. Precision scale remains the proximate driver of the F gap; cause untested. -/
+/-- CLOSED-BY-RECORD · owner: P-R8 §solved 1 (iii), by era · holder: by-record · evidence: EraTable · falsifier: a post-boundary form without stored F, or a pre-boundary form with one (non-interleaving fails) · CORRECTED 2026-08-30 (claude-13 via claude-20): `:free-energy`, `:variational-free-energy` and `:selection-gain` are three keys of ONE unconditional map literal (`war_machine.clj:4664–4687`), so conjuncts 1–2 are a write-site identity, not two facts; the only CONTINGENT conjunct is 3 — the stored-F forms are a contiguous date suffix (non-interleaving), and since the boundary 20260714 was read off the data, "0 violations at that boundary" tests contiguity, not the date. Proved by decision over the full 792-row source object. Precision scale remains the proximate driver of the F gap; cause untested. -/
 def r8EraBoundary :
     ∀ t ∈ wmTraceR8,
       (t.storedF.isSome ↔ t.selectionGain.isSome) ∧
       (t.storedF.isSome ↔ t.freeEnergyShape = .controllerMap) ∧
-      (t.storedF.isSome ↔ 20260714 ≤ t.fileDate) := sorry
+      (t.storedF.isSome ↔ 20260714 ≤ t.fileDate) := by
+  native_decide
 
 /-! ## AIF glossary bindings
 
@@ -6542,13 +6547,13 @@ private def holeDeclarations : List Declaration :=
    mkWitnessedClosed "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
    mkWitnessedClosed "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
    mkWitnessedClosed "r9WmVerdictsSound" "P-R9 §solved 3" "VerdictTable" "self producer judged independent",
-   mkHole "r9TwoRunCensus" "P-R9 §solved 2" "VerdictTable" "either thirteen-row census differs",
-   mkHole "r9WmPerRowDeclarations" "P-R9 §solved 2 (per-row declarations)" "VerdictTable" "a named-agent row under the paper sentence, or an unnamed row under row text",
+   mkWitnessedClosed "r9TwoRunCensus" "P-R9 §solved 2" "VerdictTable" "either thirteen-row census differs",
+   mkWitnessedClosed "r9WmPerRowDeclarations" "P-R9 §solved 2 (per-row declarations)" "VerdictTable" "a named-agent row under the paper sentence, or an unnamed row under row text",
    mkWitnessedClosed "wmTraceR2" "P-R2 §solved 1" "List R2TickLit" "fixture digest differs",
    mkWitnessedClosed "r2ContractCensusWmTrace" "P-R2 §solved 1" "IllFormedList" "census is not 2",
    mkWitnessedClosed "wmTraceR8" "P-R8 §solved 1" "R8PinnedSnapshot" "fixture digest differs",
    mkWitnessedClosed "r8CensusWmTrace" "P-R8 §solved 1" "R8DispositionEvidence" "triple differs from (755,32,5)",
-   mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
+   mkWitnessedClosed "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
    mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet",
    mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; amended 2026-08-31: original 'currently firing (selector-seam blocker)' is historical — a nine-hop declared-stub tick completed, while the production loop uses the Agency HTTP selector",
