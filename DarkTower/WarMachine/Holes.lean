@@ -6199,7 +6199,7 @@ structure ProbabilityKernel (S O : Type*) where
   nonnegative : ∀ s o, 0 ≤ mass s o
   normalised : ∀ s, ((support s).map (mass s)).sum = 1
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–29 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · `Q(o∣π)` is a normalized finite-support predictive distribution over vertex-tagged outcomes for each policy. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–29 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeKernelWitness · falsifier: an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned `Q(o∣π)` · `Q(o∣π)` is a normalized finite-support predictive distribution over vertex-tagged outcomes for each policy. -/
 abbrev PredictiveOutcomeKernel (PolicyIndex : Type*) (Obs : Vertex → Type*) :=
   ProbabilityKernel PolicyIndex (Outcome Obs)
 
@@ -6690,7 +6690,8 @@ private def closedDeclarations : List Declaration :=
    ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics"),
    ("observationKernelRowMass", "sec-glossary.tex:27 · P-glossary-mathematics"),
    ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
-  ++ [mkClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics",
+  ++ [mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics"
+      "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
       mkClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics",
