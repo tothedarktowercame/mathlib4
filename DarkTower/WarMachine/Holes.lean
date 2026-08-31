@@ -1,4 +1,5 @@
 import Mathlib.Data.Real.Basic
+import Mathlib.Analysis.SpecialFunctions.Gamma.Basic
 import DarkTower.WarMachine.CascadeOrder
 import DarkTower.Contract.Emit
 
@@ -526,8 +527,11 @@ def expectedFreeEnergy {PolicyIndex Observation : Type*}
 /-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ExpectedInformationGainWitness · falsifier: posterior-to-prior KL does not equal the recorded expected gain · Canonical EIG requires the outcome and parameter-posterior kernels. -/
 def expectedInformationGain (PolicyIndex : Type*) : Type := sorry
 
-/-- HOLE · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: LogMultivariateBetaWitness · falsifier: the analytic value disagrees with the Dirichlet normaliser · The analytic log multivariate beta primitive is not available Mathlib-free here. -/
-def logMultivariateBeta (concentrations : List ℝ) : ℝ := sorry
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: LogMultivariateBetaWitness · falsifier: the analytic value disagrees with the Dirichlet normaliser · The logarithm of the Dirichlet normaliser.  Its subtype excludes an empty vector and every zero or negative concentration, where the Dirichlet distribution is not defined. -/
+def logMultivariateBeta
+    (concentrations : {xs : List ℝ // xs ≠ [] ∧ ∀ x ∈ xs, 0 < x}) : ℝ :=
+  (concentrations.val.map fun x => Real.log (Real.Gamma x)).sum -
+    Real.log (Real.Gamma concentrations.val.sum)
 
 /-- BMR evidence change between a full and reduced Dirichlet model.  The name
 and wrapper prevent composition with per-tick variational F by shared `ℝ`. -/
@@ -535,7 +539,9 @@ structure ModelReductionFreeEnergyChange where
   value : ℝ
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · BMR ΔF = ln B(A) + ln B(a′) - ln B(a) - ln B(A′). -/
-def modelReductionFreeEnergyChange (A aPrime a APrime : List ℝ) : ModelReductionFreeEnergyChange :=
+def modelReductionFreeEnergyChange
+    (A aPrime a APrime : {xs : List ℝ // xs ≠ [] ∧ ∀ x ∈ xs, 0 < x}) :
+    ModelReductionFreeEnergyChange :=
   ⟨logMultivariateBeta A + logMultivariateBeta aPrime -
     logMultivariateBeta a - logMultivariateBeta APrime⟩
 
@@ -698,6 +704,11 @@ private def mkClosed (name owner : String) : Declaration :=
   {name, kind := .closed, signature := s!"see {name} in the source module", owner,
    holder := "by-record", decided := "2026-08-30"}
 
+private def mkWitnessedClosed (name owner evidence falsifier : String) : Declaration :=
+  {name, kind := .closed, signature := s!"see {name} in the source module", owner,
+   holder := "by-record", decided := "2026-08-31", evidence := some evidence,
+   falsifier := some falsifier}
+
 private def mkHole (name owner evidence falsifier : String) : Declaration :=
   {name, kind := .hole, signature := s!"see {name} in the source module", owner,
    holder := "by-record", decided := "2026-08-30", evidence := some evidence,
@@ -708,7 +719,7 @@ private def mkRefused (name owner reason : String) : Declaration :=
    holder := "by-record", decided := "2026-08-30", falsifier := some s!"REFUSED: {reason}"}
 
 private def closedDeclarations : List Declaration :=
-  [("predictionError", "sec-glossary.tex:15 · P-glossary-mathematics"),
+  ([("predictionError", "sec-glossary.tex:15 · P-glossary-mathematics"),
    ("PrecisionMap", "sec-glossary.tex:17 · P-glossary-mathematics"),
    ("variationalFreeEnergy", "sec-glossary.tex:19 · P-glossary-mathematics"),
    ("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
@@ -735,13 +746,14 @@ private def closedDeclarations : List Declaration :=
    ("observationKernel", "sec-glossary.tex:27 · P-glossary-mathematics"),
    ("BeliefState", "sec-glossary.tex:9 · P-glossary-mathematics"),
    ("observationKernelRowMass", "sec-glossary.tex:27 · P-glossary-mathematics"),
-   ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2
+   ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
+  ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
+      "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser"]
 
 private def holeDeclarations : List Declaration :=
   [mkHole "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics" "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
    mkHole "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics" "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
    mkHole "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics" "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
-   mkHole "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics" "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
    mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "Outcome/Q(o∣π) and parameter kernel are missing",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
    mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "AblationTable" "no prior has moved = true",
