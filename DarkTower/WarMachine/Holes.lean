@@ -6212,7 +6212,7 @@ abbrev ParameterPosteriorKernel (PolicyIndex : Type*) (Obs : Vertex → Type*)
     (Parameter : Type*) :=
   ProbabilityKernel (PolicyIndex × Outcome Obs) Parameter
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The controlled state transition `B : S×U ⇝ S`. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7 · P-glossary-mathematics · holder: by-record · evidence: TransitionKernelWitness · falsifier: an action-unconditioned state kernel or the scalar multivariate-beta normalizer `B(α)` is accepted as controlled transition `B` · The controlled state transition `B : S×U ⇝ S`. -/
 abbrev TransitionKernel (State Action : Type*) :=
   ProbabilityKernel (State × Action) State
 
@@ -6694,7 +6694,8 @@ private def closedDeclarations : List Declaration :=
       "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
       mkClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
-      mkClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics",
+      mkWitnessedClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics"
+      "TransitionKernelWitness" "an action-unconditioned state kernel or scalar multivariate-beta normalizer B(alpha) is accepted as controlled transition B",
       mkWitnessedClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"
       "PreferenceDistributionWitness" "a state-conditioned kernel or vertex-local pragmatic cost is accepted as the unconditioned preferred-outcome distribution"]
   ++ [mkClosed "observationEntropy" "sec-glossary.tex:21,25 · P-glossary-mathematics",
