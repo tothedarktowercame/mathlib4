@@ -75,6 +75,49 @@ def FoldEscrowRecord.reconstructible
     (reconstruct : PromptInputs → Prompt) (digest : Prompt → Digest) : Prop :=
   digest (reconstruct record.promptInputs) = record.storedDigest
 
+structure ControlVocabulary (Control : Type*) where
+  allowable : Set Control
+
+structure ControlPolicy {Control : Type*} (U : ControlVocabulary Control) where
+  controls : List Control
+  allowable : ∀ u ∈ controls, u ∈ U.allowable
+
+structure AlivenessFactor where
+  value : ℝ
+  nonnegative : 0 ≤ value
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:50 · P-glossary-mathematics · holder: by-record · evidence: AlivenessWitness · falsifier: the 0.8·0.6 fixture differs from 0.48 or a negative factor elaborates. -/
+def aliveness (temperature harmony : AlivenessFactor) : ℝ :=
+  temperature.value * harmony.value
+
+inductive ActGateVerdict where
+  | pass | fail | abstainMissingLeg
+  deriving DecidableEq, Repr
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:66 · P-glossary-mathematics · holder: by-record · evidence: ActGateWitness · falsifier: a missing leg passes or a non-improving complete gate passes. -/
+def actGate (cascadeScore coverageScoreDelta : Option ℝ) : ActGateVerdict :=
+  match cascadeScore, coverageScoreDelta with
+  | some s, some d => if 0 < s ∧ d < 0 then .pass else .fail
+  | _, _ => .abstainMissingLeg
+
+structure Click (ClickId : Type*) where
+  id : ClickId
+
+structure Attempt (AttemptId ClickId : Type*) where
+  id : AttemptId
+  click : ClickId
+  clickOrder : Nat
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:78 · P-glossary-mathematics · holder: by-record · evidence: CohortWitness · falsifier: a zero-target or overfull preregistered cohort elaborates. Outcome classes remain an epoch-specific parameter. -/
+structure Cohort (CohortId AttemptId Epoch OutcomeClass : Type*) where
+  id : CohortId
+  semanticEpoch : Epoch
+  stoppingTarget : Nat
+  positiveTarget : 0 < stoppingTarget
+  preregisteredOutcomes : Set OutcomeClass
+  attempts : List AttemptId
+  withinWindow : attempts.length ≤ stoppingTarget
+
 structure Repository (P : Type*) where
   patterns : Set P
   standsOn : P → P → Prop
@@ -6621,6 +6664,11 @@ private def closedDeclarations : List Declaration :=
    ("Channel", "P-R2 §solved 1 (Channel)"), ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
    ("HaveWantArrowState", "sec-glossary.tex:70 · P-glossary-mathematics"),
    ("HaveWantArrowComposition", "sec-glossary.tex:70 · P-glossary-mathematics"),
+   ("ControlPolicy", "sec-glossary.tex:35 · P-glossary-mathematics"),
+   ("AlivenessFactor", "sec-glossary.tex:50 · P-glossary-mathematics"),
+   ("ActGateVerdict", "sec-glossary.tex:66 · P-glossary-mathematics"),
+   ("Click", "sec-glossary.tex:78 · P-glossary-mathematics"),
+   ("Attempt", "sec-glossary.tex:78 · P-glossary-mathematics"),
    ("Tension", "P-validated-R5 §3e"), ("InformationState", "P-validated-R5 §3d"),
    ("DecisionRule", "P-validated-R5 §3"), ("Outcome", "P-validated-R5 §2a"),
    ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
@@ -6674,6 +6722,14 @@ private def closedDeclarations : List Declaration :=
       mkWitnessedClosed "FoldEscrowRecord" "sec-glossary.tex:66 · P-glossary-mathematics"
       "FoldEscrowRecordWitness" "a reconstructible prompt/digest pair is admitted to the non-reconstructible quarantine",
       mkClosed "FoldEscrowRecord.reconstructible" "sec-glossary.tex:66 · P-glossary-mathematics",
+      mkWitnessedClosed "ControlVocabulary" "sec-glossary.tex:35 · P-glossary-mathematics"
+      "ControlVocabularyWitness" "a policy containing a control outside its vocabulary elaborates",
+      mkWitnessedClosed "aliveness" "sec-glossary.tex:50 · P-glossary-mathematics"
+      "AlivenessWitness" "0.8 times 0.6 differs from 0.48, or a negative factor elaborates",
+      mkWitnessedClosed "actGate" "sec-glossary.tex:66 · P-glossary-mathematics"
+      "ActGateWitness" "a missing leg passes, or a non-improving complete gate passes",
+      mkWitnessedClosed "Cohort" "sec-glossary.tex:78 · P-glossary-mathematics"
+      "CohortWitness" "a zero-target or overfull preregistered cohort elaborates",
       mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
