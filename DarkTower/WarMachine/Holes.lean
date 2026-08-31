@@ -825,6 +825,7 @@ def machineHasNoC : Prop := sorry
 
 /-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("we should specify that it should be able to run at least once, and then we should get evidence of that") · holder: by-record · What one completed tick leaves behind: the receipt is the evidence, and each field is one of the standing invariants made concrete for a single run. On-demand ticks (run one, like the APM machine's clicks) are first-class; a scheduler is one caller among others. -/
 structure TickRunRecord where
+  runId : String            -- generated at tick start; stable across receipt reserialisation
   startedAt : String
   storeBasisCount : Nat     -- I_data_current: the STORE's count at tick time (the pin)
   storeBasisMaxAt : String
@@ -837,7 +838,7 @@ structure TickRunRecord where
   selectorSeam : String     -- "live" or the declared stub — never silent
   deriving DecidableEq
 
-/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: TickRunWitness · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord — CURRENTLY FIRING: the standalone entry throws "War Machine requires the shared reason-bearing selector" (AUD-D3 gate blocker), so the machine cannot yet demonstrate one unattended tick · The machine can run at least once on demand, leaving a receipt. -/
+/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: TickRunWitness · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord · OWNER AMENDMENT 2026-08-31: the original annotation said "CURRENTLY FIRING: selector-seam blocker". That was true of the earlier diagnostic standalone report, but a nine-hop tick subsequently completed through the explicitly recorded bounded stub. Futon3c remains absent from Futon2's local classpath; the production operator loop instead uses the live Agency HTTP selector. Original claim retained here as history, not current state. · The machine can run at least once on demand, leaving a receipt. -/
 def wmRunsOnce : Prop := sorry
 
 /-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("a map that assembles and joins appropriately, so we can see exactly what happened as the machine ran, and get evidence that that matched the specification") · holder: by-record · One hop of the route a tick actually took: the tracer tag conj'd onto the flowing map at a node boundary, reassembled pairwise into hops. The wiring diagram (control-map-edges.edn, Figure 4 as data) is the specification the route is judged against. -/
@@ -1003,7 +1004,7 @@ private def holeDeclarations : List Declaration :=
    mkHole "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
    mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet",
-   mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; currently firing (selector-seam blocker)",
+   mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; amended 2026-08-31: original 'currently firing (selector-seam blocker)' is historical — a nine-hop declared-stub tick completed, while the production loop uses the Agency HTTP selector",
    mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers"]
 
 def registry : Registry :=
