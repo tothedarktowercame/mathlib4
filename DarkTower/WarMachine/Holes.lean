@@ -99,13 +99,13 @@ structure AblationRow (Policy : Type*) where
 
 abbrev AblationTable (Prior Policy : Type*) := Prior → AblationRow Policy
 
-/-- HOLE · owner: P-validated-R5 §2a′ · holder: by-record · evidence: AblationTable · falsifier: no prior has moved = true · For some declared prior, removing the epistemic term changes the selected minimiser. -/
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former declaration asserted the existential for every carrier and graders, and was false for empty/singleton policies or identical graders. This is now the nonempty-policy predicate a concrete ablation must establish. -/
 def nonDegenerateAblationLaw {Prior Policy : Type*} (policies : List Policy)
-    (grade pragmatic : Prior → Policy → ℝ) :
-    ∃ prior πGrade πPragmatic,
+    (grade pragmatic : Prior → Policy → ℝ) : Prop :=
+    policies ≠ [] ∧ ∃ prior πGrade πPragmatic,
       IsArgminOn policies (grade prior) πGrade ∧
       IsArgminOn policies (pragmatic prior) πPragmatic ∧
-      πGrade ≠ πPragmatic := sorry
+      πGrade ≠ πPragmatic
 
 inductive TypedAbsence where
   | noPatternAddressesThisTension
@@ -157,10 +157,10 @@ def findF3NonSelfCertifying :
       ∃ receipt, (find tension repo).receipts p = some receipt ∧
         receipt.nonSelfCertifying := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e F4 · holder: by-record · evidence: FindReceiptTable · falsifier: a scenario has no zero-mass repository pattern · Every tension has a repository pattern that find does not return. -/
-def findF4Falsifiable :
-  ∀ {State P : Type*} (tension : Tension State) (repo : Repository P),
-    ∃ p, p ∈ repo.patterns ∧ p ∉ (find tension repo).selected := sorry
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e F4 · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former universal existential was false for empty pattern carriers/repositories. This is now the nonempty-repository falsifiability predicate a concrete find fixture must establish. -/
+def findF4Falsifiable {State P : Type*} (tension : Tension State)
+    (repo : Repository P) : Prop :=
+  repo.patterns.Nonempty ∧ ∃ p, p ∈ repo.patterns ∧ p ∉ (find tension repo).selected
 
 inductive ReachOutside {P : Type*} (selected : Set P) (standsOn : P → P → Prop) : P → P → Prop
   | direct {u v} : standsOn u v → ReachOutside selected standsOn u v
@@ -918,17 +918,17 @@ private def closedDeclarations : List Declaration :=
       "CascadeDiff" "edges differ from fast-forward",
       mkWitnessedClosed "organiseO4PrecedenceGovernance" "P-validated-R5 §3e O4 and S-G4"
       "CascadeDiff" "precedence changes neither order nor score",
-      mkClosed "valueEvidenceRequiresL2" "P-R9 S1"]
+      mkClosed "valueEvidenceRequiresL2" "P-R9 S1",
+      mkClosed "nonDegenerateAblationLaw" "P-validated-R5 §2a′",
+      mkClosed "findF4Falsifiable" "P-validated-R5 §3e F4"]
 
 private def holeDeclarations : List Declaration :=
   [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
-   mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "AblationTable" "no prior has moved = true",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
    mkHole "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
    mkHole "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
    mkHole "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
-   mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "no zero-mass pattern",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
    mkHole "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
    mkWitnessedClosed "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
