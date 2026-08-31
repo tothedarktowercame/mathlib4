@@ -919,9 +919,7 @@ private def closedDeclarations : List Declaration :=
       mkWitnessedClosed "organiseO4PrecedenceGovernance" "P-validated-R5 §3e O4 and S-G4"
       "CascadeDiff" "precedence changes neither order nor score",
       mkClosed "valueEvidenceRequiresL2" "P-R9 S1",
-      mkClosed "nonDegenerateAblationLaw" "P-validated-R5 §2a′",
-      mkWitnessedClosed "findF4Falsifiable" "P-validated-R5 §3e F4"
-        "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected"]
+      mkClosed "nonDegenerateAblationLaw" "P-validated-R5 §2a′"]
 
 private def holeDeclarations : List Declaration :=
   [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
@@ -930,6 +928,7 @@ private def holeDeclarations : List Declaration :=
    mkHole "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
    mkHole "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
    mkHole "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
+   mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
    mkHole "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
    mkWitnessedClosed "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
