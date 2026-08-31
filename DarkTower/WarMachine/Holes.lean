@@ -6401,7 +6401,7 @@ def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
   let total := weights.foldl (· + ·) 0
   weights.map fun weight => weight / total
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:54 · P-glossary-mathematics · holder: by-record · BMR re-expresses the old counts under the reduced prior: A′ = A + a′ - a, componentwise. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:54 · P-glossary-mathematics · holder: by-record · evidence: BayesianModelReductionWitness · falsifier: the reduced posterior fails to preserve the accumulated count vector A-a under the new prior a' · BMR re-expresses the old counts under the reduced prior: A′ = A + a′ - a, componentwise. -/
 def bayesianModelReduction (A aPrime a : List ℝ) : List ℝ :=
   (A.zip (aPrime.zip a)).map fun x => x.1 + x.2.1 - x.2.2
 
@@ -6655,7 +6655,6 @@ private def mkRefused (name owner reason : String) : Declaration :=
 
 private def closedDeclarations : List Declaration :=
   ([("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
-   ("bayesianModelReduction", "sec-glossary.tex:54 · P-glossary-mathematics"),
    ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
    ("HaveWantArrowState", "sec-glossary.tex:70 · P-glossary-mathematics"),
    ("HaveWantArrowComposition", "sec-glossary.tex:70 · P-glossary-mathematics"),
@@ -6725,6 +6724,8 @@ private def closedDeclarations : List Declaration :=
       "SoftmaxWitness" "weights fail to normalise or higher expected free energy receives higher probability at positive temperature",
       mkWitnessedClosed "bayesFactorThreshold" "sec-glossary.tex:60 · P-glossary-mathematics"
       "BayesFactorThresholdWitness" "a change above -3 passes, or a variational-free-energy value is accepted as BMR evidence",
+      mkWitnessedClosed "bayesianModelReduction" "sec-glossary.tex:54 · P-glossary-mathematics"
+      "BayesianModelReductionWitness" "the reduced posterior fails to preserve the accumulated count vector A-a under the new prior a'",
       mkWitnessedClosed "Channel" "P-R2 §solved 1 (Channel)"
       "ChannelWitness" "the declared names or order differ from the 14-channel record",
       mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
