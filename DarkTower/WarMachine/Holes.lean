@@ -789,7 +789,7 @@ structure RouteHop where
   at_ : String
   deriving DecidableEq
 
-/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: REFUSED — the measured WM-RUN2 route has six hops absent from Figure 4; naming them `route-measured-undrawn` records disagreement but does not establish conformance · falsifier: the existing non-empty route with undrawn hops · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. -/
+/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: TickRunRecord — C71 lifts the earlier refusal only after p4ng 0598d19 drew the measured routes as a distinct Figure 4 layer; WM-RUN2 is 9/9 mapped (3 original, 6 measured) · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. -/
 def wmRunConformsToWiring : Prop := sorry
 
 structure WitnessLayerRow where
@@ -944,7 +944,7 @@ private def holeDeclarations : List Declaration :=
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
    mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet",
    mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; currently firing (selector-seam blocker)",
-   mkRefused "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "WM-RUN2 contains six measured-undrawn hops, so the existing route refutes conformance"]
+   mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers"]
 
 def registry : Registry :=
   {schemaVersion := 1, contractId := "wm-holes", moduleName := "DarkTower.WarMachine.Holes",
