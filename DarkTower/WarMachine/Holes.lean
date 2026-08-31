@@ -157,10 +157,10 @@ def findF3NonSelfCertifying :
       ∃ receipt, (find tension repo).receipts p = some receipt ∧
         receipt.nonSelfCertifying := sorry
 
-/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e F4 · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former universal existential was false for empty pattern carriers/repositories. This is now the nonempty-repository falsifiability predicate a concrete find fixture must establish. -/
-def findF4Falsifiable {State P : Type*} (tension : Tension State)
-    (repo : Repository P) : Prop :=
-  repo.patterns.Nonempty ∧ ∃ p, p ∈ repo.patterns ∧ p ∉ (find tension repo).selected
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e F4 · holder: by-record · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. -/
+def findF4Falsifiable {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
+  row.repository.Nonempty ∧
+    ∃ p, p ∈ row.repository ∧ p ∈ row.zeroMass ∧ p ∉ row.selected
 
 inductive ReachOutside {P : Type*} (selected : Set P) (standsOn : P → P → Prop) : P → P → Prop
   | direct {u v} : standsOn u v → ReachOutside selected standsOn u v
@@ -920,7 +920,8 @@ private def closedDeclarations : List Declaration :=
       "CascadeDiff" "precedence changes neither order nor score",
       mkClosed "valueEvidenceRequiresL2" "P-R9 S1",
       mkClosed "nonDegenerateAblationLaw" "P-validated-R5 §2a′",
-      mkClosed "findF4Falsifiable" "P-validated-R5 §3e F4"]
+      mkWitnessedClosed "findF4Falsifiable" "P-validated-R5 §3e F4"
+        "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected"]
 
 private def holeDeclarations : List Declaration :=
   [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
