@@ -6244,7 +6244,7 @@ def generativeFactorMass {Obs : Vertex → Type*} {State Action PolicyIndex : Ty
     model.transition.mass (state, action) nextState *
       model.policyPrior.mass () policy
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The observation model is a finite-support Markov kernel A : S ⇝ O; normalisation is a field, not an external shape check. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · evidence: ObservationKernelWitness · falsifier: a row has negative mass or its declared masses do not sum to one · The observation model is a finite-support Markov kernel A : S ⇝ O; normalisation sums the row's own mass.  This witnesses kernel well-formedness, not semantic observation correctness. -/
 abbrev observationKernel (State Observation : Type*) := ProbabilityKernel State Observation
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9 · P-glossary-mathematics · holder: by-record · evidence: BeliefStateWitness · falsifier: a declared channel lacks its mean or nonnegative variance · Every channel carries both its posterior mean and a nonnegative variance.  This is the carrier claim; observation-responsive change is separately enforced by `beliefUpdate`. -/
@@ -6691,7 +6691,6 @@ private def closedDeclarations : List Declaration :=
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
    ("r8Census", "P-R8 §solved 1"),
    ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics"),
-   ("observationKernel", "sec-glossary.tex:27 · P-glossary-mathematics"),
    ("observationKernelRowMass", "sec-glossary.tex:27 · P-glossary-mathematics"),
    ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
   ++ [mkClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics",
@@ -6723,6 +6722,8 @@ private def closedDeclarations : List Declaration :=
       mkClosed "FoldEscrowRecord.reconstructible" "sec-glossary.tex:66 · P-glossary-mathematics",
       mkWitnessedClosed "BeliefState" "sec-glossary.tex:9 · P-glossary-mathematics"
       "BeliefStateWitness" "a declared channel lacks its mean or nonnegative variance",
+      mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
+      "ObservationKernelWitness" "a row has negative mass or its declared masses do not sum to one",
       mkWitnessedClosed "ControlVocabulary" "sec-glossary.tex:35 · P-glossary-mathematics"
       "ControlVocabularyWitness" "a policy containing a control outside its vocabulary elaborates",
       mkWitnessedClosed "aliveness" "sec-glossary.tex:50 · P-glossary-mathematics"
