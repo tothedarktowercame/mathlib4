@@ -6409,11 +6409,53 @@ structure PreferenceStack (Outcome : Type*) where
   falsifier : String
   holder : String
 
+inductive PreferenceSpineDeclaration where
+  | vertexLocalC
+  | gradeG
+  | recordedSnatchRisk
+  | preferenceDistribution
+  | predictiveOutcomeRisk
+  | expectedFreeEnergy
+  | softmaxHabit
+  | preferenceLayerPrefers
+  | foldC
+  deriving DecidableEq, Repr
+
+structure PreferenceConstantCensusRow where
+  declaration : PreferenceSpineDeclaration
+  preferenceInput : Bool
+  freeConstant : Bool
+  reason : String
+  deriving DecidableEq, Repr
+
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: by-record · The in-language census of the spine's complete named preference surface. `preferenceInput` says the declaration receives its preference-bearing value or layers from the caller. `freeConstant` says it instead supplies a preference function/table from its own global definition. -/
+def preferenceConstantCensus : List PreferenceConstantCensusRow :=
+  [⟨.vertexLocalC, false, true,
+      "C returns Obs v -> Real without a preference distribution, base, or layer input"⟩,
+   ⟨.gradeG, true, false, "risk and epistemic grade are parameters"⟩,
+   ⟨.recordedSnatchRisk, false, false,
+      "a pinned ablation fixture table, not a deployment preference C"⟩,
+   ⟨.preferenceDistribution, true, false, "a carrier type, not a value"⟩,
+   ⟨.predictiveOutcomeRisk, true, false, "preference distribution Cdist is a parameter"⟩,
+   ⟨.expectedFreeEnergy, true, false, "preference distribution Cdist is a parameter"⟩,
+   ⟨.softmaxHabit, true, false, "habit prior is a parameter"⟩,
+   ⟨.preferenceLayerPrefers, true, false, "prefers is supplied as structure data"⟩,
+   ⟨.foldC, true, false, "base preference and ordered layers are parameters"⟩]
+
+def freePreferenceConstants : List PreferenceSpineDeclaration :=
+  (preferenceConstantCensus.filter (·.freeConstant)).map (·.declaration)
+
+/-- The census has exactly one free preference constant: the vertex-local `C`. -/
+theorem freePreferenceConstants_eq :
+    freePreferenceConstants = [.vertexLocalC] := by decide
+
 /-- HOLE · owner: P-R19-preferences-open §gate · holder: by-record · evidence: PreferenceStackWitness · falsifier: a C value in a live trace with no layer record behind it · Every running instance's C is the fold of a recorded stack. -/
 def preferenceStackLiveRecorded : Prop := sorry
 
-/-- HOLE · owner: P-R19-preferences-open §principle · holder: by-record · evidence: REFUSED — a meta-claim about the spine's definition; no in-language census of free preference constants exists yet · falsifier: REFUSED for the same reason · No preference value is free in the spine; C is a parameter everywhere. -/
-def machineHasNoC : Prop := sorry
+/-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: by-record · COUNTEREXAMPLE 2026-08-31: the original `machineHasNoC` claim said C is a parameter everywhere.  The in-language census refutes it: global `C` returns `Obs v → ℝ` without receiving a preference distribution, base preference, or layer stack, while every other deployment preference surface is parameterized.  The historical name remains legible; the proposition now records the refutation that the free-constant census is non-empty. -/
+def machineHasNoC : freePreferenceConstants ≠ [] := by
+  rw [freePreferenceConstants_eq]
+  decide
 
 /-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("we should specify that it should be able to run at least once, and then we should get evidence of that") · holder: by-record · What one completed tick leaves behind: the receipt is the evidence, and each field is one of the standing invariants made concrete for a single run. On-demand ticks (run one, like the APM machine's clicks) are first-class; a scheduler is one caller among others. -/
 structure TickRunRecord where
@@ -6533,6 +6575,12 @@ private def closedDeclarations : List Declaration :=
    ("wmPreferenceStack2026_08_30", "R19-preference-stack.edn @ dc1dac8"), ("wmStackDeclaredPurpose", "R19-preference-stack.edn @ dc1dac8"),
    ("preferenceStackRecorded", "P-R19-preferences-open §gate"), ("PreferenceLayer", "P-R19-preferences-open §principle"),
    ("foldC", "P-R19-preferences-open §principle"), ("PreferenceStack", "P-R19-preferences-open §tetrahedron"),
+   ("PreferenceSpineDeclaration", "P-R19-preferences-open §principle"),
+   ("PreferenceConstantCensusRow", "P-R19-preferences-open §principle"),
+   ("preferenceConstantCensus", "P-R19-preferences-open §principle"),
+   ("freePreferenceConstants", "P-R19-preferences-open §principle"),
+   ("freePreferenceConstants_eq", "P-R19-preferences-open §principle"),
+   ("machineHasNoC", "P-R19-preferences-open §principle"),
    ("Delivery", "delivery-lifecycle §0.6"), ("Handoff", "delivery-lifecycle §0.10"),
    ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
@@ -6596,7 +6644,6 @@ private def holeDeclarations : List Declaration :=
    mkWitnessedClosed "r8CensusWmTrace" "P-R8 §solved 1" "R8DispositionEvidence" "triple differs from (755,32,5)",
    mkWitnessedClosed "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
-   mkRefused "machineHasNoC" "P-R19-preferences-open §principle" "meta-claim about the spine; no in-language census of free preference constants yet",
    mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; amended 2026-08-31: original 'currently firing (selector-seam blocker)' is historical — a nine-hop declared-stub tick completed, while the production loop uses the Agency HTTP selector",
    mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers"]
 
