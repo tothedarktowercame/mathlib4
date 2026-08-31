@@ -6252,7 +6252,7 @@ structure BeliefState where
   mean : Channel → ℝ
   variance : Channel → NonnegativeReal
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:15 · P-glossary-mathematics · holder: by-record · Prediction error is ε_k := o_k - μ_k. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:15 · P-glossary-mathematics · holder: by-record · evidence: PredictionErrorWitness · falsifier: prediction error equals either operand or uses the reversed sign · Prediction error is the signed difference ε_k := o_k - μ_k. -/
 def predictionError (observation beliefMean : Channel → ℝ) : Channel → ℝ :=
   fun k => observation k - beliefMean k
 
@@ -6654,8 +6654,7 @@ private def mkRefused (name owner reason : String) : Declaration :=
    holder := "by-record", decided := "2026-08-30", falsifier := some s!"REFUSED: {reason}"}
 
 private def closedDeclarations : List Declaration :=
-  ([("predictionError", "sec-glossary.tex:15 · P-glossary-mathematics"),
-   ("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
+  ([("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
    ("bayesFactorThreshold", "sec-glossary.tex:60 · P-glossary-mathematics"),
    ("softmax", "sec-glossary.tex:39 · P-glossary-mathematics"),
    ("bayesianModelReduction", "sec-glossary.tex:54 · P-glossary-mathematics"),
@@ -6722,6 +6721,8 @@ private def closedDeclarations : List Declaration :=
       "VariationalFreeEnergyWitness" "the Gaussian reference value disagrees, or expected free energy is accepted as variational F",
       mkWitnessedClosed "PrecisionMap" "sec-glossary.tex:17 · P-glossary-mathematics"
       "PrecisionWitness" "swapping precision with its signed prediction error preserves variational F, or a signed error map is accepted as precision",
+      mkWitnessedClosed "predictionError" "sec-glossary.tex:15 · P-glossary-mathematics"
+      "PredictionErrorWitness" "prediction error equals either operand or uses the reversed sign",
       mkWitnessedClosed "Channel" "P-R2 §solved 1 (Channel)"
       "ChannelWitness" "the declared names or order differ from the 14-channel record",
       mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
