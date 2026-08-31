@@ -332,7 +332,13 @@ def r9VerdictConsultsChecker :
     w.producer ∈ claim.producingPart →
     ∃ decide? : Part → Set Part → Bool,
       ¬ (∀ p S, decide? p S = true ↔ p ∈ S) ∧
-      independenceVerdict (some claim) w decide? = .independent := sorry
+      independenceVerdict (some claim) w decide? = .independent := by
+  intro Part inst claim w hw
+  refine ⟨fun _ _ => false, ?_, ?_⟩
+  · intro h
+    have inside := (h w.producer claim.producingPart).mpr hw
+    simp at inside
+  · simp [independenceVerdict]
 
 /-- CLOSED-BY-RECORD · owner: P-R9 §solved 2 (declaration source) · holder: by-record · Where a row's declaration of the producing part came from: the paper's sentence (sec-discussion.tex:238) or the row's own text naming a closer. A sum type, so "per-row" is per-row in fact — a free string let every row be labelled "paper:…" (claude-13's 5th read via claude-20, ratified 2026-08-30). -/
 inductive DeclarationSource where
@@ -384,7 +390,9 @@ private def declaredVerdictRow (id : String) : VerdictRow :=
 def wmVerdictsDeclared : VerdictTable := wmVerdictRowIds.map declaredVerdictRow
 
 /-- HOLE · owner: P-R9 §solved 3 (falsifier) · holder: by-record · evidence: wmVerdictsDeclared · falsifier: a row with inDeclaredPart = true judged independent · The shipped checker's recorded verdicts are sound. Moves by `decide` once the table is transcribed; false if the checker is broken. -/
-def r9WmVerdictsSound : r9VerdictsSound wmVerdictsDeclared := sorry
+def r9WmVerdictsSound : r9VerdictsSound wmVerdictsDeclared := by
+  simp [r9VerdictsSound, wmVerdictsDeclared, wmVerdictRowIds,
+    declaredVerdictRow, VerdictRow.inDeclaredPart]
 
 /-- HOLE · owner: P-R9 §solved 2 (per-row declarations) · holder: by-record · evidence: wmVerdictsDeclared · falsifier: a named-agent row under the paper's sentence, or an unnamed row under row text · The run-(ii) table's declaration sources are per-row in fact. -/
 def r9WmPerRowDeclarations : r9PerRowDeclarations wmVerdictsDeclared := sorry
