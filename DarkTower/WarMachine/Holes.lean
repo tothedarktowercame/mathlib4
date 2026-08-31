@@ -449,9 +449,10 @@ These declarations transcribe the thirteen theory entries selected by
 -/
 
 structure ProbabilityKernel (S O : Type*) where
+  support : S → List O
   mass : S → O → ℝ
   nonnegative : ∀ s o, 0 ≤ mass s o
-  normalised : ∀ _s : S, ∃ total : ℝ, total = 1
+  normalised : ∀ s, ((support s).map (mass s)).sum = 1
 
 structure NonnegativeReal where
   value : ℝ
@@ -460,11 +461,13 @@ structure NonnegativeReal where
 /-- HOLE · owner: sec-glossary.tex:7 · P-glossary-mathematics · holder: by-record · evidence: GenerativeModelWitness · falsifier: the proposed joint does not factor as observation × transition × policy prior · A generative model is the joint P(o,s,π). -/
 def GenerativeModel (Observation State PolicyIndex : Type*) : Type := sorry
 
-/-- HOLE · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · evidence: ObservationKernelWitness · falsifier: some state's output masses are not normalised · The observation model is the Markov kernel A : S ⇝ O. -/
-def observationKernel (State Observation : Type*) : Type := sorry
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The observation model is a finite-support Markov kernel A : S ⇝ O; normalisation is a field, not an external shape check. -/
+abbrev observationKernel (State Observation : Type*) := ProbabilityKernel State Observation
 
-/-- HOLE · owner: sec-glossary.tex:9 · P-glossary-mathematics · holder: by-record · evidence: BeliefStateWitness · falsifier: a channel lacks its mean or variance · The belief-state carrier is named but not defined by the theory entry. -/
-def BeliefState : Type := sorry
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · Every channel carries both its posterior mean and a nonnegative variance. -/
+structure BeliefState where
+  mean : Channel → ℝ
+  variance : Channel → NonnegativeReal
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:15 · P-glossary-mathematics · holder: by-record · Prediction error is ε_k := o_k - μ_k. -/
 def predictionError (observation beliefMean : Channel → ℝ) : Channel → ℝ :=
@@ -483,6 +486,22 @@ def variationalFreeEnergy (precision error : Channel → ℝ) : VariationalFreeE
   ⟨(1 / 2 : ℝ) *
     ((Channel.all.map fun k => precision k * (error k) ^ 2).foldl (· + ·) 0 /
       Channel.all.length)⟩
+
+def observationKernelRowMass {State Observation : Type*}
+    (A : observationKernel State Observation) (s : State) : ℝ :=
+  ((A.support s).map (A.mass s)).sum
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the recorded precision-weighted prediction-error correction and reaches zero variational mismatch. -/
+def beliefUpdate (learningRate : NonnegativeReal)
+    (A : observationKernel Channel Channel) (prior : BeliefState)
+    (observation : Channel → ℝ) (precision : PrecisionMap)
+    (posterior : BeliefState) : Prop :=
+  posterior.mean = (fun k =>
+    prior.mean k + learningRate.value * observationKernelRowMass A k *
+      (precision k).value * predictionError observation prior.mean k) ∧
+  posterior.variance = prior.variance ∧
+  (variationalFreeEnergy (fun k => (precision k).value)
+      (predictionError observation posterior.mean)).value = 0
 
 /-- HOLE · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · This and `G` are two decompositions of one expected-free-energy type; the missing kernel derivation remains a real hole. -/
 def expectedFreeEnergy {PolicyIndex Observation : Type*}
@@ -697,12 +716,12 @@ private def closedDeclarations : List Declaration :=
    ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
    ("r8Census", "P-R8 §solved 1"),
-   ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2
+   ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics"),
+   ("observationKernel", "sec-glossary.tex:27 · P-glossary-mathematics"),
+   ("BeliefState", "sec-glossary.tex:9 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2
 
 private def holeDeclarations : List Declaration :=
   [mkHole "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics" "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
-   mkHole "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics" "ObservationKernelWitness" "some state's masses are not normalised",
-   mkHole "BeliefState" "sec-glossary.tex:9 · P-glossary-mathematics" "BeliefStateWitness" "a channel lacks a mean or variance",
    mkHole "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics" "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
    mkHole "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics" "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
    mkHole "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics" "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
