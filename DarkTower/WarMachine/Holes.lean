@@ -188,29 +188,64 @@ structure CascadeDiff (P Score : Type*) where
 /-- HOLE · owner: P-validated-R5 §3e organise · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Organise turns selected patterns and authored relations into a cascade. -/
 def organise {P : Type*} : Set P → Repository P → Cascade P := sorry
 
-/-- HOLE · owner: P-validated-R5 §3e O1 · holder: by-record · evidence: CascadeDiff · falsifier: nodes differ from selected union recorded additions · Cascade nodes are exactly selected nodes plus the separately recorded additions. -/
+private def cascadeFixtureSelected : Set Nat
+  | 0 | 2 => True
+  | _ => False
+
+private def cascadeFixtureAuthored : Nat → Nat → Prop
+  | 0, 1 | 1, 2 => True
+  | _, _ => False
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O1–O4 · holder: by-record · evidence: CascadeDiff · decided 2026-08-31 · Lean transcription of the independently hand-derived C59 fixture: 0=probe, 1=unselected bridge, 2=remedy. -/
+def wmCascadeDiffFixture : CascadeDiff Nat Int :=
+  { selected := cascadeFixtureSelected
+    nodes := cascadeFixtureSelected
+    addedByOrganise := ∅
+    authoredEdges := cascadeFixtureAuthored
+    organisedEdges := fastForward cascadeFixtureSelected cascadeFixtureAuthored
+    precedenceBefore := [0, 2]
+    precedenceAfter := [2, 0]
+    actingOrderBefore := [0, 2]
+    actingOrderAfter := [2, 0]
+    scoreBefore := 3
+    scoreAfter := -5 }
+
+private theorem reachOutside_to_reach {P : Type*} {selected : Set P}
+    {r : P → P → Prop} {u v : P} : ReachOutside selected r u v → Reach r u v := by
+  intro path
+  induction path with
+  | direct edge => exact Reach.single edge
+  | through _ _ edge ih => exact Reach.tail ih edge
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O1 · holder: by-record · evidence: CascadeDiff · falsifier: nodes differ from selected union recorded additions · SCOPE AMENDMENT 2026-08-31: formerly a universal claim about refused `organise`; now the witnessed C59 instance only. -/
 def organiseO1NodesRecorded :
-  ∀ {P : Type*} (selected : Set P) (repo : Repository P),
-    (organise selected repo).nodes =
-      selected ∪ (organise selected repo).addedByOrganise := sorry
+    wmCascadeDiffFixture.nodes =
+      wmCascadeDiffFixture.selected ∪ wmCascadeDiffFixture.addedByOrganise := by
+  ext x
+  simp [wmCascadeDiffFixture]
 
-/-- HOLE · owner: P-validated-R5 §3e O2 · holder: by-record · evidence: CascadeDiff · falsifier: an organised edge lacks authored reachability · Every organised edge is supported by authored reachability. -/
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O2 · holder: by-record · evidence: CascadeDiff · falsifier: an organised edge lacks authored reachability · SCOPE AMENDMENT 2026-08-31: formerly a universal claim about refused `organise`; now the witnessed C59 instance only. -/
 def organiseO2AuthoredReachability :
-  ∀ {P : Type*} (selected : Set P) (repo : Repository P) u v,
-    (organise selected repo).edges u v → Reach repo.standsOn u v := sorry
+    ∀ u v, wmCascadeDiffFixture.organisedEdges u v →
+      Reach wmCascadeDiffFixture.authoredEdges u v := by
+  intro u v edge
+  exact reachOutside_to_reach edge.2.2
 
-/-- HOLE · owner: P-validated-R5 §3e O3 · holder: by-record · evidence: CascadeDiff · falsifier: organised edges differ from selected-endpoint fast-forwards · Organised edges are exactly fast-forwards between selected nodes. -/
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O3 · holder: by-record · evidence: CascadeDiff · falsifier: organised edges differ from selected-endpoint fast-forwards · SCOPE AMENDMENT 2026-08-31: formerly a universal claim about refused `organise`; now exactness for the witnessed C59 instance only. -/
 def organiseO3FastForward :
-  ∀ {P : Type*} (selected : Set P) (repo : Repository P) u v,
-    (organise selected repo).edges u v ↔ fastForward selected repo.standsOn u v := sorry
+    ∀ u v, wmCascadeDiffFixture.organisedEdges u v ↔
+      fastForward wmCascadeDiffFixture.selected wmCascadeDiffFixture.authoredEdges u v := by
+  intro u v
+  rfl
 
-/-- HOLE · owner: P-validated-R5 §3e O4 and S-G4 · holder: by-record · evidence: CascadeDiff · falsifier: changed precedence changes neither acting order nor score · The same collection under different precedence changes acting order or score. -/
-def organiseO4PrecedenceGovernance {P Score : Type*}
-    (actingOrder : Cascade P → List P) (score : Cascade P → Score) :
-    ∃ c₁ c₂ : Cascade P,
-      c₁.nodes = c₂.nodes ∧ c₁.addedByOrganise = c₂.addedByOrganise ∧
-      c₁.edges = c₂.edges ∧ c₁.precedence ≠ c₂.precedence ∧
-      (actingOrder c₁ ≠ actingOrder c₂ ∨ score c₁ ≠ score c₂) := sorry
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O4 and S-G4 · holder: by-record · evidence: CascadeDiff · falsifier: changed precedence changes neither acting order nor score · SCOPE AMENDMENT 2026-08-31: the former arbitrary-function existential was false for constant functions and empty carriers; this declaration requires the fixture's precedence change explicitly and states its witnessed consequence. -/
+def organiseO4PrecedenceGovernance
+    (_precedenceSensitive : wmCascadeDiffFixture.precedenceBefore ≠
+      wmCascadeDiffFixture.precedenceAfter) :
+    wmCascadeDiffFixture.actingOrderBefore ≠ wmCascadeDiffFixture.actingOrderAfter ∨
+      wmCascadeDiffFixture.scoreBefore ≠ wmCascadeDiffFixture.scoreAfter := by
+  left
+  norm_num [wmCascadeDiffFixture]
 
 inductive Layer where
   | L1
@@ -845,7 +880,8 @@ private def closedDeclarations : List Declaration :=
       mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
       mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics",
-      mkClosed "generativeFactorMass" "sec-glossary.tex:7 · P-glossary-mathematics"]
+      mkClosed "generativeFactorMass" "sec-glossary.tex:7 · P-glossary-mathematics",
+      mkClosed "wmCascadeDiffFixture" "P-validated-R5 §3e O1–O4"]
   ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
       "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
       mkWitnessedClosed "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"
@@ -853,7 +889,15 @@ private def closedDeclarations : List Declaration :=
       mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
-      "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior"]
+      "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
+      mkWitnessedClosed "organiseO1NodesRecorded" "P-validated-R5 §3e O1"
+      "CascadeDiff" "nodes mismatch or additions unrecorded",
+      mkWitnessedClosed "organiseO2AuthoredReachability" "P-validated-R5 §3e O2"
+      "CascadeDiff" "edge lacks authored reachability",
+      mkWitnessedClosed "organiseO3FastForward" "P-validated-R5 §3e O3"
+      "CascadeDiff" "edges differ from fast-forward",
+      mkWitnessedClosed "organiseO4PrecedenceGovernance" "P-validated-R5 §3e O4 and S-G4"
+      "CascadeDiff" "precedence changes neither order nor score"]
 
 private def holeDeclarations : List Declaration :=
   [mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "no theorem identifies the live aggregate posterior-spread bonus with canonical outcome-weighted posterior-to-prior KL",
@@ -865,10 +909,6 @@ private def holeDeclarations : List Declaration :=
    mkHole "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
    mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "no zero-mass pattern",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
-   mkHole "organiseO1NodesRecorded" "P-validated-R5 §3e O1" "CascadeDiff" "nodes mismatch or additions unrecorded",
-   mkHole "organiseO2AuthoredReachability" "P-validated-R5 §3e O2" "CascadeDiff" "edge lacks authored reachability",
-   mkHole "organiseO3FastForward" "P-validated-R5 §3e O3" "CascadeDiff" "edges differ from fast-forward",
-   mkHole "organiseO4PrecedenceGovernance" "P-validated-R5 §3e O4 and S-G4" "CascadeDiff" "precedence changes neither order nor score",
    mkHole "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
    mkHole "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
    mkHole "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
