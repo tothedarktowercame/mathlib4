@@ -99,7 +99,7 @@ structure AblationRow (Policy : Type*) where
 
 abbrev AblationTable (Prior Policy : Type*) := Prior → AblationRow Policy
 
-/-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former declaration asserted an existential for every carrier and graders, and was false for empty/singleton policies or identical graders. This predicate requires both argmins to exist and their complete minimizer sets to be disjoint; merely choosing two members of one tied minimizer set no longer counts as movement. -/
+/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §2a′ · holder: by-record · SCOPE AMENDMENT 2026-08-31: the former declaration asserted an existential for every carrier and graders, and was false for empty/singleton policies or identical graders. This predicate requires both argmins to exist and their complete minimizer sets to be disjoint; merely choosing two members of one tied minimizer set no longer counts as movement. The definition is complete, but the contract tracks the pinned exact-dyadic ablation instance as an evidence obligation rather than treating definition as discharge. -/
 def nonDegenerateAblationLaw {Prior Policy : Type*} (policies : List Policy)
     (grade pragmatic : Prior → Policy → ℝ) : Prop :=
     policies ≠ [] ∧ ∃ prior,
@@ -198,7 +198,7 @@ def findF3NonSelfCertifying :
       ∃ receipt, (find tension repo).receipts p = some receipt ∧
         receipt.nonSelfCertifying := sorry
 
-/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e F4 · holder: by-record · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. -/
+/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F4 · holder: by-record · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. The predicate is defined, while its pinned row remains deliberately tracked as an evidence obligation. -/
 def findF4Falsifiable {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.repository.Nonempty ∧
     ∃ p, p ∈ row.repository ∧ p ∈ row.zeroMass ∧ p ∉ row.selected
