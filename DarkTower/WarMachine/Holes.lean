@@ -64,7 +64,7 @@ inductive Vertex where
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a · holder: by-record · An outcome is an observation indexed by its vertex. -/
 abbrev Outcome (Obs : Vertex → Type*) := Sigma Obs
 
-/-- HOLE · owner: P-validated-R5 §2a · holder: by-record · evidence: REFUSED — this is an implementation, not a law, and the record fixes no observation that selects C · falsifier: REFUSED for the same reason · Preferences are declared per PRAGMATIC vertex only. -/
+/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §2a · holder: by-record · evidence: REFUSED — this is an implementation, not a law, and the record fixes no observation that selects C · falsifier: REFUSED for the same reason · Preferences are declared per PRAGMATIC vertex only. C122's census proves this global declaration is free; it does not license choosing its value. -/
 def C {Obs : Vertex → Type*} (v : Vertex) (_pragmatic : v ≠ Vertex.evidence) : Obs v → ℝ := sorry
 
 /-- Expected free energy, shared by the risk-minus-information-gain and
@@ -175,7 +175,7 @@ structure FindReceiptRow (Scenario P : Type*) where
 
 abbrev FindReceiptTable (Scenario P : Type*) := List (FindReceiptRow Scenario P)
 
-/-- HOLE · owner: P-validated-R5 §3e find · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Find maps a structured tension and repository to selected patterns, receipts, or typed absence. -/
+/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §3e find · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Find maps a structured tension and repository to selected patterns, receipts, or typed absence. Its recorded F1–F4 instances do not select one canonical implementation. -/
 def find {State P : Type*} : Tension State → Repository P → FindResult P := sorry
 
 /-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F1 · holder: by-record · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: selection stays inside the recorded repository and an empty selection carries typed absence. -/
@@ -219,7 +219,7 @@ structure CascadeDiff (P Score : Type*) where
   scoreBefore : Score
   scoreAfter : Score
 
-/-- HOLE · owner: P-validated-R5 §3e organise · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Organise turns selected patterns and authored relations into a cascade. -/
+/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §3e organise · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Organise turns selected patterns and authored relations into a cascade. Its recorded O1–O4 instance does not select one canonical implementation. -/
 def organise {P : Type*} : Set P → Repository P → Cascade P := sorry
 
 private def cascadeFixtureSelected : Set Nat
@@ -6449,7 +6449,7 @@ def freePreferenceConstants : List PreferenceSpineDeclaration :=
 theorem freePreferenceConstants_eq :
     freePreferenceConstants = [.vertexLocalC] := by decide
 
-/-- HOLE · owner: P-R19-preferences-open §gate · holder: by-record · evidence: PreferenceStackWitness · falsifier: a C value in a live trace with no layer record behind it · Every running instance's C is the fold of a recorded stack. -/
+/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: P-R19-preferences-open §gate · holder: by-record · evidence: `checks/preference_stack_binding_check.clj` over `holes/labs/wm-contract/PreferenceStackWitness.edn` · falsifier: a C value in a live trace with no layer record behind it · Every running instance's C is the fold of a recorded stack. C114 considered and declined narrowing: a theorem over one pinned witness would prove a pinned instance, not the existing world-level claim. -/
 def preferenceStackLiveRecorded : Prop := sorry
 
 /-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: by-record · COUNTEREXAMPLE 2026-08-31: the original `machineHasNoC` claim said C is a parameter everywhere.  The in-language census refutes it: global `C` returns `Obs v → ℝ` without receiving a preference distribution, base preference, or layer stack, while every other deployment preference surface is parameterized.  The historical name remains legible; the proposition now records the refutation that the free-constant census is non-empty. -/
@@ -6472,7 +6472,7 @@ structure TickRunRecord where
   selectorSeam : String     -- "live" or the declared stub — never silent
   deriving DecidableEq
 
-/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: TickRunWitness · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord · OWNER AMENDMENT 2026-08-31: the original annotation said "CURRENTLY FIRING: selector-seam blocker". That was true of the earlier diagnostic standalone report, but a nine-hop tick subsequently completed through the explicitly recorded bounded stub. Futon3c remains absent from Futon2's local classpath; the production operator loop instead uses the live Agency HTTP selector. Original claim retained here as history, not current state. · The machine can run at least once on demand, leaving a receipt. -/
+/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_runs_once_witness.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord · OWNER AMENDMENT 2026-08-31: the original annotation said "CURRENTLY FIRING: selector-seam blocker". That was true of the earlier diagnostic standalone report, but a nine-hop tick subsequently completed through the explicitly recorded bounded stub. Futon3c remains absent from Futon2's local classpath; the production operator loop instead uses the live Agency HTTP selector. Original claim retained here as history, not current state. · The machine can run at least once on demand, leaving a receipt. C114 considered and declined narrowing: a theorem over the receipt would prove a pinned instance, not that the world-level event occurred. -/
 def wmRunsOnce : Prop := sorry
 
 /-- CLOSED-BY-RECORD · owner: Joe 2026-08-31 ("a map that assembles and joins appropriately, so we can see exactly what happened as the machine ran, and get evidence that that matched the specification") · holder: by-record · One hop of the route a tick actually took: the tracer tag conj'd onto the flowing map at a node boundary, reassembled pairwise into hops. The wiring diagram (control-map-edges.edn, Figure 4 as data) is the specification the route is judged against. -/
@@ -6483,7 +6483,7 @@ structure RouteHop where
   at_ : String
   deriving DecidableEq
 
-/-- HOLE · owner: Joe 2026-08-31 · holder: by-record · evidence: TickRunRecord — C71 lifts the earlier refusal only after p4ng 0598d19 drew the measured routes as a distinct Figure 4 layer; WM-RUN2 is 9/9 mapped (3 original, 6 measured) · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. -/
+/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_route_conformance.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` and the live Figure 4 edge layers · C71 lifts the earlier refusal only after p4ng 0598d19 drew the measured routes as a distinct Figure 4 layer; WM-RUN2 is 9/9 mapped (3 original, 6 measured) · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. C114 considered and declined narrowing: a theorem over pinned route and wiring snapshots would prove one pinned comparison, not the existing world-level conformance claim. -/
 def wmRunConformsToWiring : Prop := sorry
 
 structure WitnessLayerRow where
