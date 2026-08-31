@@ -25,8 +25,6 @@ example : beliefUpdate learningRate kernel prior observation precision posterior
   · funext k
     simp [posterior, prior, learningRate, precision, observation,
       observationKernelRowMass, predictionError, kernel]
-  constructor
-  · rfl
   · simp [variationalFreeEnergy, predictionError, posterior, precision,
       observation, prior, Channel.all, div_eq_mul_inv]
     repeat apply add_nonneg <;> norm_num

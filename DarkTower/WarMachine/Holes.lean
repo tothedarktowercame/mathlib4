@@ -487,11 +487,12 @@ def variationalFreeEnergy (precision error : Channel → ℝ) : VariationalFreeE
     ((Channel.all.map fun k => precision k * (error k) ^ 2).foldl (· + ·) 0 /
       Channel.all.length)⟩
 
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The computed mass of a kernel row; `ProbabilityKernel.normalised` proves it is one. -/
 def observationKernelRowMass {State Observation : Type*}
     (A : observationKernel State Observation) (s : State) : ℝ :=
   ((A.support s).map (A.mass s)).sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the recorded precision-weighted prediction-error correction and does not increase its variational mismatch. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the recorded precision-weighted prediction-error correction and does not increase its variational mismatch. Its variance remains a required carrier but is unconstrained here pending a recorded update rate, sensor-noise floor, and evidence-class precision mapping. -/
 def beliefUpdate (learningRate : NonnegativeReal)
     (A : observationKernel Channel Channel) (prior : BeliefState)
     (observation : Channel → ℝ) (precision : PrecisionMap)
@@ -499,7 +500,6 @@ def beliefUpdate (learningRate : NonnegativeReal)
   posterior.mean = (fun k =>
     prior.mean k + learningRate.value * observationKernelRowMass A k *
       (precision k).value * predictionError observation prior.mean k) ∧
-  posterior.variance = prior.variance ∧
   (variationalFreeEnergy (fun k => (precision k).value)
       (predictionError observation posterior.mean)).value ≤
     (variationalFreeEnergy (fun k => (precision k).value)
@@ -720,7 +720,9 @@ private def closedDeclarations : List Declaration :=
    ("r8Census", "P-R8 §solved 1"),
    ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics"),
    ("observationKernel", "sec-glossary.tex:27 · P-glossary-mathematics"),
-   ("BeliefState", "sec-glossary.tex:9 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2
+   ("BeliefState", "sec-glossary.tex:9 · P-glossary-mathematics"),
+   ("observationKernelRowMass", "sec-glossary.tex:27 · P-glossary-mathematics"),
+   ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2
 
 private def holeDeclarations : List Declaration :=
   [mkHole "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics" "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
