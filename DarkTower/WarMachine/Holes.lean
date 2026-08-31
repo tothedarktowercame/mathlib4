@@ -50,8 +50,8 @@ structure InformationState (State History Repo Tension : Type*) where
   repo : Repo
   tension : Tension
 
-/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3 · holder: by-record · A policy reads an information state and chooses an action. -/
-abbrev Policy (InformationState Action : Type*) := InformationState → Action
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3 · holder: by-record · A decision rule reads an information state and chooses an action. It is the result of inference, not the cascade-grain policy π that G scores. -/
+abbrev DecisionRule (InformationState Action : Type*) := InformationState → Action
 
 inductive Vertex where
   | people
@@ -66,12 +66,20 @@ abbrev Outcome (Obs : Vertex → Type*) := Sigma Obs
 /-- HOLE · owner: P-validated-R5 §2a · holder: by-record · evidence: REFUSED — this is an implementation, not a law, and the record fixes no observation that selects C · falsifier: REFUSED for the same reason · Preferences are declared per PRAGMATIC vertex only. -/
 def C {Obs : Vertex → Type*} (v : Vertex) (_pragmatic : v ≠ Vertex.evidence) : Obs v → ℝ := sorry
 
-/-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: by-record · Policy grade is pragmatic risk minus epistemic gain. -/
-def G {Policy : Type*} (risk eig : Policy → ℝ) : Policy → ℝ :=
-  fun π => risk π - eig π
+/-- Expected free energy, shared by the risk-minus-information-gain and
+risk-plus-ambiguity decompositions.  It is deliberately not definitionally
+equal to either per-tick variational F or BMR model-change evidence. -/
+structure ExpectedFreeEnergyValue where
+  value : ℝ
 
-def IsArgminOn {Policy : Type*} (policies : List Policy)
-    (score : Policy → ℝ) (π : Policy) : Prop :=
+instance : LE ExpectedFreeEnergyValue := ⟨fun x y => x.value ≤ y.value⟩
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: by-record · Policy grade is pragmatic risk minus epistemic gain. -/
+def G {PolicyIndex : Type*} (risk eig : PolicyIndex → ℝ) : PolicyIndex → ExpectedFreeEnergyValue :=
+  fun π => ⟨risk π - eig π⟩
+
+def IsArgminOn {Policy Score : Type*} [LE Score] (policies : List Policy)
+    (score : Policy → Score) (π : Policy) : Prop :=
   π ∈ policies ∧ ∀ ρ ∈ policies, score π ≤ score ρ
 
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a′ · holder: by-record · Non-degeneracy requires disagreement between the terms and a changed minimiser after ablation. -/
@@ -465,16 +473,21 @@ def predictionError (observation beliefMean : Channel → ℝ) : Channel → ℝ
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:17 · P-glossary-mathematics · holder: by-record · Precision is a nonnegative channel-indexed weight. -/
 abbrev PrecisionMap := Channel → NonnegativeReal
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:19 · P-glossary-mathematics · holder: by-record · F = ½ · mean_k (Π_k · ε_k²), over Channel.all. -/
-def variationalFreeEnergy (precision error : Channel → ℝ) : ℝ :=
-  (1 / 2 : ℝ) *
-    ((Channel.all.map fun k => precision k * (error k) ^ 2).foldl (· + ·) 0 /
-      Channel.all.length)
+/-- Per-tick precision-weighted prediction error.  This is not expected free
+energy and is not the evidence change used by Bayesian model reduction. -/
+structure VariationalFreeEnergyValue where
+  value : ℝ
 
-/-- HOLE · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · Grain mismatch (verbatim from G-D1): the glossary gives `risk + ambiguity` over `a`, while `Holes.G` is `risk - eig` over a generic `Policy`. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:19 · P-glossary-mathematics · holder: by-record · F = ½ · mean_k (Π_k · ε_k²), over Channel.all. -/
+def variationalFreeEnergy (precision error : Channel → ℝ) : VariationalFreeEnergyValue :=
+  ⟨(1 / 2 : ℝ) *
+    ((Channel.all.map fun k => precision k * (error k) ^ 2).foldl (· + ·) 0 /
+      Channel.all.length)⟩
+
+/-- HOLE · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · This and `G` are two decompositions of one expected-free-energy type; the missing kernel derivation remains a real hole. -/
 def expectedFreeEnergy {PolicyIndex Observation : Type*}
     (outcomeKernel : PolicyIndex → Observation → ℝ)
-    (risk ambiguity : PolicyIndex → ℝ) : PolicyIndex → ℝ := sorry
+    (risk ambiguity : PolicyIndex → ℝ) : PolicyIndex → ExpectedFreeEnergyValue := sorry
 
 /-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ExpectedInformationGainWitness · falsifier: posterior-to-prior KL does not equal the recorded expected gain · Canonical EIG requires the outcome and parameter-posterior kernels. -/
 def expectedInformationGain (PolicyIndex : Type*) : Type := sorry
@@ -482,19 +495,24 @@ def expectedInformationGain (PolicyIndex : Type*) : Type := sorry
 /-- HOLE · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: LogMultivariateBetaWitness · falsifier: the analytic value disagrees with the Dirichlet normaliser · The analytic log multivariate beta primitive is not available Mathlib-free here. -/
 def logMultivariateBeta (concentrations : List ℝ) : ℝ := sorry
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · ΔF = ln B(A) + ln B(a′) - ln B(a) - ln B(A′). -/
-def deltaFReduction (A aPrime a APrime : List ℝ) : ℝ :=
-  logMultivariateBeta A + logMultivariateBeta aPrime -
-    logMultivariateBeta a - logMultivariateBeta APrime
+/-- BMR evidence change between a full and reduced Dirichlet model.  The name
+and wrapper prevent composition with per-tick variational F by shared `ℝ`. -/
+structure ModelReductionFreeEnergyChange where
+  value : ℝ
+
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · BMR ΔF = ln B(A) + ln B(a′) - ln B(a) - ln B(A′). -/
+def modelReductionFreeEnergyChange (A aPrime a APrime : List ℝ) : ModelReductionFreeEnergyChange :=
+  ⟨logMultivariateBeta A + logMultivariateBeta aPrime -
+    logMultivariateBeta a - logMultivariateBeta APrime⟩
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:60 · P-glossary-mathematics · holder: by-record · A reduction passes exactly when ΔF ≤ -3. -/
-def bayesFactorThreshold (deltaF : ℝ) : Prop := deltaF ≤ -3
+def bayesFactorThreshold (change : ModelReductionFreeEnergyChange) : Prop := change.value ≤ -3
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:39 · P-glossary-mathematics · holder: by-record · Q(π) ∝ exp(ln E(π) − G(π)/τ): both the log habit prior and grade term are retained. -/
 def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
-    (habit grade : PolicyIndex → ℝ) (tau : ℝ)
+    (habit : PolicyIndex → ℝ) (grade : PolicyIndex → ExpectedFreeEnergyValue) (tau : ℝ)
     (policies : List PolicyIndex) : List ℝ :=
-  let weights := policies.map fun π => exp (log (habit π) - grade π / tau)
+  let weights := policies.map fun π => exp (log (habit π) - (grade π).value / tau)
   let total := weights.foldl (· + ·) 0
   weights.map fun weight => weight / total
 
@@ -505,8 +523,8 @@ def bayesianModelReduction (A aPrime a : List ℝ) : List ℝ :=
 /-- HOLE · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: REFUSED — G-D1 says Outcome/Q(o∣π) and the parameter kernel are missing · falsifier: REFUSED until those carriers are decided · The live posterior-spread bonus may not be promoted to canonical EIG. -/
 def modelUncertaintyAndEIG : Prop := sorry
 
-/-- HOLE · owner: sec-glossary.tex:48 · P-glossary-mathematics · holder: by-record · evidence: REFUSED — G-D1 says the glossary's π is a scored cascade while Holes.Policy is an information-state function · falsifier: REFUSED pending Joe's grain decision · This declaration records the unresolved cascade-policy grain without changing Policy. -/
-def cascadeGrainPi : Type := sorry
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:48 · P-glossary-mathematics · holder: by-record · π is the pattern-language cascade scored as one policy; the state-to-action result of inference is `DecisionRule`. -/
+abbrev cascadeGrainPi (P : Type*) := Cascade P
 
 /-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: by-record · How a preference layer was determined; open — new constructors are expected (delegate = a company or domain's own harness). -/
 inductive PreferenceSource where
@@ -659,13 +677,13 @@ private def closedDeclarations : List Declaration :=
   [("predictionError", "sec-glossary.tex:15 · P-glossary-mathematics"),
    ("PrecisionMap", "sec-glossary.tex:17 · P-glossary-mathematics"),
    ("variationalFreeEnergy", "sec-glossary.tex:19 · P-glossary-mathematics"),
-   ("deltaFReduction", "sec-glossary.tex:58 · P-glossary-mathematics"),
+   ("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
    ("bayesFactorThreshold", "sec-glossary.tex:60 · P-glossary-mathematics"),
    ("softmax", "sec-glossary.tex:39 · P-glossary-mathematics"),
    ("bayesianModelReduction", "sec-glossary.tex:54 · P-glossary-mathematics"),
    ("Channel", "P-R2 §solved 1 (Channel)"), ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
    ("Tension", "P-validated-R5 §3e"), ("InformationState", "P-validated-R5 §3d"),
-   ("Policy", "P-validated-R5 §3"), ("Outcome", "P-validated-R5 §2a"),
+   ("DecisionRule", "P-validated-R5 §3"), ("Outcome", "P-validated-R5 §2a"),
    ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
    ("fastForward", "P-validated-R5 §3e O3"), ("independent", "P-R9 S1"),
    ("IndependenceVerdict", "P-R9 §solved 2"), ("independenceVerdict", "P-R9 §solved 1–2"),
@@ -678,7 +696,8 @@ private def closedDeclarations : List Declaration :=
    ("Delivery", "delivery-lifecycle §0.6"), ("Handoff", "delivery-lifecycle §0.10"),
    ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
-   ("r8Census", "P-R8 §solved 1")].map fun p => mkClosed p.1 p.2
+   ("r8Census", "P-R8 §solved 1"),
+   ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2
 
 private def holeDeclarations : List Declaration :=
   [mkHole "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics" "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
@@ -688,7 +707,6 @@ private def holeDeclarations : List Declaration :=
    mkHole "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics" "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
    mkHole "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics" "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
    mkRefused "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics" "Outcome/Q(o∣π) and parameter kernel are missing",
-   mkRefused "cascadeGrainPi" "sec-glossary.tex:48 · P-glossary-mathematics" "glossary π and Holes.Policy have unresolved grains",
    mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
    mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "AblationTable" "no prior has moved = true",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
