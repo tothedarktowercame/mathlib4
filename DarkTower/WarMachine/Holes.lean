@@ -6256,7 +6256,7 @@ structure BeliefState where
 def predictionError (observation beliefMean : Channel → ℝ) : Channel → ℝ :=
   fun k => observation k - beliefMean k
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:17 · P-glossary-mathematics · holder: by-record · Precision is a nonnegative channel-indexed weight. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:17 · P-glossary-mathematics · holder: by-record · evidence: PrecisionWitness · falsifier: swapping precision with its signed prediction error preserves variational F, or a signed error map is accepted as precision · Precision is a nonnegative channel-indexed multiplicative weight. -/
 abbrev PrecisionMap := Channel → NonnegativeReal
 
 /-- Per-tick precision-weighted prediction error.  This is not expected free
@@ -6655,7 +6655,6 @@ private def mkRefused (name owner reason : String) : Declaration :=
 
 private def closedDeclarations : List Declaration :=
   ([("predictionError", "sec-glossary.tex:15 · P-glossary-mathematics"),
-   ("PrecisionMap", "sec-glossary.tex:17 · P-glossary-mathematics"),
    ("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
    ("bayesFactorThreshold", "sec-glossary.tex:60 · P-glossary-mathematics"),
    ("softmax", "sec-glossary.tex:39 · P-glossary-mathematics"),
@@ -6721,6 +6720,8 @@ private def closedDeclarations : List Declaration :=
       "BeliefStateWitness" "a declared channel lacks its mean or nonnegative variance",
       mkWitnessedClosed "variationalFreeEnergy" "sec-glossary.tex:19 · P-glossary-mathematics"
       "VariationalFreeEnergyWitness" "the Gaussian reference value disagrees, or expected free energy is accepted as variational F",
+      mkWitnessedClosed "PrecisionMap" "sec-glossary.tex:17 · P-glossary-mathematics"
+      "PrecisionWitness" "swapping precision with its signed prediction error preserves variational F, or a signed error map is accepted as precision",
       mkWitnessedClosed "Channel" "P-R2 §solved 1 (Channel)"
       "ChannelWitness" "the declared names or order differ from the 14-channel record",
       mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
