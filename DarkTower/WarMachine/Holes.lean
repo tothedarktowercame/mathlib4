@@ -6207,7 +6207,7 @@ abbrev PredictiveOutcomeKernel (PolicyIndex : Type*) (Obs : Vertex → Type*) :=
 abbrev ParameterPriorKernel (PolicyIndex Parameter : Type*) :=
   ProbabilityKernel PolicyIndex Parameter
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · `Q(θ∣o,π)` is the normalized parameter posterior conditioned jointly on the observed outcome and policy. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ParameterPosteriorKernelWitness · falsifier: parameter-prior `Q(θ∣π)` or predictive-outcome `Q(o∣π)` is accepted as posterior `Q(θ∣o,π)` · `Q(θ∣o,π)` is the normalized parameter posterior conditioned jointly on the observed outcome and policy. -/
 abbrev ParameterPosteriorKernel (PolicyIndex : Type*) (Obs : Vertex → Type*)
     (Parameter : Type*) :=
   ProbabilityKernel (PolicyIndex × Outcome Obs) Parameter
@@ -6694,7 +6694,8 @@ private def closedDeclarations : List Declaration :=
       "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
       mkWitnessedClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ParameterPriorKernelWitness" "predictive outcome Q(o|pi) or unconditioned policy habit Q(pi) is accepted as parameter prior Q(theta|pi)",
-      mkClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkWitnessedClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics"
+      "ParameterPosteriorKernelWitness" "parameter-prior Q(theta|pi) or predictive-outcome Q(o|pi) is accepted as posterior Q(theta|o,pi)",
       mkWitnessedClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics"
       "TransitionKernelWitness" "an action-unconditioned state kernel or scalar multivariate-beta normalizer B(alpha) is accepted as controlled transition B",
       mkWitnessedClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"
