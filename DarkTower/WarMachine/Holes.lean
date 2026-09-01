@@ -6252,7 +6252,7 @@ structure BeliefState where
   mean : Channel → ℝ
   variance : Channel → NonnegativeReal
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:12 · P-glossary-mathematics · holder: by-record · evidence: ObservationVectorWitness · falsifier: a partial channel map or a single vertex-tagged outcome is accepted as the complete observation vector · A standardized numeric observation has exactly one value at every one of the fourteen declared channel coordinates. Typed absence belongs to the producer measurement envelope and must be resolved before constructing this complete update input. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex paragraph:Observation vector o · P-glossary-mathematics · holder: by-record · evidence: ObservationVectorWitness · falsifier: a partial channel map or a single vertex-tagged outcome is accepted as the complete observation vector · A standardized numeric observation has exactly one value at every one of the fourteen declared channel coordinates. Typed absence belongs to the producer measurement envelope and must be resolved before constructing this complete update input. -/
 structure ObservationVector where
   value : Channel → ℝ
 
@@ -6696,7 +6696,7 @@ private def closedDeclarations : List Declaration :=
    ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
   ++ [mkWitnessedClosed "modelReductionFreeEnergyChange" "sec-glossary.tex:58 · P-glossary-mathematics"
       "ModelReductionFreeEnergyChangeWitness" "the analytic Dirichlet-normalizer result is perturbed or per-tick variational F is accepted as BMR delta-F",
-      mkWitnessedClosed "ObservationVector" "sec-glossary.tex:12 · P-glossary-mathematics"
+      mkWitnessedClosed "ObservationVector" "sec-glossary.tex paragraph:Observation vector o · P-glossary-mathematics"
       "ObservationVectorWitness" "a partial channel map or single vertex-tagged outcome is accepted as the complete 14-coordinate observation vector",
       mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics"
       "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
