@@ -6386,7 +6386,7 @@ and wrapper prevent composition with per-tick variational F by shared `ℝ`. -/
 structure ModelReductionFreeEnergyChange where
   value : ℝ
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · BMR ΔF = ln B(A) + ln B(a′) - ln B(a) - ln B(A′). -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: ModelReductionFreeEnergyChangeWitness · falsifier: the analytic Dirichlet-normalizer result is perturbed or per-tick variational F is accepted as BMR ΔF · BMR ΔF = ln B(A) + ln B(a′) - ln B(a) - ln B(A′). -/
 def modelReductionFreeEnergyChange
     (A aPrime a APrime : {xs : List ℝ // xs ≠ [] ∧ ∀ x ∈ xs, 0 < x}) :
     ModelReductionFreeEnergyChange :=
@@ -6657,8 +6657,7 @@ private def mkRefused (name owner reason : String) : Declaration :=
    holder := "by-record", decided := "2026-08-30", falsifier := some s!"REFUSED: {reason}"}
 
 private def closedDeclarations : List Declaration :=
-  ([("modelReductionFreeEnergyChange", "sec-glossary.tex:58 · P-glossary-mathematics"),
-   ("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
+  ([("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
    ("HaveWantArrowState", "sec-glossary.tex:70 · P-glossary-mathematics"),
    ("HaveWantArrowComposition", "sec-glossary.tex:70 · P-glossary-mathematics"),
    ("ControlPolicy", "sec-glossary.tex:35 · P-glossary-mathematics"),
@@ -6690,7 +6689,9 @@ private def closedDeclarations : List Declaration :=
    ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics"),
    ("observationKernelRowMass", "sec-glossary.tex:27 · P-glossary-mathematics"),
    ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
-  ++ [mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics"
+  ++ [mkWitnessedClosed "modelReductionFreeEnergyChange" "sec-glossary.tex:58 · P-glossary-mathematics"
+      "ModelReductionFreeEnergyChangeWitness" "the analytic Dirichlet-normalizer result is perturbed or per-tick variational F is accepted as BMR delta-F",
+      mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics"
       "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
       mkWitnessedClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics"
       "ParameterPriorKernelWitness" "predictive outcome Q(o|pi) or unconditioned policy habit Q(pi) is accepted as parameter prior Q(theta|pi)",
