@@ -48,10 +48,23 @@ private def model : GenerativeModel TestObservation TestState TestAction TestPol
   transition := transition
   policyPrior := policyPrior
 
+structure FactorReference where
+  observationMass : ℝ
+  transitionMass : ℝ
+  policyPriorMass : ℝ
+  jointFactorMass : ℝ
+
+def factorReference : FactorReference :=
+  { observationMass := 1 / 2
+    transitionMass := 1
+    policyPriorMass := 1
+    jointFactorMass := 1 / 2 }
+
 /-- Hand calculation: `(1/2) × 1 × 1 = 1/2`. -/
 theorem factorFixture :
-    generativeFactorMass model .ready .run .ready passOutcome .inspect = 1 / 2 := by
-  norm_num [generativeFactorMass, model, observation, transition, policyPrior]
+    generativeFactorMass model .ready .run .ready passOutcome .inspect =
+      factorReference.jointFactorMass := by
+  norm_num [factorReference, generativeFactorMass, model, observation, transition, policyPrior]
 
 end
 end DarkTower.WarMachine.GenerativeModelWitness
