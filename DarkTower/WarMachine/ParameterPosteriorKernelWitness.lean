@@ -28,4 +28,8 @@ theorem observedPolicyRowMass :
       (posterior.mass (.inspect, clear))).sum = 1 :=
   posterior.normalised (.inspect, clear)
 
+theorem allPosteriorRowsNormalised (p : Policy) (o : Outcome Obs) :
+    ((posterior.support (p, o)).map (posterior.mass (p, o))).sum = 1 :=
+  posterior.normalised (p, o)
+
 end DarkTower.WarMachine.ParameterPosteriorKernelWitness

@@ -28,4 +28,8 @@ theorem repairRowMass :
     ((predictive.support .repair).map (predictive.mass .repair)).sum = 1 :=
   predictive.normalised .repair
 
+theorem allPolicyRowsNormalised (p : Policy) :
+    ((predictive.support p).map (predictive.mass p)).sum = 1 :=
+  predictive.normalised p
+
 end DarkTower.WarMachine.PredictiveOutcomeKernelWitness

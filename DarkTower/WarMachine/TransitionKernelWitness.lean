@@ -22,4 +22,8 @@ theorem startRowMass :
       (controlled.mass (.idle, .start))).sum = 1 :=
   controlled.normalised (.idle, .start)
 
+theorem allControlledRowsNormalised (s : State) (a : Action) :
+    ((controlled.support (s, a)).map (controlled.mass (s, a))).sum = 1 :=
+  controlled.normalised (s, a)
+
 end DarkTower.WarMachine.TransitionKernelWitness

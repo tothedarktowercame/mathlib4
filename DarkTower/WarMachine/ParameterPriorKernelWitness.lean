@@ -21,4 +21,8 @@ theorem inspectRowMass :
     ((prior.support .inspect).map (prior.mass .inspect)).sum = 1 :=
   prior.normalised .inspect
 
+theorem allPriorRowsNormalised (p : Policy) :
+    ((prior.support p).map (prior.mass p)).sum = 1 :=
+  prior.normalised p
+
 end DarkTower.WarMachine.ParameterPriorKernelWitness
