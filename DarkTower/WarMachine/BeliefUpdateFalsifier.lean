@@ -17,7 +17,7 @@ private def evidenceWeight : Channel → Option NonnegativeReal :=
 private def precision : PrecisionMap := fun _ => ⟨1, by norm_num⟩
 private def prior : BeliefState :=
   {mean := fun _ => 0, variance := fun _ => ⟨2, by norm_num⟩}
-private def observation : Channel → ℝ := fun _ => 1
+private def observation : ObservationVector := ⟨fun _ => 1⟩
 private def posterior : BeliefState :=
   {mean := fun _ => 1, variance := fun _ => ⟨1, by norm_num⟩}
 private def unresponsiveVariance : BeliefState :=

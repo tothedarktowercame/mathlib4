@@ -6252,9 +6252,14 @@ structure BeliefState where
   mean : Channel → ℝ
   variance : Channel → NonnegativeReal
 
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:12 · P-glossary-mathematics · holder: by-record · evidence: ObservationVectorWitness · falsifier: a partial channel map or a single vertex-tagged outcome is accepted as the complete observation vector · A standardized numeric observation has exactly one value at every one of the fourteen declared channel coordinates. Typed absence belongs to the producer measurement envelope and must be resolved before constructing this complete update input. -/
+structure ObservationVector where
+  value : Channel → ℝ
+
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:15 · P-glossary-mathematics · holder: by-record · evidence: PredictionErrorWitness · falsifier: prediction error equals either operand or uses the reversed sign · Prediction error is the signed difference ε_k := o_k - μ_k. -/
-def predictionError (observation beliefMean : Channel → ℝ) : Channel → ℝ :=
-  fun k => observation k - beliefMean k
+def predictionError (observation : ObservationVector)
+    (beliefMean : Channel → ℝ) : Channel → ℝ :=
+  fun k => observation.value k - beliefMean k
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:17 · P-glossary-mathematics · holder: by-record · evidence: PrecisionWitness · falsifier: swapping precision with its signed prediction error preserves variational F, or a signed error map is accepted as precision · Precision is a nonnegative channel-indexed multiplicative weight. -/
 abbrev PrecisionMap := Channel → NonnegativeReal
@@ -6279,7 +6284,7 @@ def observationKernelRowMass {State Observation : Type*}
 def beliefUpdate (learningRate sensorNoiseFloor : NonnegativeReal)
     (evidenceWeight : Channel → Option NonnegativeReal)
     (A : observationKernel Channel Channel) (prior : BeliefState)
-    (observation : Channel → ℝ) (precision : PrecisionMap)
+    (observation : ObservationVector) (precision : PrecisionMap)
     (posterior : BeliefState) : Prop :=
   learningRate.value ≤ 1 ∧
   (∀ k w, evidenceWeight k = some w → w.value ≤ 1) ∧
@@ -6691,6 +6696,8 @@ private def closedDeclarations : List Declaration :=
    ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
   ++ [mkWitnessedClosed "modelReductionFreeEnergyChange" "sec-glossary.tex:58 · P-glossary-mathematics"
       "ModelReductionFreeEnergyChangeWitness" "the analytic Dirichlet-normalizer result is perturbed or per-tick variational F is accepted as BMR delta-F",
+      mkWitnessedClosed "ObservationVector" "sec-glossary.tex:12 · P-glossary-mathematics"
+      "ObservationVectorWitness" "a partial channel map or single vertex-tagged outcome is accepted as the complete 14-coordinate observation vector",
       mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics"
       "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
       mkWitnessedClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics"
