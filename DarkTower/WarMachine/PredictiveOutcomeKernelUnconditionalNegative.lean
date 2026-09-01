@@ -10,4 +10,13 @@ noncomputable def unconditional : PreferenceDistribution Obs where
   normalised := by intro; norm_num
 
 -- Must fail: an unconditional distribution is not Q(o|pi).
+/--
+error: Type mismatch
+  unconditional
+has type
+  PreferenceDistribution Obs
+but is expected to have type
+  PredictiveOutcomeKernel Policy Obs
+-/
+#guard_msgs in
 def badPredictive : PredictiveOutcomeKernel Policy Obs := unconditional

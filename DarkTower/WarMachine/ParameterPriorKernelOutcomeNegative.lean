@@ -14,4 +14,13 @@ noncomputable def outcomePrediction : PredictiveOutcomeKernel Policy Obs where
   normalised := by intro; norm_num
 
 -- Must fail: Q(o|pi) has outcomes, not model parameters, as its codomain.
+/--
+error: Type mismatch
+  outcomePrediction
+has type
+  PredictiveOutcomeKernel Policy Obs
+but is expected to have type
+  ParameterPriorKernel Policy Parameter
+-/
+#guard_msgs in
 def badPrior : ParameterPriorKernel Policy Parameter := outcomePrediction

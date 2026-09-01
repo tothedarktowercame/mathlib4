@@ -1,7 +1,8 @@
-import DarkTower.WarMachine.PolicyPriorKernelWitness
+import DarkTower.WarMachine.Holes
 
 open DarkTower.WarMachine.Holes
-open DarkTower.WarMachine.PolicyPriorKernelWitness
+
+inductive Policy where | inspect | repair deriving DecidableEq
 
 inductive HiddenState where | one | two
 
@@ -12,4 +13,13 @@ noncomputable def stateConditioned : ProbabilityKernel HiddenState Policy where
   normalised := by intro; norm_num
 
 -- Must fail: a state-conditioned kernel is not the Unit-conditioned prior.
+/--
+error: Type mismatch
+  stateConditioned
+has type
+  ProbabilityKernel HiddenState Policy
+but is expected to have type
+  PolicyPriorKernel Policy
+-/
+#guard_msgs in
 def badPrior : PolicyPriorKernel Policy := stateConditioned

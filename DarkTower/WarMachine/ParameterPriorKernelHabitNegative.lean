@@ -10,4 +10,13 @@ noncomputable def habit : PolicyPriorKernel Policy where
   normalised := by intro; norm_num
 
 -- Must fail: Q(pi) is unconditioned and ranges over policies, not parameters.
+/--
+error: Type mismatch
+  habit
+has type
+  PolicyPriorKernel Policy
+but is expected to have type
+  ParameterPriorKernel Policy Parameter
+-/
+#guard_msgs in
 def badPrior : ParameterPriorKernel Policy Parameter := habit

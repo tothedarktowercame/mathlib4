@@ -10,4 +10,13 @@ noncomputable def uncontrolled : ProbabilityKernel State State where
   normalised := by intro; norm_num
 
 -- Must fail: B is conditioned jointly on state and action.
+/--
+error: Type mismatch
+  uncontrolled
+has type
+  ProbabilityKernel State State
+but is expected to have type
+  TransitionKernel State Action
+-/
+#guard_msgs in
 def badTransition : TransitionKernel State Action := uncontrolled

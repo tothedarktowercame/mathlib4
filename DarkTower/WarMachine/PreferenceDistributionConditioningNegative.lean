@@ -12,4 +12,13 @@ noncomputable def stateConditioned : ProbabilityKernel HiddenState (Outcome Obs)
   normalised := by intro; norm_num
 
 -- Must fail: preferences are unconditional, not likelihoods indexed by state.
+/--
+error: Type mismatch
+  stateConditioned
+has type
+  ProbabilityKernel HiddenState (Outcome Obs)
+but is expected to have type
+  PreferenceDistribution Obs
+-/
+#guard_msgs in
 def badPreference : PreferenceDistribution Obs := stateConditioned
