@@ -14,7 +14,7 @@ noncomputable def reference : observationKernel State Observation where
   nonnegative := by intros; norm_num
   normalised := by intro; norm_num
 
-example : observationKernelRowMass reference .latent = 1 := by
+theorem referenceRowMass : observationKernelRowMass reference .latent = 1 := by
   norm_num [observationKernelRowMass, reference]
 
 end DarkTower.WarMachine.ObservationKernelWitness

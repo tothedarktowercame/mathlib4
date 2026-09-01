@@ -20,4 +20,7 @@ def second : HaveWantArrow Endpoint :=
 def recordedComposition : HaveWantArrowComposition first second :=
   ⟨rfl⟩
 
+theorem recordedCompositionEndpoints : first.target = second.source :=
+  recordedComposition.endpointMatch
+
 end DarkTower.WarMachine.HaveWantArrowWitness

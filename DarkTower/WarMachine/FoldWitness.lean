@@ -16,4 +16,12 @@ three explicit policy holes. -/
 def recordedFold : Fold RecordedWiring RecordedPolicyHole :=
   ⟨⟨5, 5, 1⟩, some (-1), [.unresolvedShape, .unresolvedCoupling, .unresolvedGrain]⟩
 
+theorem recordedFoldFields :
+    recordedFold.wiring.nodeCount = 5 ∧
+    recordedFold.wiring.hyperedgeCount = 5 ∧
+    recordedFold.wiring.terminalCount = 1 ∧
+    recordedFold.coverageScoreDelta = some (-1) ∧
+    recordedFold.policyHoles.length = 3 := by
+  norm_num [recordedFold]
+
 end DarkTower.WarMachine.FoldWitness

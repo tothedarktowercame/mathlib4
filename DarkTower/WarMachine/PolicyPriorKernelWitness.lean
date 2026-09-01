@@ -12,7 +12,7 @@ noncomputable def reference : PolicyPriorKernel Policy where
   nonnegative := by intros; norm_num
   normalised := by intro; norm_num
 
-example : ((reference.support ()).map (reference.mass ())).sum = 1 :=
+theorem referenceRowMass : ((reference.support ()).map (reference.mass ())).sum = 1 :=
   reference.normalised ()
 
 end DarkTower.WarMachine.PolicyPriorKernelWitness
