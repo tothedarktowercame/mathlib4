@@ -6592,8 +6592,38 @@ structure RouteHop where
 /-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_route_conformance.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` and the live Figure 4 edge layers · C71 lifts the earlier refusal only after p4ng 0598d19 drew the measured routes as a distinct Figure 4 layer; WM-RUN2 is 9/9 mapped (3 original, 6 measured) · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. C114 considered and declined narrowing: a theorem over pinned route and wiring snapshots would prove one pinned comparison, not the existing world-level conformance claim. -/
 def wmRunConformsToWiring : Prop := sorry
 
-/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: wm-organization · TN-edge-review worklist H1 · holder: by-record · evidence: a comparison, per available run record, of the recorded Q(π) selection against the action each actuation path enacted (worklist V1 produces it) · falsifier: a run in which the enacted action differs from the recorded Q(π) selection · THE TWO PATHS PICK BY DIFFERENT RULES, which is why this is a hole and not a triviality. `full_loop_runner`'s `selected-entry` finds the ranked-actions entry whose `:action` equals `(get-in judgement [:decision :action])` — it enacts the RECORDED SELECTION (`futon2/src/futon2/aif/full_loop_runner.clj:870-873`). `close-loop!` instead takes `(first (filter #(= :pass (:verdict %)) gates))` — the FIRST PASSING ACT GATE, whose order is the ranking's, not the decision's (`futon2/src/futon2/aif/enact.clj:287-316`). The two coincide only when the selected entry is also the first to pass its gate; nothing in either path enforces that, and no recorded run has been compared. R6→R16 is therefore path-dependent, which is what `aif-conformance.edn` already classifies it as. The claim held open: the enacted action equals the recorded selection on every path. -/
-def enactedActionEqualsSelected : Prop := sorry
+/-- Fixture scaffolding: one COMPARABLE tick of a wm-trace run — the mission the recorded Q(π) decision selected (`:decision :action :target`) against the mission the actuation path enacted (`:realized-outcome :policy`). A form is COMPARABLE iff it carries both halves; forms carrying only one are not transcribed, so the list lengths below are smaller than the files' form counts. -/
+structure EnactedVsSelected where
+  selected : String
+  enacted : String
+  deriving DecidableEq
+
+/-- DERIVED: the two halves name the same mission — the property the original `enactedActionEqualsSelected` asserted of every record. A computed predicate, not a fact. -/
+def EnactedVsSelected.agrees (r : EnactedVsSelected) : Bool := r.selected == r.enacted
+
+private def firstFlightsVsBayesianStructureLearning : EnactedVsSelected :=
+  {selected := "M-first-flights", enacted := "M-bayesian-structure-learning"}
+
+/-- CLOSED-BY-RECORD · owner: wm-organization · TN-edge-review worklist H1b · holder: by-record · evidence: `futon2:data/wm-trace/wm-trace-2026-07-04.edn` · falsifier: the file's comparable records are not 37 copies of this pair · SNAPSHOT 2026-09-01: the file holds 38 forms, 37 of which carry both halves, and every one of the 37 carries the SAME pair — selection `M-first-flights`, enactment `M-bayesian-structure-learning`. Represented extensionally. Later trace growth does not rewrite this value. -/
+def wmTrace20260704EnactedVsSelected : List EnactedVsSelected :=
+  List.replicate 37 firstFlightsVsBayesianStructureLearning
+
+/-- CLOSED-BY-RECORD · owner: wm-organization · TN-edge-review worklist H1b · holder: by-record · evidence: `futon2:data/wm-trace/wm-trace-2026-07-05.edn` · falsifier: the file's comparable records are not 13 copies of this pair · SNAPSHOT 2026-09-01: the file holds 18 forms, 13 of which carry both halves, all carrying the same pair as the 07-04 file. The gate verdicts differ across these 13 (5 records gate `M-canon-fingerprint-store` `:fail`, 8 `:abstain-missing-leg`) without changing either half. -/
+def wmTrace20260705EnactedVsSelected : List EnactedVsSelected :=
+  List.replicate 13 firstFlightsVsBayesianStructureLearning
+
+/-- CLOSED-BY-RECORD · owner: wm-organization · TN-edge-review worklist H1b · holder: by-record · evidence: the two file snapshots above · falsifier: a trace file carrying both halves that is absent from this concatenation · The comparable population, and it is exactly two files wide: of the 57 wm-trace forms' files, only 07-04 and 07-05 join a recorded selection to a recorded enactment. 07-03 records a selection on a sorry against an enacted mission and has no join key; the other 54 record no actuation; the two tick-run records carry neither half and declare a stub selector (C460 §2). -/
+def enactedVsSelectedComparable : List EnactedVsSelected :=
+  wmTrace20260704EnactedVsSelected ++ wmTrace20260705EnactedVsSelected
+
+/-- CLOSED-BY-RECORD · owner: wm-organization · TN-edge-review worklist H1 (refuted), H1b (this record) · holder: by-record · evidence: proof term over `enactedVsSelectedComparable`, transcribed from `futon2:holes/labs/wm-contract/C460-enacted-vs-selected.md` and re-counted form by form against `futon2:data/wm-trace/wm-trace-2026-07-04.edn` and `futon2:data/wm-trace/wm-trace-2026-07-05.edn` · falsifier: a comparable record whose selection and enactment name the same mission · COUNTEREXAMPLE 2026-09-01: the original claim held open that the enacted action equals the recorded Q(π) selection on every path, with falsifier "a run in which the enacted action differs". V1/C460 produced that run, and the scale is not marginal — 50 records carry both halves, the enactment differs from the selection in 50 of them, and none agree. The mechanism is `close-loop!`'s and it is worse than a tie broken differently: the rank-1 selection never reached the gate stage, so the first lower-ranked candidate to pass its act gate was enacted (`futon2/src/futon2/aif/enact.clj:287-316`, C460 §4). The historical name remains legible; the proposition now records the refutation — the agreeing set is empty over a non-empty population. What replaces it is `enactedEqualsSelectedWhenRankOneGated`, a bound to be tested and NOT a claim believed true. -/
+def enactedActionEqualsSelected :
+    enactedVsSelectedComparable.length = 50 ∧
+      enactedVsSelectedComparable.filter EnactedVsSelected.agrees = [] := by
+  decide
+
+/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: wm-organization · TN-edge-review worklist H1b · holder: by-record · evidence: a run record in which the rank-1 selection passes its own act gate, paired with the action that was then enacted · falsifier: a run in which the rank-1 selection passes its gate and a different action is enacted · A BOUND TO BE TESTED, NOT A CLAIM BELIEVED TRUE — read the counterexample above first. `enactedActionEqualsSelected` is refuted on record: over `futon2/data/wm-trace/wm-trace-2026-07-04.edn` and `futon2/data/wm-trace/wm-trace-2026-07-05.edn`, the only two files joining a selection to an enactment, the paths disagree in 50 of 50 comparable records and agree in none. So this is not a weaker form of something observed to hold; it is the untested remainder after the strong claim fell. THE ANTECEDENT HAS NEVER OCCURRED ON RECORD: in all 50 records the act gates run over exactly two missions (`M-canon-fingerprint-store`, `M-bayesian-structure-learning`) and the rank-1 selection `M-first-flights` is not among them, so the rank-1 selection passes its gate in ZERO of 50 — the bound is vacuously unfalsified rather than supported, and a reader must not take its openness for evidence. The two paths can coincide only when the selected entry is also the first to pass its gate: `full_loop_runner`'s `selected-entry` enacts the recorded selection (`futon2/src/futon2/aif/full_loop_runner.clj:870-873`), `close-loop!` takes the first passing gate in ranking order (`futon2/src/futon2/aif/enact.clj:287-316`), and nothing enforces that they meet. Deciding this needs a run that produces the antecedent at all. -/
+def enactedEqualsSelectedWhenRankOneGated : Prop := sorry
 
 /-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove the absence of a code path · evidence is the executable witness · contract kind HOLE intentionally · owner: wm-organization · TN-edge-review worklist H2 · holder: by-record · evidence: a provenance walk from `DirichletConcentrations` back to its producer — name the feeder, grep the store, find the writer · falsifier: a code path from the tick model's o or μ into R17's concentrations · THE THEORY AND THE MACHINE ACCUMULATE FROM DIFFERENT SOURCES. Da Costa eq. 21 accumulates Dirichlet concentrations from the tick model's (o, s). A4a instead builds a capability × mission model: `a4a_substrate/read-corpus` reads `hyperedges-by-type :capability/*` and hands the corpus to `a4a/corpus->concentration` (`futon2/src/futon2/aif/a4a_substrate.clj:46-60`), and those hyperedges are written by the A3 actuator (`futon2/src/futon2/aif/actuator_a3.clj:31, 68`, discharge records at `:486-487`). The A4a namespace says so itself: it is pure, and its concepts are "demo-validated until real :capability/* production writes flow" (`futon2/src/futon2/aif/a4a.clj:2-6`). So R2→R17 and R1→R17 are not realised, and this is why: not a missing wire between two boxes that otherwise agree, but two accumulations over different data. The claim held open is the ABSENCE — no path carries the tick model's o or μ into R17's concentrations. Finding one falsifies it, and would also close the two edges. -/
 def dirichletAccumulationImportAbsent : Prop := sorry
@@ -6667,6 +6697,14 @@ private def mkWitnessedClosed (name owner evidence falsifier : String) : Declara
 private def mkHole (name owner evidence falsifier : String) : Declaration :=
   {name, kind := .hole, signature := s!"see {name} in the source module", owner,
    holder := "by-record", decided := "2026-08-30", evidence := some evidence,
+   falsifier := some falsifier}
+
+-- A claim closed by REFUTATION rather than by witness: the historical name is kept,
+-- its proposition now records the counterexample, and `decided` is the date the record
+-- refuted it — not the batch date `mkWitnessedClosed` carries.
+private def mkRefutedByRecord (name owner evidence falsifier : String) : Declaration :=
+  {name, kind := .closed, signature := s!"see {name} in the source module", owner,
+   holder := "by-record", decided := "2026-09-01", evidence := some evidence,
    falsifier := some falsifier}
 
 private def mkRefused (name owner reason : String) : Declaration :=
@@ -6812,7 +6850,8 @@ private def holeDeclarations : List Declaration :=
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
    mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; amended 2026-08-31: original 'currently firing (selector-seam blocker)' is historical — a nine-hop declared-stub tick completed, while the production loop uses the Agency HTTP selector",
    mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers",
-   mkHole "enactedActionEqualsSelected" "wm-organization · TN-edge-review worklist H1" "TickRunRecord" "a run in which the enacted action differs from the recorded Q(pi) selection",
+   mkRefutedByRecord "enactedActionEqualsSelected" "wm-organization · TN-edge-review worklist H1 (refuted), H1b" "C460 over wm-trace-2026-07-04.edn and wm-trace-2026-07-05.edn: 50 comparable records, 50 differ, 0 agree" "a comparable record whose selection and enactment name the same mission",
+   mkHole "enactedEqualsSelectedWhenRankOneGated" "wm-organization · TN-edge-review worklist H1b" "TickRunRecord" "a run in which the rank-1 selection passes its gate and a different action is enacted",
    mkHole "dirichletAccumulationImportAbsent" "wm-organization · TN-edge-review worklist H2" "DirichletConcentrations" "a code path from the tick model's o or mu into R17's concentrations",
    mkHole "policyPrecisionIsGammaFromBeta" "wm-organization · TN-edge-review worklist H3 (Joe's J1 ruling)" "TickRunRecord" "a run record in which tau is set by the beta update from G and pi",
    mkHole "policyPosteriorImportsPolicyF" "wm-organization · TN-edge-review worklist H4 (Joe's J2 ruling)" "TickRunRecord" "a run record in which Q(pi) is computed with an F_pi term from the observations under each policy"]
