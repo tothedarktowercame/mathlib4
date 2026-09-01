@@ -10,4 +10,13 @@ noncomputable def outcomePrediction : PredictiveOutcomeKernel Policy Obs where
   normalised := by intro; norm_num
 
 -- Must fail: Q(o|pi) has neither the posterior's domain nor its codomain.
+/--
+error: Type mismatch
+  outcomePrediction
+has type
+  PredictiveOutcomeKernel Policy Obs
+but is expected to have type
+  ParameterPosteriorKernel Policy Obs Parameter
+-/
+#guard_msgs in
 def badPosterior : ParameterPosteriorKernel Policy Obs Parameter := outcomePrediction

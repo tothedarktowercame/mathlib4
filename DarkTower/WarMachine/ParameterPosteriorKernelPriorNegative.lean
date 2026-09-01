@@ -10,4 +10,13 @@ noncomputable def parameterPrior : ParameterPriorKernel Policy Parameter where
   normalised := by intro; norm_num
 
 -- Must fail: Q(theta|pi) omits the observed-outcome conditioning coordinate.
+/--
+error: Type mismatch
+  parameterPrior
+has type
+  ParameterPriorKernel Policy Parameter
+but is expected to have type
+  ParameterPosteriorKernel Policy Obs Parameter
+-/
+#guard_msgs in
 def badPosterior : ParameterPosteriorKernel Policy Obs Parameter := parameterPrior
