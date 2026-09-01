@@ -13,6 +13,8 @@ def U : ControlVocabulary Control :=
 def recordedPolicy : ControlPolicy U :=
   ⟨[.observe, .act], by simp [U]⟩
 
+theorem recordedControlPolicy : recordedPolicy.controls = [Control.observe, Control.act] := rfl
+
 def temperature : AlivenessFactor := ⟨0.8, by norm_num⟩
 def harmony : AlivenessFactor := ⟨0.6, by norm_num⟩
 
@@ -50,5 +52,12 @@ inductive OutcomeClass where | grounded | abstained
 def recordedCohort : Cohort String Nat String OutcomeClass :=
   ⟨"wm-outer-loop-46-v1", "omni-jvm", 3, by decide,
    {OutcomeClass.grounded, OutcomeClass.abstained}, [1, 2, 3], by decide⟩
+
+theorem recordedCohortFields :
+    recordedCohort.id = "wm-outer-loop-46-v1" ∧
+    recordedCohort.semanticEpoch = "omni-jvm" ∧
+    recordedCohort.stoppingTarget = 3 ∧
+    recordedCohort.attempts = [1, 2, 3] := by
+  decide
 
 end DarkTower.WarMachine.MachineVocabularyWitness

@@ -4,14 +4,25 @@ open DarkTower.WarMachine.Holes
 
 namespace DarkTower.WarMachine.BeliefStateWitness
 
-/-- The record-derived reference state uses a total channel-indexed carrier;
+/-- The C31 fixture fields kept adjacent to the constructed posterior. -/
+structure BeliefReference where
+  priorMean : ℝ
+  priorVariance : ℝ
+  posteriorMean : ℝ
+  posteriorVariance : ℝ
+
+def beliefReference : BeliefReference :=
+  { priorMean := 0, priorVariance := 2,
+    posteriorMean := 1, posteriorVariance := 1 }
+
+/-- The record-derived posterior uses a total channel-indexed carrier;
 there is no channel for which mean or variance can be absent. -/
 def reference : BeliefState :=
-  { mean := fun _ => 0
-    variance := fun _ => ⟨0.01, by norm_num⟩ }
+  { mean := fun _ => beliefReference.posteriorMean
+    variance := fun _ => ⟨beliefReference.posteriorVariance, by norm_num [beliefReference]⟩ }
 
-example (k : Channel) : reference.mean k = 0 := rfl
-example (k : Channel) : 0 ≤ (reference.variance k).value :=
-  (reference.variance k).nonnegative
+theorem recordedPosterior (k : Channel) :
+    reference.mean k = 1 ∧ (reference.variance k).value = 1 := by
+  simp [reference, beliefReference]
 
 end DarkTower.WarMachine.BeliefStateWitness
