@@ -6592,6 +6592,9 @@ structure RouteHop where
 /-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_route_conformance.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` and the live Figure 4 edge layers · C71 lifts the earlier refusal only after p4ng 0598d19 drew the measured routes as a distinct Figure 4 layer; WM-RUN2 is 9/9 mapped (3 original, 6 measured) · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. C114 considered and declined narrowing: a theorem over pinned route and wiring snapshots would prove one pinned comparison, not the existing world-level conformance claim. -/
 def wmRunConformsToWiring : Prop := sorry
 
+/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: wm-organization · TN-edge-review worklist H1 · holder: by-record · evidence: a comparison, per available run record, of the recorded Q(π) selection against the action each actuation path enacted (worklist V1 produces it) · falsifier: a run in which the enacted action differs from the recorded Q(π) selection · THE TWO PATHS PICK BY DIFFERENT RULES, which is why this is a hole and not a triviality. `full_loop_runner`'s `selected-entry` finds the ranked-actions entry whose `:action` equals `(get-in judgement [:decision :action])` — it enacts the RECORDED SELECTION (`futon2/src/futon2/aif/full_loop_runner.clj:870-873`). `close-loop!` instead takes `(first (filter #(= :pass (:verdict %)) gates))` — the FIRST PASSING ACT GATE, whose order is the ranking's, not the decision's (`futon2/src/futon2/aif/enact.clj:287-316`). The two coincide only when the selected entry is also the first to pass its gate; nothing in either path enforces that, and no recorded run has been compared. R6→R16 is therefore path-dependent, which is what `aif-conformance.edn` already classifies it as. The claim held open: the enacted action equals the recorded selection on every path. -/
+def enactedActionEqualsSelected : Prop := sorry
+
 structure WitnessLayerRow where
   row : String
   layer : Layer
@@ -6799,7 +6802,8 @@ private def holeDeclarations : List Declaration :=
    mkWitnessedClosed "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
    mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; amended 2026-08-31: original 'currently firing (selector-seam blocker)' is historical — a nine-hop declared-stub tick completed, while the production loop uses the Agency HTTP selector",
-   mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers"]
+   mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers",
+   mkHole "enactedActionEqualsSelected" "wm-organization · TN-edge-review worklist H1" "TickRunRecord" "a run in which the enacted action differs from the recorded Q(pi) selection"]
 
 def registry : Registry :=
   {schemaVersion := 1, contractId := "wm-holes", moduleName := "DarkTower.WarMachine.Holes",
