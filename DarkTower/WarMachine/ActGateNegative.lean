@@ -1,3 +1,8 @@
 import DarkTower.WarMachine.Holes
 open DarkTower.WarMachine.Holes
-example : actGate none (some (-1)) = .pass := by native_decide
+/--
+error: unsolved goals
+⊢ False
+-/
+#guard_msgs in
+example : actGate none (some (-1)) = .pass := by simp [actGate]
