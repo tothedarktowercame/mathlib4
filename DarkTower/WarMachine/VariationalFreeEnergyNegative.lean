@@ -1,4 +1,4 @@
-import DarkTower.WarMachine.VariationalFreeEnergyWitness
+import DarkTower.WarMachine.Holes
 
 open DarkTower.WarMachine.Holes
 
