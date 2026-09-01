@@ -25,10 +25,23 @@ noncomputable def preference : PreferenceDistribution Obs where
 theorem positivePreference : ∀ π o, o ∈ predictive.support π → 0 < preference.mass () o := by
   intros; norm_num [preference]
 
+structure RiskReference where
+  predictiveMassA : ℝ
+  predictiveMassB : ℝ
+  preferenceMassA : ℝ
+  preferenceMassB : ℝ
+  expectedRisk : ℝ
+
+noncomputable def riskReference : RiskReference :=
+  { predictiveMassA := 1, predictiveMassB := 0,
+    preferenceMassA := 1 / 2, preferenceMassB := 1 / 2,
+    expectedRisk := Real.log 2 }
+
 /-- Independent identity: KL of a point mass against a fair binary preference
 distribution is `log 2`. -/
 theorem pointMassAgainstUniform :
-    predictiveOutcomeRisk predictive preference positivePreference .chooseA = Real.log 2 := by
-  simp [predictiveOutcomeRisk, predictive, preference, oa]
+    predictiveOutcomeRisk predictive preference positivePreference .chooseA =
+      riskReference.expectedRisk := by
+  simp [riskReference, predictiveOutcomeRisk, predictive, preference, oa]
 
 end DarkTower.WarMachine.PredictiveOutcomeRiskWitness

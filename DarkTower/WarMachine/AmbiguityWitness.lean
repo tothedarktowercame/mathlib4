@@ -20,9 +20,18 @@ def observationModel : observationKernel State Observation where
   nonnegative := by intros; norm_num
   normalised := by intro; norm_num
 
+structure AmbiguityReference where
+  predictedStateMass : ℝ
+  observationMass : ℝ
+  expectedAmbiguity : ℝ
+
+def ambiguityReference : AmbiguityReference :=
+  { predictedStateMass := 1, observationMass := 1, expectedAmbiguity := 0 }
+
 /-- Independent fixture: a point-mass observation has Shannon entropy zero. -/
 theorem pointMassAmbiguity :
-    ambiguity predictedState observationModel .inspect = 0 := by
-  norm_num [ambiguity, observationEntropy, predictedState, observationModel]
+    ambiguity predictedState observationModel .inspect =
+      ambiguityReference.expectedAmbiguity := by
+  norm_num [ambiguityReference, ambiguity, observationEntropy, predictedState, observationModel]
 
 end DarkTower.WarMachine.AmbiguityWitness

@@ -29,17 +29,30 @@ private theorem positivePreference :
   intros
   norm_num [Cdist]
 
+structure EFEReference where
+  predictiveMass : ℝ
+  preferenceMass : ℝ
+  risk : ℝ
+  ambiguity : ℝ
+  epistemicGain : ℝ
+  expectedFreeEnergy : ℝ
+
+def efeReference : EFEReference :=
+  { predictiveMass := 1, preferenceMass := 1, risk := 0,
+    ambiguity := 2, epistemicGain := -2, expectedFreeEnergy := 2 }
+
 /-- Independently, a one-point predictive and preferred distribution has KL
 zero; adding ambiguity 2 therefore gives expected free energy 2. -/
 theorem onePointFixture :
-    expectedFreeEnergy Q Cdist positivePreference (fun _ => 2) .inspect = ⟨2⟩ := by
-  norm_num [expectedFreeEnergy, predictiveOutcomeRisk, Q, Cdist]
+    expectedFreeEnergy Q Cdist positivePreference (fun _ => efeReference.ambiguity) .inspect =
+      ⟨efeReference.expectedFreeEnergy⟩ := by
+  norm_num [efeReference, expectedFreeEnergy, predictiveOutcomeRisk, Q, Cdist]
 
 /-- The same fixture witnesses the decomposition bridge: risk `0` minus
 epistemic gain `-2` equals KL `0` plus ambiguity `2`. -/
 theorem decompositionFixture :
-    G (fun _ : TestPolicy => 0) (fun _ => -2) .inspect =
-      expectedFreeEnergy Q Cdist positivePreference (fun _ => 2) .inspect := by
-  norm_num [G, expectedFreeEnergy, predictiveOutcomeRisk, Q, Cdist]
+    G (fun _ : TestPolicy => efeReference.risk) (fun _ => efeReference.epistemicGain) .inspect =
+      expectedFreeEnergy Q Cdist positivePreference (fun _ => efeReference.ambiguity) .inspect := by
+  norm_num [efeReference, G, expectedFreeEnergy, predictiveOutcomeRisk, Q, Cdist]
 
 end DarkTower.WarMachine.ExpectedFreeEnergyWitness
