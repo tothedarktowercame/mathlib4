@@ -6203,7 +6203,7 @@ structure ProbabilityKernel (S O : Type*) where
 abbrev PredictiveOutcomeKernel (PolicyIndex : Type*) (Obs : Vertex → Type*) :=
   ProbabilityKernel PolicyIndex (Outcome Obs)
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · `Q(θ∣π)` is the normalized parameter prior predicted by a policy. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ParameterPriorKernelWitness · falsifier: predictive outcome `Q(o∣π)` or unconditioned policy habit `Q(π)` is accepted as parameter prior `Q(θ∣π)` · `Q(θ∣π)` is the normalized parameter prior predicted by a policy. -/
 abbrev ParameterPriorKernel (PolicyIndex Parameter : Type*) :=
   ProbabilityKernel PolicyIndex Parameter
 
@@ -6692,7 +6692,8 @@ private def closedDeclarations : List Declaration :=
    ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
   ++ [mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics"
       "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
-      mkClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
+      mkWitnessedClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics"
+      "ParameterPriorKernelWitness" "predictive outcome Q(o|pi) or unconditioned policy habit Q(pi) is accepted as parameter prior Q(theta|pi)",
       mkClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics",
       mkWitnessedClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics"
       "TransitionKernelWitness" "an action-unconditioned state kernel or scalar multivariate-beta normalizer B(alpha) is accepted as controlled transition B",
