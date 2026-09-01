@@ -15,10 +15,36 @@ def recordedPolicy : ControlPolicy U :=
 
 def temperature : AlivenessFactor := ⟨0.8, by norm_num⟩
 def harmony : AlivenessFactor := ⟨0.6, by norm_num⟩
-example : aliveness temperature harmony = 0.48 := by norm_num [aliveness, temperature, harmony]
 
-example : actGate (some 1.2) (some (-0.8)) = .pass := by norm_num [actGate]
-example : actGate none (some (-0.8)) = .abstainMissingLeg := by rfl
+structure AlivenessReference where
+  temperature : ℝ
+  harmony : ℝ
+  expectedAliveness : ℝ
+
+def alivenessReference : AlivenessReference :=
+  { temperature := 0.8, harmony := 0.6, expectedAliveness := 0.48 }
+
+theorem recordedAliveness :
+    aliveness temperature harmony = alivenessReference.expectedAliveness := by
+  norm_num [alivenessReference, aliveness, temperature, harmony]
+
+structure ActGateReference where
+  passingCascade : ℝ
+  passingCoverageDelta : ℝ
+  missingCoverageDelta : ℝ
+
+def actGateReference : ActGateReference :=
+  { passingCascade := 1.2, passingCoverageDelta := -0.8,
+    missingCoverageDelta := -0.8 }
+
+theorem recordedActGatePass :
+    actGate (some actGateReference.passingCascade)
+      (some actGateReference.passingCoverageDelta) = .pass := by
+  norm_num [actGateReference, actGate]
+
+theorem recordedActGateMissing :
+    actGate none (some actGateReference.missingCoverageDelta) = .abstainMissingLeg := by
+  rfl
 
 inductive OutcomeClass where | grounded | abstained
 def recordedCohort : Cohort String Nat String OutcomeClass :=
