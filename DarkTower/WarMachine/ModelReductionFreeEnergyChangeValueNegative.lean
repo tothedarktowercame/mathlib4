@@ -10,6 +10,8 @@ error: unsolved goals
 -/
 #guard_msgs in
 example :
-    (modelReductionFreeEnergyChange alpha11 alpha11 alpha21 alpha11).value = 0 := by
-  norm_num [modelReductionFreeEnergyChange, logMultivariateBeta, alpha11, alpha21,
+    (modelReductionFreeEnergyChange reductionChangeReference.A
+      reductionChangeReference.reducedPrior reductionChangeReference.prior
+      reductionChangeReference.reducedPosterior).value = 0 := by
+  norm_num [modelReductionFreeEnergyChange, logMultivariateBeta, reductionChangeReference,
     Real.Gamma_add_one, Real.Gamma_one]
