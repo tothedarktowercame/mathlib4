@@ -304,8 +304,8 @@ structure CascadeDiff (P Score : Type*) where
   scoreBefore : Score
   scoreAfter : Score
 
-/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §3e organise · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Organise turns selected patterns and authored relations into a cascade. Its recorded O1–O4 instance does not select one canonical implementation. -/
-def organise {P : Type*} : Set P → Repository P → Cascade P := sorry
+/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §3e organise · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Organise turns selected patterns and authored relations into a cascade, under a temperament — a cascade at policy grain. Its recorded O1–O4 instance does not select one canonical implementation. TYPE AMENDMENT 2026-09-02 (worklist `:L6`, taking the foresight of `futon3:holes/labs/library-contract/LA1c-restatement.md` §10): the temperament is now an argument. Under `Set P → Repository P → Cascade P` there was nowhere to put the policy-grain cascade that decides which patterns enter and in what precedence, and the two organise policies this file already records were therefore indistinguishable in the type: `checks/playout_snatch.clj` takes the up-closure under `standsOn`, while `wmCascadeDiffFixture` below keeps `nodes = selected` and fast-forwards through the unselected bridge. O1's narrowed form admits both, so the choice between them is data, and the temperament is where that datum lives. The STATUS does not move with the type: whether the refusal weakens to definable is LA2's to decide from a running policy-grain rule, not this amendment's. Clojure mirror: `futon3:checks/find_organise.clj` `organise`, which reads the temperament's closure policy and precedence and fires nothing. -/
+def organise {Policy P : Type*} : Cascade Policy → Set P → Repository P → Cascade P := sorry
 
 private def cascadeFixtureSelected : Set Nat
   | 0 | 2 => True
