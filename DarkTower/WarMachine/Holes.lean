@@ -291,10 +291,24 @@ def fastForward {P : Type*} (selected : Set P) (standsOn : P → P → Prop)
     (u v : P) : Prop :=
   u ∈ selected ∧ v ∈ selected ∧ ReachOutside selected standsOn u v
 
+/-- FIELD AMENDMENT 2026-09-02 (worklist `:LA2`): `admittedBy` is O1's third node
+origin. `futon3:holes/labs/library-contract/LA1c-restatement.md` §3.2 gives a
+cascade node a provenance — `found | stoodOn | admittedBy (Pattern policy)` — and
+before `:LA2` the third case could not arise, because nothing executed a
+policy-grain rule and so nothing could emit an `admit` edit. It can now:
+`futon3:checks/playout_snatch.clj` fires two of `library/snatch`'s six
+policy-grain patterns through `construct`, and `apply-edit`'s `:admit` arm writes
+`[:admitted-by <rule-id>]` into the cascade's `:provenance`. The field is a `Set
+P` rather than the full `NodeOrigin` map because O1 is a statement about the
+CARRIER of the nodes; which policy-grain rule admitted each one is recorded on
+the Clojure side and is not what O1 quantifies over. It is `∅` in the C59 fixture
+below, and in every cascade `futon3:checks/find_organise.clj` `organise` builds,
+since neither temperament that file carries emits an `admit`. -/
 structure CascadeDiff (P Score : Type*) where
   selected : Set P
   nodes : Set P
   addedByOrganise : Set P
+  admittedBy : Set P
   authoredEdges : P → P → Prop
   organisedEdges : P → P → Prop
   precedenceBefore : List P
@@ -320,6 +334,7 @@ def wmCascadeDiffFixture : CascadeDiff Nat Int :=
   { selected := cascadeFixtureSelected
     nodes := cascadeFixtureSelected
     addedByOrganise := ∅
+    admittedBy := ∅
     authoredEdges := cascadeFixtureAuthored
     organisedEdges := fastForward cascadeFixtureSelected cascadeFixtureAuthored
     precedenceBefore := [0, 2]
@@ -336,10 +351,11 @@ private theorem reachOutside_to_reach {P : Type*} {selected : Set P}
   | direct edge => exact Reach.single edge
   | through _ _ edge ih => exact Reach.tail ih edge
 
-/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O1 · holder: by-record · evidence: CascadeDiff · falsifier: nodes differ from selected union recorded additions · SCOPE AMENDMENT 2026-08-31: formerly a universal claim about refused `organise`; now the witnessed C59 instance only. -/
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O1 · holder: by-record · evidence: CascadeDiff · falsifier: nodes differ from the union of the three recorded origins · SCOPE AMENDMENT 2026-08-31: formerly a universal claim about refused `organise`; now the witnessed C59 instance only. UNION AMENDMENT 2026-09-02 (worklist `:LA2`): the union is three-way. A node is in the cascade because `find` selected it, because organise closed over an authored edge to it, or because a policy-grain THEN admitted it — and O1's content is that there is no FOURTH way in. Under the two-way union the third origin had no carrier, so an admitted node would have had to be smuggled in as `addedByOrganise` and would have read as authored closure. -/
 def organiseO1NodesRecorded :
     wmCascadeDiffFixture.nodes =
-      wmCascadeDiffFixture.selected ∪ wmCascadeDiffFixture.addedByOrganise := by
+      wmCascadeDiffFixture.selected ∪ wmCascadeDiffFixture.addedByOrganise ∪
+        wmCascadeDiffFixture.admittedBy := by
   ext x
   simp [wmCascadeDiffFixture]
 
