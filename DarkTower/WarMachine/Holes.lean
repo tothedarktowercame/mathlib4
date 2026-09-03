@@ -41,7 +41,7 @@ inductive HaveWantArrowState where
   | constructed
   deriving DecidableEq
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:70 · P-glossary-mathematics · holder: by-record · evidence: HaveWantArrowWitness · falsifier: a composition whose left want differs from the right have elaborates · A Demonstration Foundry arrow is identified by its exact `(have, want)` endpoint pair; its lifecycle state does not change that identity. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:78 · P-glossary-mathematics · holder: by-record · evidence: HaveWantArrowWitness · falsifier: a composition whose left want differs from the right have elaborates · A Demonstration Foundry arrow is identified by its exact `(have, want)` endpoint pair; its lifecycle state does not change that identity. -/
 structure HaveWantArrow (Endpoint : Type*) where
   source : Endpoint
   target : Endpoint
@@ -53,13 +53,13 @@ structure HaveWantArrowComposition {Endpoint : Type*}
     (left right : HaveWantArrow Endpoint) : Prop where
   endpointMatch : left.target = right.source
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:66 · P-glossary-mathematics · holder: by-record · evidence: FoldWitness · falsifier: a fold without explicit policy holes elaborates · The common fold boundary is an implementation-specific typed wiring, an optional coverage-score delta (`none` means abstention), and an explicit list of policy holes. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:68 · P-glossary-mathematics · holder: by-record · evidence: FoldWitness · falsifier: a fold without explicit policy holes elaborates · The common fold boundary is an implementation-specific typed wiring, an optional coverage-score delta (`none` means abstention), and an explicit list of policy holes. -/
 structure Fold (Wiring PolicyHole : Type*) where
   wiring : Wiring
   coverageScoreDelta : Option ℝ
   policyHoles : List PolicyHole
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:66 · P-glossary-mathematics · holder: by-record · evidence: FoldEscrowRecordWitness · falsifier: a reconstructible prompt/digest pair is admitted to the non-reconstructible quarantine · The escrow envelope keeps prompt inputs, the stored digest, and the authored turn together; arming and fold output remain typed payloads rather than ambient state. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:68 · P-glossary-mathematics · holder: by-record · evidence: FoldEscrowRecordWitness · falsifier: a reconstructible prompt/digest pair is admitted to the non-reconstructible quarantine · The escrow envelope keeps prompt inputs, the stored digest, and the authored turn together; arming and fold output remain typed payloads rather than ambient state. -/
 structure FoldEscrowRecord (PromptInputs Digest Turn Arming FoldOutput : Type*) where
   promptInputs : PromptInputs
   storedDigest : Digest
@@ -86,7 +86,7 @@ structure AlivenessFactor where
   value : ℝ
   nonnegative : 0 ≤ value
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:50 · P-glossary-mathematics · holder: by-record · evidence: AlivenessWitness · falsifier: the 0.8·0.6 fixture differs from 0.48 or a negative factor elaborates. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:54 · P-glossary-mathematics · holder: by-record · evidence: AlivenessWitness · falsifier: the 0.8·0.6 fixture differs from 0.48 or a negative factor elaborates. -/
 def aliveness (temperature harmony : AlivenessFactor) : ℝ :=
   temperature.value * harmony.value
 
@@ -94,7 +94,7 @@ inductive ActGateVerdict where
   | pass | fail | abstainMissingLeg
   deriving DecidableEq, Repr
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:66 · P-glossary-mathematics · holder: by-record · evidence: ActGateWitness · falsifier: a missing leg passes or a non-improving complete gate passes. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:70 · P-glossary-mathematics · holder: by-record · evidence: ActGateWitness · falsifier: a missing leg passes or a non-improving complete gate passes. -/
 def actGate (cascadeScore coverageScoreDelta : Option ℝ) : ActGateVerdict :=
   match cascadeScore, coverageScoreDelta with
   | some s, some d => if 0 < s ∧ d < 0 then .pass else .fail
@@ -108,7 +108,7 @@ structure Attempt (AttemptId ClickId : Type*) where
   click : ClickId
   clickOrder : Nat
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:78 · P-glossary-mathematics · holder: by-record · evidence: CohortWitness · falsifier: a zero-target or overfull preregistered cohort elaborates. Outcome classes remain an epoch-specific parameter. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:82 · P-glossary-mathematics · holder: by-record · evidence: CohortWitness · falsifier: a zero-target or overfull preregistered cohort elaborates. Outcome classes remain an epoch-specific parameter. -/
 structure Cohort (CohortId AttemptId Epoch OutcomeClass : Type*) where
   id : CohortId
   semanticEpoch : Epoch
@@ -6215,15 +6215,15 @@ structure ProbabilityKernel (S O : Type*) where
   nonnegative : ∀ s o, 0 ≤ mass s o
   normalised : ∀ s, ((support s).map (mass s)).sum = 1
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–29 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeKernelWitness · falsifier: an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned `Q(o∣π)` · `Q(o∣π)` is a normalized finite-support predictive distribution over vertex-tagged outcomes for each policy. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:23 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeKernelWitness · falsifier: an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned `Q(o∣π)` · `Q(o∣π)` is a normalized finite-support predictive distribution over vertex-tagged outcomes for each policy. -/
 abbrev PredictiveOutcomeKernel (PolicyIndex : Type*) (Obs : Vertex → Type*) :=
   ProbabilityKernel PolicyIndex (Outcome Obs)
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ParameterPriorKernelWitness · falsifier: predictive outcome `Q(o∣π)` or unconditioned policy habit `Q(π)` is accepted as parameter prior `Q(θ∣π)` · `Q(θ∣π)` is the normalized parameter prior predicted by a policy. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:33 · P-glossary-mathematics · holder: by-record · evidence: ParameterPriorKernelWitness · falsifier: predictive outcome `Q(o∣π)` or unconditioned policy habit `Q(π)` is accepted as parameter prior `Q(θ∣π)` · `Q(θ∣π)` is the normalized parameter prior predicted by a policy. -/
 abbrev ParameterPriorKernel (PolicyIndex Parameter : Type*) :=
   ProbabilityKernel PolicyIndex Parameter
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ParameterPosteriorKernelWitness · falsifier: parameter-prior `Q(θ∣π)` or predictive-outcome `Q(o∣π)` is accepted as posterior `Q(θ∣o,π)` · `Q(θ∣o,π)` is the normalized parameter posterior conditioned jointly on the observed outcome and policy. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:33 · P-glossary-mathematics · holder: by-record · evidence: ParameterPosteriorKernelWitness · falsifier: parameter-prior `Q(θ∣π)` or predictive-outcome `Q(o∣π)` is accepted as posterior `Q(θ∣o,π)` · `Q(θ∣o,π)` is the normalized parameter posterior conditioned jointly on the observed outcome and policy. -/
 abbrev ParameterPosteriorKernel (PolicyIndex : Type*) (Obs : Vertex → Type*)
     (Parameter : Type*) :=
   ProbabilityKernel (PolicyIndex × Outcome Obs) Parameter
@@ -6232,11 +6232,11 @@ abbrev ParameterPosteriorKernel (PolicyIndex : Type*) (Obs : Vertex → Type*)
 abbrev TransitionKernel (State Action : Type*) :=
   ProbabilityKernel (State × Action) State
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:7,37 · P-glossary-mathematics · holder: by-record · evidence: PolicyPriorKernelWitness · falsifier: the proposed prior is conditioned on state rather than Unit, or its policy masses are not a distribution · The normalized policy prior `E : 1 ⇝ Π`; its Unit domain prevents contextual likelihoods from masquerading as the prior. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:41,7 · P-glossary-mathematics · holder: by-record · evidence: PolicyPriorKernelWitness · falsifier: the proposed prior is conditioned on state rather than Unit, or its policy masses are not a distribution · The normalized policy prior `E : 1 ⇝ Π`; its Unit domain prevents contextual likelihoods from masquerading as the prior. -/
 abbrev PolicyPriorKernel (PolicyIndex : Type*) :=
   ProbabilityKernel Unit PolicyIndex
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–23 · P-glossary-mathematics · holder: by-record · evidence: PreferenceDistributionWitness · falsifier: a state-conditioned kernel or vertex-local pragmatic cost is accepted as the unconditioned preferred-outcome distribution · Preferred outcomes `C` as a normalized distribution, distinct from the existing vertex-local pragmatic cost function. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:25 · P-glossary-mathematics · holder: by-record · evidence: PreferenceDistributionWitness · falsifier: a state-conditioned kernel or vertex-local pragmatic cost is accepted as the unconditioned preferred-outcome distribution · Preferred outcomes `C` as a normalized distribution, distinct from the existing vertex-local pragmatic cost function. -/
 abbrev PreferenceDistribution (Obs : Vertex → Type*) :=
   ProbabilityKernel Unit (Outcome Obs)
 
@@ -6260,7 +6260,7 @@ def generativeFactorMass {Obs : Vertex → Type*} {State Action PolicyIndex : Ty
     model.transition.mass (state, action) nextState *
       model.policyPrior.mass () policy
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · evidence: ObservationKernelWitness · falsifier: a row has negative mass or its declared masses do not sum to one · The observation model is a finite-support Markov kernel A : S ⇝ O; normalisation sums the row's own mass.  This witnesses kernel well-formedness, not semantic observation correctness. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:31 · P-glossary-mathematics · holder: by-record · evidence: ObservationKernelWitness · falsifier: a row has negative mass or its declared masses do not sum to one · The observation model is a finite-support Markov kernel A : S ⇝ O; normalisation sums the row's own mass.  This witnesses kernel well-formedness, not semantic observation correctness. -/
 abbrev observationKernel (State Observation : Type*) := ProbabilityKernel State Observation
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9 · P-glossary-mathematics · holder: by-record · evidence: BeliefStateWitness · falsifier: a declared channel lacks its mean or nonnegative variance · Every channel carries both its posterior mean and a nonnegative variance.  This is the carrier claim; observation-responsive change is separately enforced by `beliefUpdate`. -/
@@ -6291,12 +6291,12 @@ def variationalFreeEnergy (precision error : Channel → ℝ) : VariationalFreeE
     ((Channel.all.map fun k => precision k * (error k) ^ 2).foldl (· + ·) 0 /
       Channel.all.length)⟩
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The computed mass of a kernel row; `ProbabilityKernel.normalised` proves it is one. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:31 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The computed mass of a kernel row; `ProbabilityKernel.normalised` proves it is one. -/
 def observationKernelRowMass {State Observation : Type*}
     (A : observationKernel State Observation) (s : State) : ℝ :=
   ((A.support s).map (A.mass s)).sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the precision-weighted prediction-error correction and an evidence-weighted EMA of squared error plus sensor-noise floor. `none` is loud unknown provenance: both mean and variance pass through. Defaults remain external parameters recorded by C32. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:9,15,17,19,31 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The posterior applies the precision-weighted prediction-error correction and an evidence-weighted EMA of squared error plus sensor-noise floor. `none` is loud unknown provenance: both mean and variance pass through. Defaults remain external parameters recorded by C32. -/
 def beliefUpdate (learningRate sensorNoiseFloor : NonnegativeReal)
     (evidenceWeight : Channel → Option NonnegativeReal)
     (A : observationKernel Channel Channel) (prior : BeliefState)
@@ -6322,7 +6322,7 @@ def beliefUpdate (learningRate sensorNoiseFloor : NonnegativeReal)
     (variationalFreeEnergy (fun k => (precision k).value)
       (predictionError observation prior.mean)).value
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–23 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeRiskWitness · falsifier: predictive support contains an outcome with zero preference mass, or the KL value disagrees with the reference · The risk term `KL[Q(o∣π)‖C]`, over the predictive kernel's declared finite
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21,27 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeRiskWitness · falsifier: predictive support contains an outcome with zero preference mass, or the KL value disagrees with the reference · The risk term `KL[Q(o∣π)‖C]`, over the predictive kernel's declared finite
 support.  Strict positivity of `C` on that support keeps the real-valued formula
 inside its domain; a zero preferred mass would require an extended-real score. -/
 def predictiveOutcomeRisk {PolicyIndex : Type*} {Obs : Vertex → Type*}
@@ -6337,14 +6337,14 @@ def observationEntropy {State Observation : Type*}
     (A : observationKernel State Observation) (s : State) : ℝ :=
   -((A.support s).map (fun o => A.mass s o * Real.log (A.mass s o))).sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21,25 · P-glossary-mathematics · holder: by-record · evidence: AmbiguityWitness · falsifier: expected observation entropy disagrees with the kernel-derived value · Ambiguity is expected observation entropy: the predicted state mass weights the entropy of that state's observation-model row. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21,29 · P-glossary-mathematics · holder: by-record · evidence: AmbiguityWitness · falsifier: expected observation entropy disagrees with the kernel-derived value · Ambiguity is expected observation entropy: the predicted state mass weights the entropy of that state's observation-model row. -/
 def ambiguity {PolicyIndex State Observation : Type*}
     (predictedState : ProbabilityKernel PolicyIndex State)
     (A : observationKernel State Observation) (π : PolicyIndex) : ℝ :=
   (predictedState.support π).map
     (fun s => predictedState.mass π s * observationEntropy A s) |>.sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21–25 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · Expected free energy is predictive-outcome risk plus expected ambiguity.  The ambiguity argument is an explicit estimator seam; the canonical kernel-derived estimator is `ambiguity` above. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21,27,29 · P-glossary-mathematics · holder: by-record · evidence: ExpectedFreeEnergyWitness · falsifier: the supplied risk-plus-ambiguity value disagrees with the kernel-derived value · Expected free energy is predictive-outcome risk plus expected ambiguity.  The ambiguity argument is an explicit estimator seam; the canonical kernel-derived estimator is `ambiguity` above. -/
 def expectedFreeEnergy {PolicyIndex : Type*} {Obs : Vertex → Type*}
     (Q : PredictiveOutcomeKernel PolicyIndex Obs) (Cdist : PreferenceDistribution Obs)
     (positivePreference : ∀ π o, o ∈ Q.support π → 0 < Cdist.mass () o)
@@ -6383,7 +6383,7 @@ def parameterInformationGain {PolicyIndex Parameter : Type*} {Obs : Vertex → T
   (posterior.support (π, o)).map (fun θ =>
     posterior.mass (π, o) θ * Real.log (posterior.mass (π, o) θ / prior.mass π θ)) |>.sum
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: ExpectedInformationGainWitness · falsifier: posterior-to-prior KL disagrees with recorded EIG · Canonical EIG is the predictive-outcome expectation of posterior-to-prior parameter KL. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:33 · P-glossary-mathematics · holder: by-record · evidence: ExpectedInformationGainWitness · falsifier: posterior-to-prior KL disagrees with recorded EIG · Canonical EIG is the predictive-outcome expectation of posterior-to-prior parameter KL. -/
 def expectedInformationGain {PolicyIndex Parameter : Type*} {Obs : Vertex → Type*}
     (Q : PredictiveOutcomeKernel PolicyIndex Obs)
     (prior : ParameterPriorKernel PolicyIndex Parameter)
@@ -6393,10 +6393,10 @@ def expectedInformationGain {PolicyIndex Parameter : Type*} {Obs : Vertex → Ty
   ⟨(Q.support π).map (fun o =>
       Q.mass π o * parameterInformationGain prior posterior positivePrior π o) |>.sum⟩
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:56 · P-glossary-mathematics · holder: by-record · evidence: DirichletConcentrationsWitness · falsifier: an empty vector or a zero/negative concentration is accepted · A nonempty vector of strictly positive Dirichlet concentration parameters. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:60 · P-glossary-mathematics · holder: by-record · evidence: DirichletConcentrationsWitness · falsifier: an empty vector or a zero/negative concentration is accepted · A nonempty vector of strictly positive Dirichlet concentration parameters. -/
 def DirichletConcentrations := {xs : List ℝ // xs ≠ [] ∧ ∀ x ∈ xs, 0 < x}
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: LogMultivariateBetaWitness · falsifier: the analytic value disagrees with the Dirichlet normaliser · The logarithm of the Dirichlet normaliser.  Its subtype excludes an empty vector and every zero or negative concentration, where the Dirichlet distribution is not defined. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:62 · P-glossary-mathematics · holder: by-record · evidence: LogMultivariateBetaWitness · falsifier: the analytic value disagrees with the Dirichlet normaliser · The logarithm of the Dirichlet normaliser.  Its subtype excludes an empty vector and every zero or negative concentration, where the Dirichlet distribution is not defined. -/
 def logMultivariateBeta
     (concentrations : DirichletConcentrations) : ℝ :=
   (concentrations.val.map fun x => Real.log (Real.Gamma x)).sum -
@@ -6407,17 +6407,17 @@ and wrapper prevent composition with per-tick variational F by shared `ℝ`. -/
 structure ModelReductionFreeEnergyChange where
   value : ℝ
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: ModelReductionFreeEnergyChangeWitness · falsifier: the analytic Dirichlet-normalizer result is perturbed or per-tick variational F is accepted as BMR ΔF · BMR ΔF = ln B(A) + ln B(a′) - ln B(a) - ln B(A′). -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:62 · P-glossary-mathematics · holder: by-record · evidence: ModelReductionFreeEnergyChangeWitness · falsifier: the analytic Dirichlet-normalizer result is perturbed or per-tick variational F is accepted as BMR ΔF · BMR ΔF = ln B(A) + ln B(a′) - ln B(a) - ln B(A′). -/
 def modelReductionFreeEnergyChange
     (A aPrime a APrime : {xs : List ℝ // xs ≠ [] ∧ ∀ x ∈ xs, 0 < x}) :
     ModelReductionFreeEnergyChange :=
   ⟨logMultivariateBeta A + logMultivariateBeta aPrime -
     logMultivariateBeta a - logMultivariateBeta APrime⟩
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:60 · P-glossary-mathematics · holder: by-record · evidence: BayesFactorThresholdWitness · falsifier: a change above -3 passes, or a variational-free-energy value is accepted as BMR evidence · A reduction passes exactly when ΔF ≤ -3. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:64 · P-glossary-mathematics · holder: by-record · evidence: BayesFactorThresholdWitness · falsifier: a change above -3 passes, or a variational-free-energy value is accepted as BMR evidence · A reduction passes exactly when ΔF ≤ -3. -/
 def bayesFactorThreshold (change : ModelReductionFreeEnergyChange) : Prop := change.value ≤ -3
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:39 · P-glossary-mathematics · holder: by-record · evidence: SoftmaxWitness · falsifier: weights fail to normalise or higher expected free energy receives higher probability at positive temperature · Q(π) ∝ exp(ln E(π) − G(π)/τ): both the log habit prior and grade term are retained. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:35 · P-glossary-mathematics · holder: by-record · evidence: SoftmaxWitness · falsifier: weights fail to normalise or higher expected free energy receives higher probability at positive temperature · Q(π) ∝ exp(ln E(π) − G(π)/τ): both the log habit prior and grade term are retained. -/
 def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
     (habit : PolicyIndex → ℝ) (grade : PolicyIndex → ExpectedFreeEnergyValue) (tau : ℝ)
     (policies : List PolicyIndex) : List ℝ :=
@@ -6425,7 +6425,7 @@ def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
   let total := weights.foldl (· + ·) 0
   weights.map fun weight => weight / total
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:54 · P-glossary-mathematics · holder: by-record · evidence: BayesianModelReductionWitness · falsifier: the reduced posterior fails to preserve the accumulated count vector A-a under the new prior a' · BMR re-expresses the old counts under the reduced prior: A′ = A + a′ - a, componentwise. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: BayesianModelReductionWitness · falsifier: the reduced posterior fails to preserve the accumulated count vector A-a under the new prior a' · BMR re-expresses the old counts under the reduced prior: A′ = A + a′ - a, componentwise. -/
 def bayesianModelReduction (A aPrime a : List ℝ) : List ℝ :=
   (A.zip (aPrime.zip a)).map fun x => x.1 + x.2.1 - x.2.2
 
@@ -6470,7 +6470,7 @@ private theorem eigCounterPositivePrior :
   intros
   norm_num [eigCounterPrior]
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:29 · P-glossary-mathematics · holder: by-record · evidence: proof term · falsifier: the normalized point-mass counterexample no longer elaborates, or the collapsed equality elaborates · COUNTEREXAMPLE 2026-08-31: the former refusal asked whether the live aggregate posterior-spread bonus equals canonical outcome-weighted posterior-to-prior KL.  In the normalized one-policy/one-outcome/one-parameter model with identical point-mass prior and posterior, canonical EIG is zero, while a positive recorded posterior standard deviation gives live bonus one.  Therefore no unconditional identification exists; promoting the live bonus to canonical EIG is permanently refuted. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:33 · P-glossary-mathematics · holder: by-record · evidence: proof term · falsifier: the normalized point-mass counterexample no longer elaborates, or the collapsed equality elaborates · COUNTEREXAMPLE 2026-08-31: the former refusal asked whether the live aggregate posterior-spread bonus equals canonical outcome-weighted posterior-to-prior KL.  In the normalized one-policy/one-outcome/one-parameter model with identical point-mass prior and posterior, canonical EIG is zero, while a positive recorded posterior standard deviation gives live bonus one.  Therefore no unconditional identification exists; promoting the live bonus to canonical EIG is permanently refuted. -/
 def modelUncertaintyAndEIG :
     (modelUncertaintyBonus [⟨1, by norm_num⟩]).value ≠
       (expectedInformationGain eigCounterPredictive eigCounterPrior
@@ -6479,7 +6479,7 @@ def modelUncertaintyAndEIG :
     parameterInformationGain, eigCounterPredictive, eigCounterPrior,
     eigCounterPosterior, eigCounterOutcome]
 
-/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:48 · P-glossary-mathematics · holder: by-record · π is the pattern-language cascade scored as one policy; the state-to-action result of inference is `DecisionRule`. -/
+/-- CLOSED-BY-RECORD · owner: sec-glossary.tex:52 · P-glossary-mathematics · holder: by-record · π is the pattern-language cascade scored as one policy; the state-to-action result of inference is `DecisionRule`. -/
 abbrev cascadeGrainPi (P : Type*) := Cascade P
 
 /-- CLOSED-BY-RECORD · owner: P-R19-preferences-open §principle · holder: by-record · How a preference layer was determined; open — new constructors are expected (delegate = a company or domain's own harness). -/
@@ -6594,7 +6594,7 @@ structure TickRunRecord where
   selectorSeam : String     -- "live" or the declared stub — never silent
   deriving DecidableEq
 
-/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_runs_once_witness.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord · OWNER AMENDMENT 2026-08-31: the original annotation said "CURRENTLY FIRING: selector-seam blocker". That was true of the earlier diagnostic standalone report, but a nine-hop tick subsequently completed through the explicitly recorded bounded stub. Futon3c remains absent from Futon2's local classpath; the production operator loop instead uses the live Agency HTTP selector. Original claim retained here as history, not current state. · The machine can run at least once on demand, leaving a receipt. C114 considered and declined narrowing: a theorem over the receipt would prove a pinned instance, not that the world-level event occurred. -/
+/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: record: futon2:holes/problems/BUILD-packets/WM-RUN1.md · Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_runs_once_witness.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` · falsifier: no invocation of the tick entry point completes end-to-end with a TickRunRecord · OWNER AMENDMENT 2026-08-31: the original annotation said "CURRENTLY FIRING: selector-seam blocker". That was true of the earlier diagnostic standalone report, but a nine-hop tick subsequently completed through the explicitly recorded bounded stub. Futon3c remains absent from Futon2's local classpath; the production operator loop instead uses the live Agency HTTP selector. Original claim retained here as history, not current state. · The machine can run at least once on demand, leaving a receipt. C114 considered and declined narrowing: a theorem over the receipt would prove a pinned instance, not that the world-level event occurred. -/
 def wmRunsOnce : Prop := sorry
 
 /-- CLOSED-BY-RECORD · owner: record: futon2:holes/problems/BUILD-packets/WM-RUN2.md · Joe 2026-08-31 · route tracer · holder: by-record · One hop of the route a tick actually took: the tracer tag conj'd onto the flowing map at a node boundary, reassembled pairwise into hops. The wiring diagram (control-map-edges.edn, Figure 4 as data) is the specification the route is judged against. -/
@@ -6605,7 +6605,7 @@ structure RouteHop where
   at_ : String
   deriving DecidableEq
 
-/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_route_conformance.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` and the live Figure 4 edge layers · C71 lifts the earlier refusal only after p4ng 0598d19 drew the measured routes as a distinct Figure 4 layer; WM-RUN2 is 9/9 mapped (3 original, 6 measured) · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. C114 considered and declined narrowing: a theorem over pinned route and wiring snapshots would prove one pinned comparison, not the existing world-level conformance claim. -/
+/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: record: futon2:holes/problems/BUILD-packets/WM-RUN2.md · Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_route_conformance.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` and the live Figure 4 edge layers · C71 lifts the earlier refusal only after p4ng 0598d19 drew the measured routes as a distinct Figure 4 layer; WM-RUN2 is 9/9 mapped (3 original, 6 measured) · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. C114 considered and declined narrowing: a theorem over pinned route and wiring snapshots would prove one pinned comparison, not the existing world-level conformance claim. -/
 def wmRunConformsToWiring : Prop := sorry
 
 /-- Fixture scaffolding: one COMPARABLE tick of a wm-trace run — the mission the recorded Q(π) decision selected (`:decision :action :target`) against the mission the actuation path enacted (`:realized-outcome :policy`). A form is COMPARABLE iff it carries both halves; forms carrying only one are not transcribed, so the list lengths below are smaller than the files' form counts. -/
@@ -6729,13 +6729,13 @@ private def mkRefused (name owner reason : String) : Declaration :=
 
 private def closedDeclarations : List Declaration :=
   ([("Pattern", "P-validated-R5 §2.1d"), ("Cascade", "P-validated-R5 §3e"),
-   ("HaveWantArrowState", "sec-glossary.tex:70 · P-glossary-mathematics"),
-   ("HaveWantArrowComposition", "sec-glossary.tex:70 · P-glossary-mathematics"),
-   ("ControlPolicy", "sec-glossary.tex:35 · P-glossary-mathematics"),
-   ("AlivenessFactor", "sec-glossary.tex:50 · P-glossary-mathematics"),
-   ("ActGateVerdict", "sec-glossary.tex:66 · P-glossary-mathematics"),
-   ("Click", "sec-glossary.tex:78 · P-glossary-mathematics"),
-   ("Attempt", "sec-glossary.tex:78 · P-glossary-mathematics"),
+   ("HaveWantArrowState", "sec-glossary.tex:78 · P-glossary-mathematics"),
+   ("HaveWantArrowComposition", "sec-glossary.tex:78 · P-glossary-mathematics"),
+   ("ControlPolicy", "sec-glossary.tex:39 · P-glossary-mathematics"),
+   ("AlivenessFactor", "sec-glossary.tex:54 · P-glossary-mathematics"),
+   ("ActGateVerdict", "sec-glossary.tex:70 · P-glossary-mathematics"),
+   ("Click", "sec-glossary.tex:82 · P-glossary-mathematics"),
+   ("Attempt", "sec-glossary.tex:82 · P-glossary-mathematics"),
    ("Tension", "P-validated-R5 §3e"), ("InformationState", "P-validated-R5 §3d"),
    ("DecisionRule", "P-validated-R5 §3"), ("Outcome", "P-validated-R5 §2a"),
    ("G", "P-validated-R5 §2a′"), ("nonDegenerate", "P-validated-R5 §2a′"),
@@ -6757,43 +6757,43 @@ private def closedDeclarations : List Declaration :=
    ("Workflow", "delivery-lifecycle §0.10"), ("r2WellFormed", "P-R2 §solved 1"),
    ("r2ContractCensus", "P-R2 §solved 1"), ("r8Disposition", "P-R8 §solved 1"),
    ("r8Census", "P-R8 §solved 1"),
-   ("cascadeGrainPi", "sec-glossary.tex:48 · P-glossary-mathematics"),
-   ("observationKernelRowMass", "sec-glossary.tex:27 · P-glossary-mathematics"),
-   ("beliefUpdate", "sec-glossary.tex:9,15,17,19,27 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
-  ++ [mkWitnessedClosed "modelReductionFreeEnergyChange" "sec-glossary.tex:58 · P-glossary-mathematics"
+   ("cascadeGrainPi", "sec-glossary.tex:52 · P-glossary-mathematics"),
+   ("observationKernelRowMass", "sec-glossary.tex:31 · P-glossary-mathematics"),
+   ("beliefUpdate", "sec-glossary.tex:9,15,17,19,31 · P-glossary-mathematics")].map fun p => mkClosed p.1 p.2)
+  ++ [mkWitnessedClosed "modelReductionFreeEnergyChange" "sec-glossary.tex:62 · P-glossary-mathematics"
       "ModelReductionFreeEnergyChangeWitness" "the analytic Dirichlet-normalizer result is perturbed or per-tick variational F is accepted as BMR delta-F",
       mkWitnessedClosed "ObservationVector" "sec-glossary.tex paragraph:Observation vector o · P-glossary-mathematics"
       "ObservationVectorWitness" "a partial channel map or single vertex-tagged outcome is accepted as the complete 14-coordinate observation vector",
-      mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:21–29 · P-glossary-mathematics"
+      mkWitnessedClosed "PredictiveOutcomeKernel" "sec-glossary.tex:23 · P-glossary-mathematics"
       "PredictiveOutcomeKernelWitness" "an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned Q(o|pi)",
-      mkWitnessedClosed "ParameterPriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics"
+      mkWitnessedClosed "ParameterPriorKernel" "sec-glossary.tex:33 · P-glossary-mathematics"
       "ParameterPriorKernelWitness" "predictive outcome Q(o|pi) or unconditioned policy habit Q(pi) is accepted as parameter prior Q(theta|pi)",
-      mkWitnessedClosed "ParameterPosteriorKernel" "sec-glossary.tex:29 · P-glossary-mathematics"
+      mkWitnessedClosed "ParameterPosteriorKernel" "sec-glossary.tex:33 · P-glossary-mathematics"
       "ParameterPosteriorKernelWitness" "parameter-prior Q(theta|pi) or predictive-outcome Q(o|pi) is accepted as posterior Q(theta|o,pi)",
       mkWitnessedClosed "TransitionKernel" "sec-glossary.tex:7 · P-glossary-mathematics"
       "TransitionKernelWitness" "an action-unconditioned state kernel or scalar multivariate-beta normalizer B(alpha) is accepted as controlled transition B",
-      mkWitnessedClosed "PreferenceDistribution" "sec-glossary.tex:21–23 · P-glossary-mathematics"
+      mkWitnessedClosed "PreferenceDistribution" "sec-glossary.tex:25 · P-glossary-mathematics"
       "PreferenceDistributionWitness" "a state-conditioned kernel or vertex-local pragmatic cost is accepted as the unconditioned preferred-outcome distribution"]
-  ++ [mkClosed "observationEntropy" "sec-glossary.tex:21,25 · P-glossary-mathematics",
-      mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics",
-      mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:29 · P-glossary-mathematics",
-      mkClosed "parameterInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics",
-      mkClosed "modelUncertaintyBonus" "sec-glossary.tex:29 · P-glossary-mathematics",
+  ++ [mkClosed "observationEntropy" "sec-glossary.tex:21,29 · P-glossary-mathematics",
+      mkClosed "G_eq_expectedFreeEnergy" "sec-glossary.tex:21,27,29 · P-glossary-mathematics",
+      mkClosed "ExpectedInformationGainValue" "sec-glossary.tex:33 · P-glossary-mathematics",
+      mkClosed "parameterInformationGain" "sec-glossary.tex:33 · P-glossary-mathematics",
+      mkClosed "modelUncertaintyBonus" "sec-glossary.tex:33 · P-glossary-mathematics",
       mkClosed "generativeFactorMass" "sec-glossary.tex:7 · P-glossary-mathematics",
       mkClosed "wmCascadeDiffFixture" "P-validated-R5 §3e O1–O4"]
-  ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:58 · P-glossary-mathematics"
+  ++ [mkWitnessedClosed "logMultivariateBeta" "sec-glossary.tex:62 · P-glossary-mathematics"
       "LogMultivariateBetaWitness" "value disagrees with the Dirichlet normaliser",
-      mkWitnessedClosed "expectedFreeEnergy" "sec-glossary.tex:21–25 · P-glossary-mathematics"
+      mkWitnessedClosed "expectedFreeEnergy" "sec-glossary.tex:21,27,29 · P-glossary-mathematics"
       "ExpectedFreeEnergyWitness" "risk-plus-ambiguity disagrees with the kernel-derived value",
-      mkWitnessedClosed "ambiguity" "sec-glossary.tex:21,25 · P-glossary-mathematics"
+      mkWitnessedClosed "ambiguity" "sec-glossary.tex:21,29 · P-glossary-mathematics"
       "AmbiguityWitness" "expected observation entropy disagrees with the kernel-derived value",
-      mkWitnessedClosed "HaveWantArrow" "sec-glossary.tex:70 · P-glossary-mathematics"
+      mkWitnessedClosed "HaveWantArrow" "sec-glossary.tex:78 · P-glossary-mathematics"
       "HaveWantArrowWitness" "a composition whose left want differs from the right have elaborates",
-      mkWitnessedClosed "Fold" "sec-glossary.tex:66 · P-glossary-mathematics"
+      mkWitnessedClosed "Fold" "sec-glossary.tex:68 · P-glossary-mathematics"
       "FoldWitness" "a fold without explicit policy holes elaborates",
-      mkWitnessedClosed "FoldEscrowRecord" "sec-glossary.tex:66 · P-glossary-mathematics"
+      mkWitnessedClosed "FoldEscrowRecord" "sec-glossary.tex:68 · P-glossary-mathematics"
       "FoldEscrowRecordWitness" "a reconstructible prompt/digest pair is admitted to the non-reconstructible quarantine",
-      mkClosed "FoldEscrowRecord.reconstructible" "sec-glossary.tex:66 · P-glossary-mathematics",
+      mkClosed "FoldEscrowRecord.reconstructible" "sec-glossary.tex:68 · P-glossary-mathematics",
       mkWitnessedClosed "BeliefState" "sec-glossary.tex:9 · P-glossary-mathematics"
       "BeliefStateWitness" "a declared channel lacks its mean or nonnegative variance",
       mkWitnessedClosed "variationalFreeEnergy" "sec-glossary.tex:19 · P-glossary-mathematics"
@@ -6802,35 +6802,35 @@ private def closedDeclarations : List Declaration :=
       "PrecisionWitness" "swapping precision with its signed prediction error preserves variational F, or a signed error map is accepted as precision",
       mkWitnessedClosed "predictionError" "sec-glossary.tex:15 · P-glossary-mathematics"
       "PredictionErrorWitness" "prediction error equals either operand or uses the reversed sign",
-      mkWitnessedClosed "softmax" "sec-glossary.tex:39 · P-glossary-mathematics"
+      mkWitnessedClosed "softmax" "sec-glossary.tex:35 · P-glossary-mathematics"
       "SoftmaxWitness" "weights fail to normalise or higher expected free energy receives higher probability at positive temperature",
-      mkWitnessedClosed "bayesFactorThreshold" "sec-glossary.tex:60 · P-glossary-mathematics"
+      mkWitnessedClosed "bayesFactorThreshold" "sec-glossary.tex:64 · P-glossary-mathematics"
       "BayesFactorThresholdWitness" "a change above -3 passes, or a variational-free-energy value is accepted as BMR evidence",
-      mkWitnessedClosed "bayesianModelReduction" "sec-glossary.tex:54 · P-glossary-mathematics"
+      mkWitnessedClosed "bayesianModelReduction" "sec-glossary.tex:58 · P-glossary-mathematics"
       "BayesianModelReductionWitness" "the reduced posterior fails to preserve the accumulated count vector A-a under the new prior a'",
-      mkWitnessedClosed "DirichletConcentrations" "sec-glossary.tex:56 · P-glossary-mathematics"
+      mkWitnessedClosed "DirichletConcentrations" "sec-glossary.tex:60 · P-glossary-mathematics"
       "DirichletConcentrationsWitness" "an empty vector or a zero/negative concentration is accepted",
       mkWitnessedClosed "Channel" "P-R2 §solved 1 (Channel)"
       "ChannelWitness" "the declared names or order differ from the 14-channel record",
-      mkWitnessedClosed "observationKernel" "sec-glossary.tex:27 · P-glossary-mathematics"
+      mkWitnessedClosed "observationKernel" "sec-glossary.tex:31 · P-glossary-mathematics"
       "ObservationKernelWitness" "a row has negative mass or its declared masses do not sum to one",
-      mkWitnessedClosed "predictiveOutcomeRisk" "sec-glossary.tex:21–23 · P-glossary-mathematics"
+      mkWitnessedClosed "predictiveOutcomeRisk" "sec-glossary.tex:21,27 · P-glossary-mathematics"
       "PredictiveOutcomeRiskWitness" "predictive support contains an outcome with zero preference mass, or KL disagrees with the reference",
-      mkWitnessedClosed "PolicyPriorKernel" "sec-glossary.tex:7,37 · P-glossary-mathematics"
+      mkWitnessedClosed "PolicyPriorKernel" "sec-glossary.tex:41,7 · P-glossary-mathematics"
       "PolicyPriorKernelWitness" "the prior is conditioned on state rather than Unit, or its policy masses are not a distribution",
-      mkWitnessedClosed "ControlVocabulary" "sec-glossary.tex:35 · P-glossary-mathematics"
+      mkWitnessedClosed "ControlVocabulary" "sec-glossary.tex:39 · P-glossary-mathematics"
       "ControlVocabularyWitness" "a policy containing a control outside its vocabulary elaborates",
-      mkWitnessedClosed "aliveness" "sec-glossary.tex:50 · P-glossary-mathematics"
+      mkWitnessedClosed "aliveness" "sec-glossary.tex:54 · P-glossary-mathematics"
       "AlivenessWitness" "0.8 times 0.6 differs from 0.48, or a negative factor elaborates",
-      mkWitnessedClosed "actGate" "sec-glossary.tex:66 · P-glossary-mathematics"
+      mkWitnessedClosed "actGate" "sec-glossary.tex:70 · P-glossary-mathematics"
       "ActGateWitness" "a missing leg passes, or a non-improving complete gate passes",
-      mkWitnessedClosed "Cohort" "sec-glossary.tex:78 · P-glossary-mathematics"
+      mkWitnessedClosed "Cohort" "sec-glossary.tex:82 · P-glossary-mathematics"
       "CohortWitness" "a zero-target or overfull preregistered cohort elaborates",
-      mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:29 · P-glossary-mathematics"
+      mkWitnessedClosed "expectedInformationGain" "sec-glossary.tex:33 · P-glossary-mathematics"
       "ExpectedInformationGainWitness" "posterior-to-prior KL disagrees with recorded EIG",
       mkWitnessedClosed "GenerativeModel" "sec-glossary.tex:7 · P-glossary-mathematics"
       "GenerativeModelWitness" "joint does not factor into observation, transition, and policy prior",
-      mkWitnessedClosed "modelUncertaintyAndEIG" "sec-glossary.tex:29 · P-glossary-mathematics"
+      mkWitnessedClosed "modelUncertaintyAndEIG" "sec-glossary.tex:33 · P-glossary-mathematics"
       "proof term" "the normalized point-mass counterexample no longer elaborates, or the collapsed equality elaborates",
       mkWitnessedClosed "organiseO1NodesRecorded" "P-validated-R5 §3e O1"
       "CascadeDiff" "nodes mismatch or additions unrecorded",
@@ -6864,8 +6864,8 @@ private def holeDeclarations : List Declaration :=
    mkWitnessedClosed "r8CensusWmTrace" "P-R8 §solved 1" "R8DispositionEvidence" "triple differs from (755,32,5)",
    mkWitnessedClosed "r8EraBoundary" "P-R8 §solved 1 (iii)" "EraTable" "a form is in neither era",
    mkHole "preferenceStackLiveRecorded" "P-R19-preferences-open §gate" "PreferenceStackWitness" "a C value in a live trace with no layer record behind it",
-   mkHole "wmRunsOnce" "Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; amended 2026-08-31: original 'currently firing (selector-seam blocker)' is historical — a nine-hop declared-stub tick completed, while the production loop uses the Agency HTTP selector",
-   mkHole "wmRunConformsToWiring" "Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers",
+   mkHole "wmRunsOnce" "record: futon2:holes/problems/BUILD-packets/WM-RUN1.md · Joe 2026-08-31 · run-at-least-once" "TickRunWitness" "no tick-entry invocation completes with a TickRunRecord; amended 2026-08-31: original 'currently firing (selector-seam blocker)' is historical — a nine-hop declared-stub tick completed, while the production loop uses the Agency HTTP selector",
+   mkHole "wmRunConformsToWiring" "record: futon2:holes/problems/BUILD-packets/WM-RUN2.md · Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers",
    mkRefutedByRecord "enactedActionEqualsSelected" "wm-organization · TN-edge-review worklist H1 (refuted), H1b" "C460 over wm-trace-2026-07-04.edn and wm-trace-2026-07-05.edn: 50 comparable records, 50 differ, 0 agree" "a comparable record whose selection and enactment name the same mission",
    mkHole "enactedEqualsSelectedWhenRankOneGated" "wm-organization · TN-edge-review worklist H1b" "TickRunRecord" "a run in which the rank-1 selection passes its gate and a different action is enacted",
    mkHole "dirichletAccumulationImportAbsent" "wm-organization · TN-edge-review worklist H2" "DirichletConcentrations" "a code path from the tick model's o or mu into R17's concentrations",
