@@ -272,7 +272,7 @@ def findF1Containment {Scenario P : Type*} (row : FindReceiptRow Scenario P) : P
 def findF2Receipted {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.selected ⊆ row.receipted
 
-/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F3 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a selected pattern has only score evidence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the set whose receipt cites text or authored edges and is not score-alone. -/
+/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F3 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a selected pattern has only score evidence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the set whose receipt cites text or authored edges and is not score-alone. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF3NonSelfCertifying`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f3` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. The recorded non-self-certifying set equals the recorded receipted set in all 34 rows, so on THIS record the rejecting control, not the evidence, is what distinguishes F3 from F2. -/
 def findF3NonSelfCertifying {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.selected ⊆ row.nonSelfCertifying
 
@@ -731,6 +731,20 @@ theorem findF2Receipted_toRow {r : FindSnatchRowLit} (h : r.f2Ok = true) :
   have : p ∈ r.receipted := of_decide_eq_true (List.all_eq_true.mp h p hmem)
   exact this
 
+/-- F3 on the literal: every selected id is a member of the recorded
+non-self-certifying set — the receipted patterns whose receipt is not
+score-alone and cites a warrant file (`find_snatch.clj:166-171`). -/
+def f3Ok (r : FindSnatchRowLit) : Bool :=
+  r.selected.all (fun p => decide (p ∈ r.nonSelfCertifying))
+
+/-- `f3Ok` is SOUND for the declaration. -/
+theorem findF3NonSelfCertifying_toRow {r : FindSnatchRowLit} (h : r.f3Ok = true) :
+    findF3NonSelfCertifying r.toRow := by
+  intro p hp
+  have hmem : p ∈ r.selected := hp
+  have : p ∈ r.nonSelfCertifying := of_decide_eq_true (List.all_eq_true.mp h p hmem)
+  exact this
+
 end FindSnatchRowLit
 
 /-- CLOSED UNDER THE J9 CRITERION (worklist `:U46`, 2026-09-03) · leg (3) ·
@@ -758,6 +772,21 @@ theorem wmFindSnatchF2Receipted :
   have h : findSnatchRounds.all FindSnatchRowLit.f2Ok = true := by decide
   exact fun row hrow =>
     FindSnatchRowLit.findF2Receipted_toRow (List.all_eq_true.mp h row hrow)
+
+/-- CLOSED UNDER THE J9 CRITERION (worklist `:U46`, 2026-09-03) · leg (3) ·
+Every one of the 34 recorded rounds satisfies `findF3NonSelfCertifying`. Proved
+by `decide` over the transcribed table, no `sorry`. STATED, because it bounds
+what this proof shows: on this record the recorded non-self-certifying set IS
+the recorded receipted set in all 34 rows — every receipt is
+`:structured-antecedent` with a warrant file — so F3 discriminates nothing here
+that F2 does not. What separates them is the rejecting control
+`futon3:checks/find_snatch.clj --negative-f3` (a receipt rewritten to
+score-alone), not the record. -/
+theorem wmFindSnatchF3NonSelfCertifying :
+    ∀ row ∈ findSnatchRounds, findF3NonSelfCertifying row.toRow := by
+  have h : findSnatchRounds.all FindSnatchRowLit.f3Ok = true := by decide
+  exact fun row hrow =>
+    FindSnatchRowLit.findF3NonSelfCertifying_toRow (List.all_eq_true.mp h row hrow)
 
 inductive ReachOutside {P : Type*} (selected : Set P) (standsOn : P → P → Prop) : P → P → Prop
   | direct {u v} : standsOn u v → ReachOutside selected standsOn u v
@@ -7338,7 +7367,7 @@ private def holeDeclarations : List Declaration :=
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
    mkClosedUnderCriterion "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
    mkClosedUnderCriterion "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
-   mkHole "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
+   mkClosedUnderCriterion "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
    mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
    mkWitnessedClosed "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
