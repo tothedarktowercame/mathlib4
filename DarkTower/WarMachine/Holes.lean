@@ -268,7 +268,7 @@ def findF1Containment {Scenario P : Type*} (row : FindReceiptRow Scenario P) : P
   row.selected ⊆ row.repository ∧
     (row.selected = ∅ → row.absence = some .noPatternAddressesThisTension)
 
-/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F2 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a selected pattern has no receipt · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the recorded receipted set. -/
+/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F2 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a selected pattern has no receipt · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the recorded receipted set. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF2Receipted`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f2` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. -/
 def findF2Receipted {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.selected ⊆ row.receipted
 
@@ -718,6 +718,19 @@ theorem findF1Containment_toRow {r : FindSnatchRowLit} (h : r.f1Ok = true) :
     rw [hnil] at habs
     simpa [toRow] using habs
 
+/-- F2 on the literal: every selected id is a member of the recorded receipted
+set. -/
+def f2Ok (r : FindSnatchRowLit) : Bool :=
+  r.selected.all (fun p => decide (p ∈ r.receipted))
+
+/-- `f2Ok` is SOUND for the declaration. -/
+theorem findF2Receipted_toRow {r : FindSnatchRowLit} (h : r.f2Ok = true) :
+    findF2Receipted r.toRow := by
+  intro p hp
+  have hmem : p ∈ r.selected := hp
+  have : p ∈ r.receipted := of_decide_eq_true (List.all_eq_true.mp h p hmem)
+  exact this
+
 end FindSnatchRowLit
 
 /-- CLOSED UNDER THE J9 CRITERION (worklist `:U46`, 2026-09-03) · leg (3) ·
@@ -733,6 +746,18 @@ theorem wmFindSnatchF1Containment :
   have h : findSnatchRounds.all FindSnatchRowLit.f1Ok = true := by decide
   exact fun row hrow =>
     FindSnatchRowLit.findF1Containment_toRow (List.all_eq_true.mp h row hrow)
+
+/-- CLOSED UNDER THE J9 CRITERION (worklist `:U46`, 2026-09-03) · leg (3) ·
+Every one of the 34 recorded rounds satisfies `findF2Receipted`: each selected
+pattern carries a receipt in the same recorded row. Proved by `decide` over the
+transcribed table, no `sorry`. The Clojure side is
+`futon3:checks/find_snatch.clj:164-165`, whose `--negative-f2` control (the
+first selected pattern's receipt dropped) is rejected. -/
+theorem wmFindSnatchF2Receipted :
+    ∀ row ∈ findSnatchRounds, findF2Receipted row.toRow := by
+  have h : findSnatchRounds.all FindSnatchRowLit.f2Ok = true := by decide
+  exact fun row hrow =>
+    FindSnatchRowLit.findF2Receipted_toRow (List.all_eq_true.mp h row hrow)
 
 inductive ReachOutside {P : Type*} (selected : Set P) (standsOn : P → P → Prop) : P → P → Prop
   | direct {u v} : standsOn u v → ReachOutside selected standsOn u v
@@ -7312,7 +7337,7 @@ private def holeDeclarations : List Declaration :=
    mkClosedUnderCriterion "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "ExactDyadicAblationTable" "recorded G and pragmatic minimizer sets overlap",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
    mkClosedUnderCriterion "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
-   mkHole "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
+   mkClosedUnderCriterion "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
    mkHole "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
    mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
