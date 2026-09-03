@@ -276,7 +276,7 @@ def findF2Receipted {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Pro
 def findF3NonSelfCertifying {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.selected ⊆ row.nonSelfCertifying
 
-/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §3e F4 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. The predicate is defined, while its pinned row remains deliberately tracked as an evidence obligation. -/
+/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F4 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF4Falsifiable`, `decide` over all six transcribed scenario rows at the `:selected-union` grain the check uses, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f4` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. The row is no longer "deliberately tracked as an evidence obligation": the obligation is discharged, and what would still refute the claim is the falsifier field above. -/
 def findF4Falsifiable {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.repository.Nonempty ∧
     ∃ p, p ∈ row.repository ∧ p ∈ row.zeroMass ∧ p ∉ row.selected
@@ -745,6 +745,24 @@ theorem findF3NonSelfCertifying_toRow {r : FindSnatchRowLit} (h : r.f3Ok = true)
   have : p ∈ r.nonSelfCertifying := of_decide_eq_true (List.all_eq_true.mp h p hmem)
   exact this
 
+/-- F4 on the literal: the scenario's declared zero-mass pattern is a member of
+the recorded repository and is NOT in the recorded selection. -/
+def f4Ok (r : FindSnatchRowLit) : Bool :=
+  (findSnatchZeroMass r.scenario).any
+    (fun p => decide (p ∈ snatchRepository) && !decide (p ∈ r.selected))
+
+/-- `f4Ok` is SOUND for the declaration: the repository is nonempty because the
+zero-mass witness is in it, so the existential and the nonemptiness conjunct are
+discharged by the same recorded member. -/
+theorem findF4Falsifiable_toRow {r : FindSnatchRowLit} (h : r.f4Ok = true) :
+    findF4Falsifiable r.toRow := by
+  rw [f4Ok, List.any_eq_true] at h
+  obtain ⟨p, hzero, hp⟩ := h
+  rw [Bool.and_eq_true, Bool.not_eq_true'] at hp
+  have hrepo : p ∈ snatchRepository := of_decide_eq_true hp.1
+  have hsel : p ∉ r.selected := of_decide_eq_false hp.2
+  exact ⟨⟨p, hrepo⟩, p, hrepo, hzero, hsel⟩
+
 end FindSnatchRowLit
 
 /-- CLOSED UNDER THE J9 CRITERION (worklist `:U46`, 2026-09-03) · leg (3) ·
@@ -787,6 +805,20 @@ theorem wmFindSnatchF3NonSelfCertifying :
   have h : findSnatchRounds.all FindSnatchRowLit.f3Ok = true := by decide
   exact fun row hrow =>
     FindSnatchRowLit.findF3NonSelfCertifying_toRow (List.all_eq_true.mp h row hrow)
+
+/-- CLOSED UNDER THE J9 CRITERION (worklist `:U46`, 2026-09-03) · leg (3) ·
+Every one of the 6 recorded scenarios satisfies `findF4Falsifiable`: its declared
+zero-mass pattern is in the 18-member recorded repository and absent from that
+scenario's recorded `:selected-union`. Proved by `decide` over the transcribed
+scenario table, no `sorry`. The grain is the union, matching
+`futon3:checks/find_snatch.clj:172-177` — the statement per recorded ROUND is
+weaker and follows from it. The `--negative-f4` control (the omitted member
+struck from the recorded repository) is rejected. -/
+theorem wmFindSnatchF4Falsifiable :
+    ∀ row ∈ findSnatchScenarios, findF4Falsifiable row.toRow := by
+  have h : findSnatchScenarios.all FindSnatchRowLit.f4Ok = true := by decide
+  exact fun row hrow =>
+    FindSnatchRowLit.findF4Falsifiable_toRow (List.all_eq_true.mp h row hrow)
 
 inductive ReachOutside {P : Type*} (selected : Set P) (standsOn : P → P → Prop) : P → P → Prop
   | direct {u v} : standsOn u v → ReachOutside selected standsOn u v
@@ -7368,7 +7400,7 @@ private def holeDeclarations : List Declaration :=
    mkClosedUnderCriterion "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
    mkClosedUnderCriterion "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
    mkClosedUnderCriterion "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
-   mkHole "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected",
+   mkClosedUnderCriterion "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected",
    mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
    mkWitnessedClosed "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
    mkWitnessedClosed "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
