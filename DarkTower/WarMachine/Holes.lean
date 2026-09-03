@@ -184,7 +184,7 @@ structure AblationRow (Policy : Type*) where
 
 abbrev AblationTable (Prior Policy : Type*) := Prior → AblationRow Policy
 
-/-- WITNESSED-INSTANCE OBLIGATION · contract kind HOLE intentionally · owner: P-validated-R5 §2a′ · holder: by-record · fixture: `futon2:holes/labs/wm-contract/ablation-exact-dyadic.edn` · fixture-sha256: `f315b748420540688ef81086101b5789a4ecb2bd2a84c7a2b491f94fe8c56261` · SCOPE AMENDMENT 2026-08-31: the former declaration asserted an existential for every carrier and graders, and was false for empty/singleton policies or identical graders. This predicate requires both argmins to exist and their complete minimizer sets to be disjoint; merely choosing two members of one tied minimizer set no longer counts as movement. The definition is complete, but the contract tracks the pinned exact-dyadic ablation instance as an evidence obligation rather than treating definition as discharge. -/
+/-- CLOSED UNDER THE J9 CRITERION · contract kind CLOSED as of 2026-09-03 · owner: P-validated-R5 §2a′ · holder: by-record · fixture: `futon2:holes/labs/wm-contract/ablation-exact-dyadic.edn` · fixture-sha256: `f315b748420540688ef81086101b5789a4ecb2bd2a84c7a2b491f94fe8c56261` · SCOPE AMENDMENT 2026-08-31 (retained, this is what was closed): the former declaration asserted an existential for every carrier and graders, and was false for empty/singleton policies or identical graders. This predicate requires both argmins to exist and their complete minimizer sets to be disjoint; merely choosing two members of one tied minimizer set no longer counts as movement. · CLOSURE 2026-09-03, under the criterion recorded at `futon2:holes/labs/wm-contract/RUNBOOK.md` §"What ends a `closed-by-record` evidence obligation (J9 ruling, Joe, 2026-09-03)" (futon2 a2641b3), which also names this declaration's disposition. Leg (3), the Lean transcription: `wmRecordedAblationNonDegenerate` below proves this predicate over the pinned exact-dyadic table, no `sorry`. Leg (2), the rejecting witness: `futon2:checks/ablation_exact_dyadic_witness.clj` passes over the fixture and its `--negative` mode — which removes the minimizer separation — is rejected. Leg (1), the persisted record: the declared observation is a recorded score table, not a run observation, so the run leg is INAPPLICABLE here rather than met; the pinned fixture is an exact-dyadic transcription of the snatcher-dominant/g1 case of the persisted record `futon3:checks/ablation-snatch.edn`, all ten scores verified equal on decode. The earlier demotion (mathlib4 86186c3744, which added the proof and moved this row to `mkHole` in the same commit) stands in history as the pre-criterion state; it is superseded here, not amended. -/
 def nonDegenerateAblationLaw {Prior Policy : Type*} (policies : List Policy)
     (grade pragmatic : Prior → Policy → ℝ) : Prop :=
     policies ≠ [] ∧ ∃ prior,
@@ -6723,6 +6723,17 @@ private def mkRefutedByRecord (name owner evidence falsifier : String) : Declara
    holder := "by-record", decided := "2026-09-01", evidence := some evidence,
    falsifier := some falsifier}
 
+-- A hole CLOSED by the J9 criterion (futon2 holes/labs/wm-contract/RUNBOOK.md,
+-- Joe 2026-09-03): the declared evidence obligation ended, and `decided` is the
+-- date of that ruling rather than the batch date `mkClosed`/`mkWitnessedClosed`
+-- carry.  The `evidence` and `falsifier` fields are KEPT: what discharged the
+-- obligation and what would still refute the claim are the content of the
+-- closure, and `mkClosed` would drop both.
+private def mkClosedUnderCriterion (name owner evidence falsifier : String) : Declaration :=
+  {name, kind := .closed, signature := s!"see {name} in the source module", owner,
+   holder := "by-record", decided := "2026-09-03", evidence := some evidence,
+   falsifier := some falsifier}
+
 private def mkRefused (name owner reason : String) : Declaration :=
   {name, kind := .hole, signature := s!"see {name} in the source module", owner,
    holder := "by-record", decided := "2026-08-30", falsifier := some s!"REFUSED: {reason}"}
@@ -6845,7 +6856,7 @@ private def closedDeclarations : List Declaration :=
 
 private def holeDeclarations : List Declaration :=
   [mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
-   mkHole "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "ExactDyadicAblationTable" "recorded G and pragmatic minimizer sets overlap",
+   mkClosedUnderCriterion "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "ExactDyadicAblationTable" "recorded G and pragmatic minimizer sets overlap",
    mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
    mkHole "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
    mkHole "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
