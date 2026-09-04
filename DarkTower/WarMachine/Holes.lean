@@ -7197,7 +7197,7 @@ inductive RouteNode where
 
 /-- A hop, and equally an edge of the figure: an ordered pair of nodes. The
 route a tick records is a SEQUENCE of node tags, so a hop is a consecutive
-pair (`run3_conformance.bb:118-119`). -/
+pair (`run3_conformance.bb:113-114`). -/
 abbrev WiringEdge := RouteNode × RouteNode
 
 /-- The grounds on which a drawn edge was retired by a `:decisions` entry of
@@ -7209,7 +7209,7 @@ inductive RetirementGrounds where
   deriving DecidableEq, Repr
 
 /-- A retired pair with the SET of grounds it was retired on -- the shape
-`run3_conformance.bb:62-67` reduces `:decisions` to. -/
+`run3_conformance.bb:57-61` reduces `:decisions` to. -/
 structure RetiredWiringEdge where
   edge : WiringEdge
   grounds : List RetirementGrounds
@@ -7217,9 +7217,9 @@ structure RetiredWiringEdge where
 
 /-- Every pair in the map's `:edges`, in file order. NOTE, and it is a real
 difference between the two checkers rather than an oversight: `:status` is NOT
-filtered here, because `run3_conformance.bb:59` does not filter it and run3 is
+filtered here, because `run3_conformance.bb:55` does not filter it and run3 is
 what produced this run's pinned verdict. So the one `:unresolved` self-loop
-`R5 -> R5` is in this list, where `checks/wm_route_conformance.clj:30` would
+`R5 -> R5` is in this list, where `checks/wm_route_conformance.clj:28` would
 drop it. It is not traversed by this run, so nothing here turns on it. -/
 def figureDrawnEdges : List WiringEdge :=
   [(.R1, .R4),
@@ -7289,7 +7289,7 @@ inductive HopClass where
   | unmapped
   deriving DecidableEq, Repr
 
-/-- `run3_conformance.bb:121-129`, transcribed clause for clause. The order
+/-- `run3_conformance.bb:116-124`, transcribed clause for clause. The order
 matters and is the script's: a `code` retirement whose pair is ALSO on the
 measured layer retired a dependency claim while the route stayed drawn as
 measured, so it is excluded rather than a refutation. -/
