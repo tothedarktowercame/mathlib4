@@ -7492,8 +7492,10 @@ sources and regenerate rather than editing the literals.
 /-- One recorded decision's controller-score tie, transcribed from the run's
 rationale record (`:rationale/chosen :controller-score-tie`, written at decision
 time by `futon2:src/futon2/aif/selection_rationale.clj:139-153`) together with
-the plateau census recomputed from the run-store trace that record names. Ranks
-are 1-based positions in the controller ranking. -/
+the plateau census recomputed from the run store's own committed trace -- which
+is not always the file the record names; each run block's SOURCES says which
+file its census was computed from. Ranks are 1-based positions in the
+controller ranking. -/
 structure SelectionTie where
   /-- The tick's `:rationale/tick-id`, verbatim. -/
   tick : String
