@@ -23,6 +23,45 @@ theorem nonfiniteBetaReference :
     machineTemperature ⟨.variationalBetaGamma, 1/100, 3/5, 2,
       some .nonfinite⟩ = .error .invalidVariationalBeta := rfl
 
+/-- `finite-pos?` rejects zero as well as missing and non-finite
+(`futon2:src/futon2/aif/policy.clj:47-55`); the delivered module exercised
+neither zero nor a negative beta on a concrete value.  Measured at HEAD: both
+throw with the same message the `nil` case does
+(`runs/F8-temperature/review-independent-probe.txt`, the `variational beta=`
+lines). -/
+theorem zeroBetaReference :
+    machineTemperature ⟨.variationalBetaGamma, 1/100, 3/5, 2,
+      some (.finite 0)⟩ = .error .invalidVariationalBeta := by
+  norm_num [machineTemperature]
+
+/-- And a strictly negative beta (`futon2:src/futon2/aif/policy.clj:47-55`). -/
+theorem negativeBetaReference :
+    machineTemperature ⟨.variationalBetaGamma, 1/100, 3/5, 2,
+      some (.finite (-1/4))⟩ = .error .invalidVariationalBeta := by
+  norm_num [machineTemperature]
+
+/-- The gain floor at production's `tau-min`: a degenerate gain of `0` gives
+`100`, not a division by zero (`futon2:src/futon2/aif/policy.clj:132`).
+Measured at HEAD: `100.0`
+(`runs/F8-temperature/review-independent-probe.txt`, `g=0 :selection-gain-only`). -/
+theorem productionGainFloorReference :
+    machineTemperature ⟨.selectionGainOnly, 1/100, 3/5, 0, none⟩ = .ok 100 := by
+  rw [gainFloorPreventsDivisionByZero (1/100) (3/5) (by norm_num)]
+  norm_num
+
+/-- The three laws on production's own defaults, with the numbers the probe
+measured: `0.3`, `0.5`, `0.25`.  This is `threeLawsDisagree` discharged rather
+than left as a statement about a definition. -/
+theorem threeLawsReference :
+    machineTemperature (probeOpts .spread) = .ok (3/10) ∧
+    machineTemperature (probeOpts .selectionGainOnly) = .ok (1/2) ∧
+    machineTemperature (probeOpts .variationalBetaGamma) = .ok (1/4) :=
+  ⟨threeLawsDisagree.1, threeLawsDisagree.2.1, threeLawsDisagree.2.2.1⟩
+
+#print axioms zeroBetaReference
+#print axioms negativeBetaReference
+#print axioms productionGainFloorReference
+#print axioms threeLawsReference
 #print axioms productionFloorGainOne
 #print axioms belowFloorBetaReference
 #print axioms nonfiniteBetaReference
