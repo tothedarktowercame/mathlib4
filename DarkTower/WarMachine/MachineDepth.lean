@@ -125,6 +125,15 @@ def efeDepths (requested : Option Nat) : EfeDepths :=
   let k := effectiveDepth requested
   ⟨k, k, 1, 1⟩
 
+/-- **The machine's T.**  Not a number: the registry line asks for one range
+for the sums in `Q(o|pi)` and `G`, and what the machine has is a map from the
+requested `:horizon-steps` to the four depths its four G terms are evaluated at
+(`futon2:src/futon2/aif/efe.clj:633-636`, `:641`, `:701`, `:705`, `:706`).
+`efeDepths` is the machine's inhabitant of this type. -/
+abbrev machineDepth := Option Nat → EfeDepths
+
+theorem efeDepthsIsMachineDepth : (efeDepths : machineDepth) = efeDepths := rfl
+
 /-- For any requested depth of at least two, one evaluation of G evaluates its
 terms at two different depths.  This is what makes the registry's "the range of
 the sums in Q(o|pi) and G" false as written: there is no one range. -/
