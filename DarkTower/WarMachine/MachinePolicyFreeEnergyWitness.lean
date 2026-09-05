@@ -45,6 +45,22 @@ theorem negativeVarianceRejects :
       .error .invalidVariance := by
   norm_num [channelPolicyFreeEnergy]
 
+/-- The registry's declared carrier, evaluated. The two channels are exactly the
+`positive` candidate the Clojure readback scores (`prediction-mean {:a 0.5 :b
+-0.25}`, `prediction-variance {:a 0.25 :b 1.0}`, `observation {:a 1.0 :b 0.25}`),
+so the readback's two-channel total and its `f-pi-vector[0]` are measured against
+THIS statement rather than against a second Clojure expression of the same
+formula. Without it the composite is the one declaration in this slice with no
+Lean-side value, which is the declaration the registry row names. -/
+theorem machineTwoChannelTotal :
+    machinePolicyFreeEnergy [⟨1/2, 1/4, .present⟩, ⟨1/2, 1, .present⟩]
+        0 (1/100) .reject =
+      .ok ((Real.log (2 * Real.pi * (1/4)) + 1) / 2 +
+           (Real.log (2 * Real.pi * 1) + 1/4) / 2) := by
+  norm_num [machinePolicyFreeEnergy, channelPolicyFreeEnergy,
+    present_ne_absent, reject_ne_floor, List.foldlM, Except.bind, Except.pure,
+    bind, pure, Except.ok.injEq]
+
 theorem unscaledTauPair :
     selectionScore 0 4 3 2 .unscaled = -5 ∧
     selectionScore 0 4 3 4 .unscaled = -4 := by

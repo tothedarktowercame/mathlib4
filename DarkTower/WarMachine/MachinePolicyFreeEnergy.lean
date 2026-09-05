@@ -8,6 +8,26 @@ This module states the map run by `f-pi-for-candidate`
 by `selection-scores` (`futon2:src/futon2/aif/policy.clj:157-211`). Logarithms
 remain symbolic in Lean: the witness proves the algebraic terms exactly, while
 the production readback reports whole-term floating deltas at tolerance 1e-12.
+
+The Clojure docstring's claim that the function "never returns Infinity or NaN"
+(`policy_free_energy.clj:56-57`) is NOT stated here as a theorem, and the reason
+is that it cannot be. It is a claim about IEEE doubles, and this model's totals
+are in `ℝ`, which has no Infinity and no NaN to return; a rejection leaves by the
+`Except` branch instead. So the claim holds in the model by construction and
+carries no information about the implementation. Stating it as a theorem would
+have produced a tautology dressed as a property, which is what the first draft of
+this module did. What IS stated is where the doubles can leave the reals:
+`channelPolicyFreeEnergy` divides by `effectiveVariance` only on the branch where
+it is strictly positive, so the division is total here; overflow of the double
+quotient is a property of the machine arithmetic and is measured by the readback,
+not proved here.
+
+Production runs the `.floor` arm, not the default. `f-pi-for-candidate`'s own
+default is `:absent-variance :reject`, but its only production caller,
+`f-pi-dark-readback`, passes `{:absent-variance :floor}`
+(`futon2:scripts/futon2/report/war_machine.clj:528-533`) and so takes the default
+`:variance-floor` 0.01. Both arms are stated below; the floored one is the map the
+machine runs.
 -/
 
 namespace DarkTower.WarMachine.MachinePolicyFreeEnergy
@@ -55,14 +75,6 @@ theorem varianceTrichotomy (r tolerance floor : ℝ) (hfloor : 0 < floor) :
         .ok ((Real.log (2 * Real.pi * floor) + r ^ 2 / floor) / 2) := by
   have hfloorNonnegative : 0 ≤ floor := le_of_lt hfloor
   simp [channelPolicyFreeEnergy, hfloorNonnegative, ne_of_gt hfloor]
-
-/-- A successful production result is a real-valued total. `ℝ` has neither
-NaN nor infinities; failure remains in the `Except` branch. -/
-theorem successfulTotalIsFinite (channels : List ChannelDatum)
-    (tolerance floor total : ℝ) (mode : AbsentVarianceMode)
-    (h : machinePolicyFreeEnergy channels tolerance floor mode = .ok total) :
-    ∃ finiteTotal : ℝ, machinePolicyFreeEnergy channels tolerance floor mode =
-      .ok finiteTotal := ⟨total, h⟩
 
 inductive FPiScaling | unscaled | byTau deriving DecidableEq, Repr
 
