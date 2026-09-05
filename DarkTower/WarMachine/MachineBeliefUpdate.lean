@@ -164,4 +164,37 @@ theorem registryAdditiveFormIsNotGeneral :
     categoricalUpdate 0 likelihood prior 0 ≠ prior 0 + (1/10) * 2 * 1 := by
   norm_num [categoricalUpdate, temperedLikelihood, normalise]
 
+/-- μ-next for one entity, under the one name the registry row declares.
+
+The attributed weight this tick assigns the entity
+(`futon2:scripts/futon2/report/war_machine.clj:6187`) enters the categorical
+filter as the tempering exponent κ, so the posterior the entity carries into
+the next tick is `q ∝ A(o|·)^κ(w) · (B q)` with identity B
+(`futon2:src/futon2/aif/belief.clj:297-346`, reached from production through
+`apply-arena-belief-events` at `war_machine.clj:821-827`, whose likelihood mode
+is `:aif` unless `FUTON_WM_LIKELIHOOD_MODE` is set).
+
+Spelled `machine…` rather than by any of its parts because `categoricalUpdate`,
+`kappa` and `normalise` are bare symbols, and the corpus-wide name index that
+resolves a registry carrier keeps only the FIRST declaration of a name
+(`futon2:holes/labs/wm-contract/lean_state_probe.bb:185-191`). -/
+noncomputable def machineBeliefUpdate {n : Nat} [NeZero n]
+    (eventWeight entityCount totalInconsistency health : ℝ)
+    (kind : BeliefEventType) (likelihood prior : Fin n → ℝ) : Fin n → ℝ :=
+  categoricalUpdate
+    (kappa (attributedWeight eventWeight entityCount totalInconsistency health kind))
+    likelihood prior
+
+/-- A tick in which every entity is already consistent with the error direction
+moves no belief at all: the attribution normaliser is zero, so κ = 0 and the
+filter returns the prior. The two halves are `zeroTotalInconsistencyMovesNothing`
+and `kappaZeroIsNoOp`; this is the composite the registry row names. -/
+theorem machineBeliefUpdateZeroInconsistencyIsNoOp {n : Nat} [NeZero n]
+    (eventWeight entityCount health : ℝ) (kind : BeliefEventType)
+    (likelihood prior : Fin n → ℝ) (hprior : (∑ i, prior i) = 1) :
+    machineBeliefUpdate eventWeight entityCount 0 health kind likelihood prior
+      = prior := by
+  rw [machineBeliefUpdate, zeroTotalInconsistencyMovesNothing, kappa_zero]
+  exact kappaZeroIsNoOp likelihood prior hprior
+
 end DarkTower.WarMachine.MachineBeliefUpdate
