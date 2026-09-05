@@ -1,0 +1,66 @@
+import DarkTower.WarMachine.MachineBeliefState
+
+namespace DarkTower.WarMachine.MachineBeliefStateWitness
+open DarkTower.WarMachine.MachineBeliefState
+
+def peaked : Posterior := fun s => if s = .spawned then 1 else 0
+noncomputable def fresh01 : machineBeliefState := fun e => if e = 0 ∨ e = 1 then some uniformPrior else none
+def carried02 : machineBeliefState := fun e => if e = 0 then some peaked else if e = 2 then some peaked else none
+
+theorem carryEqualsNeitherInput :
+    reconcileBeliefCarry fresh01 carried02 ≠ fresh01 ∧
+    reconcileBeliefCarry fresh01 carried02 ≠ carried02 := by
+  constructor
+  · intro h
+    have hs := congrFun h 0
+    simp [reconcileBeliefCarry, fresh01, carried02] at hs
+    have hv := congrFun hs .spawned
+    norm_num [peaked, uniformPrior] at hv
+  · intro h; have := congrFun h 1; simp [reconcileBeliefCarry, fresh01, carried02] at this
+
+noncomputable def only0 : machineBeliefState := fun e => if e = 0 then some uniformPrior else none
+def empty : machineBeliefState := fun _ => none
+
+theorem reentryLosesHistory :
+    let t0 : machineBeliefState := fun e => if e = 0 then some peaked else none
+    let t1 := reconcileBeliefCarry empty t0
+    let t2 := reconcileBeliefCarry only0 t1
+    t0 0 = some peaked ∧ t1 0 = none ∧ t2 0 = some uniformPrior := by
+  simp [reconcileBeliefCarry, empty, only0]
+
+noncomputable def collisionA : Posterior := fun s =>
+  match s with | .spawned => 1/2 | .refined => 3/10 | .strengthened => 1/5 | _ => 0
+noncomputable def collisionB : Posterior := fun s =>
+  match s with | .spawned => 1/2 | .refined => 1/5 | .strengthened => 3/10 | _ => 0
+
+theorem collisionDistinct : collisionA ≠ collisionB := by
+  intro h; have := congrFun h .refined; norm_num [collisionA, collisionB] at this
+
+theorem collisionSameArgmaxReference :
+    collisionA .spawned = 1/2 ∧ collisionB .spawned = 1/2 := by
+  norm_num [collisionA, collisionB]
+
+theorem collisionSpawnedIsArgmax (s : Status) :
+    collisionA s ≤ collisionA .spawned ∧ collisionB s ≤ collisionB .spawned := by
+  cases s <;> norm_num [collisionA, collisionB]
+
+theorem collisionSameEntropy : entropy collisionA = entropy collisionB := by
+  simp [entropy, Status.all, collisionA, collisionB]
+  ring
+
+theorem collisionEntropyReference :
+    entropy collisionA =
+      -(1/2 * Real.log (1/2) + 3/10 * Real.log (3/10) +
+        1/5 * Real.log (1/5)) := by
+  simp [entropy, Status.all, collisionA]
+  ring
+
+theorem uniformEntropyReference :
+    entropy uniformPrior = -(7 * (1/7 * Real.log (1/7))) := by
+  simp [entropy, Status.all, uniformPrior]
+  ring
+
+theorem uniformCoordinates : ∀ s, uniformPrior s = 1/7 := by
+  intro s; rfl
+
+end DarkTower.WarMachine.MachineBeliefStateWitness
