@@ -36,13 +36,26 @@ noncomputable def collisionB : Posterior := fun s =>
 theorem collisionDistinct : collisionA ≠ collisionB := by
   intro h; have := congrFun h .refined; norm_num [collisionA, collisionB] at this
 
-theorem collisionSameArgmaxReference :
-    collisionA .spawned = 1/2 ∧ collisionB .spawned = 1/2 := by
-  norm_num [collisionA, collisionB]
+/-- Both counterexamples are distributions.  Without this the collision below is
+a fact about two arbitrary functions rather than about two posteriors. -/
+theorem collisionAIsNormalised : Normalised collisionA := by
+  simp [Normalised, Status.all, collisionA]
+  norm_num
 
-theorem collisionSpawnedIsArgmax (s : Status) :
-    collisionA s ≤ collisionA .spawned ∧ collisionB s ≤ collisionB .spawned := by
-  cases s <;> norm_num [collisionA, collisionB]
+theorem collisionBIsNormalised : Normalised collisionB := by
+  simp [Normalised, Status.all, collisionB]
+  norm_num
+
+theorem peakedIsNormalised : Normalised peaked := by
+  simp [Normalised, Status.all, peaked]
+
+/-- STRICT, deliberately.  `most-likely-status` (`belief.clj:447-452`) is
+`(key (apply max-key val posterior))`, whose value on a tie is whichever entry
+`max-key` reaches first.  A non-strict maximum would therefore not force the
+`:spawned` the readback measures; a strict one does. -/
+theorem collisionSpawnedIsStrictArgmax (s : Status) (hs : s ≠ Status.spawned) :
+    collisionA s < collisionA .spawned ∧ collisionB s < collisionB .spawned := by
+  cases s <;> simp_all <;> norm_num [collisionA, collisionB]
 
 theorem collisionSameEntropy : entropy collisionA = entropy collisionB := by
   simp [entropy, Status.all, collisionA, collisionB]
@@ -62,5 +75,20 @@ theorem uniformEntropyReference :
 
 theorem uniformCoordinates : ∀ s, uniformPrior s = 1/7 := by
   intro s; rfl
+
+/-- THE FINDING, as one proposition rather than as pieces a reader must assemble.
+`docs/futon-aif-completeness.md:49-68` requires "mean *and* precision (variance)
+both explicitly represented" and `:63-64` answers with `most-likely-status` and
+`entropy`.  Two distinct posteriors share both, so the pair does not determine
+the posterior and is not a sufficient statistic for it.  Whether that satisfies
+the criterion is a ruling and none is made here. -/
+theorem momentPairIsNotSufficient :
+    Normalised collisionA ∧ Normalised collisionB ∧
+    collisionA ≠ collisionB ∧
+    (∀ s, s ≠ Status.spawned →
+      collisionA s < collisionA .spawned ∧ collisionB s < collisionB .spawned) ∧
+    entropy collisionA = entropy collisionB :=
+  ⟨collisionAIsNormalised, collisionBIsNormalised, collisionDistinct,
+   fun s hs => collisionSpawnedIsStrictArgmax s hs, collisionSameEntropy⟩
 
 end DarkTower.WarMachine.MachineBeliefStateWitness

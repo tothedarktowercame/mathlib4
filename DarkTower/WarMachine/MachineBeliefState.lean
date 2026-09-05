@@ -11,6 +11,8 @@ domain is exactly the fresh bootstrap, with values chosen without arithmetic.
 -/
 namespace DarkTower.WarMachine.MachineBeliefState
 
+open DarkTower.WarMachine.Holes
+
 inductive Status
   | spawned | refined | strengthened | addressed | falsified | foreclosed | reopened
   deriving DecidableEq, Repr
@@ -40,11 +42,16 @@ theorem newEntityKeepsFresh (fresh carried : machineBeliefState) (e : Entity)
     reconcileBeliefCarry fresh carried e = some prior := by
   simp [reconcileBeliefCarry, hf, hc]
 
+/-- An entity the previous tick believed something about, absent from this tick's
+bootstrap domain, is absent from the result.  Both conjuncts are needed: the
+first alone holds for any `carried` and so would not be about a carried-only
+entity at all. -/
 theorem carriedOnlyEntityIsDropped (fresh carried : machineBeliefState) (e : Entity)
     (posterior : Posterior) (hf : fresh e = none)
-    (_hc : carried e = some posterior) :
-    reconcileBeliefCarry fresh carried e = none := by
-  simp [reconcileBeliefCarry, hf]
+    (hc : carried e = some posterior) :
+    reconcileBeliefCarry fresh carried e = none ∧ carried e ≠ none := by
+  refine ⟨by simp [reconcileBeliefCarry, hf], ?_⟩
+  simp [hc]
 
 theorem coldStartReturnsFresh (fresh : machineBeliefState) :
     reconcileBeliefCarry fresh (fun _ => none) = fresh := by
@@ -53,6 +60,13 @@ theorem coldStartReturnsFresh (fresh : machineBeliefState) :
 
 def Normalised (posterior : Posterior) : Prop :=
   (Status.all.map posterior).sum = 1
+
+/-- The uniform prior `belief.clj:44-49` builds is a distribution.  Without this
+`carryPreservesNormalisation`'s hypotheses are never discharged for any concrete
+state in the development. -/
+theorem uniformPriorIsNormalised : Normalised uniformPrior := by
+  simp [Normalised, Status.all, uniformPrior]
+  norm_num
 
 theorem carryPreservesNormalisation (fresh carried : machineBeliefState)
     (hf : ∀ e p, fresh e = some p → Normalised p)
@@ -71,6 +85,15 @@ theorem carryPreservesNormalisation (fresh carried : machineBeliefState)
       simp [reconcileBeliefCarry, hfresh, hcarry] at h
       subst p
       exact hc e posterior hcarry
+
+/-- The machine's posterior is indexed by the seven `Status` values; the
+glossary's `Holes.BeliefState` carries its mean and variance over the fourteen
+`Holes.Channel` values (`Holes.lean:6806-6808`).  This says the two index sets
+are not the same set relabelled.  It does NOT say that no map between the two
+carriers exists — that is a claim about a corpus, which Lean cannot settle. -/
+theorem statusIndexDiffersFromChannelIndex :
+    Status.all.length ≠ Channel.all.length := by
+  simp [Status.all, Channel.all]
 
 noncomputable def entropy (posterior : Posterior) : ℝ :=
   -((Status.all.filter (fun s => 0 < posterior s)).map
