@@ -921,6 +921,132 @@ def organiseO4PrecedenceGovernance
   left
   norm_num [wmCascadeDiffFixture]
 
+-- F12 SLICE 2 TRANSCRIPTION BEGIN (checked by
+-- futon2:holes/labs/wm-contract/f12_zaif_transcription.clj)
+/-- The zaif library cascade as a `CascadeDiff`, transcribed from
+`futon3:checks/zaif-cascade.edn` run `:widen-to-a-budget` over the `@why`
+relation of `library/` at `futon3` commit `1b8b1d1`.  Index table and every
+number below are derived by
+`futon2:holes/labs/wm-contract/f12_zaif_transcription.clj` into
+`runs/F12-organise/01-zaif-transcription.edn`, which also re-reads this block
+and fails if the two disagree; nothing here is hand-entered without that check.
+
+WHY A SECOND FIXTURE AND NOT A REPLACEMENT.  `wmCascadeDiffFixture` above is
+the three-node C59 fixture, in which `admittedBy = ∅` and `nodes = selected`.
+Both coincidences hide something.  `admittedBy = ∅` makes O1's three-way union
+witnessed trivially — the third origin contributes nothing — and this cascade's
+9 admitted nodes make it non-trivial.  `nodes = selected` makes the two readings
+of O3 indistinguishable, which `organiseO3FastForwardOverSelectedFails` below
+shows is not a harmless coincidence.
+
+THE INDEX, from the record and nothing else: `0-10` are the 11 patterns `find`
+selected (`:find :selected`), `11-19` the 9 the policy-grain rule admitted
+(`:runs :widen-to-a-budget :cascade :provenance`, the entries carrying
+`[:admitted-by :widen-the-cascade-only-on-evidence]`), `20-26` the 7 vertices
+that are authored targets reachable from a node but are not nodes — the bridges
+`fastForward` routes around.  Ids in the artifact.
+
+WHAT IS NOT TRANSCRIBED, and why the four O4 fields are empty rather than
+plausible.  `futon3:checks/construct_cascade.clj` `cascade-of` (`:402`, the two fields at
+`:420-421`) sets
+`:precedence-before []` and `:precedence-after []` for exactly this run and
+carries no score at all, because nothing was played: the record's `:o4` reads
+`:not-exercised-fewer-than-two-members-carry-a-play-grain-rule`.  So the O4
+fields here are `[]`/`0` and NO O4 statement is made of this fixture.  That gap
+is F12 slice 3's, not this one's. -/
+private def zaifSelected : Set Nat := {n | n < 11}
+
+private def zaifAdmitted : Set Nat := {n | 11 ≤ n ∧ n < 20}
+
+private def zaifNodes : Set Nat := {n | n < 20}
+
+/-- The 13 authored `@why` edges over the 27 vertices the cascade's nodes reach,
+at the transcription basis.  Direction is `standsOn`: `u` stands on `v`. -/
+private def zaifAuthored : Nat → Nat → Prop
+  | 6, 26 | 7, 20 | 14, 23 | 15, 22 | 16, 24 | 17, 20 | 18, 19 | 19, 20
+  | 22, 24 | 23, 26 | 24, 21 | 25, 21 | 26, 25 => True
+  | _, _ => False
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O1–O3 · holder: by-record ·
+evidence: CascadeDiff · decided 2026-09-06 · The zaif run of the library
+cascade, 20 nodes over 1239 patterns.  `organisedEdges` is `fastForward` over
+`nodes`, which is what `construct_cascade.clj:415` passes. -/
+def wmZaifCascadeDiffFixture : CascadeDiff Nat Int :=
+  { selected := zaifSelected
+    nodes := zaifNodes
+    addedByOrganise := ∅
+    admittedBy := zaifAdmitted
+    authoredEdges := zaifAuthored
+    organisedEdges := fastForward zaifNodes zaifAuthored
+    precedenceBefore := []
+    precedenceAfter := []
+    actingOrderBefore := []
+    actingOrderAfter := []
+    scoreBefore := 0
+    scoreAfter := 0 }
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O1 · holder: by-record ·
+evidence: CascadeDiff · falsifier: a node in none of the three recorded origins ·
+O1 on a real construction: unlike the C59 fixture, `admittedBy` here is the 9
+nodes a policy-grain THEN admitted, so the third origin supplies 9 of the 20
+nodes and the union is not `selected ∪ ∅ ∪ ∅`. -/
+def organiseO1NodesRecordedZaif :
+    wmZaifCascadeDiffFixture.nodes =
+      wmZaifCascadeDiffFixture.selected ∪ wmZaifCascadeDiffFixture.addedByOrganise ∪
+        wmZaifCascadeDiffFixture.admittedBy := by
+  ext x
+  simp [wmZaifCascadeDiffFixture, zaifNodes, zaifSelected, zaifAdmitted]
+  omega
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O2 · holder: by-record ·
+evidence: CascadeDiff · falsifier: an organised edge lacks authored reachability ·
+The zaif instance of O2. -/
+def organiseO2AuthoredReachabilityZaif :
+    ∀ u v, wmZaifCascadeDiffFixture.organisedEdges u v →
+      Reach wmZaifCascadeDiffFixture.authoredEdges u v := by
+  intro u v edge
+  exact reachOutside_to_reach edge.2.2
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O3 · holder: by-record ·
+evidence: CascadeDiff · falsifier: organised edges differ from the
+node-endpoint fast-forwards · O3 for the zaif instance, stated over `nodes` —
+the set `construct_cascade.clj:415` and `find_organise.clj:529` both pass. -/
+def organiseO3FastForwardZaif :
+    ∀ u v, wmZaifCascadeDiffFixture.organisedEdges u v ↔
+      fastForward wmZaifCascadeDiffFixture.nodes wmZaifCascadeDiffFixture.authoredEdges u v := by
+  intro u v
+  rfl
+
+/-- CLOSED-BY-RECORD · owner: P-validated-R5 §3e O3 · holder: by-record ·
+evidence: CascadeDiff · falsifier: the two readings of O3 agree on this
+cascade · WHAT THE C59 FIXTURE CANNOT SEE.  `organiseO3FastForward` above
+states O3 with `.selected`; the Clojure law `o3-fast-forward`
+(`futon3:checks/find_organise.clj:529`) evaluates `fast-forward` over `nodes`,
+as does the constructor that builds the edges (`:415`).  On the C59 fixture
+`nodes = selected`, so the two forms are the same proposition and the file has
+never had to choose.  Here they are not: the cascade's one organised edge runs
+between vertices 18 and 19, both ADMITTED and so neither selected, and
+`fastForward` over the 11 selected is empty.  This states the disagreement
+rather than repairing either side.  Which set O3 is owed is a SECOND question,
+next to but not the same as C539 §4's decision D1 — D1 asks which carrier the
+laws are stated of, this asks which of that carrier's two fields O3 quantifies
+over — and both are Joe's, not a slice's. -/
+def organiseO3FastForwardOverSelectedFails :
+    ¬ (∀ u v, wmZaifCascadeDiffFixture.organisedEdges u v ↔
+        fastForward wmZaifCascadeDiffFixture.selected
+          wmZaifCascadeDiffFixture.authoredEdges u v) := by
+  intro h
+  have edge : wmZaifCascadeDiffFixture.organisedEdges 18 19 := by
+    refine ⟨?_, ?_, ReachOutside.direct ?_⟩
+    · show (18 : Nat) ∈ zaifNodes
+      simp [zaifNodes]
+    · show (19 : Nat) ∈ zaifNodes
+      simp [zaifNodes]
+    · trivial
+  have selectedEnd := ((h 18 19).mp edge).1
+  simp [wmZaifCascadeDiffFixture, zaifSelected] at selectedEnd
+-- F12 SLICE 2 TRANSCRIPTION END
+
 inductive Layer where
   | L1
   | L2
