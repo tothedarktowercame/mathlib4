@@ -119,17 +119,20 @@ theorem armOneO3 (repo : Repository Nat) (hrepo : repo.standsOn = d1Authored) :
 abbrev armTwoOrganiseType (Policy P Score : Type*) :=
   Cascade Policy → Set P → Repository P → CascadeDiff P Score
 
-/-- Arm two, O4 measurement from `Holes.lean:916-921` and the public zaif fixture at `Holes.lean:973-984`: all before/after fields agree, so the precedence-change antecedent is false. -/
+/-- Arm two, O4 measurement from `Holes.lean:916-921` and the public zaif fixture at `Holes.lean:973-984`: the precedence-change antecedent O4 needs is false there, so retyping the codomain buys an O4 that cannot fire on the one library-scale run recorded.  Contrast the C59 fixture at `Holes.lean:872-884`, whose precedence does move -- this is a fact about the run, not about the statement's shape. -/
 theorem armTwoO4AntecedentUnsatisfiable :
     ¬ (wmZaifCascadeDiffFixture.precedenceBefore ≠
-      wmZaifCascadeDiffFixture.precedenceAfter) := by
-  have hprecedence : wmZaifCascadeDiffFixture.precedenceBefore =
-      wmZaifCascadeDiffFixture.precedenceAfter := by rfl
-  have hacting : wmZaifCascadeDiffFixture.actingOrderBefore =
-      wmZaifCascadeDiffFixture.actingOrderAfter := by rfl
-  have hscore : wmZaifCascadeDiffFixture.scoreBefore =
-      wmZaifCascadeDiffFixture.scoreAfter := by rfl
-  exact fun h => h hprecedence
+      wmZaifCascadeDiffFixture.precedenceAfter) :=
+  fun h => h rfl
+
+/-- Arm two, O4 measurement, second of the three before/after pairs: the acting order does not move either, so O4's disjunctive conclusion has no witness here. -/
+theorem armTwoZaifActingOrderFlat :
+    wmZaifCascadeDiffFixture.actingOrderBefore =
+      wmZaifCascadeDiffFixture.actingOrderAfter := rfl
+
+/-- Arm two, O4 measurement, third of the three before/after pairs: the score does not move either.  `construct_cascade.clj:402` (fields at `:420-421`) carries no score for this run, which is where the zero comes from. -/
+theorem armTwoZaifScoreFlat :
+    wmZaifCascadeDiffFixture.scoreBefore = wmZaifCascadeDiffFixture.scoreAfter := rfl
 
 /-- Arm three from C539 §4(iii): the unmodified `Repository` carrier at `Holes.lean:121-124`. -/
 def d1Repo : Repository Nat where
@@ -157,6 +160,21 @@ theorem armThreeO3 :
       fastForward d1CascadeZaif.nodes d1Repo.standsOn u v := by
   intro u v
   rfl
+
+/-- Arm three and arm one, non-vacuity of O2 and O3: the organised edge set is not empty.  Without this both laws would hold of a cascade with no edges at all, and the C59 fixture's single fast-forward would be the only thing either had ever been read on. -/
+theorem armThreeOrganisedEdgeExists : d1CascadeZaif.edges 18 19 := by
+  refine ⟨?_, ?_, ReachOutside.direct ?_⟩
+  · show (18 : Nat) ∈ d1Nodes
+    simp [d1Nodes]
+  · show (19 : Nat) ∈ d1Nodes
+    simp [d1Nodes]
+  · trivial
+
+/-- Arm three and arm one, the other half of non-vacuity: an unauthored pair is not an organised edge, so `edges` is not the total relation. -/
+theorem armThreeNoUnauthoredEdge : ¬ d1CascadeZaif.edges 0 1 := by
+  rintro ⟨-, -, path⟩
+  have := d1_fastForward_increases_rank 0 1 ⟨by simp [d1Nodes], by simp [d1Nodes], path⟩
+  simp [d1Rank] at this
 
 /-- Arm three, O1 measurement from `Holes.lean:987-996`: substituting repository patterns for the absent selected field is false on the recorded 20-node/27-vertex data. -/
 theorem armThreeO1PatternsSubstitutionFails :
