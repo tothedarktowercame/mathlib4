@@ -7,7 +7,7 @@ open Holes
 /-- The corrected ruled organisation-outcome vocabulary.  The authority is
 `futon2:src/futon2/aif/full_loop_cohort.clj:31-33`, enforced at
 `futon2:src/futon2/aif/full_loop_cohort.clj:317` and
-`futon2:src/futon2/tripwire.clj:189`.  The twelve-member correction is recorded
+`futon2:src/futon2/aif/tripwire.clj:189`.  The twelve-member correction is recorded
 at `futon2:holes/labs/wm-contract/aif-equations.edn:214` and explained by
 `futon2:holes/labs/wm-contract/C574-F10-disposition-enumeration.md:187`: the
 earlier fourteen counted literal syntax, not the vocabulary. -/
@@ -34,7 +34,7 @@ abbrev PeopleObservation := Empty
 
 /-- Named-empty money observation slot.  The machine has no money vertex of
 its own (that is VSAT's), as recorded at
-`futon2:holes/problems/P-validated-R5.md:129-131`. -/
+`futon2:holes/problems/P-validated-R5.md:129-133`. -/
 abbrev MoneyObservation := Empty
 
 /-- Named-empty evidence carrier used only by the seed.  The evidence
@@ -137,7 +137,7 @@ theorem seed_positivePreference_iff_support_avoids_namedZeros
         rcases o <;> simp_all [namedZeroDispositions, seed, organisationOutcome]
 
 /-- The staged carrier exists without amending `Holes.lean`, following the
-two-phase precedent at `mathlib4:DarkTower/WarMachine/F12RuledCarrier.lean:66-70`. -/
+two-phase precedent at `mathlib4:DarkTower/WarMachine/F12RuledCarrier.lean:72-76`. -/
 theorem exists_ruledPreferenceDistribution : ∃ _ : PreferenceDistribution SeedObs, True :=
   ⟨seed, trivial⟩
 
