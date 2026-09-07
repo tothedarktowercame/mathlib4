@@ -178,6 +178,46 @@ theorem clause_separates_without_citation :
     rw [← hr] at hc
     simp [dualReceipt, misattributedReceiptOwner] at hc
 
+/-- REVIEW ADDITION (F11 slice 9). Slice 4's F2 predicate `ContentF2`
+(`F11ReceiptCarrier.lean:153-156`) takes an expectation `clauseOf : P -> Clause`
+as a PARAMETER -- review added it there so F2 is stated against an
+independently given assignment rather than against the pattern itself. Slice 6's
+`ConformantAmendedFind.f2Content` (`F11AmendedCarrier.lean:40-41`) is that
+predicate with the parameter dropped and `clauseOf` fixed to the identity, which
+is why `AmendedCitesSelected` above could be discharged by it verbatim. This
+restates `ContentF2` on the dual carrier, keeping the parameter. -/
+def DualContentF2 (f : DualFind) (clauseOf : SnatchPattern → SnatchPattern) : Prop :=
+  ∀ t repo p, p ∈ (f t repo).selected →
+    ∃ r, (f t repo).receipts p = some r ∧ r.acknowledgedClause = clauseOf p
+
+/-- REVIEW ADDITION: `DualAcknowledgesSelected` is exactly F2 AT THE IDENTITY
+expectation, definitionally -- so every claim above that the acknowledged clause
+"fails" is a claim about `clauseOf = id` and about no other expectation. -/
+theorem dualAcknowledgesIsContentF2AtId (f : DualFind) :
+    DualAcknowledgesSelected f ↔ DualContentF2 f id := Iff.rfl
+
+/-- REVIEW ADDITION, THE CAUSE OF D1's COINCIDENCE: the finder that changes only
+the acknowledged clause SATISFIES F2 at its own expectation while refuting it at
+the identity, and cites faithfully throughout. So F2-with-its-parameter and F3
+are not the same question, and D1's confirmed refuter holds BECAUSE slice 6 fixed
+the expectation to the identity -- not because F2's ask does F3's work. At
+`clauseOf = id` the acknowledged clause carries nothing beyond the pattern's own
+identity, which is the collapse the record exhibits too (the lane's fixture
+measurement: `:if-text` and the receipted pattern id are in bijection over all 96
+receipts, and the F2-side fields `:if` and `:however` carry no text at all). -/
+theorem clauseFailureIsRelativeToTheExpectation :
+    DualContentF2 (dualFinder 2) misattributedReceiptOwner ∧
+      ¬ DualContentF2 (dualFinder 2) id ∧
+      DualCitesSelected (dualFinder 2) := by
+  refine ⟨?_, ?_, (clause_separates_without_citation).2.1⟩
+  · intro t repo p hp
+    have hp' : p ∈ findSnatchSelected t.context ∩ repo.patterns := hp
+    change p ∈ findSnatchSelected t.context ∧ p ∈ repo.patterns at hp'
+    refine ⟨dualReceipt 2 p, ?_, by simp [dualReceipt]⟩
+    simp [dualFinder, hp']
+  · exact (dualAcknowledgesIsContentF2AtId (dualFinder 2)).not.mp
+      (clause_separates_without_citation).2.2.2
+
 /-- D2 buy floor: both independently separated pairs become equal after erasure
 to today's carrier. -/
 theorem dualPairErasuresEqual :
