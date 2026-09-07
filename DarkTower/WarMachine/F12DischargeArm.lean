@@ -12,7 +12,7 @@ namespace DarkTower.WarMachine.Holes
 
 noncomputable section
 
-/-- F12 slice 14 R0.1: empty cascade at the carrier from `Holes.lean:29-35`. -/
+/-- F12 slice 14 R0.1: empty cascade at the carrier from `Holes.lean:29-34`. -/
 def organiseEmptyCascade {P : Type*} : Cascade P where
   nodes := ∅
   addedByOrganise := ∅
@@ -28,7 +28,7 @@ def organiseEmpty {Policy P : Type*} : OrganiseType Policy P :=
 theorem organiseTypeNonempty {Policy P : Type*} : Nonempty (OrganiseType Policy P) :=
   ⟨organiseEmpty⟩
 
-/-- F12 slice 14 R0.4: mere inhabitance buys no selected-reading conformance; O1 fails on `d1Selected` from `F12D1Arms.lean:16`. -/
+/-- F12 slice 14 R0.4: mere inhabitance buys no selected-reading conformance; O1 fails on `d1Selected` from `F12D1Arms.lean:17`. -/
 theorem organiseEmptyNotConformantSelected :
     ¬ ConformantOrganiseSelected (organiseEmpty (Policy := Unit) (P := Nat)) := by
   intro h
@@ -54,7 +54,7 @@ theorem organiseDischargeExistsNodes {Policy P : Type*} :
     ∃ f : OrganiseType Policy P, ConformantOrganiseNodes f :=
   ⟨organiseSelectedOnly, organiseSelectedOnlyConformantNodes⟩
 
-/-- F12 slice 14 R2.8: named up-closure set from `organiseUpClosure` at `F12Conformance.lean:78`. -/
+/-- F12 slice 14 R2.8: named up-closure set from `organiseUpClosure` at `F12Conformance.lean:77`. -/
 def upClosureNodesSet {P : Type*} (sel : Set P) (repo : Repository P) : Set P :=
   sel ∪ {p | ∃ s ∈ sel, Reach repo.standsOn s p}
 
@@ -80,7 +80,7 @@ theorem organiseNodesUpClosureConformantNodes {Policy P : Type*} :
     exact d1_reachOutside_to_reach hedge.2.2
   o3 := by intros; rfl
 
-/-- F12 slice 14 R2.11: selected-reading laws admit two functions with different recorded node sets, using `organiseWitnessesDifferOnZaif` at `F12Conformance.lean:108`. -/
+/-- F12 slice 14 R2.11: selected-reading laws admit two functions with different recorded node sets, using `organiseWitnessesDifferOnZaif` at `F12Conformance.lean:107`. -/
 theorem organiseDischargeNotUniqueSelected :
     ∃ f g : OrganiseType Unit Nat,
       ConformantOrganiseSelected f ∧ ConformantOrganiseSelected g ∧
@@ -101,6 +101,20 @@ theorem organiseDischargeNotUniqueNodes :
   have h26 := Set.ext_iff.mp h 26
   simp [organiseSelectedOnly, organiseNodesUpClosure, upClosureNodesSet, d1Selected, d1Repo] at h26
   exact h26 6 (by omega) (Reach.single (by trivial))
+
+/-- F12 slice 14 review addition, R2 floor: the two node-reading discharges are
+not two unrelated functions.  Both return every one of the recorded selected
+nodes (`F12D1Arms.lean:17`), and that set is not empty, so what
+`organiseDischargeNotUniqueNodes` exhibits is a disagreement about O1's SECOND
+origin and nothing else.  Slices 8, 10, 11 and 13 each shipped a comparison with
+no such floor under it and each had one added in review. -/
+theorem organiseDischargeWitnessesAgreeOnSelected :
+    d1Selected.Nonempty ∧
+      d1Selected ⊆ (organiseSelectedOnly trivialPolicyCascade d1Selected d1Repo).nodes ∧
+      d1Selected ⊆ (organiseNodesUpClosure trivialPolicyCascade d1Selected d1Repo).nodes := by
+  refine ⟨⟨0, by simp [d1Selected]⟩, ?_, ?_⟩
+  · intro x hx; exact hx
+  · intro x hx; exact Or.inl hx
 
 /-- F12 slice 14 R3.13: recorded authored edge `6 → 26` from `F12D1Arms.lean:26` makes vertex 26 organise-added. -/
 theorem organiseNodesUpClosureAddsZaifVertex :
@@ -130,7 +144,7 @@ theorem organiseNodesUpClosureNoUnauthoredEdge :
     (d1_reachOutside_to_reach hedge.2.2)
   simp [d1Rank] at hrank
 
-/-- F12 slice 14 R4.17: nonempty-precedence temperament contrasting `trivialPolicyCascade` at `F12Conformance.lean:98`. -/
+/-- F12 slice 14 R4.17: nonempty-precedence temperament contrasting `trivialPolicyCascade` at `F12Conformance.lean:99`. -/
 def nonTrivialPolicyCascade : Cascade Unit where
   nodes := ∅
   addedByOrganise := ∅
@@ -222,15 +236,39 @@ theorem organiseByTemperamentNodesReadsTemperament :
     organiseSelectedOnly, organiseNodesUpClosure, upClosureNodesSet, d1Selected, d1Repo] at h26
   exact h26 6 (by omega) (Reach.single (by trivial))
 
-/-- F12 slice 14 R4.24: the selected-only conformant discharge ignores temperament entirely; full structure equality closes definitionally at `F12Conformance.lean:59-66`. -/
+/-- F12 slice 14 R4.24: the selected-only conformant discharge ignores temperament entirely; full structure equality closes definitionally at `F12Conformance.lean:59-65`. -/
 theorem organiseSelectedOnlyIgnoresTemperament :
     ∀ (t t' : Cascade Unit) (sel : Set Nat) (repo : Repository Nat),
       organiseSelectedOnly t sel repo = organiseSelectedOnly t' sel repo := by
   intros
   rfl
 
-/-- F12 slice 14 R5.25: opacity still requires a selected body; this declaration hides `organiseEmpty`, whose non-conformance is proved by R0.4 and R0.5. -/
+/-- F12 slice 14 R5.25, CORRECTED IN REVIEW.  The dispatch packet claimed that
+`opaque` REQUIRES a body, so that opacity would hide a chosen implementation
+rather than avoid choosing one.  That is false, and `organiseOpaqueNoBody` below
+is the refutation.  What the two routes actually differ in is their AXIOM
+FOOTPRINT, and the difference is machine-readable: this declaration names
+`organiseEmpty` and `#print axioms` reports no axioms of it, while the bodiless
+one reports `Classical.choice`.  Either route removes the `sorry` and neither
+leaves an O-law provable of the declaration, since nothing about the value
+survives the seal -- and the value this one seals is the one
+`organiseEmptyNotConformantSelected` refutes. -/
 opaque organiseOpaqueZaif : OrganiseType Unit Nat := organiseEmpty
+
+/-- F12 slice 14 R5.25 review addition: the inhabitance `organiseTypeNonempty`
+proves is the whole of what `opaque` needs.  Declared `local` so that importing
+this module does not put a `Nonempty` instance for `organise`'s own type into
+anyone else's scope. -/
+local instance organiseTypeNonemptyInstance : Nonempty (OrganiseType Unit Nat) :=
+  organiseTypeNonempty
+
+/-- F12 slice 14 R5.25 review addition: `opaque` with NO body at all, elaborating
+from the instance above.  This is the declaration that refutes the packet's
+premise, and it is what makes the cost of the opacity route measurable rather
+than asserted: a bodiless `opaque` is a classical choice among the type's
+inhabitants, which `#print axioms` reports as `Classical.choice`, where
+`organiseOpaqueZaif` reports none. -/
+opaque organiseOpaqueNoBody : OrganiseType Unit Nat
 
 end
 
