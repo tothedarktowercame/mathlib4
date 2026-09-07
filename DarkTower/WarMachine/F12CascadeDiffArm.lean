@@ -27,7 +27,7 @@ structure ConformantOrganiseCascadeDiff {Policy P Score : Type*}
       (f t sel repo).actingOrderBefore ≠ (f t sel repo).actingOrderAfter ∨
       (f t sel repo).scoreBefore ≠ (f t sel repo).scoreAfter
 
-/-- F12 slice 13 task 2: `CascadeDiff` witness using `zaifAdmittedFor` from `F12AdmittingArm.lean:50` and repository authorship directly. -/
+/-- F12 slice 13 task 2: `CascadeDiff` witness using `zaifAdmittedFor` from `F12AdmittingArm.lean:48` and repository authorship directly. -/
 def organiseCascadeDiff {Policy Score : Type*} [Inhabited Score] :
     armTwoOrganiseType Policy Nat Score :=
   fun _ sel repo =>
@@ -66,12 +66,12 @@ theorem organiseCascadeDiffZaifNodes :
   simp [organiseCascadeDiff, zaifAdmittedFor, d1Selected, d1Admitted, d1Nodes]
   omega
 
-/-- F12 slice 13 task 2 recorded execution: the witness retains the selected argument from `F12D1Arms.lean:16`. -/
+/-- F12 slice 13 task 2 recorded execution: the witness retains the selected argument from `F12D1Arms.lean:17`. -/
 theorem organiseCascadeDiffZaifSelected :
     (organiseCascadeDiff (Policy := Unit) (Score := Int)
       trivialPolicyCascade d1Selected d1Repo).selected = d1Selected := rfl
 
-/-- F12 slice 13 task 2 recorded execution: the witness returns the nine admissions through `zaifAdmittedFor` at `F12AdmittingArm.lean:50`. -/
+/-- F12 slice 13 task 2 recorded execution: the witness returns the nine admissions through `zaifAdmittedFor` at `F12AdmittingArm.lean:48`. -/
 theorem organiseCascadeDiffZaifAdmitted :
     (organiseCascadeDiff (Policy := Unit) (Score := Int)
       trivialPolicyCascade d1Selected d1Repo).admittedBy = d1Admitted := by
@@ -274,6 +274,87 @@ theorem cascadeDiffRecordedAllLaws :
       trivialPolicyCascade d1Selected d1Repo).organisedEdges 18 19 :=
   ⟨organiseCascadeDiffConformant, organiseCascadeDiffZaifNodes,
     organiseCascadeDiffZaifAdmitted, organiseCascadeDiffZaifEdge⟩
+
+
+/-- F12 slice 13 REVIEW ADDITION, what the `Score` parameter actually costs.
+C550 and the registry entry record arm two's price as "a `Score` type parameter
+the declared signature does not have" (`F12D1Arms.lean:119` against
+`Holes.lean:861`), which reads as a notational inconvenience.  It is not only
+that.  `organise`'s declared type has an implementation at every instantiation --
+`organiseSelectedOnly` (`F12Conformance.lean:59`) is one, whatever `Policy` and
+`P` are.  This arm's type does not: at `Score := Empty` it is EMPTY, because a
+total function at this signature has to produce two `Score` values on inputs that
+carry none, and the recorded run carries none
+(`futon3:checks/construct_cascade.clj:402`, fields at
+`futon3:checks/construct_cascade.clj:420-421`).  That is why the witness above
+takes `[Inhabited Score]` and writes `default` twice.  So the parameter is not
+free notation: it adds a proof obligation to the interface. -/
+theorem cascadeDiffArmIsEmptyAtAnEmptyScore :
+    ¬ Nonempty (armTwoOrganiseType Unit Nat Empty) := by
+  rintro ⟨f⟩
+  exact (f trivialPolicyCascade d1Selected d1Repo).scoreBefore.elim
+
+/-- F12 slice 13 REVIEW ADDITION, the comparand that makes the previous theorem a
+cost rather than a curiosity: the declared `organise` signature
+(`F12Conformance.lean:19`) is inhabited at the same argument types. -/
+theorem organiseTypeIsInhabitedAtTheSameArguments :
+    Nonempty (OrganiseType Unit Nat) :=
+  ⟨organiseSelectedOnly⟩
+
+/-- F12 slice 13 REVIEW ADDITION: overwrite the result's `authoredEdges` field
+with the repository's relation, changing nothing else. -/
+def pinAuthored {Policy P Score : Type*} (f : armTwoOrganiseType Policy P Score) :
+    armTwoOrganiseType Policy P Score :=
+  fun t sel repo => { f t sel repo with authoredEdges := repo.standsOn }
+
+/-- F12 slice 13 REVIEW ADDITION: pinning touches the `authoredEdges` field and
+none of the other eleven `CascadeDiff` fields (`Holes.lean:846-858`). -/
+theorem pinAuthoredAgreesOutsideAuthoredEdges {Policy P Score : Type*}
+    (f : armTwoOrganiseType Policy P Score) (t : Cascade Policy) (sel : Set P)
+    (repo : Repository P) :
+    (pinAuthored f t sel repo).selected = (f t sel repo).selected ∧
+    (pinAuthored f t sel repo).nodes = (f t sel repo).nodes ∧
+    (pinAuthored f t sel repo).addedByOrganise = (f t sel repo).addedByOrganise ∧
+    (pinAuthored f t sel repo).admittedBy = (f t sel repo).admittedBy ∧
+    (pinAuthored f t sel repo).organisedEdges = (f t sel repo).organisedEdges ∧
+    (pinAuthored f t sel repo).precedenceBefore = (f t sel repo).precedenceBefore ∧
+    (pinAuthored f t sel repo).precedenceAfter = (f t sel repo).precedenceAfter ∧
+    (pinAuthored f t sel repo).actingOrderBefore = (f t sel repo).actingOrderBefore ∧
+    (pinAuthored f t sel repo).actingOrderAfter = (f t sel repo).actingOrderAfter ∧
+    (pinAuthored f t sel repo).scoreBefore = (f t sel repo).scoreBefore ∧
+    (pinAuthored f t sel repo).scoreAfter = (f t sel repo).scoreAfter :=
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+/-- F12 slice 13 REVIEW ADDITION, the positive form of
+`sansOAuthStillForcesRepositoryReachability`.  That theorem refutes the
+expectation that dropping `oauth` lets O2/O3 be satisfied against a self-chosen
+relation.  This says what `oauth` DOES do, and it is less than it looks: any
+function conformant without it becomes conformant with it by overwriting the one
+field, and by `pinAuthoredAgreesOutsideAuthoredEdges` that overwrite changes
+nothing else the laws read.  So at this framing `oauth` constrains no behaviour
+of `organise` -- it pins a result field that no other clause mentions, because
+O2 and O3 read the repository ARGUMENT.  That is a difference from the
+value-grain O2 in `Holes.lean:1000-1004`, which reads `.authoredEdges` because
+there is no repository in scope to read instead.  The honest reading of the
+twelfth field at this arm is therefore: carried, and unread by the laws. -/
+theorem pinAuthoredIsConformant {Policy P Score : Type*}
+    {f : armTwoOrganiseType Policy P Score}
+    (hf : ConformantOrganiseCascadeDiffSansOAuth f) :
+    ConformantOrganiseCascadeDiff (pinAuthored f) where
+  osel := hf.osel
+  oauth := fun _ _ _ => rfl
+  o1 := hf.o1
+  o2 := hf.o2
+  o3 := hf.o3
+  o4 := hf.o4
+
+/-- F12 slice 13 REVIEW ADDITION, the recorded instance: pinning repairs the very
+witness `unpinnedAuthoredNotFullyConformant` rejects, so that rejection is about
+the field's VALUE and not about anything the function computes. -/
+theorem pinAuthoredRepairsTheDriftingWitness {Policy : Type*} :
+    ConformantOrganiseCascadeDiff
+      (pinAuthored (organiseCascadeDiffUnpinnedAuthored (Policy := Policy))) :=
+  pinAuthoredIsConformant organiseCascadeDiffUnpinnedAuthoredSansOAuth
 
 end
 
