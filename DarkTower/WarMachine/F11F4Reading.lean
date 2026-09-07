@@ -117,6 +117,20 @@ theorem findReadingCDoesNotImplyReadingA :
       ¬ FindFalsifiable (findIdentity (State := Unit) (P := SnatchPattern)) := by
   exact ⟨by simp [FindRespectsZeroMass], findIdentityNotFalsifiable⟩
 
+/-- M1b, review addition: the separation above is proved at the EMPTY
+designation, where C asserts nothing, so on its own it says only that a vacuous
+C does not imply A.  At the RECORDED designation (`Holes.lean:342-348`) the
+separation still holds and is witnessed by a finder that selects: replay
+satisfies C on every repository (`F11F4Reading.lean:44-49`) and refutes A
+(`F11Conformance.lean:207-218`), and its selection on the recorded repository is
+nonempty (`F11F4Reading.lean:107-112`).  Without this the C-not-A verdict was
+the vacuous form the packet's floor was written against, in its DESIGNATION
+guise rather than its finder guise. -/
+theorem findRecordedReadingCDoesNotImplyReadingA :
+    FindRespectsZeroMass findSnatchZeroMassSet findSnatchReplay ∧
+      ¬ FindFalsifiable findSnatchReplay :=
+  ⟨findSnatchReplayRespectsRecordedZeroMass, findSnatchReplayNotFalsifiable⟩
+
 /-- M1b: A does not imply C at the recorded designation: the `findAllBut`
 witness from `F11DischargeArm.lean:207-214` returns g4's designated member. -/
 theorem findReadingADoesNotImplyRecordedReadingC :
@@ -267,6 +281,34 @@ theorem bothReadingFinderReproducesEveryRecordedSelection :
           (findSnatchReplayExcludesDeclaredZeroMass t p hp)
       · intro t
         simp [findReplayRecordedElseRefuse]
+
+/-- M2, review addition, leg 1: every pattern any recorded row selects is in the
+recorded repository -- F1 containment at the record grain, decided over the rows
+of `findSnatchScenarios` (`Holes.lean:626`) against `snatchRepository`
+(`Holes.lean:319`). -/
+theorem findSnatchRecordedSelectionsAreInRepository :
+    ∀ row ∈ findSnatchScenarios, ∀ p ∈ row.selected, p ∈ snatchRepository := by decide
+
+/-- M2, review addition, leg 2: so intersecting with the repository drops
+nothing the record selected. -/
+theorem findSnatchSelectedSubsetRepository (scenario : FindSnatchScenario) :
+    findSnatchSelected scenario ⊆ findSnatchRepository.patterns := by
+  rintro p ⟨row, hrow, _, hmem⟩
+  exact findSnatchRecordedSelectionsAreInRepository row hrow p hmem
+
+/-- M2, review addition: what makes the reproduction claim a claim about the
+RECORD.  The theorem above states that the hybrid's selection equals REPLAY's,
+which is one step short: `findSnatchReplay` intersects with `repo.patterns`
+(`F11Conformance.lean:72-78`), so equality with replay would still hold if the
+record had selected a pattern outside its own repository and replay had silently
+dropped it.  It did not -- and here the hybrid's selection on the recorded
+repository is the recorded scenario-grain selection itself
+(`F11Conformance.lean:41-44`), read from the rows at `Holes.lean:626`. -/
+theorem bothReadingFinderSelectionIsTheRecordedSelection (t : Tension FindSnatchScenario) :
+    (findReplayRecordedElseRefuse t findSnatchRepository).selected
+      = findSnatchSelected t.context := by
+  simp only [findReplayRecordedElseRefuse, findSnatchReplay]
+  exact Set.inter_eq_left.mpr (findSnatchSelectedSubsetRepository t.context)
 
 /-- M3: the executable F4 leg carries a designated member and tests precisely
 repository membership plus exclusion (`futon3:checks/find_snatch.clj:172-177`). -/
