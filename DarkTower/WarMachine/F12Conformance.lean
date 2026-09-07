@@ -150,6 +150,76 @@ theorem selectedOnlyYieldsZaifEdgeWhenAdmittedSupplied :
     (organiseSelectedOnly (Policy := Unit) trivialPolicyCascade d1Nodes d1Repo).edges 18 19 := by
   exact armThreeOrganisedEdgeExists
 
+/-- F12 slice 6 review addition: `organiseSelectedOnly` also satisfies the
+node-set reading, because it returns `nodes = sel` and the two readings of O3
+are then the same proposition — the same coincidence that made the C59 fixture
+unable to tell them apart (`Holes.lean:1018-1034`). -/
+theorem organiseSelectedOnlyConformantNodes {Policy P : Type*} :
+    ConformantOrganiseNodes (organiseSelectedOnly (Policy := Policy) (P := P)) where
+  o1 := by intro t sel repo; ext x; simp [organiseSelectedOnly]
+  o2 := by
+    intro t sel repo u v edge
+    exact d1_reachOutside_to_reach edge.2.2
+  o3 := by intro t sel repo u v; rfl
+
+/-- F12 slice 6 review addition: the two readings of O3 are NOT interchangeable
+at the implementation, and this is what separates them.  `organiseUpClosure`
+satisfies the selected reading (`organiseUpClosureConformant`) and refutes the
+node-set reading on the recorded zaif inputs: authored edge `6 → 26` runs
+between two vertices of its returned node set, so the node-set reading demands
+it as an organised edge, while its edge relation is fast-forward over the
+eleven selected and has no such edge.  Slice 2 exhibited this disagreement
+between two READINGS of one recorded cascade (`Holes.lean:1034`); here it
+separates two implementations at the interface. -/
+theorem organiseUpClosureNotConformantNodes :
+    ¬ ConformantOrganiseNodes (organiseUpClosure (Policy := Unit) (P := Nat)) := by
+  intro hf
+  have h6 : (6 : Nat) ∈
+      (organiseUpClosure (Policy := Unit) trivialPolicyCascade d1Selected d1Repo).nodes :=
+    Or.inl (by simp [d1Selected])
+  have h26 : (26 : Nat) ∈
+      (organiseUpClosure (Policy := Unit) trivialPolicyCascade d1Selected d1Repo).nodes :=
+    Or.inr ⟨6, by simp [d1Selected], Reach.single (by trivial)⟩
+  have hff : fastForward
+      (organiseUpClosure (Policy := Unit) trivialPolicyCascade d1Selected d1Repo).nodes
+      d1Repo.standsOn 6 26 := ⟨h6, h26, ReachOutside.direct (by trivial)⟩
+  have hedge := (hf.o3 trivialPolicyCascade d1Selected d1Repo 6 26).mpr hff
+  have hsel : (26 : Nat) ∈ d1Selected := hedge.2.1
+  simp [d1Selected] at hsel
+
+/-- F12 slice 6 review addition: nothing of rank zero is an authored target, so
+no rank-zero vertex is reachable at all.  Uses the rank
+(`F12D1Arms.lean:35-48`) that already proves the authored relation acyclic. -/
+theorem d1_not_reachable_of_rank_zero {v : Nat} (hv : d1Rank v = 0) (u : Nat) :
+    ¬ Reach d1Authored u v := by
+  intro path
+  cases path with
+  | single edge =>
+      have := d1_authored_increases_rank _ _ edge
+      omega
+  | tail _ edge =>
+      have := d1_authored_increases_rank _ _ edge
+      omega
+
+/-- F12 slice 6 review addition, the unconditional half of
+`admittedIndistinguishableFromAdded`: that theorem says a conformant function
+returning the recorded twenty nodes MUST attribute the nine admitted ones to
+`addedByOrganise`.  This says the up-closure temperament cannot produce them at
+all — vertex 11 is not selected and is not an authored target of anything, so no
+amount of closing over authorship reaches it.  The nine admitted nodes entered
+the recorded cascade through a policy-grain `admit`, which is the origin the
+`:LA2` field amendment (`Holes.lean:833-845`) added `admittedBy` to carry and
+which this signature has nowhere to put.  That the up-closure of the recorded
+selected set is exactly `{20, 21, 25, 26}`, disjoint from all nine admitted
+nodes, is recomputed from the record by
+`futon2:holes/labs/wm-contract/f12_conformance_check.bb`. -/
+theorem organiseUpClosureOmitsAdmittedWitness :
+    (11 : Nat) ∉
+      (organiseUpClosure (Policy := Unit) trivialPolicyCascade d1Selected d1Repo).nodes := by
+  rintro (hsel | ⟨s, -, path⟩)
+  · simp [d1Selected] at hsel
+  · exact d1_not_reachable_of_rank_zero (by simp [d1Rank]) s path
+
 end
 
 
