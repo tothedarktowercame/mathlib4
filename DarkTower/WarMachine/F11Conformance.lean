@@ -3,8 +3,8 @@ import DarkTower.WarMachine.Holes
 /-! # F11 find-function conformance
 
 This module states F1--F3 of `find` at the function grain from
-`P-validated-R5.md:443-560`. F4 is separate because it quantifies over a
-finder's possible inputs; `FindResult` (`Holes.lean:250-253`) has no `zeroMass`
+`P-validated-R5.md:443-547`. F4 is separate because it quantifies over a
+finder's possible inputs; `FindResult` (`Holes.lean:247-250`) has no `zeroMass`
 field from which a single returned value could state it.
 -/
 
@@ -17,7 +17,7 @@ noncomputable section
 /-- F11 slice 2 signature, identical to refused `find` at `Holes.lean:264`. -/
 abbrev FindType (State P : Type*) := Tension State → Repository P → FindResult P
 
-/-- F11 slice 2 laws F1--F3 at the function grain of `P-validated-R5.md:471-479`; F4 is separately quantified by `FindFalsifiable`. -/
+/-- F11 slice 2 laws F1--F3 at the function grain of `P-validated-R5.md:485-487`; F4 is separately quantified by `FindFalsifiable`. -/
 structure ConformantFind {State P : Type*} (f : FindType State P) : Prop where
   f1Containment : ∀ t repo, (f t repo).selected ⊆ repo.patterns
   f1TypedAbsence : ∀ t repo, (f t repo).selected = ∅ →
@@ -27,7 +27,7 @@ structure ConformantFind {State P : Type*} (f : FindType State P) : Prop where
   f3NonSelfCertifying : ∀ t repo p r, p ∈ (f t repo).selected →
     (f t repo).receipts p = some r → r.nonSelfCertifying
 
-/-- F11 slice 2 F4 at `P-validated-R5.md:478-479`: for each input with a nonempty repository, at least one repository member is excluded. This rules out a finder that may return the whole repository; it does not encode the row-only `zeroMass` field at `Holes.lean:259`. -/
+/-- F11 slice 2 F4 at `P-validated-R5.md:488`: for each input with a nonempty repository, at least one repository member is excluded. This rules out a finder that may return the whole repository; it does not encode the row-only `zeroMass` field at `Holes.lean:258`. -/
 def FindFalsifiable {State P : Type*} (f : FindType State P) : Prop :=
   ∀ t repo, repo.patterns.Nonempty → ∃ p ∈ repo.patterns, p ∉ (f t repo).selected
 
@@ -77,7 +77,7 @@ def findSnatchReplay : FindType FindSnatchScenario SnatchPattern :=
         if p ∈ findSnatchReceipted t.context then some findStructuredReceipt else none
       absence := if selected = ∅ then some .noPatternAddressesThisTension else none }
 
-/-- F11 slice 2 F1--F3 conformance of the recorded replay at `P-validated-R5.md:471-477`. -/
+/-- F11 slice 2 F1--F3 conformance of the recorded replay at `P-validated-R5.md:485-487`. -/
 theorem findSnatchReplayConformant : ConformantFind findSnatchReplay where
   f1Containment := by intro t repo p hp; exact hp.2
   f1TypedAbsence := by
@@ -116,12 +116,12 @@ theorem findSnatchReplayReceiptsArePartial :
   · simp [findSnatchReplay, findSnatchReceipted, findSnatchScenarios]
   · simp [findSnatchRepository, snatchRepository]
 
-/-- F11 slice 2 total refusal: the empty selection carries F1's typed absence from `P-validated-R5.md:471-473`. -/
+/-- F11 slice 2 total refusal: the empty selection carries F1's typed absence from `P-validated-R5.md:485`. -/
 def findRefusing {State P : Type*} : FindType State P :=
   fun _ _ => { selected := ∅, receipts := fun _ => none,
                absence := some .noPatternAddressesThisTension }
 
-/-- F11 slice 2 F1--F3 conformance of the refusing implementation at `P-validated-R5.md:471-477`. -/
+/-- F11 slice 2 F1--F3 conformance of the refusing implementation at `P-validated-R5.md:485-487`. -/
 theorem findRefusingConformant {State P : Type*} :
     ConformantFind (findRefusing (State := State) (P := P)) where
   f1Containment := by simp [findRefusing]
@@ -129,21 +129,21 @@ theorem findRefusingConformant {State P : Type*} :
   f2Receipted := by simp [findRefusing]
   f3NonSelfCertifying := by simp [findRefusing]
 
-/-- F11 slice 2 F4: refusal excludes every member of every nonempty repository, following `P-validated-R5.md:478-479`. -/
+/-- F11 slice 2 F4: refusal excludes every member of every nonempty repository, following `P-validated-R5.md:488`. -/
 theorem findRefusingFalsifiable {State P : Type*} :
     FindFalsifiable (findRefusing (State := State) (P := P)) := by
   intro t repo h
   obtain ⟨p, hp⟩ := h
   exact ⟨p, hp, by simp [findRefusing]⟩
 
-/-- F11 slice 2 identity implementation corresponding to the hand-authored Snatch row in `P-validated-R5.md:512-516`. -/
+/-- F11 slice 2 identity implementation corresponding to the hand-authored Snatch row in `P-validated-R5.md:528`. -/
 def findIdentity {State P : Type*} : FindType State P :=
   fun _ repo =>
     { selected := repo.patterns
       receipts := fun _ => some findStructuredReceipt
       absence := if repo.patterns = ∅ then some .noPatternAddressesThisTension else none }
 
-/-- F11 slice 2 F1--F3 conformance of identity search, separating those laws from F4 at `P-validated-R5.md:471-479`. -/
+/-- F11 slice 2 F1--F3 conformance of identity search, separating those laws from F4 at `P-validated-R5.md:485-488`. -/
 theorem findIdentityConformant {State P : Type*} :
     ConformantFind (findIdentity (State := State) (P := P)) where
   f1Containment := by simp [findIdentity]
@@ -158,7 +158,7 @@ theorem findIdentityConformant {State P : Type*} :
     subst r
     simp [Receipt.nonSelfCertifying, findStructuredReceipt]
 
-/-- F11 slice 2 F4 measurement from `P-validated-R5.md:478-479`: identity on a nonempty repository is unfalsifiable. -/
+/-- F11 slice 2 F4 measurement from `P-validated-R5.md:488`: identity on a nonempty repository is unfalsifiable. -/
 theorem findIdentityNotFalsifiable :
     ¬ FindFalsifiable (findIdentity (State := Unit) (P := SnatchPattern)) := by
   intro h
@@ -227,7 +227,7 @@ theorem findSnatchReplaySelectsNamedPattern
   simp [findSnatchReplay, findSnatchSelected, findSnatchRepository,
     findSnatchScenarios, snatchRepository]
 
-/-- F11 slice 2 swappability witness from `P-validated-R5.md:501-518`: two F1--F3-conformant implementations differ on the recorded `g1Snatcher` input. -/
+/-- F11 slice 2 swappability witness from `P-validated-R5.md:530-534`: two F1--F3-conformant implementations differ on the recorded `g1Snatcher` input. -/
 theorem findConformantImplementationsDifferOnSnatch :
     (findSnatchReplay
       { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
