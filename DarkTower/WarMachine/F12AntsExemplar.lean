@@ -2,7 +2,8 @@ import DarkTower.WarMachine.F12RuledCarrier
 
 /-! # F12 ants exemplar
 
-Index map from `futon3:checks/ants-cascade.edn:69-74` and its admitted member:
+Index map from `futon3:checks/ants-cascade.edn:72-76` and its admitted member at
+`futon3:checks/ants-cascade.edn:108`:
 `0` cargo-return-discipline; `1` hunger-precision-coupling; `2`
 pheromone-trail-tuner; `3` white-space-scout; `4` baseline-cyber-ant.
 -/
@@ -11,24 +12,24 @@ open Set
 namespace DarkTower.WarMachine.Holes
 noncomputable section
 
-/-- Selected ants, from `futon3:checks/ants-cascade.edn:69-74`. -/
+/-- Selected ants, from `futon3:checks/ants-cascade.edn:72-76`. -/
 def antsSelected : Set Nat := {0, 1, 2, 3}
-/-- Admitted ant, from `futon3:checks/ants-cascade.edn:110`. -/
+/-- Admitted ant, from `futon3:checks/ants-cascade.edn:108`. -/
 def antsAdmitted : Set Nat := {4}
 /-- Empty authored relation, from `futon3:checks/ants-cascade.edn:2`. -/
 def antsRepo : Repository Nat where
   patterns := {0, 1, 2, 3, 4}
   standsOn := fun _ _ => False
   acyclic := acyclic_of_increasing_rank _ (fun _ => 0) (by intros; contradiction)
-/-- Recorded precedence before, `futon3:checks/ants-cascade.edn:89-93`. -/
+/-- Recorded precedence before, `futon3:checks/ants-cascade.edn:98-102`. -/
 def antsPrecedenceBefore : List Nat := [0, 1, 2, 3]
-/-- Recorded precedence after, `futon3:checks/ants-cascade.edn:84-88`. -/
+/-- Recorded precedence after, `futon3:checks/ants-cascade.edn:93-97`. -/
 def antsPrecedenceAfter : List Nat := [0, 1, 3, 2]
-/-- Recorded acting order before, `futon3:checks/ants-cascade.edn:79-83`. -/
+/-- Recorded acting order before, `futon3:checks/ants-cascade.edn:88-92`. -/
 def antsActingOrderBefore : List Nat := [0, 1, 2, 3]
-/-- Recorded acting order after, `futon3:checks/ants-cascade.edn:75-79`. -/
+/-- Recorded acting order after, `futon3:checks/ants-cascade.edn:83-87`. -/
 def antsActingOrderAfter : List Nat := [0, 1, 3, 2]
-/-- Printed IEEE digits from `futon3:checks/ants-cascade.edn:94-95`; this Rat
+/-- Printed IEEE digits from `futon3:checks/ants-cascade.edn:103-104`; this Rat
 transcribes the printout, not the score computation. -/
 def antsScore : Rat := 18759999999999874 / 1000000000000000
 
@@ -79,18 +80,31 @@ theorem organiseAntsNoOrganisedEdges (u v : Nat) :
   | tail _ edge _ => exact edge
 
 /-- Zaif exercises an edge with flat precedence; ants exercises moving
-precedence with no edge. -/
+precedence with no edge.  The zaif conjuncts are anchored in the RECORD, not in
+the witness's own `[]` literals: `ruledO4UnexercisedOnTheRecordedRun`
+(`DarkTower/WarMachine/F12RuledCarrier.lean:117`) is about
+`wmZaifCascadeDiffFixture`, and
+`organiseRuledZaifPrecedenceIsTheRecordedOne`
+(`DarkTower/WarMachine/F12RuledCarrier.lean:108`) is what ties the witness to it.
+Using `organiseRuledZaifO4AntecedentFalse` here instead would be the defect slice
+4a's review removed one file over -- a headline discharged by `simp` against the
+witness's own literals. -/
 theorem zaifAntsComplementary :
     (organiseRuled (Policy := Unit) (Score := Int)
       trivialPolicyCascade d1Selected d1Repo d1Admitted).organisedEdges 18 19 ∧
-    ¬ ((organiseRuled (Policy := Unit) (Score := Int)
-      trivialPolicyCascade d1Selected d1Repo d1Admitted).precedenceBefore ≠
+    ¬ (wmZaifCascadeDiffFixture.precedenceBefore ≠
+      wmZaifCascadeDiffFixture.precedenceAfter) ∧
+    ((organiseRuled (Policy := Unit) (Score := Int)
+        trivialPolicyCascade d1Selected d1Repo d1Admitted).precedenceBefore =
+        wmZaifCascadeDiffFixture.precedenceBefore ∧
       (organiseRuled (Policy := Unit) (Score := Int)
-        trivialPolicyCascade d1Selected d1Repo d1Admitted).precedenceAfter) ∧
+        trivialPolicyCascade d1Selected d1Repo d1Admitted).precedenceAfter =
+        wmZaifCascadeDiffFixture.precedenceAfter) ∧
     (organiseAnts trivialPolicyCascade antsSelected antsRepo antsAdmitted).precedenceBefore ≠
       (organiseAnts trivialPolicyCascade antsSelected antsRepo antsAdmitted).precedenceAfter ∧
     (∀ u v, ¬ (organiseAnts trivialPolicyCascade antsSelected antsRepo antsAdmitted).organisedEdges u v) :=
-  ⟨organiseRuledZaifEdge, organiseRuledZaifO4AntecedentFalse,
+  ⟨organiseRuledZaifEdge, ruledO4UnexercisedOnTheRecordedRun,
+    organiseRuledZaifPrecedenceIsTheRecordedOne,
     organiseAntsPrecedenceMoves, organiseAntsNoOrganisedEdges⟩
 
 /-- Negative control: moving precedence with flat acting order and score. -/
