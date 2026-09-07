@@ -82,10 +82,10 @@ theorem organiseAntsNoOrganisedEdges (u v : Nat) :
 /-- Zaif exercises an edge with flat precedence; ants exercises moving
 precedence with no edge.  The zaif conjuncts are anchored in the RECORD, not in
 the witness's own `[]` literals: `ruledO4UnexercisedOnTheRecordedRun`
-(`DarkTower/WarMachine/F12RuledCarrier.lean:117`) is about
+(`DarkTower/WarMachine/F12RuledCarrier.lean:118`) is about
 `wmZaifCascadeDiffFixture`, and
 `organiseRuledZaifPrecedenceIsTheRecordedOne`
-(`DarkTower/WarMachine/F12RuledCarrier.lean:108`) is what ties the witness to it.
+(`DarkTower/WarMachine/F12RuledCarrier.lean:109`) is what ties the witness to it.
 Using `organiseRuledZaifO4AntecedentFalse` here instead would be the defect slice
 4a's review removed one file over -- a headline discharged by `simp` against the
 witness's own literals. -/
