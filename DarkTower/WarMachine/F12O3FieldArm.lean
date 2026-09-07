@@ -151,10 +151,22 @@ theorem organiseSelectedOnlyConformantNoBootstrap {Policy P : Type*} :
     exact d1_reachOutside_to_reach hedge.2.2
   o3 := by intros; simp [organiseSelectedOnly]
 
-/-- F12 slice 11 R4 constructed non-vacuity: when all twenty vertices are supplied externally, a no-bootstrap-conformant implementation has edge `18 → 19`. -/
-theorem noBootstrapConstructedEdge :
-    (organiseSelectedOnly (Policy := Unit) trivialPolicyCascade d1Nodes d1Repo).edges 18 19 :=
-  selectedOnlyYieldsZaifEdgeWhenAdmittedSupplied
+/-- F12 slice 11 R4 constructed non-vacuity.  `recordedNoBootstrapFastForwardEmpty`
+above says the no-bootstrap relation is EMPTY on the recorded selected input, so the
+R3(b) refutation would be a comparison against nothing unless that relation is
+inhabited somewhere.  It is: supplying all twenty recorded vertices as the selection,
+the relation a no-bootstrap-conformant implementation's O3 quantifies over contains
+`18 → 19`.  Routed through `organiseSelectedOnlyConformantNoBootstrap` rather than
+asserted of `.edges`, so what is shown inhabited is the no-bootstrap FIELD and not
+merely the implementation's edge set. -/
+theorem noBootstrapRelationInhabitedOnConstructedInput :
+    fastForward
+      ((organiseSelectedOnly (Policy := Unit) trivialPolicyCascade d1Nodes d1Repo).nodes \
+        (organiseSelectedOnly (Policy := Unit) trivialPolicyCascade d1Nodes
+          d1Repo).addedByOrganise)
+      d1Repo.standsOn 18 19 :=
+  (organiseSelectedOnlyConformantNoBootstrap.o3 trivialPolicyCascade d1Nodes d1Repo 18 19).mp
+    selectedOnlyYieldsZaifEdgeWhenAdmittedSupplied
 
 /-- F12 slice 11 R5: no no-bootstrap-conformant function can return the recorded admitted-endpoint edge on the eleven-node selected input. -/
 theorem noBootstrapCannotYieldZaifEdge {Policy : Type*}
@@ -167,10 +179,30 @@ theorem noBootstrapCannotYieldZaifEdge {Policy : Type*}
   · simp [d1Selected] at hsel
   · exact h18.2 hadd
 
-/-- F12 slice 11 R5: supplying all twenty recorded nodes externally makes the same no-bootstrap-conformant selected-only implementation return edge `18 → 19`. -/
-theorem noBootstrapYieldsZaifEdgeWhenAllNodesSupplied :
-    (organiseSelectedOnly (Policy := Unit) trivialPolicyCascade d1Nodes d1Repo).edges 18 19 :=
-  noBootstrapConstructedEdge
+/-- F12 slice 11 R4: the recorded organised edge set is INHABITED, so
+`organiseO3NoBootstrapZaif` above is not an equivalence between two empty relations.
+The one edge the zaif run records runs `18 → 19` (`runs/F12-organise/01-zaif-transcription.edn`,
+`:cascade-edges 1`). -/
+theorem zaifRecordedEdgeNonVacuous : wmZaifCascadeDiffFixture.organisedEdges 18 19 :=
+  ⟨show (18 : Nat) < 20 by norm_num, show (19 : Nat) < 20 by norm_num,
+    ReachOutside.direct (by trivial)⟩
+
+/-- F12 slice 11 R5, the value-carrier half of the contrast, and the reason the reading
+is one proposition with two different contents.  At `CascadeDiff` the no-bootstrap field
+is `selected ∪ admittedBy` (`zaifSelectedUnionAdmitted_eq_nodes`), which CONTAINS the
+nine recorded admissions, so the recorded edge `18 → 19` — both of whose endpoints were
+admitted rather than selected — IS a no-bootstrap fast-forward there.  At the function
+carrier `Cascade` (`Holes.lean:29-35`) has no `admittedBy` field, the same reading is
+`nodes \ addedByOrganise = sel` (`organiseNodeClosureEdgesOutside_eq_selected`), and the
+same edge is out of reach of every conformant function
+(`noBootstrapCannotYieldZaifEdge`).  So what the no-bootstrap reading costs is not a
+property of the reading but of which carrier it is stated at. -/
+theorem noBootstrapYieldsZaifEdgeAtValueCarrier :
+    fastForward
+      (wmZaifCascadeDiffFixture.selected ∪ wmZaifCascadeDiffFixture.admittedBy)
+      wmZaifCascadeDiffFixture.authoredEdges 18 19 := by
+  rw [zaifSelectedUnionAdmitted_eq_nodes, ← zaifNodesDiffAdded_eq_nodes]
+  exact (organiseO3NoBootstrapZaif 18 19).mp zaifRecordedEdgeNonVacuous
 
 end
 
