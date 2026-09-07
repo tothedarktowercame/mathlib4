@@ -145,6 +145,130 @@ theorem admittingThirdOriginUnconstrainedGeneral {Policy : Type*}
   · exact ⟨organiseAdmitting, organiseAdmittingConformant,
       organiseAdmittingZaifNodes, organiseAdmittingZaifAdmitsNine⟩
 
+/-- F12 slice 7 review: the recorded edge is IN the relation both witnesses return, so
+`admittingAgreeOnEdges` is an agreement on a non-empty relation and not on the empty one.
+The edge is `18 → 19` from `F12D1Arms.lean:26-28`, the single fast-forward over the twenty
+recorded nodes (`runs/F12-organise/01-zaif-transcription.edn` `:fast-forward :over-nodes`). -/
+theorem admittingZaifEdgeNonVacuous :
+    (organiseAdmitting (Policy := Unit) trivialPolicyCascade d1Selected d1Repo).edges 18 19 ∧
+      (organiseAdmittingMirror (Policy := Unit)
+        trivialPolicyCascade d1Selected d1Repo).edges 18 19 := by
+  have hmem : ∀ n : Nat, n < 20 → n ∈ d1Selected ∪ zaifAdmittedFor d1Selected := by
+    intro n hn
+    simp [zaifAdmittedFor, d1Selected, d1Admitted]
+    omega
+  refine ⟨⟨hmem 18 (by omega), hmem 19 (by omega), ReachOutside.direct ?_⟩,
+    ⟨hmem 18 (by omega), hmem 19 (by omega), ReachOutside.direct ?_⟩⟩ <;>
+    exact trivial
+
+/-- F12 slice 7 review: the selected-reading counterpart of `ConformantOrganiseAdmitting`,
+differing in exactly one place — O3 quantifies over the function's `sel` argument, which is
+what `Holes.lean:909` does, rather than over its returned nodes, which is what
+`futon3:checks/find_organise.clj:529` does.  Which field O3 reads is an open question beside
+D1 (C540 §b), so the arm's result is measured under both readings rather than under the one
+the slice happened to pick. -/
+structure ConformantOrganiseAdmittingSelected {Policy P : Type*}
+    (f : AdmittingOrganiseType Policy P) : Prop where
+  osel : ∀ t sel repo, (f t sel repo).selected = sel
+  o1 : ∀ t sel repo,
+    (f t sel repo).nodes =
+      sel ∪ (f t sel repo).addedByOrganise ∪ (f t sel repo).admittedBy
+  o2 : ∀ t sel repo u v, (f t sel repo).edges u v → Reach repo.standsOn u v
+  o3 : ∀ t sel repo u v,
+    (f t sel repo).edges u v ↔ fastForward sel repo.standsOn u v
+
+/-- F12 slice 7 review: the admitting witness under the selected reading of O3. -/
+def organiseAdmittingSelectedReading {Policy : Type*} : AdmittingOrganiseType Policy Nat :=
+  fun _ sel repo =>
+    { nodes := sel ∪ ∅ ∪ zaifAdmittedFor sel
+      addedByOrganise := ∅
+      edges := fastForward sel repo.standsOn
+      acyclic := fastForward_acyclic sel repo.standsOn repo.acyclic
+      precedence := []
+      selected := sel
+      admittedBy := zaifAdmittedFor sel }
+
+/-- F12 slice 7 review: its mirror, attributing the same nine nodes to `addedByOrganise`. -/
+def organiseAdmittingSelectedReadingMirror {Policy : Type*} :
+    AdmittingOrganiseType Policy Nat :=
+  fun _ sel repo =>
+    { nodes := sel ∪ zaifAdmittedFor sel ∪ ∅
+      addedByOrganise := zaifAdmittedFor sel
+      edges := fastForward sel repo.standsOn
+      acyclic := fastForward_acyclic sel repo.standsOn repo.acyclic
+      precedence := []
+      selected := sel
+      admittedBy := ∅ }
+
+/-- F12 slice 7 review: the admitting witness is conformant under the selected reading. -/
+theorem organiseAdmittingSelectedReadingConformant {Policy : Type*} :
+    ConformantOrganiseAdmittingSelected
+      (organiseAdmittingSelectedReading (Policy := Policy)) where
+  osel := by intro t sel repo; rfl
+  o1 := by intro t sel repo; simp [organiseAdmittingSelectedReading]
+  o2 := by
+    intro t sel repo u v edge
+    exact d1_reachOutside_to_reach edge.2.2
+  o3 := by intro t sel repo u v; rfl
+
+/-- F12 slice 7 review: so is its mirror. -/
+theorem organiseAdmittingSelectedReadingMirrorConformant {Policy : Type*} :
+    ConformantOrganiseAdmittingSelected
+      (organiseAdmittingSelectedReadingMirror (Policy := Policy)) where
+  osel := by intro t sel repo; rfl
+  o1 := by intro t sel repo; simp [organiseAdmittingSelectedReadingMirror]
+  o2 := by
+    intro t sel repo u v edge
+    exact d1_reachOutside_to_reach edge.2.2
+  o3 := by intro t sel repo u v; rfl
+
+/-- F12 slice 7 review: the split survives the other reading of O3.  Two functions conformant
+under the selected reading agree on the recorded nodes and on the whole edge relation and still
+disagree on `admittedBy`, at recorded vertex 11.  So `admittingSplitUnderdetermined` does not
+depend on which field O3 quantifies over, and the open field question does not have to be
+answered for the arm's result to stand. -/
+theorem admittingSplitUnderdeterminedSelectedReading :
+    (organiseAdmittingSelectedReading (Policy := Unit)
+        trivialPolicyCascade d1Selected d1Repo).nodes =
+      (organiseAdmittingSelectedReadingMirror (Policy := Unit)
+        trivialPolicyCascade d1Selected d1Repo).nodes ∧
+    (organiseAdmittingSelectedReading (Policy := Unit)
+        trivialPolicyCascade d1Selected d1Repo).edges =
+      (organiseAdmittingSelectedReadingMirror (Policy := Unit)
+        trivialPolicyCascade d1Selected d1Repo).edges ∧
+    (organiseAdmittingSelectedReading (Policy := Unit)
+        trivialPolicyCascade d1Selected d1Repo).admittedBy ≠
+      (organiseAdmittingSelectedReadingMirror (Policy := Unit)
+        trivialPolicyCascade d1Selected d1Repo).admittedBy := by
+  refine ⟨by simp [organiseAdmittingSelectedReading, organiseAdmittingSelectedReadingMirror],
+    rfl, ?_⟩
+  intro h
+  have h11 := Set.ext_iff.mp h 11
+  simp [organiseAdmittingSelectedReading, organiseAdmittingSelectedReadingMirror,
+    zaifAdmittedFor, d1Admitted] at h11
+
+/-- F12 slice 7 review: every selected vertex has authored rank zero (`F12D1Arms.lean:35-41`). -/
+theorem d1Rank_eq_zero_of_selected {v : Nat} (hv : v ∈ d1Selected) : d1Rank v = 0 := by
+  simp only [d1Selected, mem_setOf_eq] at hv
+  interval_cases v <;> rfl
+
+/-- F12 slice 7 review: what the other reading COSTS, measured rather than argued.  Under the
+selected reading the two witnesses agree on an EMPTY edge relation on the recorded inputs — no
+fast-forward runs between two selected vertices, because every authored edge raises the rank and
+every selected vertex has rank zero.  The one recorded edge `18 → 19`
+(`admittingZaifEdgeNonVacuous`) is visible only under the node-set reading, where the admitted
+nodes are in the set O3 quantifies over.  So both readings leave the third origin undetermined,
+and they differ in whether the agreement is witnessed on any edge at all. -/
+theorem admittingSelectedReadingEdgesEmptyOnRecorded :
+    ∀ u v, ¬ (organiseAdmittingSelectedReading (Policy := Unit)
+      trivialPolicyCascade d1Selected d1Repo).edges u v := by
+  intro u v edge
+  have hrank : d1Rank u < d1Rank v :=
+    reach_increases_rank d1Authored d1Rank d1_authored_increases_rank
+      (d1_reachOutside_to_reach edge.2.2)
+  rw [d1Rank_eq_zero_of_selected edge.2.1] at hrank
+  omega
+
 end
 
 
