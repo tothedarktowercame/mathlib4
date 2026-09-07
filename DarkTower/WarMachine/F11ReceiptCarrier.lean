@@ -111,5 +111,141 @@ theorem handCarriedReceiptHasRightClause :
     handCarriedReceipt.acknowledgedClause =
       SnatchPattern.askForSurplusNotSurrender := rfl
 
+/-! ## Review addition: where the attribution has to live
+
+`ReceiptContentAttributed` above takes its `owner` from OUTSIDE the finder, and
+the next theorem is why that cannot price F2: instantiated at the identity it
+holds of every finder in the type, the misattributing one included.  So
+`findSnatchMisattributingFailsContentF2` refutes a choice of auxiliary function
+and not a property of `findSnatchMisattributing`.  The rest of this section
+restates the measurement of the finder's OWN output, which is where F2 asks the
+attribution to be (`P-validated-R5.md:486`).
+-/
+
+/-- F11 slice 4 review: the externally-supplied-owner reading is degenerate -- at the identity it is satisfied by every finder of the type, so it separates owner functions rather than finders. -/
+theorem receiptContentAttributedHoldsOfEveryFinder {State P : Type*}
+    (f : FindType State P) : ReceiptContentAttributed f (fun _ _ p => p) := by
+  intro t repo p _; rfl
+
+/-- F11 slice 4 review: `find`'s result carrier with receipts that CARRY data, the shape a content-stating F2 needs; `FindResult` at `Holes.lean:247-250` types its receipts by `Receipt`, so this is a change to `find`'s own return type and not only to `Receipt`. -/
+structure FindResultR (P Clause Route AsOf : Type*) where
+  selected : Set P
+  receipts : P → Option (RelationalReceipt Clause Route AsOf)
+  absence : Option TypedAbsence
+
+/-- F11 slice 4 review: the data-carrying analogue of `FindType` at `F11Conformance.lean:18`. -/
+abbrev FindTypeR (State P Clause Route AsOf : Type*) :=
+  Tension State → Repository P → FindResultR P Clause Route AsOf
+
+/-- F11 slice 4 review: forgetting the carried data gives exactly today's `FindResult`, via the `toReceipt` projection `extends Receipt` supplies. -/
+def FindResultR.erase {P Clause Route AsOf : Type*}
+    (r : FindResultR P Clause Route AsOf) : FindResult P where
+  selected := r.selected
+  receipts := fun p => (r.receipts p).map (·.toReceipt)
+  absence := r.absence
+
+/-- F11 slice 4 review: the erasure lifted to finders, so a data-carrying finder can be judged by today's `ConformantFind` at `F11Conformance.lean:21-29`. -/
+def eraseFinder {State P Clause Route AsOf : Type*}
+    (f : FindTypeR State P Clause Route AsOf) : FindType State P :=
+  fun t repo => (f t repo).erase
+
+/-- F11 slice 4 review: F2 stated of the finder's OWN output -- every selected pattern's returned receipt carries the clause an independently given expectation assigns it. Unlike `ReceiptContentAttributed` this quantifies over what `f` returns, so it separates finders. -/
+def ContentF2 {State P Clause Route AsOf : Type*}
+    (f : FindTypeR State P Clause Route AsOf) (clauseOf : P → Clause) : Prop :=
+  ∀ t repo p, p ∈ (f t repo).selected →
+    ∃ r, (f t repo).receipts p = some r ∧ r.acknowledgedClause = clauseOf p
+
+/-- F11 slice 4 review: the recorded replay selection, receipting each selected pattern with a receipt that names THAT pattern. -/
+def findRFaithful :
+    FindTypeR FindSnatchScenario SnatchPattern SnatchPattern Unit Unit :=
+  fun t repo =>
+    let selected := findSnatchSelected t.context ∩ repo.patterns
+    { selected := selected
+      receipts := fun p =>
+        if p ∈ selected then
+          some { citesTextOrEdges := True, scoreAlone := False,
+                 acknowledgedClause := p, retrievalRoute := (), asOf := () }
+        else none
+      absence := if selected = ∅ then some .noPatternAddressesThisTension else none }
+
+/-- F11 slice 4 review: the same selection, receipting every selected pattern with a receipt that names a DIFFERENT pattern (`misattributedReceiptOwner`). -/
+def findRMisattributing :
+    FindTypeR FindSnatchScenario SnatchPattern SnatchPattern Unit Unit :=
+  fun t repo =>
+    let selected := findSnatchSelected t.context ∩ repo.patterns
+    { selected := selected
+      receipts := fun p =>
+        if p ∈ selected then
+          some { citesTextOrEdges := True, scoreAlone := False,
+                 acknowledgedClause := misattributedReceiptOwner p,
+                 retrievalRoute := (), asOf := () }
+        else none
+      absence := if selected = ∅ then some .noPatternAddressesThisTension else none }
+
+/-- F11 slice 4 review, THE MEASUREMENT: the faithful and the misattributing finder are EQUAL after erasure -- not merely both conformant. So no predicate whatever on today's `FindResult` can separate them, and F2's blindness to attribution is a fact about the carrier rather than about how F2 is phrased. -/
+theorem findRErasuresAreEqual :
+    eraseFinder findRFaithful = eraseFinder findRMisattributing := by
+  funext t repo
+  simp only [eraseFinder, findRFaithful, findRMisattributing, FindResultR.erase,
+    FindResult.mk.injEq, true_and, and_true]
+  funext p
+  by_cases hp : p ∈ findSnatchSelected t.context ∩ repo.patterns <;>
+    simp [hp]
+
+/-- F11 slice 4 review: the erased misattributing finder satisfies today's F1-F3, by the equality above and the faithful finder's own conformance. -/
+theorem findRFaithfulErasureConformant : ConformantFind (eraseFinder findRFaithful) where
+  f1Containment := by
+    intro t repo p hp
+    exact hp.2
+  f1TypedAbsence := by
+    intro t repo h
+    have hs : findSnatchSelected t.context ∩ repo.patterns = ∅ := by
+      simpa [eraseFinder, findRFaithful, FindResultR.erase] using h
+    simp [eraseFinder, findRFaithful, FindResultR.erase, hs]
+  f2Receipted := by
+    intro t repo p hp
+    have hp' : p ∈ findSnatchSelected t.context ∩ repo.patterns := hp
+    simp [eraseFinder, findRFaithful, FindResultR.erase]
+    exact hp'
+  f3NonSelfCertifying := by
+    intro t repo p r hp hr
+    simp [eraseFinder, findRFaithful, FindResultR.erase] at hr
+    rw [← hr.2]
+    simp [Receipt.nonSelfCertifying]
+
+/-- F11 slice 4 review: and therefore so does the misattributing one -- the same conformance verdict on a finder whose every receipt names the wrong pattern. -/
+theorem findRMisattributingErasureConformant :
+    ConformantFind (eraseFinder findRMisattributing) := by
+  rw [← findRErasuresAreEqual]; exact findRFaithfulErasureConformant
+
+/-- F11 slice 4 review: content-F2 is INHABITED by a finder, not only by a hand-built receipt -- the faithful finder satisfies it at the identity expectation. -/
+theorem findRFaithfulContentF2 : ContentF2 findRFaithful id := by
+  intro t repo p hp
+  have hp' : p ∈ findSnatchSelected t.context ∩ repo.patterns := hp
+  refine ⟨{ citesTextOrEdges := True, scoreAlone := False,
+            acknowledgedClause := p, retrievalRoute := (), asOf := () }, ?_, rfl⟩
+  simp only [findRFaithful, if_pos hp']
+
+/-- F11 slice 4 review: and content-F2 REFUTES the misattributing finder, witnessed on the full recorded repository (`F11Conformance.lean:35-38`) at a pattern the record selects -- so the two laws disagree exactly where the carrier is blind. -/
+theorem findRMisattributingFailsContentF2 : ¬ ContentF2 findRMisattributing id := by
+  have key : ∀ (t : Tension FindSnatchScenario) (repo : Repository SnatchPattern) p,
+      p ∈ (findRMisattributing t repo).selected →
+      (findRMisattributing t repo).receipts p =
+        some { citesTextOrEdges := True, scoreAlone := False,
+               acknowledgedClause := misattributedReceiptOwner p,
+               retrievalRoute := (), asOf := () } := by
+    intro t repo p hp
+    have hp' : p ∈ findSnatchSelected t.context ∩ repo.patterns := hp
+    simp only [findRMisattributing, if_pos hp']
+  intro h
+  have hp : SnatchPattern.askForSurplusNotSurrender ∈
+      (findRMisattributing
+        { context := .g1Snatcher, want := True, however := True }
+        findSnatchRepository).selected := findSnatchMisattributingWitness.1
+  obtain ⟨r, hr, hclause⟩ := h { context := .g1Snatcher, want := True, however := True }
+    findSnatchRepository .askForSurplusNotSurrender hp
+  rw [key _ _ _ hp, Option.some.injEq] at hr
+  subst hr
+  simp [misattributedReceiptOwner] at hclause
 end
 end DarkTower.WarMachine.Holes
