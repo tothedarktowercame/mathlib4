@@ -25,7 +25,11 @@ def miningSelected : Set Nat := {0, 1, 2}
 
 /-- The empty admission set from
 `futon2:holes/labs/library-loop/runs/mining-exemplar/cascade.edn:30-32`; the
-note says classifying an unrecorded admission would invent evidence. -/
+note says classifying an unrecorded admission would invent evidence.  So arm
+four's attribution input is instantiated EMPTY here and this exemplar witnesses
+nothing about it; the nine recorded admissions of `organiseRuledZaifAdmitted`
+(`DarkTower/WarMachine/F12RuledCarrier.lean:90`) remain that ruling's only
+non-trivial instance. -/
 def miningAdmitted : Set Nat := ∅
 
 /-- The two mission-attested edges from
@@ -42,7 +46,10 @@ def miningRepo : Repository Nat where
 def miningPrecedence : List Nat := [0, 1, 2]
 
 /-- The sole recorded acting order from
-`futon2:holes/labs/library-loop/runs/mining-exemplar/cascade.edn:70-76`. -/
+`futon2:holes/labs/library-loop/runs/mining-exemplar/cascade.edn:72-75`, inside
+the `:o4` block at
+`futon2:holes/labs/library-loop/runs/mining-exemplar/cascade.edn:70-76` whose
+only other members are `:rule-bearing-members` and `:basis`. -/
 def miningActingOrder : List Nat := [0, 1, 2]
 
 /-- Ruled mining carrier. `Score := Unit` because the record contains no score.
@@ -57,8 +64,15 @@ def organiseMining : RuledOrganiseType Unit Nat Unit := fun _ sel repo adm =>
     actingOrderBefore := miningActingOrder, actingOrderAfter := miningActingOrder
     scoreBefore := (), scoreAfter := () }
 
-/-- At `Score := Unit`, O4's score-change disjunct is unavailable. -/
-theorem miningScoreCannotMove (a b : Unit) : ¬ a ≠ b := by simp
+/-- The record's silence about a score is carried into the TYPE: at
+`Score := Unit`, O4's score-change disjunct is unavailable to every function of
+this instantiation, `organiseMining` included, so acting order is the only way
+through O4 here.  Stated of an arbitrary `f` rather than of `organiseMining`'s
+own `()` literals, which would be a fact about the transcription. -/
+theorem miningScoreCannotMove (f : RuledOrganiseType Unit Nat Unit)
+    (t : Cascade Unit) (sel : Set Nat) (repo : Repository Nat) (adm : Set Nat) :
+    ¬ ((f t sel repo adm).scoreBefore ≠ (f t sel repo adm).scoreAfter) := by
+  intro h; exact h (Subsingleton.elim _ _)
 
 /-- All seven ruled clauses hold for the mining transcription. -/
 theorem organiseMiningConformant : ConformantOrganiseRuled organiseMining where
@@ -167,6 +181,37 @@ theorem organiseMiningInventedEdgeNotConformant :
   apply h.o2 trivialPolicyCascade miningSelected miningRepo miningAdmitted 2 1
   simp [organiseMiningInventedEdge]
 
+/-- Negative control, and the answer to what the unexercised O4 clause is still
+doing here: a function that moves the precedence this record does not, with the
+acting order left flat.  The record supplies no before/after pair, so O4's
+antecedent is false at `organiseMining` by transcription; the clause nevertheless
+refuses this neighbour of it. -/
+def organiseMiningPrecedenceMoves : RuledOrganiseType Unit Nat Unit := fun t sel repo adm =>
+  { organiseMining t sel repo adm with precedenceAfter := [0, 2, 1] }
+
+/-- Every ruled clause except O4 holds of the moving-precedence control, so its
+refutation below is located at O4 alone. -/
+theorem organiseMiningPrecedenceMovesSansO4 :
+    ConformantOrganiseRuledSansO4 organiseMiningPrecedenceMoves where
+  osel := by intros; rfl
+  oauth := by intros; rfl
+  oattr := by intros; rfl
+  o1 := by intros; simp [organiseMiningPrecedenceMoves, organiseMining]
+  o2 := by intro _ _ _ _ _ _ h; exact d1_reachOutside_to_reach h.2.2
+  o3 := by intros; simp [organiseMiningPrecedenceMoves, organiseMining]
+
+/-- The moving-precedence control fails exactly O4: its acting order is flat and
+`miningScoreCannotMove` closes the other disjunct. -/
+theorem organiseMiningPrecedenceMovesNotConformant :
+    ¬ ConformantOrganiseRuled organiseMiningPrecedenceMoves := by
+  intro h
+  have hmove := h.o4 trivialPolicyCascade miningSelected miningRepo miningAdmitted
+    (by simp [organiseMiningPrecedenceMoves, organiseMining, miningPrecedence])
+  rcases hmove with hact | hscore
+  · exact hact (by simp [organiseMiningPrecedenceMoves, organiseMining])
+  · exact miningScoreCannotMove organiseMiningPrecedenceMoves trivialPolicyCascade
+      miningSelected miningRepo miningAdmitted hscore
+
 #print axioms miningSelected
 #print axioms miningAdmitted
 #print axioms miningRepo
@@ -185,6 +230,9 @@ theorem organiseMiningInventedEdgeNotConformant :
 #print axioms organiseMiningInventedEdge
 #print axioms organiseMiningInventedEdgeFailsO2
 #print axioms organiseMiningInventedEdgeNotConformant
+#print axioms organiseMiningPrecedenceMoves
+#print axioms organiseMiningPrecedenceMovesSansO4
+#print axioms organiseMiningPrecedenceMovesNotConformant
 
 end
 end DarkTower.WarMachine.Holes
