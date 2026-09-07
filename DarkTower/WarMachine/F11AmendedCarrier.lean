@@ -332,6 +332,120 @@ theorem amendedRefusingRecordedDesignationNonempty :
       findSnatchRepository).zeroMass).Nonempty := by
   simpa [amendedRefusing] using findSnatchRepositoryNonempty
 
+/-- F11 slice 6 review, M2's benchmark stated in Lean: the two receipt-separated
+finders are EQUAL after erasure to today's `FindResult`, exactly as slice 4
+measured at `F11ReceiptCarrier.lean:186-193`.  Without this the separation at
+`amendedReceiptDataSeparates` would only say the two amended finders differ, not
+that the amendment buys a distinction today's carrier cannot make. -/
+theorem amendedReceiptPairErasuresAreEqual :
+    eraseAmendedFinder amendedFaithful = eraseAmendedFinder amendedMisattributing := by
+  funext t repo
+  simp only [eraseAmendedFinder, amendedFaithful, amendedMisattributing,
+    AmendedFindResult.erase, FindResult.mk.injEq, true_and, and_true]
+  funext p
+  by_cases hp : p ∈ findSnatchSelected t.context ∩ repo.patterns <;> simp [hp]
+
+/-- F11 slice 6 review: the same for the zero-mass-separated pair, which the
+docstring at `amendedZeroMassSeparates` asserted without proving.  Erasure drops
+the returned designation, so the two are equal at today's carrier by `rfl`. -/
+theorem amendedZeroMassPairErasuresAreEqual :
+    eraseAmendedFinder amendedFaithful = eraseAmendedFinder amendedDifferentZeroMass := rfl
+
+/-- F11 slice 6 review: a conformant amended finder that selects the WHOLE
+repository and returns the EMPTY zero-mass designation.  It is the witness for
+what the joint F4 conjunct constrains on its own, with no hypothesis pinning the
+returned field to a designation. -/
+def amendedIdentity : AmendedFindType FindSnatchScenario SnatchPattern SnatchPattern Unit Unit :=
+  fun _ repo =>
+    { selected := repo.patterns
+      receipts := fun p => if p ∈ repo.patterns then some
+        { citesTextOrEdges := True, scoreAlone := False, acknowledgedClause := p,
+          retrievalRoute := (), asOf := () } else none
+      zeroMass := ∅
+      absence := if repo.patterns = ∅ then some .noPatternAddressesThisTension else none }
+
+/-- F11 slice 6 review: `amendedIdentity` satisfies all four joint laws, F4
+vacuously because it designates nothing. -/
+theorem amendedIdentityConformant : ConformantAmendedFind amendedIdentity where
+  f1Containment := by intro t repo p hp; exact hp
+  f1TypedAbsence := by
+    intro t repo h
+    have hr : repo.patterns = ∅ := by simpa [amendedIdentity] using h
+    simp [amendedIdentity, hr]
+  f2Content := by
+    intro t repo p hp
+    have hp' : p ∈ repo.patterns := hp
+    let rr : AmendedReceipt SnatchPattern Unit Unit :=
+      { citesTextOrEdges := True, scoreAlone := False, acknowledgedClause := p,
+        retrievalRoute := (), asOf := () }
+    refine ⟨rr, ?_, rfl⟩
+    change (if p ∈ repo.patterns then some _ else none) = some rr
+    rw [if_pos hp']
+  f3NonSelfCertifying := by
+    intro t repo p r hp hr
+    have hp' : p ∈ repo.patterns := hp
+    simp only [amendedIdentity, if_pos hp'] at hr
+    have hre := Option.some.inj hr
+    rw [← hre]
+    simp [Receipt.nonSelfCertifying]
+  f4ReturnedZeroMass := by
+    intro t repo p hp
+    simp [amendedIdentity] at hp
+
+/-- F11 slice 6 review floor: the witness selects a named member of the recorded
+18-pattern repository, so none of the refutations below is proved of a finder
+that selects nothing. -/
+theorem amendedIdentitySelectionNonempty :
+    ((amendedIdentity { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
+      findSnatchRepository).selected).Nonempty :=
+  ⟨.askForSurplusNotSurrender, by
+    simp [amendedIdentity, findSnatchRepository, snatchRepository]⟩
+
+/-- F11 slice 6 review: `amendedIdentity` refutes reading A -- it returns the
+whole repository, which is what `FindFalsifiable` forbids. -/
+theorem amendedIdentityNotReadingA :
+    ¬ FindFalsifiable (eraseAmendedFinder amendedIdentity) := by
+  intro h
+  obtain ⟨p, hp, hns⟩ := h { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
+    findSnatchRepository findSnatchRepositoryNonempty
+  exact hns hp
+
+/-- F11 slice 6 review: it refutes record-grain reading B -- it selects
+`consultTheRemedyBeforeExiting`, the pattern `find_snatch.clj:25-31` declares
+zero-mass for `g1Snatcher`. -/
+theorem amendedIdentityNotReadingB :
+    ¬ FindExcludesRecordedZeroMass (eraseAmendedFinder amendedIdentity) := by
+  intro h
+  have hz := h { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
+    .consultTheRemedyBeforeExiting (by simp [findSnatchZeroMass])
+  exact hz.2 hz.1
+
+/-- F11 slice 6 review: it refutes reading C at the recorded designation, which
+`amendedRecordedDesignationNonempty` shows is not vacuous. -/
+theorem amendedIdentityNotReadingC :
+    ¬ FindRespectsZeroMass findSnatchZeroMassSet (eraseAmendedFinder amendedIdentity) := by
+  intro h
+  have hmem : SnatchPattern.consultTheRemedyBeforeExiting ∈ findSnatchRepository.patterns := by
+    simp [findSnatchRepository, snatchRepository]
+  exact h { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
+    findSnatchRepository .consultTheRemedyBeforeExiting
+    (by simp [findSnatchZeroMassSet, findSnatchZeroMass]) hmem hmem
+
+/-- F11 slice 6 review, THE PRICE OF THE JOINT ARM: the F4 conjunct on its own
+constrains nothing about zero mass.  One conformant amended finder, selecting a
+named member of the recorded repository, refutes ALL THREE readings at once.  So
+`amendedF4ImpliesRecordedReadingB` and `amendedF4ImpliesReadingC` are carried
+entirely by their pinning hypotheses `hz`: what the amendment buys is a PLACE to
+put a designation, not an obligation that the designation be the recorded one. -/
+theorem amendedF4AloneBuysNoReadingOfF4 :
+    ConformantAmendedFind amendedIdentity ∧
+      ¬ FindFalsifiable (eraseAmendedFinder amendedIdentity) ∧
+      ¬ FindExcludesRecordedZeroMass (eraseAmendedFinder amendedIdentity) ∧
+      ¬ FindRespectsZeroMass findSnatchZeroMassSet (eraseAmendedFinder amendedIdentity) :=
+  ⟨amendedIdentityConformant, amendedIdentityNotReadingA,
+    amendedIdentityNotReadingB, amendedIdentityNotReadingC⟩
+
+
 end
 
 end DarkTower.WarMachine.Holes
