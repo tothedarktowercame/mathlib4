@@ -26,16 +26,24 @@ theorem findRefusingMeetsConformanceAndReadingA {State P : Type*} :
 def findSilent {State P : Type*} : FindType State P :=
   fun _ _ => { selected := ∅, receipts := fun _ => none, absence := none }
 
-/-- F11 slice 3 R0.3: `findSilent` is not conformant because `ConformantFind.f1TypedAbsence` at `F11Conformance.lean:23-24` fails. -/
+/-- F11 slice 3 R0.3, CORRECTED IN REVIEW: `findSilent` is not conformant because
+`ConformantFind.f1TypedAbsence` at `F11Conformance.lean:23-24` fails.  As dispatched
+this was witnessed on a repository with NO patterns, where the refutation is about a
+degenerate input rather than about the record; it is now witnessed on the recorded
+18-pattern `findSnatchRepository` (`F11Conformance.lean:35`), which
+`findSnatchRepositoryNonempty` below shows is not empty. -/
 theorem findSilentNotConformant :
-    ¬ ConformantFind (findSilent (State := Unit) (P := Nat)) := by
+    ¬ ConformantFind (findSilent (State := FindSnatchScenario) (P := SnatchPattern)) := by
   intro h
-  let t : Tension Unit := { context := (), want := True, however := True }
-  let repo : Repository Nat :=
-    { patterns := ∅, standsOn := fun _ _ => False
-      acyclic := by intro x path; cases path with | single e => exact e | tail _ e => exact e }
-  have := h.f1TypedAbsence t repo (by simp [findSilent])
+  have := h.f1TypedAbsence
+    { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
+    findSnatchRepository (by simp [findSilent])
   simp [findSilent] at this
+
+/-- F11 slice 3 review addition: the recorded repository the refutation above is
+witnessed on is inhabited, so that refutation is not vacuous. -/
+theorem findSnatchRepositoryNonempty : findSnatchRepository.patterns.Nonempty :=
+  ⟨.askForSurplusNotSurrender, by simp [findSnatchRepository, snatchRepository]⟩
 
 /-- F11 slice 3 R1.1: an F1--F3 conformant discharge exists at `F11Conformance.lean:18`, witnessed independently of either F4 reading. -/
 theorem findDischargeExists {State P : Type*} :
@@ -150,7 +158,14 @@ theorem findDischargeNotUniqueReadingB :
     findSnatchReplayExcludesDeclaredZeroMass, findRefusingConformant,
     findRefusingExcludesRecordedZeroMass, findConformantImplementationsDifferOnSnatch⟩
 
-/-- F11 slice 3 R2.4a: both reading-B witnesses exclude every declared zero-mass member, while replay's disagreement is inhabited by the named member at `F11Conformance.lean:221`. -/
+/-- F11 slice 3 R2.4a, AMENDED IN REVIEW to say what it does not carry.  Both
+reading-B witnesses exclude every declared zero-mass member and the disagreement is
+inhabited by the named member at `F11Conformance.lean:221` -- but `findRefusing`
+excludes every pattern whatever, so its half of that agreement is vacuous, exactly
+as in the reading-A pair.  Unlike reading A, reading B has NO cheap second witness
+that actually selects: `findAllButFailsReadingB` below shows why.  So on this record
+the two reading-B discharges are the finder that replays the record and the finder
+that refuses, and that is the measurement rather than a gap in the search. -/
 theorem findReadingBWitnessesAgreeOnFloor :
     FindExcludesRecordedZeroMass findSnatchReplay ∧
       FindExcludesRecordedZeroMass
@@ -162,7 +177,12 @@ theorem findReadingBWitnessesAgreeOnFloor :
   ⟨findSnatchReplayExcludesDeclaredZeroMass,
     findRefusingExcludesRecordedZeroMass, findSnatchReplaySelectsNamedPattern True True⟩
 
-/-- F11 slice 3 R2.4b: the reading-A witnesses both exclude `consultTheRemedyBeforeExiting`, and the repository-minus-that-pattern set is inhabited by a different recorded member (`F11Conformance.lean:35-38`). -/
+/-- F11 slice 3 R2.4b, WEAKENED BY REVIEW AND KEPT ONLY AS THE WEAK FORM.  Both
+reading-A witnesses do exclude `consultTheRemedyBeforeExiting`, but `findRefusing`
+excludes EVERY pattern, so its half of that agreement is vacuous and the pair does
+not locate where the two finders disagree.  The located version is
+`findAllButPairDisagreesExactlyOnTheTwoZeroMassMembers` below, whose two witnesses
+both select on the record. -/
 theorem findReadingAWitnessesAgreeOnFloor :
     let q := SnatchPattern.consultTheRemedyBeforeExiting
     q ∉ (findAllBut q
@@ -176,6 +196,47 @@ theorem findReadingAWitnessesAgreeOnFloor :
     by simp [findRefusing], ?_⟩
   exact ⟨.askForSurplusNotSurrender,
     by simp [findSnatchRepository, snatchRepository]⟩
+
+/-- F11 slice 3 review addition: reading B bites harder than reading A, and this is
+why the reading-B pair has to include the total refusal.  `findAllBut` at the
+`g1` scenarios' declared zero-mass member still SELECTS `forcedPlayNeedsALossFloor`,
+which the record declares zero-mass at `g4Snatcher` (`Holes.lean:346`), so it
+satisfies reading A (`findAllButFalsifiable`) and refutes reading B.  A finder can
+therefore exclude one pattern from every repository, as reading A asks, and still
+return a pattern the record said in advance it must not. -/
+theorem findAllButFailsReadingB :
+    ¬ FindExcludesRecordedZeroMass
+        (findAllBut (State := FindSnatchScenario) SnatchPattern.consultTheRemedyBeforeExiting) := by
+  intro h
+  have := (h { context := FindSnatchScenario.g4Snatcher, want := True, however := True }
+    SnatchPattern.forcedPlayNeedsALossFloor (by simp [findSnatchZeroMass])).2
+  exact this (by simp [findAllBut, findSnatchRepository, snatchRepository])
+
+/-- F11 slice 3 review addition, and the reading-A floor the dispatched pair could not
+carry.  Non-uniqueness under reading A was witnessed by `findAllBut` against
+`findRefusing`, which selects nothing at all; "they differ" is then only the
+observation that one of them refuses.  Here both witnesses are `findAllBut`
+instances, at the two patterns the record declares zero-mass -- `consultTheRemedyBeforeExiting`
+at `g1Snatcher` and `forcedPlayNeedsALossFloor` at `g4Snatcher`
+(`find_snatch.clj:25-31`, transcribed at `Holes.lean:342`).  Both are conformant
+(`findAllButConformant`) and reading-A falsifiable (`findAllButFalsifiable`), both
+SELECT the recorded member `askForSurplusNotSurrender`, and the disagreement is
+exactly the two excluded patterns: each finder selects the one the other drops. -/
+theorem findAllButPairDisagreesExactlyOnTheTwoZeroMassMembers :
+    let q := SnatchPattern.consultTheRemedyBeforeExiting
+    let q' := SnatchPattern.forcedPlayNeedsALossFloor
+    let t : Tension FindSnatchScenario :=
+      { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
+    (SnatchPattern.askForSurplusNotSurrender ∈
+        (findAllBut q t findSnatchRepository).selected ∧
+      SnatchPattern.askForSurplusNotSurrender ∈
+        (findAllBut q' t findSnatchRepository).selected) ∧
+    (q ∉ (findAllBut q t findSnatchRepository).selected ∧
+      q ∈ (findAllBut q' t findSnatchRepository).selected) ∧
+    (q' ∈ (findAllBut q t findSnatchRepository).selected ∧
+      q' ∉ (findAllBut q' t findSnatchRepository).selected) := by
+  refine ⟨⟨?_, ?_⟩, ⟨?_, ?_⟩, ?_, ?_⟩ <;>
+    simp [findAllBut, findSnatchRepository, snatchRepository]
 
 /-- F11 slice 3 R3.1: opacity with an explicit refusing body hides that selected inhabitant; compare the bodiless measurement at `F12DischargeArm.lean:265-271`. -/
 opaque findOpaqueRefusing : FindType Unit SnatchPattern := findRefusing
