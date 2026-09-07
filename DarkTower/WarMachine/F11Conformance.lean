@@ -98,6 +98,24 @@ theorem findSnatchReplayConformant : ConformantFind findSnatchReplay where
       simp [Receipt.nonSelfCertifying, findStructuredReceipt]
     · simp [findSnatchReplay, hrec] at hr
 
+/-- F11 slice 2 review addition: the replay's receipts are PARTIAL on the
+repository -- `consultTheRemedyBeforeExiting` is one of the eighteen recorded
+patterns and gets no receipt under `g1Snatcher`.  This is what the constant
+receipt function could not say, and it is why F2 is now a claim about the
+record.  Measured bound on how much it says: at the scenario grain the recorded
+receipted column EQUALS the recorded selection in all six scenarios
+(`futon3:checks/find-snatch.edn`), so what the partiality separates here is
+repository from selection, not receipted from selected -- the same coincidence
+`wmFindSnatchF3NonSelfCertifying` (`Holes.lean:803`) records for F3. -/
+theorem findSnatchReplayReceiptsArePartial :
+    (findSnatchReplay
+      { context := FindSnatchScenario.g1Snatcher, want := True, however := True }
+      findSnatchRepository).receipts SnatchPattern.consultTheRemedyBeforeExiting = none ∧
+    SnatchPattern.consultTheRemedyBeforeExiting ∈ findSnatchRepository.patterns := by
+  constructor
+  · simp [findSnatchReplay, findSnatchReceipted, findSnatchScenarios]
+  · simp [findSnatchRepository, snatchRepository]
+
 /-- F11 slice 2 total refusal: the empty selection carries F1's typed absence from `P-validated-R5.md:471-473`. -/
 def findRefusing {State P : Type*} : FindType State P :=
   fun _ _ => { selected := ∅, receipts := fun _ => none,
