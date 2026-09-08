@@ -263,35 +263,35 @@ abbrev FindReceiptTable (Scenario P : Type*) := List (FindReceiptRow Scenario P)
 /-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §3e find · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Find maps a structured tension and repository to selected patterns, receipts, or typed absence. Its recorded F1–F4 instances do not select one canonical implementation. -/
 def find {State P : Type*} : Tension State → Repository P → FindResult P := sorry
 
-/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F1 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: selection stays inside the recorded repository and an empty selection carries typed absence. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF1Containment`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f1` rejected; leg (1) is INAPPLICABLE — the declared observation is a recorded find-receipt table over authored library text, not a run observation, so the run leg does not apply here rather than being met. -/
+/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F1 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `c11673ea7164e90b10cc378ab6b2dfe14e545449d85e0dde70d5c2282e2430ce` · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: selection stays inside the recorded repository and an empty selection carries typed absence. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF1Containment`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f1` rejected; leg (1) is INAPPLICABLE — the declared observation is a recorded find-receipt table over authored library text, not a run observation, so the run leg does not apply here rather than being met. -/
 def findF1Containment {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.selected ⊆ row.repository ∧
     (row.selected = ∅ → row.absence = some .noPatternAddressesThisTension)
 
-/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F2 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a selected pattern has no receipt · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the recorded receipted set. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF2Receipted`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f2` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. -/
+/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F2 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `c11673ea7164e90b10cc378ab6b2dfe14e545449d85e0dde70d5c2282e2430ce` · evidence: FindReceiptTable · falsifier: a selected pattern has no receipt · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the recorded receipted set. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF2Receipted`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f2` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. -/
 def findF2Receipted {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.selected ⊆ row.receipted
 
-/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F3 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a selected pattern has only score evidence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the set whose receipt cites text or authored edges and is not score-alone. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF3NonSelfCertifying`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f3` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. The recorded non-self-certifying set equals the recorded receipted set in all 34 rows, so on THIS record the rejecting control, not the evidence, is what distinguishes F3 from F2. -/
+/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F3 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `c11673ea7164e90b10cc378ab6b2dfe14e545449d85e0dde70d5c2282e2430ce` · evidence: FindReceiptTable · falsifier: a selected pattern has only score evidence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: every selected member is in the set whose receipt cites text or authored edges and is not score-alone. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF3NonSelfCertifying`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f3` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. The recorded non-self-certifying set equals the recorded receipted set in all 34 rows, so on THIS record the rejecting control, not the evidence, is what distinguishes F3 from F2. -/
 def findF3NonSelfCertifying {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.selected ⊆ row.nonSelfCertifying
 
-/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F4 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa` · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF4Falsifiable`, `decide` over all six transcribed scenario rows at the `:selected-union` grain the check uses, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f4` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. The row is no longer "deliberately tracked as an evidence obligation": the obligation is discharged, and what would still refute the claim is the falsifier field above. -/
+/-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F4 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `c11673ea7164e90b10cc378ab6b2dfe14e545449d85e0dde70d5c2282e2430ce` · evidence: FindReceiptTable · falsifier: a recorded zero-mass pattern is absent from the row repository or was selected · SCOPE AMENDMENT 2026-08-31: the original universal over opaque `find` was false for empty repositories and could not be connected to serialized evidence without assuming correspondence. This declaration is narrowed to one pinned `FindReceiptRow`: its declared zero-mass member is in the recorded repository and absent from the recorded selection. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF4Falsifiable`, `decide` over all six transcribed scenario rows at the `:selected-union` grain the check uses, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f4` rejected; leg (1) is INAPPLICABLE for the reason given on findF1Containment. The row is no longer "deliberately tracked as an evidence obligation": the obligation is discharged, and what would still refute the claim is the falsifier field above. -/
 def findF4Falsifiable {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
   row.repository.Nonempty ∧
     ∃ p, p ∈ row.repository ∧ p ∈ row.zeroMass ∧ p ∉ row.selected
 
 /-! ### The pinned `find-snatch` record, transcribed (worklist `:U46`)
 
-`futon3:checks/find-snatch.edn`, sha256 `839897ef8fe44952403700bd237389449ae4735d3da7df8239b1b94dc7ef4dfa`, whose
-`:as-of` is the futon3 commit `2734ac570ed78d9bf822a5013cc48e53e68c8ff9` that last touched
-`library/snatch` -- 18 authored patterns, 6 scenarios, 34 recorded rounds.
+`futon3:checks/find-snatch.edn`, sha256 `c11673ea7164e90b10cc378ab6b2dfe14e545449d85e0dde70d5c2282e2430ce`, whose
+`:as-of` is the futon3 commit `e58576cec0f14c3da4667ed452d522c561487ee8` that last touched
+`library/snatch` -- 24 authored patterns, 6 scenarios, 34 recorded rounds.
 This block is GENERATED from that file by
 `futon2:holes/labs/wm-contract/u46_find_transcribe.bb`; edit the fixture and
 regenerate rather than editing the literals.
 -/
 
-/-- The 18 authored Snatch patterns of the pinned record, in its
+/-- The 24 authored Snatch patterns of the pinned record, in its
 sorted order. Constructor names are the recorded ids in lowerCamel. -/
 inductive SnatchPattern where
   | aFreeMarkIsAlwaysWorthAssigning
@@ -302,16 +302,22 @@ inductive SnatchPattern where
   | escalateOnlyAsFarAsYouCanLose
   | exchangeWhenBothSidesGain
   | forcedPlayNeedsALossFloor
+  | grimCutsTheCascadeAndNeverWidensIt
+  | haveATemperament
   | institutionsVaryByPositionAndForce
+  | leadWithTheExchangeRule
   | markWithoutForce
   | nonBindingTalkStillMovesPlay
+  | playTheAuthoredOrderFirst
   | preserveTheRightToAbstain
   | priceTheFinalRoundAsFinal
   | probeBeforeCommitting
+  | promoteTheRemedyBeforeTheExit
   | protectTheUnprotectedMove
   | reEnterAfterObservedRepair
   | revertThenInvert
   | useTalkToMakeATestableOffer
+  | widenTheCascadeOnlyOnEvidence
   deriving DecidableEq, Repr
 
 /-- The recorded repository as a list -- what `findF1Containment` contains
@@ -321,10 +327,12 @@ def snatchRepository : List SnatchPattern :=
   .anUnmodelledResponseStopsTheLine, .askForSurplusNotSurrender,
   .consultTheRemedyBeforeExiting, .escalateOnlyAsFarAsYouCanLose,
   .exchangeWhenBothSidesGain, .forcedPlayNeedsALossFloor,
-  .institutionsVaryByPositionAndForce, .markWithoutForce, .nonBindingTalkStillMovesPlay,
-  .preserveTheRightToAbstain, .priceTheFinalRoundAsFinal, .probeBeforeCommitting,
+  .grimCutsTheCascadeAndNeverWidensIt, .haveATemperament,
+  .institutionsVaryByPositionAndForce, .leadWithTheExchangeRule, .markWithoutForce,
+  .nonBindingTalkStillMovesPlay, .playTheAuthoredOrderFirst, .preserveTheRightToAbstain,
+  .priceTheFinalRoundAsFinal, .probeBeforeCommitting, .promoteTheRemedyBeforeTheExit,
   .protectTheUnprotectedMove, .reEnterAfterObservedRepair, .revertThenInvert,
-  .useTalkToMakeATestableOffer]
+  .useTalkToMakeATestableOffer, .widenTheCascadeOnlyOnEvidence]
 
 /-- The six recorded scenarios, `treatment`/`disposition`
 (`find_snatch.clj:22-24`, declaration order). -/
