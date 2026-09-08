@@ -13,9 +13,13 @@ namespace DarkTower.WarMachine.Holes
 
 noncomputable section
 
+/-- The candidate action space supplied to selection and to `organise`.  It is
+the existing `Set P` argument given a name, not a second carrier beside it. -/
+abbrev CandidateActionSpace (P : Type*) := Set P
+
 /-- F12 slice 4a, the ruled signature: Joe's ARM 6 ruling of 2026-09-07 (`futon2:holes/labs/wm-contract/RULINGS-walkthrough-2026-09-07.md` item 4) takes arm two's `CascadeDiff` codomain from `DarkTower/WarMachine/F12D1Arms.lean:119`, and his ARM 4 ruling (item 9) adds the support-grain `Set P` attribution argument from `DarkTower/WarMachine/F12SupportArm.lean:26`. -/
 abbrev RuledOrganiseType (Policy P Score : Type*) :=
-  Cascade Policy → Set P → Repository P → Set P → CascadeDiff P Score
+  Cascade Policy → CandidateActionSpace P → Repository P → Set P → CascadeDiff P Score
 
 /-- F12 slice 4a, the ruled conformance predicate.  `osel`, `oauth`, `o1`, `o2` and `o4` are arm six's clauses from `DarkTower/WarMachine/F12CascadeDiffArm.lean:16-27`; `oattr` is arm four's from `DarkTower/WarMachine/F12SupportArm.lean:38`; `o3` is the no-bootstrap reading ruled at item 6, in slice 11's shape from `DarkTower/WarMachine/F12O3FieldArm.lean:20-22`. -/
 structure ConformantOrganiseRuled {Policy P Score : Type*}
