@@ -188,10 +188,12 @@ theorem organiseSnatchRecordedEdge1822 :
     ReachOutside.direct ?_⟩
   simp [snatchRepo]
 
-/-- The ruled subtraction refuses recorded edge 18→22. Together with the next
-theorem this witnesses the real-record shape of synthetic
-`organiseRuledOwnBootstrap`: the ruled O3 keeps only one of ten computed edges,
-so it cannot reproduce that edge set. -/
+/-- The ruled subtraction refuses recorded edge 18→22, both of whose endpoints
+lie in `snatchAdded`.  This row is the real-record instance of the shape
+`organiseRuledOwnBootstrap` (`DarkTower/WarMachine/F12RuledCarrier.lean:187`)
+was built synthetically to control for.  That the ruled O3 keeps only one of the
+ten is not asserted here: it is
+`snatchOnlyEdge02SurvivesTheSubtraction` below. -/
 theorem organiseSnatchNotEdge1822 :
     ¬ (organiseSnatch trivialPolicyCascade snatchSelected snatchRepo snatchAdmitted).organisedEdges
       18 22 := by
