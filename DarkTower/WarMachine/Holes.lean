@@ -8155,7 +8155,9 @@ private def closedDeclarations : List Declaration :=
 private def holeDeclarations : List Declaration :=
   [mkRefused "C" "P-validated-R5 §2a" "implementation; no observation selects C",
    mkClosedUnderCriterion "nonDegenerateAblationLaw" "P-validated-R5 §2a′" "ExactDyadicAblationTable" "recorded G and pragmatic minimizer sets overlap",
-   mkRefused "find" "P-validated-R5 §3e find" "implementation, not a law",
+   { (mkWitnessedClosed "find" "P-validated-R5 §3e find; Item 20; Item 23 and RUN4 checklist A2 commission"
+     "F11AppliedConformance.conformantImplementationExists (ab8e4b8762), Item-20 statements 93ade5be78; a conformant implementation EXISTS at the named three-pattern Snatch instantiation; interface laws remain statements about opaque find; no runtime correspondence claimed"
+     "the named existence witness fails conformance, nonempty selection, or non-vacuous external-designation exclusion") with decided := "2026-09-09" },
    mkClosedUnderCriterion "findF1Containment" "P-validated-R5 §3e F1" "FindReceiptTable" "selection escapes repository or empty lacks absence",
    mkClosedUnderCriterion "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
    mkClosedUnderCriterion "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
