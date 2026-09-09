@@ -149,7 +149,7 @@ inductive Vertex where
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §2a · holder: by-record · An outcome is an observation indexed by its vertex. -/
 abbrev Outcome (Obs : Vertex → Type*) := Sigma Obs
 
-/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §2a · holder: by-record · evidence: REFUSED — this is an implementation, not a law, and the record fixes no observation that selects C · falsifier: REFUSED for the same reason · Preferences are declared per PRAGMATIC vertex only. C122's census proves this global declaration is free; it does not license choosing its value. -/
+/-- DEFERRAL UNDER ORGANIZED DISCOVERY · contract kind HOLE intentionally · owner: RULINGS-walkthrough-2026-09-08.md Item 17, approved RULINGS-walkthrough-2026-09-09.md Item 18c · holder: by-record · evidence: futon2 holes/labs/wm-contract/C591-C-as-calculation-proposal.md; excursion futon2 holes/E-C-realization.md · Preferred observations form a time-indexed Cτ family whose terminal member is the ruled outcome-kind distribution. The disposition bridge P(d|o) is to be fitted from recorded observation-to-disposition evidence, and proposed preferences retain provenance until an operator ruling fixes them. Preferences are declared per PRAGMATIC vertex only; C122's census proves this global declaration is free, and it does not license choosing its value. This is an active discovery obligation, not a deliberate implementation refusal. -/
 def C {Obs : Vertex → Type*} (v : Vertex) (_pragmatic : v ≠ Vertex.evidence) : Obs v → ℝ := sorry
 
 /-- Expected free energy, shared by the risk-minus-information-gain and
