@@ -237,17 +237,55 @@ inductive TypedAbsence where
   | noPatternAddressesThisTension
   deriving DecidableEq, Repr
 
-structure Receipt where
-  citesTextOrEdges : Prop
-  scoreAlone : Prop
+inductive FindRoute where
+  | structuredAntecedent
+  deriving DecidableEq, Repr
 
-def Receipt.nonSelfCertifying (receipt : Receipt) : Prop :=
-  receipt.citesTextOrEdges ∧ ¬ receipt.scoreAlone
+inductive FindClauseKind where
+  | ifClause
+  | howeverClause
+  deriving DecidableEq, Repr
 
-structure FindResult (P : Type*) where
+structure FindQuery (State P : Type*) where
+  tension : Tension State
+  fires : P → State → Prop
+
+/-- An authored descent beginning at `pattern`. An empty tail cites the
+    pattern itself; a nonempty tail cites authored repository edges. -/
+structure FindWarrant {P : Type*} (R : Repository P) (pattern : P) where
+  tail : List P
+  members : ∀ p ∈ tail, p ∈ R.patterns
+  descent : List.IsChain R.standsOn (pattern :: tail)
+
+inductive FindCitation {P : Type*} (R : Repository P) (pattern : P)
+    (TextCitation : Type*) where
+  | patternText : TextCitation → FindCitation R pattern TextCitation
+  | authoredEdges : FindWarrant R pattern → FindCitation R pattern TextCitation
+
+structure Receipt {P : Type*} (R : Repository P) (pattern : P)
+    (Clause AsOf TextCitation : Type*) where
+  clauseKind : FindClauseKind
+  acknowledgedClause : Clause
+  route : FindRoute
+  asOf : AsOf
+  citation : FindCitation R pattern TextCitation
+
+def Receipt.nonSelfCertifying {P : Type*} {R : Repository P} {pattern : P}
+    {Clause AsOf TextCitation : Type*}
+    (_receipt : Receipt R pattern Clause AsOf TextCitation) : Prop :=
+  True
+
+structure FindResult (P Clause AsOf TextCitation : Type*)
+    (R : Repository P) where
   selected : Set P
-  receipts : P → Option Receipt
+  receipts : ∀ p, p ∈ selected → Receipt R p Clause AsOf TextCitation
   absence : Option TypedAbsence
+
+instance {P Clause AsOf TextCitation : Type*} {R : Repository P} :
+    Nonempty (FindResult P Clause AsOf TextCitation R) :=
+  ⟨{ selected := ∅
+     receipts := by intro _ membership; simp at membership
+     absence := none }⟩
 
 structure FindReceiptRow (Scenario P : Type*) where
   scenario : Scenario
@@ -260,8 +298,42 @@ structure FindReceiptRow (Scenario P : Type*) where
 
 abbrev FindReceiptTable (Scenario P : Type*) := List (FindReceiptRow Scenario P)
 
-/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §3e find · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Find maps a structured tension and repository to selected patterns, receipts, or typed absence. Its recorded F1–F4 instances do not select one canonical implementation. -/
-def find {State P : Type*} : Tension State → Repository P → FindResult P := sorry
+/-- RULINGS-walkthrough-2026-09-09.md Item 18a replaces the implementation
+    refusal with this approved opaque interface; owner: P-validated-R5 §3e find. -/
+opaque find {State P Clause AsOf TextCitation : Type*} :
+  FindQuery State P →
+  (R : Repository P) →
+  FindResult P Clause AsOf TextCitation R
+
+def findF1ContainmentLaw {State P Clause AsOf TextCitation : Type*}
+    (q : FindQuery State P) (R : Repository P) : Prop :=
+  (find (Clause := Clause) (AsOf := AsOf) (TextCitation := TextCitation)
+      q R).selected ⊆ R.patterns ∧
+  ((find (Clause := Clause) (AsOf := AsOf) (TextCitation := TextCitation)
+      q R).selected = ∅ →
+    (find (Clause := Clause) (AsOf := AsOf) (TextCitation := TextCitation)
+      q R).absence = some .noPatternAddressesThisTension)
+
+def findF2ReceiptedLaw {State P Clause AsOf TextCitation : Type*}
+    (q : FindQuery State P) (R : Repository P) : Prop :=
+  ∀ p, p ∈ (find (Clause := Clause) (AsOf := AsOf)
+    (TextCitation := TextCitation) q R).selected →
+    Nonempty (Receipt R p Clause AsOf TextCitation)
+
+def findF3NonSelfCertifyingLaw {State P Clause AsOf TextCitation : Type*}
+    (q : FindQuery State P) (R : Repository P) : Prop :=
+  ∀ p, p ∈ (find (Clause := Clause) (AsOf := AsOf)
+    (TextCitation := TextCitation) q R).selected →
+    ∃ receipt : Receipt R p Clause AsOf TextCitation,
+      receipt.nonSelfCertifying
+
+/-- The authoritative F4 statement. It deliberately does not identify a
+    zero-mass designation; that registered reading remains evidence-sensitive. -/
+def findF4FalsifiableLaw {State P Clause AsOf TextCitation : Type*}
+    (q : FindQuery State P) (R : Repository P) : Prop :=
+  ∃ p, p ∈ R.patterns ∧
+    p ∉ (find (Clause := Clause) (AsOf := AsOf)
+      (TextCitation := TextCitation) q R).selected
 
 /-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F1 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `c11673ea7164e90b10cc378ab6b2dfe14e545449d85e0dde70d5c2282e2430ce` · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: selection stays inside the recorded repository and an empty selection carries typed absence. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF1Containment`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f1` rejected; leg (1) is INAPPLICABLE — the declared observation is a recorded find-receipt table over authored library text, not a run observation, so the run leg does not apply here rather than being met. -/
 def findF1Containment {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
