@@ -27,15 +27,19 @@ def FlightDisposition.all : List FlightDisposition :=
 theorem FlightDisposition.mem_all (d : FlightDisposition) : d ∈ FlightDisposition.all := by
   rcases d <;> simp [FlightDisposition.all]
 
-/-- Named-empty people observation slot.  The four vertices are recorded at
+/-- Named-empty noun observation slot. People occupied nouns in the earlier
+specialization and remain unattested (Item 18b, 2026-09-09).
+The four vertices are recorded at
 `futon2:holes/problems/P-validated-R5.md:116`; no people outcome carrier is
 attested for this ruled C. -/
-abbrev PeopleObservation := Empty
+abbrev NounObservation := Empty
 
-/-- Named-empty money observation slot.  The machine has no money vertex of
+/-- Named-empty verb observation slot. Money occupied verbs in the earlier
+specialization and remains unattested (Item 18b, 2026-09-09).
+The machine has no money vertex of
 its own (that is VSAT's), as recorded at
 `futon2:holes/problems/P-validated-R5.md:129-133`. -/
-abbrev MoneyObservation := Empty
+abbrev VerbObservation := Empty
 
 /-- Named-empty evidence carrier used only by the seed.  The evidence
 enumeration is owed: the only source mention is prose at
@@ -47,15 +51,15 @@ abbrev SeedEvidenceObservation := Empty
 /-- Ruled tagged observation family, polymorphic in the deliberately unruled
 evidence observation carrier. -/
 def Obs (EvidenceObs : Type) : Vertex → Type
-  | .people => PeopleObservation
-  | .money => MoneyObservation
-  | .organisations => FlightDisposition
+  | .nouns => NounObservation
+  | .verbs => VerbObservation
+  | .organization => FlightDisposition
   | .evidence => EvidenceObs
 
 abbrev SeedObs := Obs SeedEvidenceObservation
 
 def organisationOutcome (d : FlightDisposition) : Outcome SeedObs :=
-  ⟨.organisations, d⟩
+  ⟨.organization, d⟩
 
 /-- The five dispositions observed at
 `futon2:holes/labs/wm-contract/runs/D1-evidence/kl-worked-example.edn:5`. -/
@@ -84,18 +88,18 @@ ruling (`futon2:holes/labs/wm-contract/runs/D1-evidence/kl-worked-example.edn:15
 noncomputable def seed : PreferenceDistribution SeedObs where
   support := fun _ => FlightDisposition.all.map organisationOutcome
   mass := fun _ o => match o with
-    | ⟨.organisations, .groundedChange⟩ => 1 / 2
-    | ⟨.organisations, .agentUnavailable⟩ => 1 / 8
-    | ⟨.organisations, .buildFailed⟩ => 1 / 8
-    | ⟨.organisations, .incomplete⟩ => 1 / 8
-    | ⟨.organisations, .noSelection⟩ => 1 / 8
-    | ⟨.organisations, .groundedNoChange⟩ => 0
-    | ⟨.organisations, .artifactOnly⟩ => 0
-    | ⟨.organisations, .abstained⟩ => 0
-    | ⟨.organisations, .guardrailRefusal⟩ => 0
-    | ⟨.organisations, .dispatchFailed⟩ => 0
-    | ⟨.organisations, .substrateUnavailable⟩ => 0
-    | ⟨.organisations, .cancelled⟩ => 0
+    | ⟨.organization, .groundedChange⟩ => 1 / 2
+    | ⟨.organization, .agentUnavailable⟩ => 1 / 8
+    | ⟨.organization, .buildFailed⟩ => 1 / 8
+    | ⟨.organization, .incomplete⟩ => 1 / 8
+    | ⟨.organization, .noSelection⟩ => 1 / 8
+    | ⟨.organization, .groundedNoChange⟩ => 0
+    | ⟨.organization, .artifactOnly⟩ => 0
+    | ⟨.organization, .abstained⟩ => 0
+    | ⟨.organization, .guardrailRefusal⟩ => 0
+    | ⟨.organization, .dispatchFailed⟩ => 0
+    | ⟨.organization, .substrateUnavailable⟩ => 0
+    | ⟨.organization, .cancelled⟩ => 0
     | _ => 0
   nonnegative := by intro _ o; rcases o with ⟨v, o⟩; cases v <;> cases o <;> norm_num
   normalised := by intro _; norm_num [FlightDisposition.all, organisationOutcome]
@@ -129,10 +133,10 @@ theorem seed_positivePreference_iff_support_avoids_namedZeros
   · intro h π o ho
     rcases o with ⟨v, o⟩
     cases v with
-    | people => exact Empty.elim o
-    | money => exact Empty.elim o
+    | nouns => exact Empty.elim o
+    | verbs => exact Empty.elim o
     | evidence => exact Empty.elim o
-    | organisations =>
+    | organization =>
         have hn := h π o ho
         rcases o <;> simp_all [namedZeroDispositions, seed, organisationOutcome]
 

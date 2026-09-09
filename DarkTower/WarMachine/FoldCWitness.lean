@@ -7,7 +7,7 @@ open F10RuledCarrier
 
 /-- Base preference on the ruled F10 outcome carrier. -/
 def ruledBase : Outcome SeedObs → ℝ
-  | ⟨.organisations, .groundedChange⟩ => 3
+  | ⟨.organization, .groundedChange⟩ => 3
   | _ => 0
 
 /-- The runtime declaration currently marks no ruled-sum layer folded. -/

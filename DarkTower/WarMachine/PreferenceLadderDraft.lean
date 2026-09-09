@@ -17,8 +17,8 @@ universe u v w x
 noncomputable section
 
 /-- An observation at a pragmatic vertex.  The distinguished evidence vertex
-is excluded by the proof field without choosing either competing `Vertex`
-enumeration. -/
+is excluded by the proof field. `Vertex` is canonical per Item 16/18b;
+the earlier people/money/organisations reading is the recorded specialization. -/
 structure PragmaticObservation (V : Type u) (evidence : V)
     (Obs : V → Type v) where
   vertex : V

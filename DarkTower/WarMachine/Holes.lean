@@ -139,10 +139,14 @@ structure InformationState (State History Repo Tension : Type*) where
 /-- CLOSED-BY-RECORD · owner: P-validated-R5 §3 · holder: by-record · A decision rule reads an information state and chooses an action. It is the result of inference, not the cascade-grain policy π that G scores. -/
 abbrev DecisionRule (InformationState Action : Type*) := InformationState → Action
 
+/-- Canonical tetrahedron per Item 16/18b of the walkthrough rulings
+    (2026-09-09 Item 18b). The earlier people/money/organisations reading is
+    a specialization; its people and money slots are named-empty in the
+    machine, as recorded in `F10RuledCarrier`. -/
 inductive Vertex where
-  | people
-  | money
-  | organisations
+  | nouns
+  | verbs
+  | organization
   | evidence
   deriving DecidableEq, Repr
 
