@@ -318,26 +318,80 @@ def findF1ContainmentLaw {State P Clause AsOf TextCitation : Type*}
     (find (Clause := Clause) (AsOf := AsOf) (TextCitation := TextCitation)
       q R).absence = some .noPatternAddressesThisTension)
 
+/-- Item 20a (2026-09-09), STATEMENT ONLY: independently supplied expected
+    receipt content. Neither the pattern identity nor the actual receipt supplies
+    this expectation by definition. No implementation is witnessed here. -/
+structure FindReceiptExpectation (Clause AsOf : Type*) where
+  clauseKind : FindClauseKind
+  acknowledgedClause : Clause
+  route : FindRoute
+  asOf : AsOf
+
+/-- Item 20a, STATEMENT ONLY: compare the actual selected receipt's data with
+    independent expectations, rather than existential receipt presence. -/
+def FindResult.contentF2 {P Clause AsOf TextCitation : Type*} {R : Repository P}
+    (result : FindResult P Clause AsOf TextCitation R)
+    (expected : P → FindReceiptExpectation Clause AsOf) : Prop :=
+  ∀ p (hp : p ∈ result.selected),
+    (result.receipts p hp).clauseKind = (expected p).clauseKind ∧
+    (result.receipts p hp).acknowledgedClause = (expected p).acknowledgedClause ∧
+    (result.receipts p hp).route = (expected p).route ∧
+    (result.receipts p hp).asOf = (expected p).asOf
+
+/-- Item 20c, STATEMENT ONLY: F3 reads the citation field, independently of
+    F2's clause expectation. Text validation is supplied against authored source;
+    authored-edge citations carry their descent proof in the applied carrier.
+    Constructing a text payload alone does not validate it. -/
+def FindCitation.validates {P TextCitation : Type*} {R : Repository P} {p : P}
+    (citation : FindCitation R p TextCitation)
+    (validText : P → TextCitation → Prop) : Prop :=
+  match citation with
+  | .patternText text => validText p text
+  | .authoredEdges _ => True
+
+/-- Item 20c, STATEMENT ONLY: the returned receipt's actual citation must
+    validate; an unrelated existential receipt cannot discharge this law. -/
+def FindResult.citationF3 {P Clause AsOf TextCitation : Type*} {R : Repository P}
+    (result : FindResult P Clause AsOf TextCitation R)
+    (validText : P → TextCitation → Prop) : Prop :=
+  ∀ p (hp : p ∈ result.selected), (result.receipts p hp).citation.validates validText
+
+/-- Item 20b, STATEMENT ONLY: reading C, exclusion under an externally supplied
+    designation. Empty applicable designations satisfy exclusion vacuously;
+    they earn no discrimination (see `FindResult.discriminatingF4`). -/
+def FindResult.exclusionF4 {P Clause AsOf TextCitation : Type*} {R : Repository P}
+    (result : FindResult P Clause AsOf TextCitation R) (designated : Set P) : Prop :=
+  ∀ p ∈ designated, p ∈ R.patterns → p ∉ result.selected
+
+/-- Item 20b's vacuity clause, STATEMENT ONLY: evidence earns discrimination
+    only when an applicable external designation exists and is respected. -/
+def FindResult.discriminatingF4 {P Clause AsOf TextCitation : Type*} {R : Repository P}
+    (result : FindResult P Clause AsOf TextCitation R) (designated : Set P) : Prop :=
+  (designated ∩ R.patterns).Nonempty ∧ result.exclusionF4 designated
+
+/-- Item 20a, STATEMENT ONLY: content-F2 at the applied opaque interface.
+    This constrains a future implementation; it does not witness conformance. -/
 def findF2ReceiptedLaw {State P Clause AsOf TextCitation : Type*}
-    (q : FindQuery State P) (R : Repository P) : Prop :=
-  ∀ p, p ∈ (find (Clause := Clause) (AsOf := AsOf)
-    (TextCitation := TextCitation) q R).selected →
-    Nonempty (Receipt R p Clause AsOf TextCitation)
+    (q : FindQuery State P) (R : Repository P)
+    (expected : P → FindReceiptExpectation Clause AsOf) : Prop :=
+  (find (Clause := Clause) (AsOf := AsOf) (TextCitation := TextCitation) q R).contentF2 expected
 
+/-- Item 20c, STATEMENT ONLY: citation-F3 at the applied opaque interface,
+    distinct from F2. No implementation is witnessed. -/
 def findF3NonSelfCertifyingLaw {State P Clause AsOf TextCitation : Type*}
-    (q : FindQuery State P) (R : Repository P) : Prop :=
-  ∀ p, p ∈ (find (Clause := Clause) (AsOf := AsOf)
-    (TextCitation := TextCitation) q R).selected →
-    ∃ receipt : Receipt R p Clause AsOf TextCitation,
-      receipt.nonSelfCertifying
+    (q : FindQuery State P) (R : Repository P)
+    (validText : P → TextCitation → Prop) : Prop :=
+  (find (Clause := Clause) (AsOf := AsOf) (TextCitation := TextCitation) q R).citationF3 validText
 
-/-- The authoritative F4 statement. It deliberately does not identify a
-    zero-mass designation; that registered reading remains evidence-sensitive. -/
+/-- Item 20b, STATEMENT ONLY: external-designation reading C at the applied
+    interface. Quantifying this law over q and R gives the universal reading;
+    the designation is supplied independently of finder output. Empty applicable
+    designations are vacuous, not discriminatory evidence. No implementation
+    is witnessed. -/
 def findF4FalsifiableLaw {State P Clause AsOf TextCitation : Type*}
-    (q : FindQuery State P) (R : Repository P) : Prop :=
-  ∃ p, p ∈ R.patterns ∧
-    p ∉ (find (Clause := Clause) (AsOf := AsOf)
-      (TextCitation := TextCitation) q R).selected
+    (q : FindQuery State P) (R : Repository P) (zeroMass : State → Set P) : Prop :=
+  (find (Clause := Clause) (AsOf := AsOf) (TextCitation := TextCitation) q R).exclusionF4
+    (zeroMass q.tension.context)
 
 /-- CLOSED UNDER THE J9 CRITERION 2026-09-03 (worklist `:U46`) · owner: P-validated-R5 §3e F1 · holder: by-record · fixture: `futon3:checks/find-snatch.edn` · fixture-sha256: `c11673ea7164e90b10cc378ab6b2dfe14e545449d85e0dde70d5c2282e2430ce` · evidence: FindReceiptTable · falsifier: a selected pattern is outside the repository, or empty selection has no typed absence · SCOPE AMENDMENT 2026-08-31: the original declaration universally quantified over opaque, deliberately refused `find`; no serialized evidence could prove that correspondence. This predicate states exactly the recorded-row invariant: selection stays inside the recorded repository and an empty selection carries typed absence. CLOSE (criterion: futon2 `holes/labs/wm-contract/RUNBOOK.md`, which dispositions F1-F4 by name): leg (3) is `wmFindSnatchF1Containment`, `decide` over the 34 transcribed rounds, no `sorry`; leg (2) is `futon3:checks/find_snatch.clj` exiting 0 with `--negative-f1` rejected; leg (1) is INAPPLICABLE — the declared observation is a recorded find-receipt table over authored library text, not a run observation, so the run leg does not apply here rather than being met. -/
 def findF1Containment {Scenario P : Type*} (row : FindReceiptRow Scenario P) : Prop :=
