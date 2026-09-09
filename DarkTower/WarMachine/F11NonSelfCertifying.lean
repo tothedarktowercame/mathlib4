@@ -24,7 +24,7 @@ def FinderF2 {State P : Type*} (f : FindType State P) : Prop :=
 
 /-- A receipt whose two propositions merely assert the desired conclusion;
 the carrier has no citation data (`DarkTower/WarMachine/Holes.lean:240-245`). -/
-def assertedNonSelfCertifyingReceipt : Receipt where
+def assertedNonSelfCertifyingReceipt : LegacyReceipt where
   citesTextOrEdges := True
   scoreAlone := False
 
@@ -66,7 +66,7 @@ theorem findAssertingF3_conformant : ConformantFind findAssertingF3 where
     change p ∈ findSnatchSelected t.context ∧ p ∈ repo.patterns at hp'
     simp [findAssertingF3, hp'] at hr
     rw [← hr]
-    simp [assertedNonSelfCertifyingReceipt, Receipt.nonSelfCertifying]
+    simp [assertedNonSelfCertifyingReceipt, LegacyReceipt.nonSelfCertifying]
 
 /-- M2 nondegeneracy for the faithful data-carrying finder
 (`DarkTower/WarMachine/F11ReceiptCarrier.lean:150-164`). -/
@@ -233,15 +233,15 @@ theorem misattributing_not_clauseAttributedF2 : ¬ ClauseAttributedF2 findRMisat
 
 /-! ### REVIEW ADDITION (slice 7): the carrier that has F3's field -/
 
-/-- A receipt that carries WHOSE text it cites. `Receipt`
+/-- A receipt that carries WHOSE text it cites. `LegacyReceipt`
 (`Holes.lean:240-242`) has no such field, and neither has `RelationalReceipt`
 (`F11ReceiptCarrier.lean:95-99`): this is the smallest carrier at which F3's
 `the pattern's text` can be stated (`P-validated-R5.md:487`). -/
-structure CitingReceipt (P : Type*) extends Receipt where
+structure CitingReceipt (P : Type*) extends LegacyReceipt where
   citedText : P
 
 /-- `find`'s result carrier with citing receipts; as in slice 4 this moves
-`find`'s own RETURN TYPE, not only `Receipt` (`Holes.lean:247-250`). -/
+`find`'s own RETURN TYPE, not only `LegacyReceipt` (`Holes.lean:247-250`). -/
 structure FindResultC (P : Type*) where
   selected : Set P
   receipts : P → Option (CitingReceipt P)
@@ -251,10 +251,10 @@ structure FindResultC (P : Type*) where
 abbrev FindTypeC (State P : Type*) :=
   Tension State → Repository P → FindResultC P
 
-/-- Forgetting the citation gives exactly today's `FindResult`. -/
-def FindResultC.erase {P : Type*} (r : FindResultC P) : FindResult P where
+/-- Forgetting the citation gives exactly today's `LegacyFindResult`. -/
+def FindResultC.erase {P : Type*} (r : FindResultC P) : LegacyFindResult P where
   selected := r.selected
-  receipts := fun p => (r.receipts p).map (·.toReceipt)
+  receipts := fun p => (r.receipts p).map (·.toLegacyReceipt)
   absence := r.absence
 
 /-- The citation erasure lifted to finders (`F11ReceiptCarrier.lean:147-149`). -/
@@ -284,7 +284,7 @@ def findCFaithful : FindTypeC FindSnatchScenario SnatchPattern :=
 /-- The same selection, citing a DIFFERENT recorded pattern's text
 (`misattributedReceiptOwner`, `F11ReceiptCarrier.lean:13-14`). Nothing in
 `find_snatch.clj:167-171`, in `find_organise.clj:567-571` or in
-`Receipt.nonSelfCertifying` compares the citation to the pattern it is for. -/
+`LegacyReceipt.nonSelfCertifying` compares the citation to the pattern it is for. -/
 def findCMisciting : FindTypeC FindSnatchScenario SnatchPattern :=
   fun t repo =>
     let selected := findSnatchSelected t.context ∩ repo.patterns
@@ -343,7 +343,7 @@ theorem findCMiscitingFailsCitation : ¬ CitesTheSelectedPattern findCMisciting 
   simp [misattributedReceiptOwner] at hcite
 
 /-- M2/M4, THE MEASUREMENT: the two finders are EQUAL after erasing the citation,
-so no predicate whatever on today's `FindResult` separates a finder that cites the
+so no predicate whatever on today's `LegacyFindResult` separates a finder that cites the
 selected pattern's text from one that cites another pattern's. F3's blindness is a
 fact about the CARRIER, exactly as slice 4 found of F2
 (`F11ReceiptCarrier.lean:182-195`) -- and it is a SECOND blindness, on a second
@@ -351,7 +351,7 @@ field, not that one re-exported. -/
 theorem findCErasuresAreEqual : eraseFinderC findCFaithful = eraseFinderC findCMisciting := by
   funext t repo
   simp only [eraseFinderC, findCFaithful, findCMisciting, FindResultC.erase,
-    FindResult.mk.injEq, true_and, and_true]
+    LegacyFindResult.mk.injEq, true_and, and_true]
   funext p
   by_cases hp : p ∈ findSnatchSelected t.context ∩ repo.patterns <;>
     simp [hp]
@@ -373,7 +373,7 @@ theorem findCFaithfulErasureConformant : ConformantFind (eraseFinderC findCFaith
     intro t repo p r hp hr
     simp [eraseFinderC, findCFaithful, FindResultC.erase] at hr
     rw [← hr.2]
-    simp [Receipt.nonSelfCertifying]
+    simp [LegacyReceipt.nonSelfCertifying]
 
 /-- M4: and therefore so does the MISCITING finder's -- today's F3 returns the same
 verdict on a finder whose every receipt cites the wrong pattern's text. -/
@@ -437,7 +437,7 @@ theorem findF2NotF3_refutes_f3 : ¬ FinderF3 findF2NotF3 := by
     simp [findF2NotF3, t, findSnatchSelected, findSnatchScenarios,
       findSnatchRepository, snatchRepository]
   have := h t findSnatchRepository .askForSurplusNotSurrender _ hp hr
-  simp [Receipt.nonSelfCertifying] at this
+  simp [LegacyReceipt.nonSelfCertifying] at this
 
 /-- M5 finder satisfying F3 vacuously but not F2: it selects recorded members
 and returns no receipts (`DarkTower/WarMachine/F11Conformance.lean:25-29`). -/

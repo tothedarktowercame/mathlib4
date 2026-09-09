@@ -1,10 +1,10 @@
-import DarkTower.WarMachine.Holes
+import DarkTower.WarMachine.F11LegacyCarrier
 
 /-! # F11 find-function conformance
 
 This module states F1--F3 of `find` at the function grain from
 `P-validated-R5.md:443-547`. F4 is separate because it quantifies over a
-finder's possible inputs; `FindResult` (`Holes.lean:247-250`) has no `zeroMass`
+finder's possible inputs; `LegacyFindResult` (`Holes.lean:247-250`) has no `zeroMass`
 field from which a single returned value could state it.
 -/
 
@@ -15,7 +15,7 @@ namespace DarkTower.WarMachine.Holes
 noncomputable section
 
 /-- F11 slice 2 signature, identical to refused `find` at `Holes.lean:264`. -/
-abbrev FindType (State P : Type*) := Tension State → Repository P → FindResult P
+abbrev FindType (State P : Type*) := Tension State → Repository P → LegacyFindResult P
 
 /-- F11 slice 2 laws F1--F3 at the function grain of `P-validated-R5.md:485-487`; F4 is separately quantified by `FindFalsifiable`. -/
 structure ConformantFind {State P : Type*} (f : FindType State P) : Prop where
@@ -63,7 +63,7 @@ theorem findSnatchSelectedSubsetReceipted (scenario : FindSnatchScenario) :
   rcases hcases with rfl | rfl | rfl | rfl | rfl | rfl <;> simpa using hmem
 
 /-- F11 slice 2 structured-antecedent receipt corresponding to `find_snatch.clj:47-71`: it cites authored text/edges and is not score-alone. -/
-def findStructuredReceipt : Receipt where
+def findStructuredReceipt : LegacyReceipt where
   citesTextOrEdges := True
   scoreAlone := False
 
@@ -95,7 +95,7 @@ theorem findSnatchReplayConformant : ConformantFind findSnatchReplay where
     by_cases hrec : p ∈ findSnatchReceipted t.context
     · simp [findSnatchReplay, hrec] at hr
       rw [← hr]
-      simp [Receipt.nonSelfCertifying, findStructuredReceipt]
+      simp [LegacyReceipt.nonSelfCertifying, findStructuredReceipt]
     · simp [findSnatchReplay, hrec] at hr
 
 /-- F11 slice 2 review addition: the replay's receipts are PARTIAL on the
@@ -156,7 +156,7 @@ theorem findIdentityConformant {State P : Type*} :
     intro t repo p r hp hr
     simp [findIdentity] at hr
     subst r
-    simp [Receipt.nonSelfCertifying, findStructuredReceipt]
+    simp [LegacyReceipt.nonSelfCertifying, findStructuredReceipt]
 
 /-- F11 slice 2 F4 measurement from `P-validated-R5.md:488`: identity on a nonempty repository is unfalsifiable. -/
 theorem findIdentityNotFalsifiable :

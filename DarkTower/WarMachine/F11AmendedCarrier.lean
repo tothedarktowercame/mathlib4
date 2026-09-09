@@ -15,7 +15,7 @@ namespace DarkTower.WarMachine.Holes
 noncomputable section
 
 /-- F11 slice 6 M1: receipt data requested by `P-validated-R5.md:486`, extending the two proposition fields at `Holes.lean:240-242`. -/
-structure AmendedReceipt (Clause Route AsOf : Type*) extends Receipt where
+structure AmendedReceipt (Clause Route AsOf : Type*) extends LegacyReceipt where
   acknowledgedClause : Clause
   retrievalRoute : Route
   asOf : AsOf
@@ -44,11 +44,11 @@ structure ConformantAmendedFind {State P Route AsOf : Type*}
   f4ReturnedZeroMass : ∀ t repo p, p ∈ (f t repo).zeroMass →
     p ∈ repo.patterns ∧ p ∉ (f t repo).selected
 
-/-- F11 slice 6 M1: erase the joint carrier to today's `FindResult` at `Holes.lean:247-250`. -/
+/-- F11 slice 6 M1: erase the joint carrier to today's `LegacyFindResult` at `Holes.lean:247-250`. -/
 def AmendedFindResult.erase {P Clause Route AsOf : Type*}
-    (r : AmendedFindResult P Clause Route AsOf) : FindResult P where
+    (r : AmendedFindResult P Clause Route AsOf) : LegacyFindResult P where
   selected := r.selected
-  receipts := fun p => (r.receipts p).map (·.toReceipt)
+  receipts := fun p => (r.receipts p).map (·.toLegacyReceipt)
   absence := r.absence
 
 /-- F11 slice 6 M1: erase a joint amended finder to today's function signature at `F11Conformance.lean:18`. -/
@@ -150,7 +150,7 @@ theorem amendedFaithfulConformant : ConformantAmendedFind amendedFaithful where
     simp only [amendedFaithful, if_pos hp'] at hr
     have hre := Option.some.inj hr
     rw [← hre]
-    simp [Receipt.nonSelfCertifying]
+    simp [LegacyReceipt.nonSelfCertifying]
   f4ReturnedZeroMass := by
     intro t repo p hp
     refine ⟨hp.2, ?_⟩
@@ -282,7 +282,7 @@ theorem amendedDifferentZeroMassConformant : ConformantAmendedFind amendedDiffer
   refine { amendedFaithfulConformant with f4ReturnedZeroMass := ?_ }
   simp [amendedDifferentZeroMass]
 
-/-- F11 slice 6 M2: the zero-mass field alone separates two finders erased to equal current `FindResult` values. -/
+/-- F11 slice 6 M2: the zero-mass field alone separates two finders erased to equal current `LegacyFindResult` values. -/
 theorem amendedZeroMassSeparates : amendedFaithful ≠ amendedDifferentZeroMass := by
   intro h
   have hm : SnatchPattern.consultTheRemedyBeforeExiting ∈
@@ -333,7 +333,7 @@ theorem amendedRefusingRecordedDesignationNonempty :
   simpa [amendedRefusing] using findSnatchRepositoryNonempty
 
 /-- F11 slice 6 review, M2's benchmark stated in Lean: the two receipt-separated
-finders are EQUAL after erasure to today's `FindResult`, exactly as slice 4
+finders are EQUAL after erasure to today's `LegacyFindResult`, exactly as slice 4
 measured at `F11ReceiptCarrier.lean:186-193`.  Without this the separation at
 `amendedReceiptDataSeparates` would only say the two amended finders differ, not
 that the amendment buys a distinction today's carrier cannot make. -/
@@ -341,7 +341,7 @@ theorem amendedReceiptPairErasuresAreEqual :
     eraseAmendedFinder amendedFaithful = eraseAmendedFinder amendedMisattributing := by
   funext t repo
   simp only [eraseAmendedFinder, amendedFaithful, amendedMisattributing,
-    AmendedFindResult.erase, FindResult.mk.injEq, true_and, and_true]
+    AmendedFindResult.erase, LegacyFindResult.mk.injEq, true_and, and_true]
   funext p
   by_cases hp : p ∈ findSnatchSelected t.context ∩ repo.patterns <;> simp [hp]
 
@@ -387,7 +387,7 @@ theorem amendedIdentityConformant : ConformantAmendedFind amendedIdentity where
     simp only [amendedIdentity, if_pos hp'] at hr
     have hre := Option.some.inj hr
     rw [← hre]
-    simp [Receipt.nonSelfCertifying]
+    simp [LegacyReceipt.nonSelfCertifying]
   f4ReturnedZeroMass := by
     intro t repo p hp
     simp [amendedIdentity] at hp

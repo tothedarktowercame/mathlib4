@@ -104,7 +104,7 @@ theorem findAllButConformant {State P : Type*} (q : P) :
     · have hp' : p ∈ repo.patterns \ {q} := by simpa [findAllBut, hq] using hp
       simp [findAllBut, hq] at hr
       rw [← hr.2]
-      simp [Receipt.nonSelfCertifying, findStructuredReceipt]
+      simp [LegacyReceipt.nonSelfCertifying, findStructuredReceipt]
     · simp [findAllBut, hq] at hp
 
 /-- F11 slice 3 R2.1: `findAllBut` satisfies forall-inputs reading A from `F11Conformance.lean:31-32`. -/

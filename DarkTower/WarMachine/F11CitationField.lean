@@ -57,7 +57,7 @@ theorem amendedCitationBuy :
 /-- D2 carrier holding the two candidate data independently: acknowledged
 pattern and cited-text owner (`F11AmendedCarrier.lean:18-21` and
 `F11NonSelfCertifying.lean:240-243`). -/
-structure DualReceipt extends Receipt where
+structure DualReceipt extends LegacyReceipt where
   acknowledgedClause : SnatchPattern
   citedText : SnatchPattern
 
@@ -70,10 +70,10 @@ structure DualResult where
 /-- D2 finder type over the recorded scenario and repository types. -/
 abbrev DualFind := Tension FindSnatchScenario → Repository SnatchPattern → DualResult
 
-/-- D2 erasure to today's `FindResult` (`Holes.lean:247-250`). -/
+/-- D2 erasure to today's `LegacyFindResult` (`Holes.lean:247-250`). -/
 def eraseDual (f : DualFind) : FindType FindSnatchScenario SnatchPattern := fun t repo =>
   let r := f t repo
-  { selected := r.selected, receipts := fun p => (r.receipts p).map (·.toReceipt),
+  { selected := r.selected, receipts := fun p => (r.receipts p).map (·.toLegacyReceipt),
     absence := r.absence }
 
 /-- D2 clause predicate, stated only from the finder's own output. -/
@@ -224,7 +224,7 @@ theorem dualPairErasuresEqual :
     eraseDual (dualFinder 0) = eraseDual (dualFinder 1) ∧
     eraseDual (dualFinder 0) = eraseDual (dualFinder 2) := by
   constructor <;> funext t repo <;>
-    simp only [eraseDual, dualFinder, FindResult.mk.injEq, true_and, and_true] <;>
+    simp only [eraseDual, dualFinder, LegacyFindResult.mk.injEq, true_and, and_true] <;>
     funext p <;> by_cases hp : p ∈ findSnatchSelected t.context ∩ repo.patterns <;>
     simp [hp, dualReceipt]
 

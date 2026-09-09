@@ -3,14 +3,14 @@ import DarkTower.WarMachine.F11Conformance
 /-! # F11 receipt-carrier arms
 
 This module prices presence-only, proposition-only, and relational readings of
-F2 without changing `Receipt` at `Holes.lean:240-242`.
+F2 without changing `LegacyReceipt` at `Holes.lean:240-242`.
 -/
 
 open Set Classical
 namespace DarkTower.WarMachine.Holes
 noncomputable section
 
-/-- F11 slice 4 M1: the deliberately wrong owner assigned to every receipt; current `Receipt` at `Holes.lean:240-242` has no field in which this attribution could appear. -/
+/-- F11 slice 4 M1: the deliberately wrong owner assigned to every receipt; current `LegacyReceipt` at `Holes.lean:240-242` has no field in which this attribution could appear. -/
 def misattributedReceiptOwner (_ : SnatchPattern) : SnatchPattern :=
   .consultTheRemedyBeforeExiting
 
@@ -22,7 +22,7 @@ def findSnatchMisattributing : FindType FindSnatchScenario SnatchPattern :=
       receipts := fun p => if p ∈ selected then some findStructuredReceipt else none
       absence := if selected = ∅ then some .noPatternAddressesThisTension else none }
 
-/-- F11 slice 4 M1: presence-only F2 accepts the misattributing finder; F1 and F3 also hold because `Receipt.nonSelfCertifying` at `Holes.lean:244-245` reads only two propositions. -/
+/-- F11 slice 4 M1: presence-only F2 accepts the misattributing finder; F1 and F3 also hold because `LegacyReceipt.nonSelfCertifying` at `Holes.lean:244-245` reads only two propositions. -/
 theorem findSnatchMisattributingConformant : ConformantFind findSnatchMisattributing where
   f1Containment := by intro t repo p hp; exact hp.2
   f1TypedAbsence := by
@@ -40,7 +40,7 @@ theorem findSnatchMisattributingConformant : ConformantFind findSnatchMisattribu
     intro t repo p r hp hr
     simp [findSnatchMisattributing] at hr
     rw [← hr.2]
-    simp [Receipt.nonSelfCertifying, findStructuredReceipt]
+    simp [LegacyReceipt.nonSelfCertifying, findStructuredReceipt]
 
 /-- F11 slice 4 M1: on the full recorded repository (`F11Conformance.lean:35-38`) a selected pattern is assigned the different pattern's receipt owner. -/
 theorem findSnatchMisattributingWitness :
@@ -70,7 +70,7 @@ theorem findSnatchMisattributingFailsContentF2 :
   simp [misattributedReceiptOwner] at this
 
 /-- F11 slice 4 M2 proposition-field arm, adding exactly the three propositions requested by F2 at `P-validated-R5.md:486`; none carries which clause, route, or date. -/
-structure ReceiptWithAssertions extends Receipt where
+structure ReceiptWithAssertions extends LegacyReceipt where
   acknowledgesClause : Prop
   hasRoute : Prop
   hasAsOf : Prop
@@ -93,7 +93,7 @@ theorem assertionFieldsDoNotFixAttribution :
   simp [misattributedReceiptWithAssertions, misattributedReceiptOwner]
 
 /-- F11 slice 4 M2/M3 relational carrier: unlike three propositions, this stores clause, route, and fixture as-of data and can equate the clause to an input-derived expectation. -/
-structure RelationalReceipt (Clause Route AsOf : Type*) extends Receipt where
+structure RelationalReceipt (Clause Route AsOf : Type*) extends LegacyReceipt where
   acknowledgedClause : Clause
   retrievalRoute : Route
   asOf : AsOf
@@ -127,7 +127,7 @@ theorem receiptContentAttributedHoldsOfEveryFinder {State P : Type*}
     (f : FindType State P) : ReceiptContentAttributed f (fun _ _ p => p) := by
   intro t repo p _; rfl
 
-/-- F11 slice 4 review: `find`'s result carrier with receipts that CARRY data, the shape a content-stating F2 needs; `FindResult` at `Holes.lean:247-250` types its receipts by `Receipt`, so this is a change to `find`'s own return type and not only to `Receipt`. -/
+/-- F11 slice 4 review: `find`'s result carrier with receipts that CARRY data, the shape a content-stating F2 needs; `LegacyFindResult` at `Holes.lean:247-250` types its receipts by `LegacyReceipt`, so this is a change to `find`'s own return type and not only to `LegacyReceipt`. -/
 structure FindResultR (P Clause Route AsOf : Type*) where
   selected : Set P
   receipts : P → Option (RelationalReceipt Clause Route AsOf)
@@ -137,11 +137,11 @@ structure FindResultR (P Clause Route AsOf : Type*) where
 abbrev FindTypeR (State P Clause Route AsOf : Type*) :=
   Tension State → Repository P → FindResultR P Clause Route AsOf
 
-/-- F11 slice 4 review: forgetting the carried data gives exactly today's `FindResult`, via the `toReceipt` projection `extends Receipt` supplies. -/
+/-- F11 slice 4 review: forgetting the carried data gives exactly today's `LegacyFindResult`, via the `toLegacyReceipt` projection `extends LegacyReceipt` supplies. -/
 def FindResultR.erase {P Clause Route AsOf : Type*}
-    (r : FindResultR P Clause Route AsOf) : FindResult P where
+    (r : FindResultR P Clause Route AsOf) : LegacyFindResult P where
   selected := r.selected
-  receipts := fun p => (r.receipts p).map (·.toReceipt)
+  receipts := fun p => (r.receipts p).map (·.toLegacyReceipt)
   absence := r.absence
 
 /-- F11 slice 4 review: the erasure lifted to finders, so a data-carrying finder can be judged by today's `ConformantFind` at `F11Conformance.lean:21-29`. -/
@@ -182,12 +182,12 @@ def findRMisattributing :
         else none
       absence := if selected = ∅ then some .noPatternAddressesThisTension else none }
 
-/-- F11 slice 4 review, THE MEASUREMENT: the faithful and the misattributing finder are EQUAL after erasure -- not merely both conformant. So no predicate whatever on today's `FindResult` can separate them, and F2's blindness to attribution is a fact about the carrier rather than about how F2 is phrased. -/
+/-- F11 slice 4 review, THE MEASUREMENT: the faithful and the misattributing finder are EQUAL after erasure -- not merely both conformant. So no predicate whatever on today's `LegacyFindResult` can separate them, and F2's blindness to attribution is a fact about the carrier rather than about how F2 is phrased. -/
 theorem findRErasuresAreEqual :
     eraseFinder findRFaithful = eraseFinder findRMisattributing := by
   funext t repo
   simp only [eraseFinder, findRFaithful, findRMisattributing, FindResultR.erase,
-    FindResult.mk.injEq, true_and, and_true]
+    LegacyFindResult.mk.injEq, true_and, and_true]
   funext p
   by_cases hp : p ∈ findSnatchSelected t.context ∩ repo.patterns <;>
     simp [hp]
@@ -211,7 +211,7 @@ theorem findRFaithfulErasureConformant : ConformantFind (eraseFinder findRFaithf
     intro t repo p r hp hr
     simp [eraseFinder, findRFaithful, FindResultR.erase] at hr
     rw [← hr.2]
-    simp [Receipt.nonSelfCertifying]
+    simp [LegacyReceipt.nonSelfCertifying]
 
 /-- F11 slice 4 review: and therefore so does the misattributing one -- the same conformance verdict on a finder whose every receipt names the wrong pattern. -/
 theorem findRMisattributingErasureConformant :
