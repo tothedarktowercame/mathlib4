@@ -7228,24 +7228,6 @@ def softmax {PolicyIndex : Type*} (exp log : ℝ → ℝ)
   let total := weights.foldl (· + ·) 0
   weights.map fun weight => weight / total
 
-/-- CARRIER · owner: sec-glossary.tex:35 · P-glossary-mathematics · holder: by-rule · evidence: Row 16 R6 production-trace witness · falsifier: the declared `F_π` term is omitted, or the zero-`F_π` branch diverges from `softmax` · The full policy posterior is Q(π) ∝ exp(ln E(π) − G(π)/τ − F_π(π)). -/
-def softmaxWithFPi {PolicyIndex : Type*} (exp log : ℝ → ℝ)
-    (habit : PolicyIndex → ℝ) (grade : PolicyIndex → ExpectedFreeEnergyValue)
-    (fPi : PolicyIndex → ℝ) (tau : ℝ) (policies : List PolicyIndex) : List ℝ :=
-  let weights := policies.map fun π =>
-    exp (log (habit π) - (grade π).value / tau - fPi π)
-  let total := weights.foldl (· + ·) 0
-  weights.map fun weight => weight / total
-
-/-- With an identically zero policy free-energy term, the general carrier is
-exactly the existing closed-by-record softmax object. -/
-theorem softmaxWithFPi_zero {PolicyIndex : Type*} (exp log : ℝ → ℝ)
-    (habit : PolicyIndex → ℝ) (grade : PolicyIndex → ExpectedFreeEnergyValue)
-    (tau : ℝ) (policies : List PolicyIndex) :
-    softmaxWithFPi exp log habit grade (fun _ => 0) tau policies =
-      softmax exp log habit grade tau policies := by
-  simp [softmaxWithFPi, softmax]
-
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:58 · P-glossary-mathematics · holder: by-record · evidence: BayesianModelReductionWitness · falsifier: the reduced posterior fails to preserve the accumulated count vector A-a under the new prior a' · BMR re-expresses the old counts under the reduced prior: A′ = A + a′ - a, componentwise. -/
 def bayesianModelReduction (A aPrime a : List ℝ) : List ℝ :=
   (A.zip (aPrime.zip a)).map fun x => x.1 + x.2.1 - x.2.2

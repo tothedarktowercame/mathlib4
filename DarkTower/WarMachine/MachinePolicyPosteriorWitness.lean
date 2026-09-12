@@ -1,4 +1,4 @@
-import DarkTower.WarMachine.Holes
+import DarkTower.WarMachine.PolicyPosterior
 
 namespace DarkTower.WarMachine.MachinePolicyPosteriorWitness
 
@@ -10,9 +10,9 @@ theorem fAbsentBranchCompatibility {PolicyIndex : Type*} (exp log : ℝ → ℝ)
     (habit : PolicyIndex → ℝ)
     (grade : PolicyIndex → DarkTower.WarMachine.Holes.ExpectedFreeEnergyValue)
     (tau : ℝ) (policies : List PolicyIndex) :
-    DarkTower.WarMachine.Holes.softmaxWithFPi exp log habit grade (fun _ => 0) tau policies =
+    DarkTower.WarMachine.PolicyPosterior.softmaxWithFPi exp log habit grade (fun _ => 0) tau policies =
       DarkTower.WarMachine.Holes.softmax exp log habit grade tau policies := by
-  exact DarkTower.WarMachine.Holes.softmaxWithFPi_zero exp log habit grade tau policies
+  exact DarkTower.WarMachine.PolicyPosterior.softmaxWithFPi_zero exp log habit grade tau policies
 
 /-- Rank 1: retained posterior versus raw-exp carrier reference. -/
 theorem coordinate001 : (4971256597298457 / 288230376151711744 : ℚ) = (621407074662307 / 36028797018963968 : ℚ) + (1 / 288230376151711744 : ℚ) ∧ |(1 / 288230376151711744 : ℚ)| ≤ (1 / 2^45 : ℚ) := by
