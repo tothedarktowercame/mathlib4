@@ -1,0 +1,6 @@
+import DarkTower.WarMachine.MachineBeliefStateWitness
+
+#print axioms DarkTower.WarMachine.MachineBeliefState.machineBeliefState
+#print axioms DarkTower.WarMachine.MachineBeliefStateWitness.carriedTraceCoordinates
+#print axioms DarkTower.WarMachine.MachineBeliefStateWitness.bootstrappedTraceCoordinates
+#print axioms DarkTower.WarMachine.MachineBeliefStateWitness.retainedTraceBeliefReferences
