@@ -87,12 +87,13 @@ noncomputable def reasonBearingAction
     (boundary : ReasonBearingBoundary)
     (law : StrategicLaw) (fPiEntered anyHabitPrior : Bool)
     (ranked scored : List Candidate) (input : ReasonBearingInput) :
-    Option boundary.Output :=
-  match boundary with
-  | .machineActionBoundary => machineAction .strategicRecommendation law
-      fPiEntered anyHabitPrior ranked scored
-  | .reasonBearingStrategicPolicy =>
-      if WellFormed input then selectPolicy input.temperature input.policies else none
+    Option boundary.Output := by
+  classical
+  exact match boundary with
+    | .machineActionBoundary => machineAction .strategicRecommendation law
+        fPiEntered anyHabitPrior ranked scored
+    | .reasonBearingStrategicPolicy =>
+        if WellFormed input then selectPolicy input.temperature input.policies else none
 
 /-- Frozen-boundary compatibility over the full old argument list. -/
 theorem machineActionBoundary_compat
@@ -108,11 +109,11 @@ private theorem betterPolicy_either (temperature : ℝ)
     betterPolicy temperature left right = left ∨
       betterPolicy temperature left right = right := by
   by_cases hscore : policyScore temperature left < policyScore temperature right
-  · exact Or.inr (by simp [betterPolicy, hscore])
+  · exact Or.inr (by simp only [betterPolicy, if_pos hscore])
   · by_cases htie : policyScore temperature left = policyScore temperature right ∧
         right.policyId < left.policyId
-    · exact Or.inr (by simp [betterPolicy, hscore, htie])
-    · exact Or.inl (by simp [betterPolicy, hscore, htie])
+    · exact Or.inr (by simp only [betterPolicy, if_neg hscore, if_pos htie])
+    · exact Or.inl (by simp only [betterPolicy, if_neg hscore, if_neg htie])
 
 private theorem fold_better_mem (temperature : ℝ) (first : ReasonBearingPolicy)
     (rest : List ReasonBearingPolicy) :
@@ -151,7 +152,8 @@ theorem wellFormed_selects_declared_policy
       ∀ mission ∈ selected.missionIds, mission ∈ input.candidateDomain := by
   rcases h with ⟨hdomain, htemperature, hpolicies, horder, hnodup,
     hsupport, hall⟩
-  obtain ⟨selected, hselected, hmem⟩ := selectPolicy_some_mem hpolicies
+  obtain ⟨selected, hselected, hmem⟩ :=
+    selectPolicy_some_mem (temperature := input.temperature) hpolicies
   refine ⟨selected, ?_, hmem, (hall selected hmem).2.1⟩
   have hwf : WellFormed input :=
     ⟨hdomain, htemperature, hpolicies, horder, hnodup, hsupport, hall⟩
@@ -172,7 +174,10 @@ theorem emptyDomain_refuses
     (h : input.candidateDomain = []) :
     reasonBearingAction .reasonBearingStrategicPolicy law fPiEntered anyHabitPrior
       ranked scored input = none := by
-  simp [reasonBearingAction, WellFormed, h]
+  have hnot : ¬ WellFormed input := by
+    intro hwf
+    exact hwf.1 h
+  simp [reasonBearingAction, hnot]
 
 /-- A table whose retained order is incomplete refuses. -/
 theorem incompletePolicyTable_refuses
@@ -181,7 +186,10 @@ theorem incompletePolicyTable_refuses
     (h : input.policies.map (·.policyId) ≠ input.declaredPolicyOrder) :
     reasonBearingAction .reasonBearingStrategicPolicy law fPiEntered anyHabitPrior
       ranked scored input = none := by
-  simp [reasonBearingAction, WellFormed, h]
+  have hnot : ¬ WellFormed input := by
+    intro hwf
+    exact h hwf.2.2.2.1
+  simp [reasonBearingAction, hnot]
 
 /-- A declared support differing from the candidate domain refuses. -/
 theorem supportMismatch_refuses
@@ -190,7 +198,10 @@ theorem supportMismatch_refuses
     (h : input.declaredSupport ≠ input.candidateDomain) :
     reasonBearingAction .reasonBearingStrategicPolicy law fPiEntered anyHabitPrior
       ranked scored input = none := by
-  simp [reasonBearingAction, WellFormed, h]
+  have hnot : ¬ WellFormed input := by
+    intro hwf
+    exact h hwf.2.2.2.2.2.1
+  simp [reasonBearingAction, hnot]
 
 /-- Shape instantiated by packet 4d: retained identity and ordered missions
 must equal the extension output at one pinned complete input. -/
@@ -212,5 +223,7 @@ def PositiveSelectionWitness
 #print axioms incompletePolicyTable_refuses
 #print axioms supportMismatch_refuses
 #print axioms PositiveSelectionWitness
+
+end
 
 end DarkTower.WarMachine.ReasonBearingSelector
