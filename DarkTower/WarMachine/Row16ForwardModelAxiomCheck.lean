@@ -1,0 +1,9 @@
+import DarkTower.WarMachine.MachineForwardModelWitness
+
+#print axioms DarkTower.WarMachine.Holes.PredictiveOutcomeKernel
+#print axioms DarkTower.WarMachine.MachineForwardModelWitness.advanceTwiceRow
+#print axioms DarkTower.WarMachine.MachineForwardModelWitness.cascadeRow
+#print axioms DarkTower.WarMachine.MachineForwardModelWitness.advanceTwiceComposition
+#print axioms DarkTower.WarMachine.MachineForwardModelWitness.cascadeComposition
+#print axioms DarkTower.WarMachine.MachineForwardModelWitness.repeatedComposition
+#print axioms DarkTower.WarMachine.MachineForwardModelWitness.inheritedExcess
