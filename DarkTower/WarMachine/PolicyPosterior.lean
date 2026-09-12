@@ -2,6 +2,8 @@ import DarkTower.WarMachine.Holes
 
 namespace DarkTower.WarMachine.PolicyPosterior
 
+noncomputable section
+
 /-- CARRIER · owner: sec-glossary.tex:35 · P-glossary-mathematics · holder: by-rule · evidence: Row 16 R6 production-trace witness · falsifier: the declared `F_π` term is omitted, or the zero-`F_π` branch diverges from `softmax` · The full policy posterior is Q(π) ∝ exp(ln E(π) − G(π)/τ − F_π(π)). -/
 def softmaxWithFPi {PolicyIndex : Type*} (exp log : ℝ → ℝ)
     (habit : PolicyIndex → ℝ)
