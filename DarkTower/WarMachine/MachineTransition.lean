@@ -1,4 +1,4 @@
-import DarkTower.WarMachine.MachineModelSpec
+import DarkTower.WarMachine.MachineBeliefState
 
 namespace DarkTower.WarMachine.MachineTransition
 open DarkTower.WarMachine.Holes
