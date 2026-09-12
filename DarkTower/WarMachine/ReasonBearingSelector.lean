@@ -12,6 +12,8 @@ namespace DarkTower.WarMachine.ReasonBearingSelector
 
 open DarkTower.WarMachine.MachineAction
 
+noncomputable section
+
 /-- One admitted strategic policy.  The propositions are the retained
 admissibility and evidence-support witnesses, rather than names inferred from
 the policy id. -/
@@ -68,14 +70,14 @@ noncomputable def selectPolicy (temperature : ℝ) :
 incomplete policy order, support mismatch, duplicate ids, empty policies, or a
 missing policy witness all fail closed. -/
 def WellFormed (input : ReasonBearingInput) : Prop :=
-  input.candidateDomain.Nonempty ∧
+  input.candidateDomain ≠ [] ∧
   0 < input.temperature ∧
-  input.policies.Nonempty ∧
+  input.policies ≠ [] ∧
   input.policies.map (·.policyId) = input.declaredPolicyOrder ∧
   input.declaredPolicyOrder.Nodup ∧
   input.declaredSupport = input.candidateDomain ∧
   ∀ policy ∈ input.policies,
-    policy.missionIds.Nonempty ∧
+    policy.missionIds ≠ [] ∧
     (∀ mission ∈ policy.missionIds, mission ∈ input.candidateDomain) ∧
     policy.admissibilityWitness ∧ policy.supportWitness
 
@@ -105,9 +107,12 @@ private theorem betterPolicy_either (temperature : ℝ)
     (left right : ReasonBearingPolicy) :
     betterPolicy temperature left right = left ∨
       betterPolicy temperature left right = right := by
-  simp only [betterPolicy]
-  split <;> simp_all
-  split <;> simp_all
+  by_cases hscore : policyScore temperature left < policyScore temperature right
+  · exact Or.inr (by simp [betterPolicy, hscore])
+  · by_cases htie : policyScore temperature left = policyScore temperature right ∧
+        right.policyId < left.policyId
+    · exact Or.inr (by simp [betterPolicy, hscore, htie])
+    · exact Or.inl (by simp [betterPolicy, hscore, htie])
 
 private theorem fold_better_mem (temperature : ℝ) (first : ReasonBearingPolicy)
     (rest : List ReasonBearingPolicy) :
@@ -117,17 +122,18 @@ private theorem fold_better_mem (temperature : ℝ) (first : ReasonBearingPolicy
   | cons next tail ih =>
       simp only [List.foldl_cons]
       have hmem := ih (betterPolicy temperature first next)
-      rcases betterPolicy_either temperature first next with h | h
-      · simpa [h] using hmem
-      · have : betterPolicy temperature first next ∈ next :: tail := by
-          simpa [h] using hmem
-        exact List.mem_cons_of_mem first this
+      simp only [List.mem_cons] at hmem ⊢
+      rcases hmem with heq | htail
+      · rcases betterPolicy_either temperature first next with hbetter | hbetter
+        · exact Or.inl (heq.trans hbetter)
+        · exact Or.inr (Or.inl (heq.trans hbetter))
+      · exact Or.inr (Or.inr htail)
 
 private theorem selectPolicy_some_mem {temperature : ℝ}
-    {policies : List ReasonBearingPolicy} (hne : policies.Nonempty) :
+    {policies : List ReasonBearingPolicy} (hne : policies ≠ []) :
     ∃ selected, selectPolicy temperature policies = some selected ∧ selected ∈ policies := by
   cases policies with
-  | nil => exact (hne []).elim
+  | nil => exact (hne rfl).elim
   | cons first rest =>
       refine ⟨rest.foldl (betterPolicy temperature) first, rfl, ?_⟩
       exact fold_better_mem temperature first rest
@@ -143,9 +149,13 @@ theorem wellFormed_selects_declared_policy
         ranked scored input = some selected ∧
       selected ∈ input.policies ∧
       ∀ mission ∈ selected.missionIds, mission ∈ input.candidateDomain := by
-  obtain ⟨selected, hselected, hmem⟩ := selectPolicy_some_mem h.2.2.1
-  refine ⟨selected, ?_, hmem, (h.2.2.2.2.2.2 selected hmem).2.1⟩
-  simp [reasonBearingAction, h, hselected]
+  rcases h with ⟨hdomain, htemperature, hpolicies, horder, hnodup,
+    hsupport, hall⟩
+  obtain ⟨selected, hselected, hmem⟩ := selectPolicy_some_mem hpolicies
+  refine ⟨selected, ?_, hmem, (hall selected hmem).2.1⟩
+  have hwf : WellFormed input :=
+    ⟨hdomain, htemperature, hpolicies, horder, hnodup, hsupport, hall⟩
+  simp [reasonBearingAction, hwf, hselected]
 
 /-- Equal scores resolve to the lexicographically least stable id. -/
 theorem equalScore_tie_selects_right
