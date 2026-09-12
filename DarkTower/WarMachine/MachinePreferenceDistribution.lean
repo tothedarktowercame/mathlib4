@@ -33,7 +33,7 @@ noncomputable def machineC : PreferenceDistribution SeedObs where
   normalised := by intro _; norm_num [machineSupport, organisationOutcome, seed]
 
 theorem machineC_normalised :
-    ∀ u, (machineC.support u).sum (machineC.mass u) = 1 :=
+    ∀ u, ((machineC.support u).map (machineC.mass u)).sum = 1 :=
   machineC.normalised
 
 theorem machineC_nonnegative : ∀ u o, 0 ≤ machineC.mass u o :=
@@ -46,11 +46,8 @@ theorem machineC_unconditional (u₁ u₂ : Unit) (o : Outcome SeedObs) :
 theorem machineC_support_partition (o : Outcome SeedObs)
     (h : o ∈ machineC.support ()) : o.1 = .organization := by
   rcases o with ⟨v, value⟩
-  cases v with
-  | nouns => exact Empty.elim value
-  | verbs => exact Empty.elim value
-  | evidence => exact Empty.elim value
-  | organization => rfl
+  cases v <;> simp_all [SeedObs, Obs, NounObservation, VerbObservation,
+                        SeedEvidenceObservation]
 
 theorem machineC_named_zero (d : FlightDisposition)
     (h : d ∈ namedZeroDispositions) :
@@ -60,19 +57,21 @@ theorem machineC_named_zero (d : FlightDisposition)
 theorem machineC_named_empty_nouns (o : Outcome SeedObs)
     (h : o.1 = .nouns) : False := by
   rcases o with ⟨v, value⟩
-  cases v <;> simp_all
+  cases v <;> simp_all [SeedObs, Obs, NounObservation, VerbObservation,
+                        SeedEvidenceObservation]
 
 theorem machineC_named_empty_verbs (o : Outcome SeedObs)
     (h : o.1 = .verbs) : False := by
   rcases o with ⟨v, value⟩
-  cases v <;> simp_all
+  cases v <;> simp_all [SeedObs, Obs, NounObservation, VerbObservation,
+                        SeedEvidenceObservation]
 
 theorem machineC_first_supported :
-    machineC.support ().head? = some (organisationOutcome .abstained) := by
+    (machineC.support ()).head? = some (organisationOutcome .abstained) := by
   rfl
 
 theorem machineC_first_positive :
-    (machineC.support ().dropWhile (fun o => decide (machineC.mass () o = 0))).head? =
+    ((machineC.support ()).dropWhile (fun o => decide (machineC.mass () o = 0))).head? =
       some (organisationOutcome .agentUnavailable) := by
   norm_num [machineC, machineSupport, organisationOutcome, seed]
 
