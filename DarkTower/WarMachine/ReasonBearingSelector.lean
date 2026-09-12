@@ -158,6 +158,7 @@ theorem wellFormed_selects_declared_policy
   have hwf : WellFormed input :=
     ⟨hdomain, htemperature, hpolicies, horder, hnodup, hsupport, hall⟩
   simp [reasonBearingAction, hwf, hselected]
+  rfl
 
 /-- Equal scores resolve to the lexicographically least stable id. -/
 theorem equalScore_tie_selects_right
