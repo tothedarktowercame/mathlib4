@@ -102,4 +102,25 @@ theorem selected_entity_preserved {O : Vertex → Type} {A T : Type}
     (c : Contract O A T) (p : Policy A) (h : p ∈ c.policies) : p.entity = c.entity :=
   c.policyEntities p h
 
+/-- Contract v1.1: the declared numerical admission for float-carried rows.
+Production belief rows carry IEEE doubles whose exact sums land within one
+ulp of 1 (row-7 witness); coordinates are read at their exact values and
+summed exactly, so the sum is order-independent, and admission requires the
+sum within `floatRowBound` of 1. Masses are never renormalised. -/
+def floatRowBound : ℚ := 1 / 10 ^ 12
+
+structure FloatCarriedRow (O : Type) where
+  support : List O
+  mass : O → ℚ
+  nonnegative : ∀ o, 0 ≤ mass o
+  nearNormalised : |((support.map mass).sum) - 1| ≤ floatRowBound
+
+/-- Exact rows satisfy the v1.1 criterion trivially: the two admissions agree
+on exactly-normalised rows. -/
+theorem exact_row_admissible {O : Type} (support : List O) (mass : O → ℚ)
+    (h : (support.map mass).sum = 1) :
+    |((support.map mass).sum) - 1| ≤ floatRowBound := by
+  rw [h]
+  norm_num [floatRowBound]
+
 end DarkTower.WarMachine.MachineModelSpec
