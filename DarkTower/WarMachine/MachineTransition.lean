@@ -41,9 +41,9 @@ theorem declaredActionsDistinguished :
 
 /-- Applying the production witness's point belief at spawned under advance. -/
 theorem appliedSpawnedAdvance :
-    ∀ s', controlled.mass (.spawned, .advanceMission) s' =
+  ∀ s', controlled.mass (.spawned, .advanceMission) s' =
       if s' = .refined then 1 else 0 := by
   intro s'
-  cases s' <;> simp [controlled, next]
+  cases s' <;> norm_num [controlled, next]
 
 end DarkTower.WarMachine.MachineTransition
