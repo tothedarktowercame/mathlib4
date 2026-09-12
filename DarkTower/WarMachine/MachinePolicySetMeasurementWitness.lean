@@ -158,7 +158,7 @@ def pinnedRanked : List Candidate := [
   ⟨148, 4638637791321784721, false⟩
 ]
 
-theorem pinnedCandidateCount : pinnedRanked.length = 148 := by native_decide
+theorem pinnedCandidateCount : pinnedRanked.length = 148 := by rfl
 
 theorem everyProjectedCandidateIsMember :
     ∀ c, c ∈ pinnedRanked → c ∈ machinePolicySet pinnedRanked := by
