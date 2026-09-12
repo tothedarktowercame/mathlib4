@@ -1,0 +1,122 @@
+ℹ [2701/3015] Replayed DarkTower.WarMachine.CascadeOrder
+info: DarkTower/WarMachine/CascadeOrder.lean:143:0: 'attempt001_2026_07_14_two_cycle_is_refused' depends on axioms: [propext]
+info: DarkTower/WarMachine/CascadeOrder.lean:144:0: 'dropping_reverse_edge_is_acyclic_but_not_a_semilattice' depends on axioms: [propext]
+info: DarkTower/WarMachine/CascadeOrder.lean:145:0: 'attempt008_2026_07_16_descent_is_accepted' depends on axioms: [propext]
+⚠ [2703/3015] Replayed DarkTower.WarMachine.Holes
+warning: DarkTower/WarMachine/Holes.lean:157:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:999:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7378:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7401:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7412:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7940:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7943:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7946:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7949:4: declaration uses `sorry`
+ℹ [8503/8508] Replayed DarkTower.WarMachine.CommitmentTemperature
+info: DarkTower/WarMachine/CommitmentTemperature.lean:293:0: 'DarkTower.WarMachine.CommitmentTemperature.factorsThroughDiscard_iff_temperatureInvariant' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:294:0: 'DarkTower.WarMachine.CommitmentTemperature.not_governs_iff_factorsThroughDiscard' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CommitmentTemperature.lean:295:0: 'DarkTower.WarMachine.CommitmentTemperature.discard_absorbs_upstream' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:296:0: 'DarkTower.WarMachine.CommitmentTemperature.live_selector_factors_through_discard' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:297:0: 'DarkTower.WarMachine.CommitmentTemperature.mode_only_ignores_temperature' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:298:0: 'DarkTower.WarMachine.CommitmentTemperature.live_selector_does_not_govern' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:299:0: 'DarkTower.WarMachine.CommitmentTemperature.single_term_argmax_annihilates_temperature' depends on axioms: [propext,
+ Quot.sound]
+info: DarkTower/WarMachine/CommitmentTemperature.lean:300:0: 'DarkTower.WarMachine.CommitmentTemperature.repairing_r8_changes_no_action' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:301:0: 'DarkTower.WarMachine.CommitmentTemperature.live_gain_repair_changes_no_action' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:302:0: 'DarkTower.WarMachine.CommitmentTemperature.default_branch_gain_repair_changes_no_action' depends on axioms: [propext,
+ Quot.sound]
+info: DarkTower/WarMachine/CommitmentTemperature.lean:303:0: 'DarkTower.WarMachine.CommitmentTemperature.record_sensitivity_is_not_governance' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:304:0: 'DarkTower.WarMachine.CommitmentTemperature.scores_move_action_does_not' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:305:0: 'DarkTower.WarMachine.CommitmentTemperature.habit_prior_governs' does not depend on any axioms
+ℹ [8506/8508] Replayed DarkTower.WarMachine.MachineTemperature
+info: DarkTower/WarMachine/MachineTemperature.lean:279:0: 'DarkTower.WarMachine.MachineTemperature.gRange' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:280:0: 'DarkTower.WarMachine.MachineTemperature.adaptiveTemperature' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:281:0: 'DarkTower.WarMachine.MachineTemperature.adaptiveTemperatureReference' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:282:0: 'DarkTower.WarMachine.MachineTemperature.emptySpreadIsTheFloor' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:283:0: 'DarkTower.WarMachine.MachineTemperature.degenerateSpreadIsTheFloor' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:284:0: 'DarkTower.WarMachine.MachineTemperature.probeOpts' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:285:0: 'DarkTower.WarMachine.MachineTemperature.threeLawsDisagree' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:286:0: 'DarkTower.WarMachine.MachineTemperature.machineGamma' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:287:0: 'DarkTower.WarMachine.MachineTemperature.variationalGammaIsInverseBeta' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:288:0: 'DarkTower.WarMachine.MachineTemperature.engineeringGammaIsNotInverseBeta' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:289:0: 'DarkTower.WarMachine.MachineTemperature.gainFloorPreventsDivisionByZero' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:290:0: 'DarkTower.WarMachine.MachineTemperature.selectionScore' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:291:0: 'DarkTower.WarMachine.MachineTemperature.largerTemperatureFlattensScores' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:292:0: 'DarkTower.WarMachine.MachineTemperature.zeroPriorOrderIsTemperatureInvariant' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:293:0: 'DarkTower.WarMachine.MachineTemperature.habitPriorMakesOrderTemperatureDependent' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:294:0: 'DarkTower.WarMachine.MachineTemperature.TauMode' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:295:0: 'DarkTower.WarMachine.MachineTemperature.MachineNumber' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:296:0: 'DarkTower.WarMachine.MachineTemperature.TemperatureOpts' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:297:0: 'DarkTower.WarMachine.MachineTemperature.TemperatureError' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:298:0: 'DarkTower.WarMachine.MachineTemperature.machineTemperature' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:299:0: 'DarkTower.WarMachine.MachineTemperature.gainOneReductions' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:300:0: 'DarkTower.WarMachine.MachineTemperature.betaIsNotFloored' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:301:0: 'DarkTower.WarMachine.MachineTemperature.missingBetaNeverFallsBack' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:302:0: 'DarkTower.WarMachine.MachineTemperature.policyFunctionDefault' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:303:0: 'DarkTower.WarMachine.MachineTemperature.liveArenaDefault' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:304:0: 'DarkTower.WarMachine.MachineTemperature.temperatureDefaultsDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:305:0: 'DarkTower.WarMachine.MachineTemperature.BetaSource' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:306:0: 'DarkTower.WarMachine.MachineTemperature.solvedThisTick' depends on axioms: [propext]
+info: DarkTower/WarMachine/MachineTemperature.lean:307:0: 'DarkTower.WarMachine.MachineTemperature.variationalModeCanCarryHeldBeta' depends on axioms: [propext]
+info: DarkTower/WarMachine/MachineTemperature.lean:308:0: 'DarkTower.WarMachine.MachineTemperature.temperatureScore' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:309:0: 'DarkTower.WarMachine.MachineTemperature.SelectionLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:310:0: 'DarkTower.WarMachine.MachineTemperature.temperatureReachesChoice' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:311:0: 'DarkTower.WarMachine.MachineTemperature.selectionLawControlsTemperatureChannel' does not depend on any axioms
+ℹ [8507/8508] Replayed DarkTower.WarMachine.MachineAction
+info: DarkTower/WarMachine/MachineAction.lean:215:0: 'DarkTower.WarMachine.MachineAction.Candidate' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:216:0: 'DarkTower.WarMachine.MachineAction.StrategicLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:217:0: 'DarkTower.WarMachine.MachineAction.SelectionBoundary' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:218:0: 'DarkTower.WarMachine.MachineAction.firstArgmax' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:219:0: 'DarkTower.WarMachine.MachineAction.lastArgmax' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:220:0: 'DarkTower.WarMachine.MachineAction.strategicCandidates' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:221:0: 'DarkTower.WarMachine.MachineAction.actuationCandidates' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:222:0: 'DarkTower.WarMachine.MachineAction.machineAction' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:223:0: 'DarkTower.WarMachine.MachineAction.headAndPosteriorDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:224:0: 'DarkTower.WarMachine.MachineAction.strategicAndActuationDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:225:0: 'DarkTower.WarMachine.MachineAction.tiedArgmaxesDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:226:0: 'DarkTower.WarMachine.MachineAction.requestedPosteriorCanBecomeHead' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:227:0: 'DarkTower.WarMachine.MachineAction.fullScoreIsPosteriorArgmax' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:228:0: 'DarkTower.WarMachine.MachineAction.noOpCandidateSetsDiffer' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:229:0: 'DarkTower.WarMachine.MachineAction.enactedAction' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:230:0: 'DarkTower.WarMachine.MachineAction.selectionScore' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:231:0: 'DarkTower.WarMachine.MachineAction.posteriorWeight' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:232:0: 'DarkTower.WarMachine.MachineAction.posteriorOrderIsScoreOrder' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:233:0: 'DarkTower.WarMachine.MachineAction.productionDefaultBoundary' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:234:0: 'DarkTower.WarMachine.MachineAction.productionDefaultLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:235:0: 'DarkTower.WarMachine.MachineAction.registryLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:236:0: 'DarkTower.WarMachine.MachineAction.defaultRuleIsNotTheRegistryRule' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:237:0: 'DarkTower.WarMachine.MachineAction.defaultSelectionIsTheHead' depends on axioms: [propext]
+info: DarkTower/WarMachine/MachineAction.lean:238:0: 'DarkTower.WarMachine.MachineAction.habitPriorAloneMovesTheChoice' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:239:0: 'DarkTower.WarMachine.MachineAction.noOpExclusionMovesTheChoice' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:240:0: 'DarkTower.WarMachine.MachineAction.abstains' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:241:0: 'DarkTower.WarMachine.MachineAction.noOpArgmaxAbstains' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:242:0: 'DarkTower.WarMachine.MachineAction.requestedPosteriorDependsOnFPiEntered' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:243:0: 'DarkTower.WarMachine.MachineAction.selectedAndEnactedDisagree' does not depend on any axioms
+✔ [8508/8508] Built DarkTower.WarMachine.MachineContracts (2.7s)
+Build completed successfully (8508 jobs).

@@ -1,0 +1,4 @@
+Control: copy canonical manifest and bundle to a disposable directory; replace only DarkTower/WarMachine/MachineContracts.lean source SHA256 71b89a36b037c05465f48d4fc590bf7dc136ef5b074cb54869d34e2b5eb601f8 with 0000000000000000000000000000000000000000000000000000000000000000.
+Command: python3 scripts/emit-machine-contracts.py verify /tmp/wm-machine-stale-control-ip4ktg95/manifest.json
+Exit: 1
+REFUSED: stale source pin: DarkTower/WarMachine/MachineContracts.lean

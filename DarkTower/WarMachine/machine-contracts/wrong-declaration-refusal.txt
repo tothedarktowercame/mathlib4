@@ -1,0 +1,9 @@
+Command: lake env lean /tmp/wm-machine-wrong-name.lean
+Source:
+import DarkTower.WarMachine.MachineContracts
+-- Deliberately wrong member of an otherwise real module.
+def deliberatelyWrongReference : Lean.Name :=
+  ``DarkTower.WarMachine.MachineObservation.machineObservationDoesNotExist
+
+Exit: 1
+/tmp/wm-machine-wrong-name.lean:4:4: error(lean.unknownIdentifier): Unknown constant `DarkTower.WarMachine.MachineObservation.machineObservationDoesNotExist`

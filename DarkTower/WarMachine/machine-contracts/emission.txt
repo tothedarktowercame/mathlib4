@@ -1,0 +1,1 @@
+PASS: eight machine contracts plus unchanged Holes; source and contract pins verified
