@@ -84,4 +84,5 @@ theorem predictedStateStep_agrees_machinePredictedStateKernel
   simp [DarkTower.WarMachine.MachineQ.machinePredictedStateKernel,
     DarkTower.WarMachine.MachineQ.predictedStateMass, predictedStateStep, hs, hp, hb, ht]
 
+end
 end DarkTower.WarMachine.MachinePredictiveOutcome
