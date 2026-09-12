@@ -273,4 +273,114 @@ def chipLine (c : Chip) : String := String.intercalate "|"
 #print axioms fixtureExecutes
 #print axioms fixtureNamedHazard
 #print axioms fixtureDeltasZero
+
+/-! ## Repair 80d874b8: explicit non-nil ZAP guard and full trace replay
+
+The earlier counterexamples above describe the retained v0 construction. The
+following relation describes the repaired base verbs. Both models remain
+visible; historical evidence is not rewritten. Registry replacement is still
+outside the base-verb theorem and is NOT bound by a board digest.
+-/
+namespace Repaired
+inductive Step : Repo → Row → Repo → Prop where
+  | feelIdle (s r : Repo) (id digest : String) :
+      Step s ⟨id, .feel, false, digest, r, []⟩ r
+  | feelLive (s r : Repo) (id digest : String) :
+      Step s ⟨id, .feel, true, digest, r, []⟩ s
+  | zapYes (repo : String) (id digest : String) :
+      Step (some repo) ⟨id, .zap, true, digest, some repo, [.commit (some repo)]⟩ (some repo)
+  | zapNo (s r : Repo) (id digest : String) (refused : s ≠ r ∨ r = none) :
+      Step s ⟨id, .zap, false, digest, r, [.refusal]⟩ s
+  | other (s : Repo) (row : Row) (notFeel : row.verb ≠ .feel)
+      (noCommit : ∀ r, Effect.commit r ∉ row.effects) : Step s row s
+
+lemma Step.original {s t : Repo} {row : Row} (h : Step s row t) :
+    ChipBoardWitness.Step s row t := by
+  cases h with
+  | feelIdle s r id digest => exact .feelIdle s t id digest
+  | feelLive s r id digest => exact .feelLive s r id digest
+  | zapYes repo id digest => exact .zapYes (some repo) (some repo) id digest rfl
+  | zapNo s r id digest refused => exact .other s _ (by simp) (by intro r; simp)
+  | other s row nf nc => exact .other s row nf nc
+
+lemma Step.noNilCommit {s t : Repo} {row : Row} (h : Step s row t) :
+    Effect.commit none ∉ row.effects := by
+  cases h with
+  | feelIdle => simp
+  | feelLive => simp
+  | zapYes => simp
+  | zapNo => simp
+  | other s row nf nc => exact nc none
+
+inductive Executes : Repo → List Row → Prop where
+  | initial : Executes none []
+  | next {s t trace row} : Executes s trace → Step s row t → Executes t (trace ++ [row])
+
+/-- Every commit target, including the missing-target case, now has a strict
+prior FEEL. Missing targets cannot be committed at all in the repaired model. -/
+inductive Safe : List Row → Prop where
+  | empty : Safe []
+  | next {trace row} : Safe trace →
+      (∀ r : Repo, Effect.commit r ∈ row.effects → HasFeel trace r) → Safe (trace ++ [row])
+
+theorem repairedHazard {s : Repo} {trace : List Row} (run : Executes s trace) :
+    Certified s trace ∧ Safe trace := by
+  induction run with
+  | initial =>
+      constructor
+      · intro r hr; cases hr
+      · exact .empty
+  | next execution step ih =>
+      refine ⟨stepPreservesCertified ih.1 step.original, .next ih.2 ?_⟩
+      intro r hr
+      cases r with
+      | none => exact False.elim (step.noNilCommit hr)
+      | some name => exact stepNamedCommit ih.1 step.original name hr
+
+theorem nilZapNowImpossible : ¬ Step none nilZap none := by
+  intro h
+  exact h.noNilCommit (by simp [nilZap])
+
+def nilRefusal : Row := ⟨"z", .zap, false, "opaque", none, [.refusal]⟩
+theorem nilNowRefuses : Step none nilRefusal none := .zapNo none none "z" "opaque" (Or.inr rfl)
+
+/-- Equality of full modeled trace rows implies equality of effect lists. -/
+def replayView (r : Row) := (r.chip, r.verb, r.branch, r.digest, r.effects)
+theorem replayCertifiesModeledEffects (a b : Row) (h : replayView a = replayView b) :
+    a.effects = b.effects := congrArg (fun x => x.2.2.2.2) h
+
+theorem alteredEffectsNowRefuse : replayView nilZap ≠ replayView forgedZap := by decide
+
+/-- top-of-stack comparison from compare-move; nil argument means emptiness. -/
+def compareMove (stack : List String) (arg : Option String) : Bool :=
+  match arg with
+  | none => stack.isEmpty
+  | some move => stack.getLast? == some move
+
+theorem compareMoveReference :
+    compareMove ["forward"] (some "forward") = true ∧
+    compareMove ["forward"] (some "back") = false ∧
+    compareMove [] none = true ∧ compareMove ["forward"] none = false := by decide
+
+theorem fixtureStillExecutes : Executes (some "futon5a") fixtureRows := by
+  have h0 := Executes.initial
+  have h1 := Executes.next h0 (Step.other none (fixtureRows[0]) (by decide) (by intro r; simp [fixtureRows]))
+  have h2 := Executes.next h1 (Step.other none (fixtureRows[1]) (by decide) (by intro r; simp [fixtureRows]))
+  have h3 := Executes.next h2 (Step.other none (fixtureRows[2]) (by decide) (by intro r; simp [fixtureRows]))
+  have h4 := Executes.next h3 (Step.feelIdle none (some "futon5a") "ck/feel-target" boardDigest)
+  have h5 := Executes.next h4 (Step.zapYes "futon5a" "ck/zap-commit" boardDigest)
+  have h6 := Executes.next h5 (Step.other (some "futon5a") (fixtureRows[5]) (by decide) (by intro r; simp [fixtureRows]))
+  exact h6
+
+theorem fixtureFullHazard : Safe fixtureRows := (repairedHazard fixtureStillExecutes).2
+#print axioms repairedHazard
+#print axioms nilZapNowImpossible
+#print axioms nilNowRefuses
+#print axioms replayCertifiesModeledEffects
+#print axioms alteredEffectsNowRefuse
+#print axioms compareMoveReference
+#print axioms fixtureStillExecutes
+#print axioms fixtureFullHazard
+end Repaired
+
 end DarkTower.WarMachine.ChipBoardWitness
