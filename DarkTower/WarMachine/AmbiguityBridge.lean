@@ -77,7 +77,8 @@ theorem unitVariance_diverges_from_deterministicCategorical :
     norm_num [gaussianVarianceFloor]
   simp only [gaussianChannelAmbiguity, List.map_cons, List.map_nil, List.sum_cons,
     List.sum_nil, add_zero, max_eq_left hfloor]
-  linarith
+  rw [mul_one]
+  exact ne_of_gt (div_pos hlog (by norm_num))
 
 /-- A genuine agreement case exists.  A deterministic categorical row has
 zero entropy, and a Gaussian channel at variance `1/(2*pi*e)` has zero
@@ -93,7 +94,7 @@ theorem zeroEntropy_specialCase_agrees :
   have he3 : Real.exp 1 < 3 := Real.exp_one_lt_three
   have hdenom24 : 2 * Real.pi * Real.exp 1 < 24 := by nlinarith
   have hfloor : gaussianVarianceFloor ≤ 1 / (2 * Real.pi * Real.exp 1) := by
-    rw [div_le_div_iff_of_pos_right hdenom]
+    apply (le_div_iff₀ hdenom).2
     norm_num [gaussianVarianceFloor]
     nlinarith
   rw [gaussianChannelAmbiguity]
