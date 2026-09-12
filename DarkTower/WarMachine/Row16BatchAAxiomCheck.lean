@@ -1,6 +1,0 @@
-import DarkTower.WarMachine.MachinePredictiveOutcomeWitness
-
-#print axioms DarkTower.WarMachine.Holes.PredictiveOutcomeKernel
-#print axioms DarkTower.WarMachine.MachinePredictiveOutcomeWitness.advanceTwiceCoordinates
-#print axioms DarkTower.WarMachine.MachinePredictiveOutcomeWitness.advanceThenCascadeCoordinates
-#print axioms DarkTower.WarMachine.MachinePredictiveOutcomeWitness.repeatedPlanCoordinates
