@@ -115,11 +115,13 @@ def CensusComplete (att : FullAttestation) : Prop :=
   att.recordFamilies.map RecordFamilyPresence.family = allRecordFamilies
 
 instance censusCompleteDecidable (att : FullAttestation) : Decidable (CensusComplete att) :=
-  inferInstance
+  by
+    unfold CensusComplete
+    infer_instance
 
 theorem censusCompleteness_is_decidable (att : FullAttestation) :
-    Decidable (CensusComplete att) := by
-  infer_instance
+    CensusComplete att ∨ ¬ CensusComplete att := by
+  exact decidable_em (CensusComplete att)
 
 def positiveAtThisRun : NodeValidationState → Prop
   | .supportedAtRun _ _ => True
