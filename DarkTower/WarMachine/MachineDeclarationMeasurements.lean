@@ -17,3 +17,5 @@ theorem temperatureTrace20260904Row0 :
   norm_num [machineTemperature]
 
 end DarkTower.WarMachine.MachineDeclarationMeasurements
+
+#print axioms DarkTower.WarMachine.MachineDeclarationMeasurements.temperatureTrace20260904Row0
