@@ -92,10 +92,10 @@ def cascadeRow : FloatCarriedRow O where
 def advanceTwiceRepeatRow : FloatCarriedRow O := advanceTwiceRow
 
 theorem advanceTwiceComposition (o : O) : advanceTwiceMass o = compose advanceTwiceTerminal o := by
-  cases o <;> norm_num [advanceTwiceMass, advanceTwiceTerminal, compose, allS, positionalA]
+  cases o <;> simp [advanceTwiceMass, advanceTwiceTerminal, compose, allS, positionalA] <;> norm_num
 
 theorem cascadeComposition (o : O) : cascadeMass o = compose cascadeTerminal o := by
-  cases o <;> norm_num [cascadeMass, cascadeTerminal, compose, allS, positionalA]
+  cases o <;> simp [cascadeMass, cascadeTerminal, compose, allS, positionalA] <;> norm_num
 
 theorem repeatedComposition (o : O) : advanceTwiceRepeatRow.mass o = advanceTwiceRow.mass o := rfl
 
