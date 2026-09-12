@@ -39,11 +39,4 @@ theorem declaredActionsDistinguished :
     controlled.mass (.spawned, .applyCascade) .refined = 0 := by
   norm_num [controlled, next]
 
-/-- Applying the production witness's point belief at spawned under advance. -/
-theorem appliedSpawnedAdvance :
-  ∀ s', controlled.mass (.spawned, .advanceMission) s' =
-      if s' = .refined then 1 else 0 := by
-  intro s'
-  cases s' <;> norm_num [controlled, next]
-
 end DarkTower.WarMachine.MachineTransition
