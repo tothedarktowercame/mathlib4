@@ -121,7 +121,9 @@ instance censusCompleteDecidable (att : FullAttestation) : Decidable (CensusComp
 
 theorem censusCompleteness_is_decidable (att : FullAttestation) :
     CensusComplete att ∨ ¬ CensusComplete att := by
-  exact decidable_em (CensusComplete att)
+  by_cases h : CensusComplete att
+  · exact Or.inl h
+  · exact Or.inr h
 
 def positiveAtThisRun : NodeValidationState → Prop
   | .supportedAtRun _ _ => True
