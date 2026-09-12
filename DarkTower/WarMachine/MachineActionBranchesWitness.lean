@@ -501,6 +501,21 @@ theorem equalScoreTieKeepsFirst :
 theorem noOpAbstainComparison : abstains ((5427825292749016 : ℚ) / 562949953421312) ((-4870603365324470 : ℚ) / 288230376151711744) ((8192000000000000 : ℚ) / 8192) = true := by
   norm_num [abstains]
 
+/-- One proposition carrying every retained internal-branch equality. -/
+structure RetainedInternalBranchAgreement : Prop where
+  natural : machineAction .strategicRecommendation .controllerHead false true baseRanked [] = some ⟨1, 4621138193050540224, false⟩
+  directHead : machineAction .strategicRecommendation .controllerHead false true baseRanked [] = some ⟨1, 4621138193050540224, false⟩
+  fullScore : machineAction .strategicRecommendation .fullScorePosterior true true baseRanked fullScoreRanked = some ⟨149, 4603506874290294124, false⟩
+  habit : machineAction .actuation .controllerHead false true baseRanked habitScoreRanked = some ⟨149, 4603506874290294124, false⟩
+  absentFPi : machineAction .strategicRecommendation .fullScorePosterior false true baseRanked fullScoreRanked = some ⟨1, 4621138193050540224, false⟩
+  tie : machineAction .strategicRecommendation .fullScorePosterior true true tieRanked tieScored = some ⟨1, 4602678819172646912, false⟩
+  abstainMargin : abstains ((5427825292749016 : ℚ) / 562949953421312) ((-4870603365324470 : ℚ) / 288230376151711744) ((8192000000000000 : ℚ) / 8192) = true
+
+theorem allRetainedInternalBranches : RetainedInternalBranchAgreement :=
+  ⟨naturalInternalControllerHead, directControllerHead, fullScoreFirstMax,
+   habitLastMax, requestedPosteriorAbsentFallsToHead, equalScoreTieKeepsFirst,
+   noOpAbstainComparison⟩
+
 #print axioms naturalInternalControllerHead
 #print axioms directControllerHead
 #print axioms fullScoreFirstMax
@@ -508,5 +523,6 @@ theorem noOpAbstainComparison : abstains ((5427825292749016 : ℚ) / 56294995342
 #print axioms requestedPosteriorAbsentFallsToHead
 #print axioms equalScoreTieKeepsFirst
 #print axioms noOpAbstainComparison
+#print axioms allRetainedInternalBranches
 
 end DarkTower.WarMachine.MachineActionBranchesWitness
