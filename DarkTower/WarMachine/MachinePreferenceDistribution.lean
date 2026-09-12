@@ -45,9 +45,9 @@ theorem machineC_unconditional (u₁ u₂ : Unit) (o : Outcome SeedObs) :
 
 theorem machineC_support_partition (o : Outcome SeedObs)
     (h : o ∈ machineC.support ()) : o.1 = .organization := by
-  rcases o with ⟨v, value⟩
-  cases v <;> simp_all [SeedObs, Obs, NounObservation, VerbObservation,
-                        SeedEvidenceObservation]
+  simp only [machineC, machineSupport, List.mem_map] at h
+  rcases h with ⟨d, _, rfl⟩
+  rfl
 
 theorem machineC_named_zero (d : FlightDisposition)
     (h : d ∈ namedZeroDispositions) :
@@ -55,16 +55,14 @@ theorem machineC_named_zero (d : FlightDisposition)
   seedMass_zero_of_mem_namedZeros d h
 
 theorem machineC_named_empty_nouns (o : Outcome SeedObs)
-    (h : o.1 = .nouns) : False := by
-  rcases o with ⟨v, value⟩
-  cases v <;> simp_all [SeedObs, Obs, NounObservation, VerbObservation,
-                        SeedEvidenceObservation]
+    (hm : o ∈ machineC.support ()) (hv : o.1 = .nouns) : False := by
+  have hp := machineC_support_partition o hm
+  simp_all
 
 theorem machineC_named_empty_verbs (o : Outcome SeedObs)
-    (h : o.1 = .verbs) : False := by
-  rcases o with ⟨v, value⟩
-  cases v <;> simp_all [SeedObs, Obs, NounObservation, VerbObservation,
-                        SeedEvidenceObservation]
+    (hm : o ∈ machineC.support ()) (hv : o.1 = .verbs) : False := by
+  have hp := machineC_support_partition o hm
+  simp_all
 
 theorem machineC_first_supported :
     (machineC.support ()).head? = some (organisationOutcome .abstained) := by
