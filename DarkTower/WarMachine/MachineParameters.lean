@@ -38,10 +38,13 @@ noncomputable def machineParameterPosterior (Policy : Type)
       (le_of_lt (positive po.2))
   normalised := by
     intro po
-    have hp := ne_of_gt (positive po.2)
+    have hs : l.mass .identityTransition po.2 + l.mass .controlledTransition po.2 ≠ 0 := by
+      intro hs
+      have hz : evidence l po.2 = 0 := by simp [evidence, hs]
+      exact (ne_of_gt (positive po.2)) hz
     simp only [Theta.all, List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]
     simp [evidence]
-    field_simp
+    field_simp [hs]
     ring
 
 theorem bayesConditioning (Policy : Type) (l : RegisteredLikelihood Obs)
