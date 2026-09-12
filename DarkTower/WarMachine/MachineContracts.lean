@@ -100,4 +100,3 @@ def main : IO Unit := do
     ("scope", Json.str "model-transcription-only"),
     ("contracts", Json.arr contracts.toArray)]).compress
 end DarkTower.WarMachine.MachineContracts
-
