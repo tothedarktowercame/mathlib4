@@ -17,6 +17,14 @@ noncomputable def predictedStateSteps : Posterior → List Action → List Poste
   | q, [] => [q]
   | q, a :: as => q :: predictedStateSteps (predictedStateStep q a) as
 
+private theorem sumSwap {α β : Type*} (xs : List α) (ys : List β)
+    (f : α → β → ℝ) :
+    (xs.map (fun x => (ys.map (f x)).sum)).sum =
+      (ys.map (fun y => (xs.map (fun x => f x y)).sum)).sum := by
+  induction xs with
+  | nil => simp
+  | cons _ _ ih => simp [ih, List.sum_map_add]
+
 theorem zeroDepthIdentity (q : Posterior) : predictedStateTerminal q [] = q := rfl
 
 theorem oneStepAgreement (q : Posterior) (a : Action) :
@@ -34,7 +42,7 @@ theorem stepNonnegative (q : Posterior) (a : Action) (hq : ∀ s, 0 ≤ q s) :
 theorem stepNormalised (q : Posterior) (a : Action) (hq : Normalised q) :
     Normalised (predictedStateStep q a) := by
   unfold Normalised predictedStateStep
-  rw [DarkTower.WarMachine.MachineQ.sum_swap Status.all Status.all
+  rw [sumSwap Status.all Status.all
       (fun s' s => q s * controlled.mass (s, a) s')]
   simp only [List.sum_map_mul_left, controlled.normalised, mul_one]
   exact hq
@@ -58,8 +66,9 @@ theorem everyRetainedStepNormalised (q : Posterior) (actions : List Action)
       simp only [predictedStateSteps, List.mem_cons] at hr
       cases hr with
       | inl h => simpa [h] using hq
-      | inr h => exact ih (predictedStateStep q a) (stepNonnegative q a hn)
-          (stepNormalised q a hq) r h
+      | inr h =>
+          exact (ih (predictedStateStep q a) (stepNonnegative q a hn)
+            (stepNormalised q a hq) r h)
 
 theorem equalFullPlansGiveEqualPrediction (q : Posterior) (p₁ p₂ : List Action)
     (h : p₁ = p₂) : predictedStateTerminal q p₁ = predictedStateTerminal q p₂ := by
