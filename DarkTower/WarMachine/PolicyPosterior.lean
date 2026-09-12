@@ -24,4 +24,6 @@ theorem softmaxWithFPi_zero {PolicyIndex : Type*} (exp log : ℝ → ℝ)
       DarkTower.WarMachine.Holes.softmax exp log habit grade tau policies := by
   simp [softmaxWithFPi, DarkTower.WarMachine.Holes.softmax]
 
+end
+
 end DarkTower.WarMachine.PolicyPosterior
