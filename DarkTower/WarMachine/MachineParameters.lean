@@ -45,7 +45,6 @@ noncomputable def machineParameterPosterior (Policy : Type)
     simp only [Theta.all, List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]
     simp [evidence]
     field_simp [hs]
-    ring
 
 theorem bayesConditioning (Policy : Type) (l : RegisteredLikelihood Obs)
     (positive : ∀ o, 0 < evidence l o) (p : Policy) (o : Outcome Obs) (t : Theta) :
