@@ -7,3 +7,4 @@ import DarkTower.WarMachine.MachineForwardModelWitness
 #print axioms DarkTower.WarMachine.MachineForwardModelWitness.cascadeComposition
 #print axioms DarkTower.WarMachine.MachineForwardModelWitness.repeatedComposition
 #print axioms DarkTower.WarMachine.MachineForwardModelWitness.inheritedExcess
+#print axioms DarkTower.WarMachine.MachineForwardModelWitness.productionPinnedFloatCarried

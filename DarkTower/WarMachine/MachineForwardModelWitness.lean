@@ -104,4 +104,12 @@ theorem inheritedExcess :
     (allO.map cascadeMass).sum - 1 = (1 : ℚ) / 36028797018963968 := by
   norm_num [allO, advanceTwiceMass, cascadeMass]
 
+theorem productionPinnedFloatCarried :
+    (∀ o, advanceTwiceMass o = compose advanceTwiceTerminal o) ∧
+    (∀ o, cascadeMass o = compose cascadeTerminal o) ∧
+    |((allO.map advanceTwiceMass).sum) - 1| ≤ floatRowBound ∧
+    |((allO.map cascadeMass).sum) - 1| ≤ floatRowBound := by
+  exact ⟨advanceTwiceComposition, cascadeComposition,
+    advanceTwiceRow.nearNormalised, cascadeRow.nearNormalised⟩
+
 end DarkTower.WarMachine.MachineForwardModelWitness
