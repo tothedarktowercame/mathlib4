@@ -76,6 +76,50 @@ theorem uniformEntropyReference :
 theorem uniformCoordinates : ∀ s, uniformPrior s = 1/7 := by
   intro s; rfl
 
+/-! ## Pinned production reference rows (2026-09-04 and 2026-05-23)
+
+The decimal numerals below are the exact decimal renderings retained in
+`row-7-belief-state-2026-09-12/input.edn`.  The production reader carries
+these coordinates without renormalising them; the accompanying Clojure
+readback records the IEEE-double comparison for every coordinate. -/
+
+noncomputable def carriedTracePosterior : Posterior
+  | .spawned => 0.10532904980883244
+  | .refined => 0.14086253396643547
+  | .strengthened => 0.31240050666821867
+  | .addressed => 0.09555013225308848
+  | .falsified => 0.07447381184188043
+  | .foreclosed => 0.1660549156527121
+  | .reopened => 0.10532904980883244
+
+theorem carriedTraceCoordinates :
+    carriedTracePosterior .spawned = 0.10532904980883244 ∧
+    carriedTracePosterior .refined = 0.14086253396643547 ∧
+    carriedTracePosterior .strengthened = 0.31240050666821867 ∧
+    carriedTracePosterior .addressed = 0.09555013225308848 ∧
+    carriedTracePosterior .falsified = 0.07447381184188043 ∧
+    carriedTracePosterior .foreclosed = 0.1660549156527121 ∧
+    carriedTracePosterior .reopened = 0.10532904980883244 := by
+  norm_num [carriedTracePosterior]
+
+noncomputable def bootstrappedTracePosterior : Posterior := fun _ =>
+  0.14285714285714285
+
+theorem bootstrappedTraceCoordinates : ∀ s,
+    bootstrappedTracePosterior s = 0.14285714285714285 := by
+  intro s
+  rfl
+
+noncomputable def retainedTraceBelief : machineBeliefState
+  | 0 => some carriedTracePosterior
+  | 1 => some bootstrappedTracePosterior
+  | _ => none
+
+theorem retainedTraceBeliefReferences :
+    retainedTraceBelief 0 = some carriedTracePosterior ∧
+    retainedTraceBelief 1 = some bootstrappedTracePosterior := by
+  constructor <;> rfl
+
 /-- THE FINDING, as one proposition rather than as pieces a reader must assemble.
 `docs/futon-aif-completeness.md:49-68` requires "mean *and* precision (variance)
 both explicitly represented" and `:63-64` answers with `most-likely-status` and
