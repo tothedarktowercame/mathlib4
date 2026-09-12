@@ -37,6 +37,7 @@ theorem everyRowNormalised (s : Status) (a : Action) :
 theorem declaredActionsDistinguished :
     controlled.mass (.spawned, .advanceMission) .refined = 1 ∧
     controlled.mass (.spawned, .applyCascade) .refined = 0 := by
-  norm_num [controlled, next]
+  have h : Status.refined ≠ Status.spawned := by decide
+  simp [controlled, next, h]
 
 end DarkTower.WarMachine.MachineTransition
