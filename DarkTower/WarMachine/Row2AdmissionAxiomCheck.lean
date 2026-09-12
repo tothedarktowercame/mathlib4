@@ -1,0 +1,28 @@
+import DarkTower.WarMachine.MachineObservationWitness
+import DarkTower.WarMachine.MachinePrecisionWitness
+import DarkTower.WarMachine.MachinePredictionErrorWitness
+
+#print axioms DarkTower.WarMachine.MachineObservationWitness.emptyObservationHasFourteenZeros
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.oneStillError
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.threeStillErrors
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.sevenStillErrors
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.fifteenStillErrors
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.fullWindowOfStillErrors
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.windowBinds
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.unitError
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.halfError
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.tripleError
+#print axioms DarkTower.WarMachine.MachinePrecisionWitness.floorIsReached
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.basicTriple
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.unitVariance
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.emptyBeliefReadsTheObservation
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.negativeError
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.exactZeroError
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.eighthVariance
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.zeroVarianceFloored
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.negativeVarianceFloored
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.unobservedIsOmitted
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.brokenModelRefuses
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.unobservedWithBrokenModelRefuses
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.malformedObservationRefuses
+#print axioms DarkTower.WarMachine.MachinePredictionErrorWitness.bothModelMembersNamed
