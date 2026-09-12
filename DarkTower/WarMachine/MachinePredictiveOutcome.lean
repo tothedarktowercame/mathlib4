@@ -1,7 +1,9 @@
 import DarkTower.WarMachine.MachinePredictedStatePlan
 import DarkTower.WarMachine.MachineQ
+import DarkTower.WarMachine.MachineModelSpec
 
 namespace DarkTower.WarMachine.MachinePredictiveOutcome
+noncomputable section
 open DarkTower.WarMachine.Holes
 open DarkTower.WarMachine.MachineBeliefState
 open DarkTower.WarMachine.MachineTransition
