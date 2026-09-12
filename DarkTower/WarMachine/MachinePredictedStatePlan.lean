@@ -41,10 +41,14 @@ theorem stepNonnegative (q : Posterior) (a : Action) (hq : ∀ s, 0 ≤ q s) :
 
 theorem stepNormalised (q : Posterior) (a : Action) (hq : Normalised q) :
     Normalised (predictedStateStep q a) := by
+  have hT : ∀ s : Status,
+      (Status.all.map (controlled.mass (s, a))).sum = 1 := by
+    intro s
+    exact controlled.normalised (s, a)
   unfold Normalised predictedStateStep
   rw [sumSwap Status.all Status.all
       (fun s' s => q s * controlled.mass (s, a) s')]
-  simp only [List.sum_map_mul_left, controlled.normalised, mul_one]
+  simp only [List.sum_map_mul_left, hT, mul_one]
   exact hq
 
 theorem terminalNormalised (q : Posterior) (actions : List Action)
