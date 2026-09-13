@@ -156,8 +156,7 @@ theorem finiteFieldRootOrdering [Nonempty (Fin n)]
       ∀ ⦃b : ℝ⦄, 0 < b →
         InteroceptivePolicyPrecisionPositiveDomain.PosteriorRoot c2
           (evidenceDelta habit g fPi) b → b = b2 := by
-  exact InteroceptivePolicyPrecisionPositiveDomain.
-    increasedRateLowersGammaAtUniquePositiveRootOn
+  exact DarkTower.WarMachine.InteroceptivePolicyPrecisionPositiveDomain.increasedRateLowersGammaAtUniquePositiveRootOn
       (evidenceDelta_continuousOn_positive habit g fPi)
       (fun beta _ => evidenceDelta_range_bound habit g fPi hlo hhi beta)
       hb1pos hb1root hrates hunique
