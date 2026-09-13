@@ -193,7 +193,7 @@ theorem rejects_unclosed_node (att : FullAttestation) (req : FullScopeRequiremen
     ¬ FullQualifyingRun req ev att := by
   intro hfull
   rcases hfull with ⟨_, hnodes, _, _, _, _, _⟩
-  have hp := hnodes.2.2 _ h
+  have hp := hnodes.2.2.2 _ h
   simp [positiveAtThisRun] at hp
 
 theorem rejects_unfired_edge (att : FullAttestation) (req : FullScopeRequirements)
