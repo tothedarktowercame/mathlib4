@@ -108,18 +108,20 @@ theorem score_hasDerivAt [Nonempty (Fin n)]
     HasDerivAt (fun b => score habit g fPi b i) (g i / beta ^ 2) beta := by
   have hbne : beta ≠ 0 := ne_of_gt hbeta
   have hgdiv : HasDerivAt (fun b : ℝ => g i / b) (-g i / beta ^ 2) beta := by
-    convert ((hasDerivAt_id beta).inv hbne).const_mul (g i) using 1 <;>
-      simp only [id_eq] <;> field_simp <;> ring
+    convert ((hasDerivAt_id beta).inv hbne).const_mul (g i) using 1
+    simp only [id_eq]
+    field_simp
   convert (((hasDerivAt_const beta (Real.log (habit i))).sub hgdiv).sub_const
-      (fPi i)) using 1 <;> ring
+      (fPi i)) using 1
+  ring
 
 theorem rawWeight_hasDerivAt [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {beta : ℝ} (hbeta : 0 < beta) (i : Fin n) :
     HasDerivAt (fun b => rawWeight habit g fPi b i)
       (rawWeight habit g fPi beta i * g i / beta ^ 2) beta := by
-  convert (Real.hasDerivAt_exp (score habit g fPi beta i)).comp beta
-      (score_hasDerivAt habit g fPi hbeta i) using 1 <;>
-    simp [rawWeight, Function.comp_def, mul_div_assoc]
+  simpa only [rawWeight, Function.comp_apply, mul_div_assoc] using
+    (Real.hasDerivAt_exp (score habit g fPi beta i)).comp beta
+      (score_hasDerivAt habit g fPi hbeta i)
 
 theorem normalizer_hasDerivAt [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {beta : ℝ} (hbeta : 0 < beta) :
@@ -184,7 +186,7 @@ theorem expectedG_hasDerivAt [Nonempty (Fin n)]
   rw [weightedVariance_eq_secondMoment_sub_sq,
     expectedG_eq_raw_div, secondMoment_eq_raw_div]
   dsimp [M]
-  field_simp <;> ring
+  field_simp
 
 theorem evidenceDelta_hasDerivAt [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {beta : ℝ} (hbeta : 0 < beta) :
@@ -197,7 +199,8 @@ theorem evidenceDelta_hasDerivAt [Nonempty (Fin n)]
     ((weightedVariance habit g fPi beta -
       weightedVariance habit g (fun _ => 0) beta) / beta ^ 2) beta
   convert (expectedG_hasDerivAt habit g fPi hbeta).sub
-      (expectedG_hasDerivAt habit g (fun _ => 0) hbeta) using 1 <;> ring
+      (expectedG_hasDerivAt habit g (fun _ => 0) hbeta) using 1
+  ring
 
 theorem canonical_derivativeCertificate [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {lo hi : ℝ}
