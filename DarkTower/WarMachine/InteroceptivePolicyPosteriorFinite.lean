@@ -37,13 +37,14 @@ theorem canonicalList_eq_ofFn (habit g fPi : Fin n → ℝ) (beta : ℝ) :
     PolicyPosterior.softmaxWithFPi Real.exp Real.log habit (gradeOf g) fPi beta
       (List.ofFn id) = List.ofFn (weight habit g fPi beta) := by
   simp only [PolicyPosterior.softmaxWithFPi, gradeOf, List.map_ofFn,
-    Function.comp_apply, List.foldl_eq_foldr]
+    List.foldl_eq_foldr]
   apply congrArg List.ofFn
   funext i
-  simp [InteroceptivePolicyPosteriorFinite.weight,
+  simp only [InteroceptivePolicyPosteriorFinite.weight,
     InteroceptivePolicyPosteriorFinite.rawWeight,
     InteroceptivePolicyPosteriorFinite.score,
-    InteroceptivePolicyPosteriorFinite.normalizer, List.sum_ofFn]
+    InteroceptivePolicyPosteriorFinite.normalizer]
+  rw [List.sum_ofFn]
 
 /-- Positivity is not needed merely to normalise exponentiated real scores,
 but it is required for `Real.log habit` to denote the log of the supplied
