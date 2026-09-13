@@ -36,8 +36,22 @@ noncomputable def weight (habit g fPi : Fin n → ℝ) (beta : ℝ) (i : Fin n) 
 theorem canonicalList_eq_ofFn (habit g fPi : Fin n → ℝ) (beta : ℝ) :
     PolicyPosterior.softmaxWithFPi Real.exp Real.log habit (gradeOf g) fPi beta
       (List.ofFn id) = List.ofFn (weight habit g fPi beta) := by
-  simp [PolicyPosterior.softmaxWithFPi, gradeOf, weight, rawWeight, score,
-    normalizer, List.foldl_eq_foldr, List.sum_ofFn]
+  simp only [PolicyPosterior.softmaxWithFPi, gradeOf, List.map_ofFn,
+    Function.comp_apply, List.foldl_eq_foldr]
+  apply congrArg List.ofFn
+  funext i
+  simp [InteroceptivePolicyPosteriorFinite.weight,
+    InteroceptivePolicyPosteriorFinite.rawWeight,
+    InteroceptivePolicyPosteriorFinite.score,
+    InteroceptivePolicyPosteriorFinite.normalizer, List.sum_ofFn]
+
+/-- Positivity is not needed merely to normalise exponentiated real scores,
+but it is required for `Real.log habit` to denote the log of the supplied
+habit mass rather than Lean's totalised log at a nonpositive input. -/
+theorem exp_log_habit {habit : Fin n → ℝ}
+    (hhabit : ∀ i, 0 < habit i) (i : Fin n) :
+    Real.exp (Real.log (habit i)) = habit i :=
+  Real.exp_log (hhabit i)
 
 theorem normalizer_pos [Nonempty (Fin n)] (habit g fPi : Fin n → ℝ) (beta : ℝ) :
     0 < normalizer habit g fPi beta := by
@@ -75,7 +89,7 @@ theorem rawWeight_continuousOn_positive (habit g fPi : Fin n → ℝ) (i : Fin n
 
 theorem normalizer_continuousOn_positive (habit g fPi : Fin n → ℝ) :
     ContinuousOn (fun beta => normalizer habit g fPi beta) (Set.Ioi 0) := by
-  exact continuousOn_finset_sum _ fun i _ => rawWeight_continuousOn_positive habit g fPi i
+  exact continuousOn_finsetSum _ fun i _ => rawWeight_continuousOn_positive habit g fPi i
 
 theorem weight_continuousOn_positive [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) (i : Fin n) :
@@ -109,12 +123,13 @@ theorem evidenceDelta_continuousOn_positive [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) :
     ContinuousOn (evidenceDelta habit g fPi) (Set.Ioi 0) := by
   apply ContinuousOn.sub
-  · exact continuousOn_finset_sum _ fun i _ =>
+  · exact continuousOn_finsetSum _ fun i _ =>
       (weight_continuousOn_positive habit g fPi i).mul continuousOn_const
-  · exact continuousOn_finset_sum _ fun i _ =>
+  · exact continuousOn_finsetSum _ fun i _ =>
       (weight_continuousOn_positive habit g (fun _ => 0) i).mul continuousOn_const
 
 #print axioms canonicalList_eq_ofFn
+#print axioms exp_log_habit
 #print axioms normalizer_pos
 #print axioms weights_normalised
 #print axioms canonicalList_length
