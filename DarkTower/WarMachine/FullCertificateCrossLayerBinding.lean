@@ -11,7 +11,7 @@ structure RecordKey where
   recordId : String
   deriving DecidableEq, Repr
 
-def ResolvedRecord.key (r : ResolvedRecord) : RecordKey := ⟨r.family, r.run, r.recordId⟩
+def resolvedRecordKey (r : ResolvedRecord) : RecordKey := ⟨r.family, r.run, r.recordId⟩
 
 def referenceProjects (old : CausalReferences) : ApplicableReference → Prop
   | .checkpoint checkpoint close => old.closeAttemptId = close ∧ old.tickId = checkpoint
@@ -81,18 +81,18 @@ def targetsExact (actual : ResolvedEvidence) (x : CrossLayerEvidence) : Prop :=
   x.edgeTargets.map (·.semanticEdgeId) = actual.connections.map (·.requirement.semanticEdgeId) ∧
   ∀ t ∈ x.edgeTargets, ∃ c ∈ actual.connections,
     c.requirement.semanticEdgeId = t.semanticEdgeId ∧ c.causalRecordId = t.target.recordId ∧
-    ∃ r ∈ actual.records, r.key = t.target
+    ∃ r ∈ actual.records, resolvedRecordKey r = t.target
 
 def CrossLayerQualifyingRun (fixed : ExternallyFixedRun) (events : ExternallyFixedEventPair)
     (subjects : ExternallyFixedRecordConnectionSubjects) (expected actual : ResolvedEvidence)
     (x : CrossLayerEvidence) (req : FullScopeRequirements) (ev : FullScopeEvidence)
     (rb : RunBindingEvidence) (eb : EventBindingEvidence) (att : FullAttestation) : Prop :=
   ResolvedQualifyingRun fixed events subjects expected actual req ev rb eb att ∧
-  projectionsExact subjects actual ∧ (actual.records.map ResolvedRecord.key).Nodup ∧
+  projectionsExact subjects actual ∧ (actual.records.map resolvedRecordKey).Nodup ∧
   crossFamilyExact x.causal actual.records ∧ targetsExact actual x ∧
   ((∃ j ∈ rb.nodeJoins, j.claimId = x.causal.reviewClaimId) ∨
    (∃ j ∈ rb.equationJoins, j.claimId = x.causal.reviewClaimId)) ∧
-  x.expansions.map (·.summary) = actual.records.map ResolvedRecord.key ∧
+  x.expansions.map (·.summary) = actual.records.map resolvedRecordKey ∧
   ∀ e ∈ x.expansions, e.underlyingMembers ≠ [] ∧
     (∀ p ∈ e.underlyingMembers, p.valid) ∧ e.membershipAuthorityRef ≠ ""
 
@@ -115,7 +115,7 @@ theorem rejects_wrong_nonempty_cross_family_reference (fixed) (events) (subjects
 
 theorem rejects_ambiguous_composite_record_identity (fixed) (events) (subjects)
     (expected actual) (x) (req) (ev) (rb) (eb) (att)
-    (hdup : ¬ (actual.records.map ResolvedRecord.key).Nodup) :
+    (hdup : ¬ (actual.records.map resolvedRecordKey).Nodup) :
     ¬ CrossLayerQualifyingRun fixed events subjects expected actual x req ev rb eb att := by
   intro h; exact hdup h.2.2.1
 
