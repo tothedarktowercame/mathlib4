@@ -131,8 +131,32 @@ theorem canonical_unique_positive_root
     dsimp [f, PosteriorRoot] at hroot hother ⊢
     linarith
 
+/-- The sufficient criterion supplies exactly the uniqueness premise used by
+the accepted finite-field prior-rate ordering theorem. -/
+theorem canonical_prior_rate_root_order
+    {n : ℕ} [Nonempty (Fin n)]
+    (habit g fPi : Fin n → ℝ) {lo hi c1 c2 b1 : ℝ}
+    (hhabit : ∀ i, 0 < habit i)
+    (hlohi : lo ≤ hi) (hlo : ∀ i, lo ≤ g i) (hhi : ∀ i, g i ≤ hi)
+    (hb1pos : 0 < b1) (hb1root : PosteriorRoot c1
+      (evidenceDelta habit g fPi) b1)
+    (hrates : c1 < c2) (hc2 : 3 * (hi - lo) / 2 < c2)
+    (cert : DerivativeCertificate (evidenceDelta habit g fPi) (hi - lo)) :
+    ∃ b2,
+      PosteriorRoot c2 (evidenceDelta habit g fPi) b2 ∧
+      b1 < b2 ∧
+      appliedGamma b2 < appliedGamma b1 ∧
+      ∀ ⦃b : ℝ⦄, 0 < b →
+        PosteriorRoot c2 (evidenceDelta habit g fPi) b → b = b2 := by
+  obtain ⟨_, b2, hb2, hb2unique⟩ :=
+    canonical_unique_positive_root habit g fPi hhabit hlohi hlo hhi hc2 cert
+  apply finiteFieldRootOrdering habit g fPi hlo hhi hb1pos hb1root hrates
+  intro x y hx hxroot hy hyroot
+  exact (hb2unique x ⟨hx, hxroot⟩).trans (hb2unique y ⟨hy, hyroot⟩).symm
+
 #print axioms root_localisation
 #print axioms derivative_lt_one_above_half_range
 #print axioms canonical_unique_positive_root
+#print axioms canonical_prior_rate_root_order
 
 end DarkTower.WarMachine.InteroceptivePolicyPrecisionUniqueRoot
