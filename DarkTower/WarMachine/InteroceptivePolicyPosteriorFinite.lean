@@ -1,5 +1,6 @@
 import Mathlib
 import DarkTower.WarMachine.PolicyPosterior
+import DarkTower.WarMachine.InteroceptivePolicyPrecisionProposal
 import DarkTower.WarMachine.InteroceptivePolicyPrecisionBounded
 import DarkTower.WarMachine.InteroceptivePolicyPrecisionPositiveDomain
 
@@ -15,6 +16,16 @@ open scoped BigOperators
 open DarkTower.WarMachine
 
 variable {n : ℕ}
+
+/-- The two owned modules use definitionally identical fixed-point carriers. -/
+theorem posteriorRoot_correspondence (priorRate : ℝ) (delta : ℝ → ℝ) (beta : ℝ) :
+    InteroceptivePolicyPrecisionProposal.PosteriorRoot priorRate delta beta ↔
+      InteroceptivePolicyPrecisionPositiveDomain.PosteriorRoot priorRate delta beta :=
+  Iff.rfl
+
+theorem proposalGamma_correspondence (beta : ℝ) :
+    InteroceptivePolicyPrecisionProposal.appliedGamma beta =
+      InteroceptivePolicyPrecisionPositiveDomain.appliedGamma beta := rfl
 
 noncomputable def gradeOf (g : Fin n → ℝ) (i : Fin n) :
     Holes.ExpectedFreeEnergyValue := ⟨g i⟩
@@ -162,6 +173,8 @@ theorem finiteFieldRootOrdering [Nonempty (Fin n)]
       hb1pos hb1root hrates hunique
 
 #print axioms canonicalList_eq_ofFn
+#print axioms posteriorRoot_correspondence
+#print axioms proposalGamma_correspondence
 #print axioms exp_log_habit
 #print axioms normalizer_pos
 #print axioms weights_normalised
