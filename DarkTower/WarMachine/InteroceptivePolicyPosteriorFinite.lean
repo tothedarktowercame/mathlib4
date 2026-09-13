@@ -132,6 +132,36 @@ theorem evidenceDelta_continuousOn_positive [Nonempty (Fin n)]
   · exact continuousOn_finsetSum _ fun i _ =>
       (weight_continuousOn_positive habit g (fun _ => 0) i).mul continuousOn_const
 
+/-- The finite canonical posterior discharges the boundedness and continuity
+premises of the accepted positive-domain theorem. Global uniqueness of the new
+positive root remains an explicit caller premise. -/
+theorem finiteFieldRootOrdering [Nonempty (Fin n)]
+    (habit g fPi : Fin n → ℝ) {lo hi c1 c2 b1 : ℝ}
+    (hlo : ∀ i, lo ≤ g i) (hhi : ∀ i, g i ≤ hi)
+    (hb1pos : 0 < b1)
+    (hb1root : InteroceptivePolicyPrecisionPositiveDomain.PosteriorRoot c1
+      (evidenceDelta habit g fPi) b1)
+    (hrates : c1 < c2)
+    (hunique : ∀ ⦃x y : ℝ⦄,
+      0 < x → InteroceptivePolicyPrecisionPositiveDomain.PosteriorRoot c2
+        (evidenceDelta habit g fPi) x →
+      0 < y → InteroceptivePolicyPrecisionPositiveDomain.PosteriorRoot c2
+        (evidenceDelta habit g fPi) y → x = y) :
+    ∃ b2,
+      InteroceptivePolicyPrecisionPositiveDomain.PosteriorRoot c2
+        (evidenceDelta habit g fPi) b2 ∧
+      b1 < b2 ∧
+      InteroceptivePolicyPrecisionPositiveDomain.appliedGamma b2 <
+        InteroceptivePolicyPrecisionPositiveDomain.appliedGamma b1 ∧
+      ∀ ⦃b : ℝ⦄, 0 < b →
+        InteroceptivePolicyPrecisionPositiveDomain.PosteriorRoot c2
+          (evidenceDelta habit g fPi) b → b = b2 := by
+  exact InteroceptivePolicyPrecisionPositiveDomain.
+    increasedRateLowersGammaAtUniquePositiveRootOn
+      (evidenceDelta_continuousOn_positive habit g fPi)
+      (fun beta _ => evidenceDelta_range_bound habit g fPi hlo hhi beta)
+      hb1pos hb1root hrates hunique
+
 #print axioms canonicalList_eq_ofFn
 #print axioms exp_log_habit
 #print axioms normalizer_pos
@@ -139,5 +169,6 @@ theorem evidenceDelta_continuousOn_positive [Nonempty (Fin n)]
 #print axioms canonicalList_length
 #print axioms evidenceDelta_range_bound
 #print axioms evidenceDelta_continuousOn_positive
+#print axioms finiteFieldRootOrdering
 
 end DarkTower.WarMachine.InteroceptivePolicyPosteriorFinite
