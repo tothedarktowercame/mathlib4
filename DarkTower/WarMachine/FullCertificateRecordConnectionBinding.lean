@@ -129,7 +129,7 @@ theorem rejects_wrong_connection_endpoint (fixed) (events) (expected) (req) (ev)
     (hendpoint : s.connectionId ≠ s.fromNode ++ "->" ++ s.toNode) :
     ¬ RecordConnectionBoundQualifyingRun fixed events expected req ev rb eb att := by
   intro h
-  exact hendpoint (h.2.2.2.2.2 s hs).1.2.2.1
+  exact hendpoint (h.2.2.2.2.2 s hs).1.2.2.2.1
 
 theorem rejects_wrong_connection_classification (fixed) (events) (expected) (req) (ev)
     (rb) (eb) (att) (s : ConnectionSubject) (hs : s ∈ expected.connections)
