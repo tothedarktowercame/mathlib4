@@ -55,19 +55,29 @@ def fixedPairValid (fixed : ExternallyFixedRun) (expected : ExternallyFixedEvent
   expected.authorityRef ≠ "" ∧ expected.authorityPin.valid
 
 def eventSelectionExact (fixed : ExternallyFixedRun) (req : FullScopeRequirements)
+    (ev : FullScopeEvidence) (rb : RunBindingEvidence)
     (expected : ExternallyFixedEventPair) (eb : EventBindingEvidence) :
     SelectionEnaction → Prop
   | .match selected enacted =>
       eb.actual.selected = expected.selected ∧ eb.actual.enacted = expected.enacted ∧
       selected = expected.selected.actionId ∧ enacted = expected.enacted.actionId ∧
-      selected = enacted ∧ eb.divergenceSubject = none
+      selected = enacted ∧
+      expected.selected.occurrenceId = expected.enacted.occurrenceId ∧
+      eb.divergenceSubject = none ∧ rb.divergenceAuthority = none
   | .typedDivergence selected enacted cls grounds source =>
       eb.actual.selected = expected.selected ∧ eb.actual.enacted = expected.enacted ∧
       ∃ d, eb.divergenceSubject = some d ∧ d.selected = expected.selected ∧
         d.enacted = expected.enacted ∧ d.divergenceClass = cls ∧
         cls ∈ req.allowedDivergenceClasses ∧ d.groundsRef = grounds ∧
         d.evidenceSource = source ∧ d.authorityRef ≠ "" ∧ d.authorityPin.valid ∧
-        selected = expected.selected.actionId ∧ enacted = expected.enacted.actionId
+        selected = expected.selected.actionId ∧ enacted = expected.enacted.actionId ∧
+        ev.divergenceAuthorityPin = d.authorityPin ∧
+        ∃ r, rb.divergenceAuthority = some r ∧ r.run = fixed.identity ∧
+          r.selected = ⟨d.selected.run, d.selected.occurrenceId, d.selected.actionId⟩ ∧
+          r.enacted = ⟨d.enacted.run, d.enacted.occurrenceId, d.enacted.actionId⟩ ∧
+          r.divergenceClass = d.divergenceClass ∧ r.groundsRef = d.groundsRef ∧
+          r.evidenceSource = d.evidenceSource ∧ r.authorityRef = d.authorityRef ∧
+          r.authorityPin = d.authorityPin
   | .refusedShape _ => False
 
 def EventBoundQualifyingRun (fixed : ExternallyFixedRun)
@@ -75,7 +85,7 @@ def EventBoundQualifyingRun (fixed : ExternallyFixedRun)
     (ev : FullScopeEvidence) (rb : RunBindingEvidence) (eb : EventBindingEvidence)
     (att : FullAttestation) : Prop :=
   RunBoundQualifyingRun fixed req ev rb att ∧ fixedPairValid fixed expected ∧
-  eventSelectionExact fixed req expected eb att.selectionEnaction
+  eventSelectionExact fixed req ev rb expected eb att.selectionEnaction
 
 theorem eventBound_implies_runBound {fixed expected req ev rb eb att} :
     EventBoundQualifyingRun fixed expected req ev rb eb att →
@@ -104,6 +114,16 @@ theorem rejects_same_action_wrong_occurrence (fixed) (expected) (req) (ev) (rb) 
   rw [hsel] at hs
   exact hocc (congrArg EventSubject.occurrenceId hs.1)
 
+theorem rejects_match_selected_enacted_occurrence_mismatch (fixed) (expected) (req) (ev)
+    (rb) (eb) (att) (selected enacted : String)
+    (hsel : att.selectionEnaction = .match selected enacted)
+    (hocc : expected.selected.occurrenceId ≠ expected.enacted.occurrenceId) :
+    ¬ EventBoundQualifyingRun fixed expected req ev rb eb att := by
+  intro h
+  have hs := h.2.2
+  rw [hsel] at hs
+  exact hocc hs.2.2.2.2.2.1
+
 theorem rejects_borrowed_divergence_occurrence_pair (fixed) (expected) (req) (ev) (rb)
     (eb) (att) (selected enacted cls grounds source : String)
     (d : ExactDivergenceSubject)
@@ -130,11 +150,29 @@ theorem rejects_mismatched_exact_subject_pin (fixed) (expected) (req) (ev) (rb) 
   rw [hsel] at hs
   exact hpin (congrArg EventSubject.sourcePin hs.1)
 
+theorem rejects_unshared_divergence_authority_pin (fixed) (expected) (req) (ev) (rb)
+    (eb) (att) (selected enacted cls grounds source : String)
+    (d : ExactDivergenceSubject)
+    (hsel : att.selectionEnaction = .typedDivergence selected enacted cls grounds source)
+    (hd : eb.divergenceSubject = some d)
+    (hpin : ev.divergenceAuthorityPin ≠ d.authorityPin) :
+    ¬ EventBoundQualifyingRun fixed expected req ev rb eb att := by
+  intro h
+  have hs := h.2.2
+  rw [hsel] at hs
+  rcases hs.2.2 with ⟨d', hd', _, _, _, _, _, _, _, _, _, _, hshared, _⟩
+  rw [hd] at hd'
+  injection hd' with heq
+  subst d'
+  exact hpin hshared
+
 #print axioms eventBound_implies_runBound
 #print axioms eventBound_implies_full
 #print axioms rejects_cross_run_ordinary_match
 #print axioms rejects_same_action_wrong_occurrence
+#print axioms rejects_match_selected_enacted_occurrence_mismatch
 #print axioms rejects_borrowed_divergence_occurrence_pair
 #print axioms rejects_mismatched_exact_subject_pin
+#print axioms rejects_unshared_divergence_authority_pin
 
 end DarkTower.WarMachine.FullCertificateEventBinding
