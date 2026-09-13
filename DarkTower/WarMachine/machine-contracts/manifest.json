@@ -16,7 +16,7 @@
   ],
   "holes-component": {
     "path": "DarkTower/WarMachine/holes-contract.json",
-    "sha256": "333b31739f984d2a291da1ce0551ae219fcc1aa5fb4af4e5a414910b8f69bde9"
+    "sha256": "e9aafdaab14494f8ca543c704f93a2b1aa4865be0a3194ebed2cdf23eb08a4a0"
   },
   "schema": "wm-machine-contract-manifest-v1",
   "scope": "model-transcription-only",
@@ -47,7 +47,7 @@
       "sha256": "33cbab0d3ba76bdf58d9f3638748f12cb9e3befb1336b223ddbd3567589a09e8"
     },
     {
-      "commit": "bf79f988b3131701ff9ed257d371cc45dd5eea5b",
+      "commit": "ea5bb437e8cd6c917c94b519bff683377fbb33a8",
       "path": "DarkTower/WarMachine/Holes.lean",
       "sha256": "4dc0a76b9999d09b2ab49c932117e5b7dcfec523e5e61735b3a84191229cd02b"
     },
