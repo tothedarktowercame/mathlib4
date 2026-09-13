@@ -100,7 +100,7 @@ theorem rejects_cross_run_family_reuse (fixed) (events) (expected) (req) (ev) (r
     (hrun : s.run ≠ fixed.identity) :
     ¬ RecordConnectionBoundQualifyingRun fixed events expected req ev rb eb att := by
   intro h
-  exact hrun (h.2.2.1.2 s hs).1.1
+  exact hrun (h.2.2.1.2.2 s hs).1.1
 
 theorem rejects_missing_family (fixed) (events) (expected) (req) (ev) (rb) (eb) (att)
     (family : RecordFamily) (hfamily : family ∉ expected.records.map (·.family)) :
@@ -115,21 +115,21 @@ theorem rejects_mismatched_family_evidence_source (fixed) (events) (expected) (r
     (hmissing : .presentAndConsistent s.family s.evidenceSource ∉ att.recordFamilies) :
     ¬ RecordConnectionBoundQualifyingRun fixed events expected req ev rb eb att := by
   intro h
-  exact hmissing (h.2.2.1.2 s hs).2
+  exact hmissing (h.2.2.1.2.2 s hs).2
 
 theorem rejects_cross_run_edge_reuse (fixed) (events) (expected) (req) (ev) (rb)
     (eb) (att) (s : ConnectionSubject) (hs : s ∈ expected.connections)
     (hrun : s.run ≠ fixed.identity) :
     ¬ RecordConnectionBoundQualifyingRun fixed events expected req ev rb eb att := by
   intro h
-  exact hrun (h.2.2.2.2 s hs).1.1
+  exact hrun (h.2.2.2.2.2 s hs).1.1
 
 theorem rejects_wrong_connection_endpoint (fixed) (events) (expected) (req) (ev) (rb)
     (eb) (att) (s : ConnectionSubject) (hs : s ∈ expected.connections)
     (hendpoint : s.connectionId ≠ s.fromNode ++ "->" ++ s.toNode) :
     ¬ RecordConnectionBoundQualifyingRun fixed events expected req ev rb eb att := by
   intro h
-  exact hendpoint (h.2.2.2.2 s hs).1.2.2.1
+  exact hendpoint (h.2.2.2.2.2 s hs).1.2.2.1
 
 theorem rejects_wrong_connection_classification (fixed) (events) (expected) (req) (ev)
     (rb) (eb) (att) (s : ConnectionSubject) (hs : s ∈ expected.connections)
@@ -137,14 +137,14 @@ theorem rejects_wrong_connection_classification (fixed) (events) (expected) (req
       att.connectionStates) :
     ¬ RecordConnectionBoundQualifyingRun fixed events expected req ev rb eb att := by
   intro h
-  exact hmissing (h.2.2.2.2 s hs).2
+  exact hmissing (h.2.2.2.2.2 s hs).2
 
 theorem rejects_stale_causal_reference (fixed) (events) (expected) (req) (ev) (rb)
     (eb) (att) (s : ConnectionSubject) (hs : s ∈ expected.connections)
     (hstale : s.causalRecordId = "") :
     ¬ RecordConnectionBoundQualifyingRun fixed events expected req ev rb eb att := by
   intro h
-  exact (h.2.2.2.2 s hs).1.2.2.2.2.2.2.2 hstale
+  exact (h.2.2.2.2.2 s hs).1.2.2.2.2.2.2.2 hstale
 
 #print axioms recordConnectionBound_implies_eventBound
 #print axioms recordConnectionBound_implies_full
