@@ -121,7 +121,8 @@ theorem rawWeight_hasDerivAt [Nonempty (Fin n)]
       (rawWeight habit g fPi beta i * g i / beta ^ 2) beta := by
   convert (Real.hasDerivAt_exp (score habit g fPi beta i)).comp beta
       (score_hasDerivAt habit g fPi hbeta i) using 1
-  rfl
+  simp only [rawWeight]
+  ring
 
 theorem normalizer_hasDerivAt [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {beta : ℝ} (hbeta : 0 < beta) :
