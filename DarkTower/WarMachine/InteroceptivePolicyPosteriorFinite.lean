@@ -44,6 +44,9 @@ theorem canonicalList_eq_ofFn (habit g fPi : Fin n → ℝ) (beta : ℝ) :
     InteroceptivePolicyPosteriorFinite.rawWeight,
     InteroceptivePolicyPosteriorFinite.score,
     InteroceptivePolicyPosteriorFinite.normalizer]
+  simp only [Function.comp_apply, id_eq]
+  change Real.exp (Real.log (habit i) - g i / beta - fPi i) /
+      (List.ofFn fun π => Real.exp (Real.log (habit π) - g π / beta - fPi π)).sum = _
   rw [List.sum_ofFn]
 
 /-- Positivity is not needed merely to normalise exponentiated real scores,
