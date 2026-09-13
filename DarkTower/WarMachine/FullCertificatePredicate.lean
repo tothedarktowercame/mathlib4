@@ -44,8 +44,9 @@ def EquationBindingState.requirement : EquationBindingState → EquationRequirem
   | .mismatched expected _ => expected
 
 def EquationBindingState.positive : EquationBindingState → Prop
-  | .exact _ claimId runScope registryPin declarationPin witnessPin =>
-      claimId ≠ "" ∧ runScope ≠ "" ∧ registryPin.valid ∧
+  | .exact requirement claimId runScope registryPin declarationPin witnessPin =>
+      requirement.nodeId ≠ "" ∧ requirement.equationId ≠ "" ∧
+      requirement.declaration ≠ "" ∧ claimId ≠ "" ∧ runScope ≠ "" ∧ registryPin.valid ∧
       declarationPin.valid ∧ witnessPin.valid
   | _ => False
 
@@ -61,10 +62,15 @@ structure LegacyScalarRetirement where
 
 def legacyObligationId := "retired-r8-legacy-free-energy-production-object"
 def legacyDescription := "R8 retired legacy scalar producer; live F_pi remains required"
+def delegatedRulingSha256 :=
+  "30414e60c0b84d18f4322c4f45fba8f22242c633eef35c1d209025b00577faea"
+def originalJ2Sha256 :=
+  "2fed9f7c5d4a3c375807dab5e0e3f24c82852bbbd9cef949a2fac8d7c22479da"
 
 def LegacyScalarRetirement.valid (r : LegacyScalarRetirement) : Prop :=
   r.obligationId = legacyObligationId ∧ r.rulingRef ≠ "" ∧
-  r.rulingPin.valid ∧ r.j2AuthorityPin.valid
+  r.rulingPin.expectedSha256 = delegatedRulingSha256 ∧ r.rulingPin.valid ∧
+  r.j2AuthorityPin.expectedSha256 = originalJ2Sha256 ∧ r.j2AuthorityPin.valid
 
 instance (r : LegacyScalarRetirement) : Decidable r.valid := by
   unfold LegacyScalarRetirement.valid
