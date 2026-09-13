@@ -86,10 +86,19 @@ theorem weightedVariance_le_range_sq_div_four [Nonempty (Fin n)]
             intro i _
             ring
           _ = (lo + hi) * m - lo * hi := by
-            rw [Finset.sum_sub_distrib, ← Finset.sum_mul]
-            rw [weights_normalised]
+            rw [Finset.sum_sub_distrib]
+            have hfirst :
+                (∑ i, weight habit g fPi beta i * ((lo + hi) * g i)) =
+                  (lo + hi) * ∑ i, weight habit g fPi beta i * g i := by
+              rw [Finset.mul_sum]
+              apply Finset.sum_congr rfl
+              intro i _
+              ring
+            have hsecond :
+                (∑ i, weight habit g fPi beta i * (lo * hi)) = lo * hi := by
+              rw [← Finset.sum_mul, weights_normalised, one_mul]
+            rw [hfirst, hsecond]
             dsimp [m, expectedG]
-            ring
   rw [weightedVariance_eq_secondMoment_sub_sq]
   have hsquare : 0 ≤ (2 * m - (lo + hi)) ^ 2 := sq_nonneg _
   nlinarith
@@ -100,7 +109,7 @@ theorem score_hasDerivAt [Nonempty (Fin n)]
   have hbne : beta ≠ 0 := ne_of_gt hbeta
   have hgdiv : HasDerivAt (fun b : ℝ => g i / b) (-g i / beta ^ 2) beta := by
     convert ((hasDerivAt_id beta).inv hbne).const_mul (g i) using 1 <;>
-      field_simp <;> ring
+      simp only [id_eq] <;> field_simp <;> ring
   convert (((hasDerivAt_const beta (Real.log (habit i))).sub hgdiv).sub_const
       (fPi i)) using 1 <;> ring
 
@@ -160,11 +169,10 @@ theorem expectedG_hasDerivAt [Nonempty (Fin n)]
       ((∑ i, rawWeight habit g fPi beta i * (g i) ^ 2) / beta ^ 2) beta := by
     convert HasDerivAt.fun_sum fun i _ =>
       (rawWeight_hasDerivAt habit g fPi hbeta i).mul_const (g i) using 1
-    · rfl
-    · rw [Finset.sum_div]
-      apply Finset.sum_congr rfl
-      intro i _
-      ring
+    rw [Finset.sum_div]
+    apply Finset.sum_congr rfl
+    intro i _
+    ring
   have hZ := normalizer_hasDerivAt habit g fPi hbeta
   have hZne : normalizer habit g fPi beta ≠ 0 :=
     ne_of_gt (normalizer_pos habit g fPi beta)
@@ -176,19 +184,20 @@ theorem expectedG_hasDerivAt [Nonempty (Fin n)]
   rw [weightedVariance_eq_secondMoment_sub_sq,
     expectedG_eq_raw_div, secondMoment_eq_raw_div]
   dsimp [M]
-  field_simp
-  ring
+  field_simp <;> ring
 
 theorem evidenceDelta_hasDerivAt [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {beta : ℝ} (hbeta : 0 < beta) :
     HasDerivAt (evidenceDelta habit g fPi)
       ((weightedVariance habit g fPi beta -
         weightedVariance habit g (fun _ => 0) beta) / beta ^ 2) beta := by
+  change HasDerivAt
+    ((fun b => expectedG habit g fPi b) -
+      fun b => expectedG habit g (fun _ => 0) b)
+    ((weightedVariance habit g fPi beta -
+      weightedVariance habit g (fun _ => 0) beta) / beta ^ 2) beta
   convert (expectedG_hasDerivAt habit g fPi hbeta).sub
-      (expectedG_hasDerivAt habit g (fun _ => 0) hbeta) using 1
-  · simp [evidenceDelta, expectedG,
-      InteroceptivePolicyPrecisionBounded.expectation, finiteWeights]
-  · ring
+      (expectedG_hasDerivAt habit g (fun _ => 0) hbeta) using 1 <;> ring
 
 theorem canonical_derivativeCertificate [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {lo hi : ℝ}
