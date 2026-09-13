@@ -80,7 +80,8 @@ theorem increasedRateLowersGammaAtUniquePositiveRoot
   have hfcont : Continuous f := continuous_id.sub hcont
   have hb1f : f b1 = c1 := by
     dsimp [f]
-    exact (eq_sub_iff_add_eq).2 hb1root
+    dsimp [PosteriorRoot] at hb1root
+    linarith
   have hub : bound < upper - c2 := by
     have hle : c2 + bound + 1 ≤ upper := le_max_right _ _
     linarith
@@ -102,7 +103,8 @@ theorem increasedRateLowersGammaAtUniquePositiveRoot
   have hb1b2le : b1 ≤ b2 := hb2mem.1
   have hb2root : PosteriorRoot c2 delta b2 := by
     dsimp [f] at hb2f
-    exact (eq_sub_iff_add_eq).1 hb2f.symm
+    dsimp [PosteriorRoot]
+    linarith
   have hb1b2 : b1 < b2 := by
     refine lt_of_le_of_ne hb1b2le ?_
     intro heq
