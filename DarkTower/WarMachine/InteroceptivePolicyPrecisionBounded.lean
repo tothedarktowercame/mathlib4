@@ -1,5 +1,5 @@
 import Mathlib
-import DarkTower.WarMachine.InteroceptivePolicyPrecisionProposal
+import DarkTower.WarMachine.MachineTemperature
 
 /-!
 # Bounded finite-policy refinement of the interoceptive proposal
@@ -13,9 +13,15 @@ floating production solver establishes the continuity or uniqueness premises.
 namespace DarkTower.WarMachine.InteroceptivePolicyPrecisionBounded
 
 open scoped BigOperators
-open DarkTower.WarMachine.InteroceptivePolicyPrecisionProposal
-
 variable {n : ℕ}
+
+/-- Local restatement of the proposal's abstract fixed-point predicate.  It is
+local so this refinement can elaborate without rebuilding the proposal olean. -/
+def PosteriorRoot (priorRate : ℝ) (evidenceDelta : ℝ → ℝ) (beta : ℝ) : Prop :=
+  beta = priorRate + evidenceDelta beta
+
+/-- Local restatement of the variational reciprocal. -/
+noncomputable def appliedGamma (beta : ℝ) : ℝ := 1 / beta
 
 /-- A finite probability vector, stated without choosing a softmax formula. -/
 structure FiniteWeights (n : ℕ) where
