@@ -34,7 +34,8 @@ theorem derivative_lt_one_above_half_range
     {delta : ℝ → ℝ} {R beta : ℝ}
     (hR : 0 ≤ R) (hbeta : R / 2 < beta)
     (cert : DerivativeCertificate delta R) : deriv delta beta < 1 := by
-  have hbpos : 0 < beta := lt_of_le_of_lt (half_nonneg hR) hbeta
+  have hRhalf : 0 ≤ R / 2 := div_nonneg hR (by norm_num)
+  have hbpos : 0 < beta := lt_of_le_of_lt hRhalf hbeta
   obtain ⟨vp, v0, hv0, hvp, hd⟩ := cert.atPositive beta hbpos
   rw [hd.deriv]
   have hsquares : R ^ 2 < 4 * beta ^ 2 := by nlinarith
@@ -42,9 +43,11 @@ theorem derivative_lt_one_above_half_range
   have hratio : R ^ 2 / (4 * beta ^ 2) < 1 := (div_lt_one hden).2 hsquares
   have : (vp - v0) / beta ^ 2 ≤ R ^ 2 / (4 * beta ^ 2) := by
     have hb2 : 0 < beta ^ 2 := sq_pos_of_pos hbpos
-    apply (div_le_iff₀ hb2).2
-    have : vp - v0 ≤ R ^ 2 / 4 := by linarith
-    nlinarith
+    have hv : vp - v0 ≤ R ^ 2 / 4 := by linarith
+    calc
+      (vp - v0) / beta ^ 2 ≤ (R ^ 2 / 4) / beta ^ 2 :=
+        (div_le_div_iff_of_pos_right hb2).2 hv
+      _ = R ^ 2 / (4 * beta ^ 2) := by rw [div_div]
   linarith
 
 /-- For the canonical finite `:both` posterior, `c > 3R/2` plus the derivative
@@ -72,13 +75,14 @@ theorem canonical_unique_positive_root
     apply continuousOn_id.sub
     exact hcont.mono (by
       intro b hb
-      exact lt_of_le_of_lt (half_nonneg hR) hb)
+      exact lt_of_le_of_lt (div_nonneg hR (by norm_num)) hb)
   have hfmono : StrictMonoOn f (Set.Ioi (R / 2)) := by
-    apply strictMonoOn_of_deriv_pos convex_Ioi hfcont
+    apply strictMonoOn_of_deriv_pos (convex_Ioi (R / 2)) hfcont
     intro b hb
     have hb' : R / 2 < b := by simpa using hb
     have hdlt := derivative_lt_one_above_half_range hR hb' cert
-    have hbpos : 0 < b := lt_of_le_of_lt (half_nonneg hR) hb'
+    have hbpos : 0 < b :=
+      lt_of_le_of_lt (div_nonneg hR (by norm_num)) hb'
     obtain ⟨vp, v0, hv0, hvp, hd⟩ := cert.atPositive b hbpos
     have hfderiv : HasDerivAt f (1 - ((vp - v0) / b ^ 2)) b := by
       exact (hasDerivAt_id b).sub hd
@@ -122,6 +126,7 @@ theorem canonical_unique_positive_root
     have hohalf : other ∈ Set.Ioi (R / 2) := by
       have : R / 2 < c - R := by nlinarith
       exact lt_of_lt_of_le this holoc.1
+    symm
     apply hfmono.injOn hbhalf hohalf
     dsimp [f, PosteriorRoot] at hroot hother ⊢
     linarith
