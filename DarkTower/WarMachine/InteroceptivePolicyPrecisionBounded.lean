@@ -74,7 +74,8 @@ theorem increasedRateLowersGammaAtUniquePositiveRoot
       0 < x → PosteriorRoot c2 delta x →
       0 < y → PosteriorRoot c2 delta y → x = y) :
     ∃ b2, PosteriorRoot c2 delta b2 ∧ b1 < b2 ∧
-      appliedGamma b2 < appliedGamma b1 := by
+      appliedGamma b2 < appliedGamma b1 ∧
+      ∀ ⦃b : ℝ⦄, 0 < b → PosteriorRoot c2 delta b → b = b2 := by
   let f : ℝ → ℝ := fun b => b - delta b
   let upper : ℝ := max (b1 + 1) (c2 + bound + 1)
   have hfcont : Continuous f := continuous_id.sub hcont
@@ -113,8 +114,9 @@ theorem increasedRateLowersGammaAtUniquePositiveRoot
       rw [← hb1f, hb2f]
     exact (ne_of_lt hrates) this
   have hb2pos : 0 < b2 := lt_trans hb1pos hb1b2
-  refine ⟨b2, hb2root, hb1b2, ?_⟩
-  exact one_div_lt_one_div_of_lt hb1pos hb1b2
+  refine ⟨b2, hb2root, hb1b2, one_div_lt_one_div_of_lt hb1pos hb1b2, ?_⟩
+  intro b hbpos hbroot
+  exact hunique hbpos hbroot hb2pos hb2root
 
 #print axioms finitePolicyDeltaBound
 #print axioms increasedRateLowersGammaAtUniquePositiveRoot
