@@ -173,13 +173,18 @@ def leadCounterexample : FullAttestation :=
 
 theorem rejects_existing_lead_counterexample :
     ¬ FullQualifyingRun fixtureReq fixtureEvidence leadCounterexample := by
-  simp [FullQualifyingRun, nodesPositive, fixtureReq, badPin, ExactBytePin.valid]
+  intro hfull
+  rcases hfull with ⟨_, _, _, hrecords, _, _, _⟩
+  have hp := hrecords (.typedGap .fullLoopCheckpoints "missing") (by
+    simp [leadCounterexample, allRecordFamilies])
+  simp [recordPositive] at hp
 
 theorem rejects_missing_record_family (att : FullAttestation) (req : FullScopeRequirements)
     (ev : FullScopeEvidence) (family : RecordFamily) (gap : String)
     (h : .typedGap family gap ∈ att.recordFamilies) : ¬ FullQualifyingRun req ev att := by
   intro hfull
-  have hp := hfull.2.2.2.1 _ h
+  rcases hfull with ⟨_, _, _, hrecords, _, _, _⟩
+  have hp := hrecords _ h
   simp [recordPositive] at hp
 
 theorem rejects_unclosed_node (att : FullAttestation) (req : FullScopeRequirements)
@@ -187,7 +192,8 @@ theorem rejects_unclosed_node (att : FullAttestation) (req : FullScopeRequiremen
     (h : ⟨node, .unvalidated claim scope⟩ ∈ att.nodeStates) :
     ¬ FullQualifyingRun req ev att := by
   intro hfull
-  have hp := hfull.2.1.2.2 _ h
+  rcases hfull with ⟨_, hnodes, _, _, _, _, _⟩
+  have hp := hnodes.2.2 _ h
   simp [positiveAtThisRun] at hp
 
 theorem rejects_unfired_edge (att : FullAttestation) (req : FullScopeRequirements)
@@ -195,7 +201,8 @@ theorem rejects_unfired_edge (att : FullAttestation) (req : FullScopeRequirement
     (h : ⟨edge, .mandatoryUnfired scope⟩ ∈ att.connectionStates) :
     ¬ FullQualifyingRun req ev att := by
   intro hfull
-  have hp := hfull.2.2.1.2.2 _ h
+  rcases hfull with ⟨_, _, hconnections, _, _, _, _⟩
+  have hp := hconnections.2.2 _ h
   simp [connectionPositive] at hp
 
 theorem rejects_selection_mismatch (att : FullAttestation) (req : FullScopeRequirements)
@@ -203,7 +210,7 @@ theorem rejects_selection_mismatch (att : FullAttestation) (req : FullScopeRequi
     (hne : selected ≠ enacted) (hsel : att.selectionEnaction = .match selected enacted) :
     ¬ FullQualifyingRun req ev att := by
   intro hfull
-  have hp := hfull.2.2.2.2.1
+  rcases hfull with ⟨_, _, _, _, hp, _, _⟩
   rw [hsel] at hp
   exact hne hp.1
 
@@ -211,7 +218,8 @@ theorem rejects_absent_equation (att : FullAttestation) (req : FullScopeRequirem
     (ev : FullScopeEvidence) (equation : EquationRequirement)
     (h : .absent equation ∈ ev.equationBindings) : ¬ FullQualifyingRun req ev att := by
   intro hfull
-  have hp := hfull.2.2.2.2.2.1.2.2 _ h
+  rcases hfull with ⟨_, _, _, _, _, hequations, _⟩
+  have hp := hequations.2.2 _ h
   simp [EquationBindingState.positive] at hp
 
 theorem rejects_mismatched_declaration (att : FullAttestation)
@@ -220,7 +228,8 @@ theorem rejects_mismatched_declaration (att : FullAttestation)
     (h : .mismatched expected actual ∈ ev.equationBindings) :
     ¬ FullQualifyingRun req ev att := by
   intro hfull
-  have hp := hfull.2.2.2.2.2.1.2.2 _ h
+  rcases hfull with ⟨_, _, _, _, _, hequations, _⟩
+  have hp := hequations.2.2 _ h
   simp [EquationBindingState.positive] at hp
 
 theorem rejects_unauthorized_negative_scope (att : FullAttestation)
@@ -228,7 +237,8 @@ theorem rejects_unauthorized_negative_scope (att : FullAttestation)
     (h : att.negativeScope ≠ [⟨legacyObligationId, legacyDescription⟩]) :
     ¬ FullQualifyingRun req ev att := by
   intro hfull
-  exact h hfull.2.2.2.2.2.2.1
+  rcases hfull with ⟨_, _, _, _, _, _, hnegative⟩
+  exact h hnegative.1
 
 #print axioms rejects_existing_lead_counterexample
 #print axioms rejects_missing_record_family
