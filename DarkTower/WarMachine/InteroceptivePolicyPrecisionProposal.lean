@@ -32,7 +32,8 @@ old mean.  This is a prior statement only. -/
 theorem adjustedPriorMean {betaPrior m : ℝ}
     (hbeta : betaPrior ≠ 0) (hm : m ≠ 0) :
     1 / adjustedPriorRate betaPrior m = m * (1 / betaPrior) := by
-  field_simp [adjustedPriorRate, hbeta, hm]
+  rw [adjustedPriorRate]
+  field_simp
 
 /-- Abstract form of the production fixed point: posterior beta is adjusted
 prior rate plus the policy evidence term `(pi - pi0) dot G`, whose dependence
