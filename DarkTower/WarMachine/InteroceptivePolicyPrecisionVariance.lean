@@ -119,9 +119,9 @@ theorem rawWeight_hasDerivAt [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {beta : ℝ} (hbeta : 0 < beta) (i : Fin n) :
     HasDerivAt (fun b => rawWeight habit g fPi b i)
       (rawWeight habit g fPi beta i * g i / beta ^ 2) beta := by
-  simpa only [rawWeight, Function.comp_apply, mul_div_assoc] using
-    (Real.hasDerivAt_exp (score habit g fPi beta i)).comp beta
-      (score_hasDerivAt habit g fPi hbeta i)
+  convert (Real.hasDerivAt_exp (score habit g fPi beta i)).comp beta
+      (score_hasDerivAt habit g fPi hbeta i) using 1
+  rfl
 
 theorem normalizer_hasDerivAt [Nonempty (Fin n)]
     (habit g fPi : Fin n → ℝ) {beta : ℝ} (hbeta : 0 < beta) :
