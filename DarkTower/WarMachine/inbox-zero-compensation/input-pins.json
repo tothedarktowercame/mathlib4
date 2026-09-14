@@ -1,0 +1,12 @@
+[
+  {
+    "path": "mathlib4/DarkTower/WarMachine/InboxZeroWitness.lean",
+    "sha256": "633e340b3d584e71272d91d54e4059173add54185aabb60b39890192bc0b57aa",
+    "last-touch-commit": "18ff4a0040e6fb1a678fd0bf044f31512ba3e53d"
+  },
+  {
+    "path": "futon3/library/workshop/compensate-when-exclusion-is-unobtainable.flexiarg",
+    "sha256": "e1c0409aa2399d6f17cc4ce2d076fe0283da7c4d5902a33dbd2dc4724cd56d7e",
+    "last-touch-commit": "59ab385648025ffdcab5b4443385e479ed984a2f"
+  }
+]

@@ -1,0 +1,109 @@
+{
+  "scope": "model-only; runtime-correspondence not-proven",
+  "model-sha256": "7d526b5d26c453d6fec783ac5681652d959af53e87c29cb853a9a7f06fdf115c",
+  "checks": [
+    {
+      "case": "build",
+      "argv": [
+        "lake",
+        "build",
+        "DarkTower.WarMachine.InboxZeroCompensationWitness"
+      ],
+      "exit": 0,
+      "expected-exit": 0,
+      "stdout": "\u2139 [459/460] Replayed DarkTower.WarMachine.InboxZeroWitness\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:201:0: 'DarkTower.WarMachine.InboxZeroWitness.noNewDirtFlags' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:202:0: 'DarkTower.WarMachine.InboxZeroWitness.repeatedFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:203:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroAppendsNoRecords' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:204:0: 'DarkTower.WarMachine.InboxZeroWitness.exampleProgress' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:205:0: 'DarkTower.WarMachine.InboxZeroWitness.stepFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:206:0: 'DarkTower.WarMachine.InboxZeroWitness.typedTermination' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:207:0: 'DarkTower.WarMachine.InboxZeroWitness.cycleLength' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:208:0: 'DarkTower.WarMachine.InboxZeroWitness.cycleTypedTermination' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:209:0: 'DarkTower.WarMachine.InboxZeroWitness.inFlightNeverCommitted' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:210:0: 'DarkTower.WarMachine.InboxZeroWitness.progress' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:211:0: 'DarkTower.WarMachine.InboxZeroWitness.flagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:212:0: 'DarkTower.WarMachine.InboxZeroWitness.refusalsAppended' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:213:0: 'DarkTower.WarMachine.InboxZeroWitness.refusalRecorded' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:214:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroFixedPoint' depends on axioms: [propext, Classical.choice, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:215:0: 'DarkTower.WarMachine.InboxZeroWitness.silentBreaksT1' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:216:0: 'DarkTower.WarMachine.InboxZeroWitness.staleObservationRefused' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:217:0: 'DarkTower.WarMachine.InboxZeroWitness.newDirtBreaksMonotonicity' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:218:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroCommitBreaksT4' does not depend on any axioms\n\u2139 [460/460] Built DarkTower.WarMachine.InboxZeroCompensationWitness (1.3s)\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:254:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.recordAppended' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:255:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.survivalFromEdit' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:256:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.detectionFromEdit' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:257:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.boundedCompensation' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:258:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleTypedTermination' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:259:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleLength' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:260:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:261:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.recordsPreserved' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:262:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleZero' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:263:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.detectionBound' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:264:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.compensation' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:265:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.boundedSurvival' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:266:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.editorChangesPreserved' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:267:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.typedTermination' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:268:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.progress' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:269:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.flagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:270:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.strictRefusal' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:271:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.zeroFixedPoint' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:272:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.fixtureDetects' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:273:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.fixtureTransientCommit' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:274:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.fixtureGoneAtBound' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroCompensationWitness.lean:275:0: 'DarkTower.WarMachine.InboxZeroCompensationWitness.failedUndoCanSurvive' does not depend on any axioms\nBuild completed successfully (460 jobs).\n",
+      "stderr": ""
+    },
+    {
+      "case": "model",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "DarkTower/WarMachine/InboxZeroCompensationWitness.lean"
+      ],
+      "exit": 0,
+      "expected-exit": 0,
+      "stdout": "'DarkTower.WarMachine.InboxZeroCompensationWitness.recordAppended' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.survivalFromEdit' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.detectionFromEdit' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.boundedCompensation' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleTypedTermination' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleLength' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.recordsPreserved' does not depend on any axioms\n'DarkTower.WarMachine.InboxZeroCompensationWitness.cycleZero' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.detectionBound' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.compensation' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.boundedSurvival' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.editorChangesPreserved' does not depend on any axioms\n'DarkTower.WarMachine.InboxZeroCompensationWitness.typedTermination' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.progress' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.flagsNonincreasing' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.strictRefusal' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.zeroFixedPoint' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroCompensationWitness.fixtureDetects' does not depend on any axioms\n'DarkTower.WarMachine.InboxZeroCompensationWitness.fixtureTransientCommit' does not depend on any axioms\n'DarkTower.WarMachine.InboxZeroCompensationWitness.fixtureGoneAtBound' does not depend on any axioms\n'DarkTower.WarMachine.InboxZeroCompensationWitness.failedUndoCanSurvive' does not depend on any axioms\n",
+      "stderr": ""
+    },
+    {
+      "case": "MissedEdit",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/MissedEdit.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/MissedEdit.lean:5:50: error: Tactic `decide` proved that the proposition\n  detects editAfterSnapshot = false\nis false\n",
+      "stderr": ""
+    },
+    {
+      "case": "SurvivesDeadline",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/SurvivesDeadline.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/SurvivesDeadline.lean:5:65: error: Tactic `decide` proved that the proposition\n  survivesAt editAfterSnapshot Undo.restored 10 = true\nis false\n",
+      "stderr": ""
+    },
+    {
+      "case": "DetectionOnlyBound",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/DetectionOnlyBound.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/DetectionOnlyBound.lean:5:65: error: Tactic `decide` proved that the proposition\n  survivesAt editAfterSnapshot Undo.restored 7 = false\nis false\n",
+      "stderr": ""
+    },
+    {
+      "case": "FailedUndo",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/FailedUndo.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/FailedUndo.lean:5:65: error: Tactic `decide` proved that the proposition\n  survivesAt editAfterSnapshot Undo.failed 100 = false\nis false\n",
+      "stderr": ""
+    },
+    {
+      "case": "LostEditorChange",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/LostEditorChange.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/LostEditorChange.lean:5:55: error: Tactic `decide` proved that the proposition\n  restoredVersion editAfterSnapshot = 10\nis false\n",
+      "stderr": ""
+    },
+    {
+      "case": "ZeroCommits",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/ZeroCommits.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-compensation/negative/ZeroCommits.lean:5:138: error: Tactic `decide` proved that the proposition\n  (finish\n        (let __src := InboxZeroWitness.cleanInput;\n        { repo := \"clean\", observed := __src.observed, current := __src.current, permission := __src.permission,\n          commitResult := __src.commitResult })\n        editAfterSnapshot Undo.restored Mode.compensate).commitIssued =\n    true\nis false\n",
+      "stderr": ""
+    }
+  ]
+}
