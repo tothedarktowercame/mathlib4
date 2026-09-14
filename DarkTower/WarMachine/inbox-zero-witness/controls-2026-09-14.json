@@ -1,0 +1,96 @@
+{
+  "scope": "model-only; runtime-correspondence not-proven",
+  "model-sha256": "633e340b3d584e71272d91d54e4059173add54185aabb60b39890192bc0b57aa",
+  "checks": [
+    {
+      "case": "build",
+      "argv": [
+        "lake",
+        "build",
+        "DarkTower.WarMachine.InboxZeroWitness"
+      ],
+      "exit": 0,
+      "expected-exit": 0,
+      "stdout": "\u2139 [459/459] Replayed DarkTower.WarMachine.InboxZeroWitness\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:201:0: 'DarkTower.WarMachine.InboxZeroWitness.noNewDirtFlags' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:202:0: 'DarkTower.WarMachine.InboxZeroWitness.repeatedFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:203:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroAppendsNoRecords' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:204:0: 'DarkTower.WarMachine.InboxZeroWitness.exampleProgress' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:205:0: 'DarkTower.WarMachine.InboxZeroWitness.stepFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:206:0: 'DarkTower.WarMachine.InboxZeroWitness.typedTermination' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:207:0: 'DarkTower.WarMachine.InboxZeroWitness.cycleLength' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:208:0: 'DarkTower.WarMachine.InboxZeroWitness.cycleTypedTermination' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:209:0: 'DarkTower.WarMachine.InboxZeroWitness.inFlightNeverCommitted' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:210:0: 'DarkTower.WarMachine.InboxZeroWitness.progress' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:211:0: 'DarkTower.WarMachine.InboxZeroWitness.flagsNonincreasing' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:212:0: 'DarkTower.WarMachine.InboxZeroWitness.refusalsAppended' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:213:0: 'DarkTower.WarMachine.InboxZeroWitness.refusalRecorded' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:214:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroFixedPoint' depends on axioms: [propext, Classical.choice, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:215:0: 'DarkTower.WarMachine.InboxZeroWitness.silentBreaksT1' depends on axioms: [propext, Quot.sound]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:216:0: 'DarkTower.WarMachine.InboxZeroWitness.staleObservationRefused' does not depend on any axioms\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:217:0: 'DarkTower.WarMachine.InboxZeroWitness.newDirtBreaksMonotonicity' depends on axioms: [propext]\ninfo: DarkTower/WarMachine/InboxZeroWitness.lean:218:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroCommitBreaksT4' does not depend on any axioms\nBuild completed successfully (459 jobs).\n",
+      "stderr": ""
+    },
+    {
+      "case": "model",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "DarkTower/WarMachine/InboxZeroWitness.lean"
+      ],
+      "exit": 0,
+      "expected-exit": 0,
+      "stdout": "'DarkTower.WarMachine.InboxZeroWitness.noNewDirtFlags' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroWitness.repeatedFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.zeroAppendsNoRecords' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.exampleProgress' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroWitness.stepFlagsNonincreasing' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.typedTermination' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.cycleLength' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroWitness.cycleTypedTermination' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.inFlightNeverCommitted' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroWitness.progress' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.flagsNonincreasing' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.refusalsAppended' does not depend on any axioms\n'DarkTower.WarMachine.InboxZeroWitness.refusalRecorded' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.zeroFixedPoint' depends on axioms: [propext, Classical.choice, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.silentBreaksT1' depends on axioms: [propext, Quot.sound]\n'DarkTower.WarMachine.InboxZeroWitness.staleObservationRefused' does not depend on any axioms\n'DarkTower.WarMachine.InboxZeroWitness.newDirtBreaksMonotonicity' depends on axioms: [propext]\n'DarkTower.WarMachine.InboxZeroWitness.zeroCommitBreaksT4' does not depend on any axioms\n",
+      "stderr": ""
+    },
+    {
+      "case": "T1Silent",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T1Silent.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T1Silent.lean:4:28: error: unsolved goals\n\u22a2 False\n",
+      "stderr": ""
+    },
+    {
+      "case": "T2StaleFeel",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T2StaleFeel.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T2StaleFeel.lean:4:78: error: Tactic `decide` proved that the proposition\n  busyInput.current \u2260 RepoState.inFlight \u2228 staleCommit.committed = false\nis false\n",
+      "stderr": ""
+    },
+    {
+      "case": "T3SilentProgress",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T3SilentProgress.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T3SilentProgress.lean:5:65: error: unsolved goals\n\u22a2 False\n",
+      "stderr": ""
+    },
+    {
+      "case": "T3NewDirt",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T3NewDirt.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T3NewDirt.lean:4:61: error: Tactic `decide` proved that the proposition\n  flag newDirt.state \u2264 flag cleanInput.current\nis false\n",
+      "stderr": ""
+    },
+    {
+      "case": "T4ZeroCommit",
+      "argv": [
+        "lake",
+        "env",
+        "lean",
+        "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T4ZeroCommit.lean"
+      ],
+      "exit": 1,
+      "expected-exit": 1,
+      "stdout": "/home/joe/code/mathlib4/DarkTower/WarMachine/inbox-zero-witness/negative/T4ZeroCommit.lean:4:46: error: Tactic `decide` proved that the proposition\n  commitCount [staleCommit] = 0\nis false\n",
+      "stderr": ""
+    }
+  ]
+}

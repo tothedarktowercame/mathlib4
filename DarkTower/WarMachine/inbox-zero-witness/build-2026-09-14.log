@@ -1,0 +1,20 @@
+ℹ [459/459] Built DarkTower.WarMachine.InboxZeroWitness (976ms)
+info: DarkTower/WarMachine/InboxZeroWitness.lean:201:0: 'DarkTower.WarMachine.InboxZeroWitness.noNewDirtFlags' depends on axioms: [propext]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:202:0: 'DarkTower.WarMachine.InboxZeroWitness.repeatedFlagsNonincreasing' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:203:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroAppendsNoRecords' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:204:0: 'DarkTower.WarMachine.InboxZeroWitness.exampleProgress' depends on axioms: [propext]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:205:0: 'DarkTower.WarMachine.InboxZeroWitness.stepFlagsNonincreasing' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:206:0: 'DarkTower.WarMachine.InboxZeroWitness.typedTermination' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:207:0: 'DarkTower.WarMachine.InboxZeroWitness.cycleLength' depends on axioms: [propext]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:208:0: 'DarkTower.WarMachine.InboxZeroWitness.cycleTypedTermination' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:209:0: 'DarkTower.WarMachine.InboxZeroWitness.inFlightNeverCommitted' depends on axioms: [propext]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:210:0: 'DarkTower.WarMachine.InboxZeroWitness.progress' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:211:0: 'DarkTower.WarMachine.InboxZeroWitness.flagsNonincreasing' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:212:0: 'DarkTower.WarMachine.InboxZeroWitness.refusalsAppended' does not depend on any axioms
+info: DarkTower/WarMachine/InboxZeroWitness.lean:213:0: 'DarkTower.WarMachine.InboxZeroWitness.refusalRecorded' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:214:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroFixedPoint' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:215:0: 'DarkTower.WarMachine.InboxZeroWitness.silentBreaksT1' depends on axioms: [propext, Quot.sound]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:216:0: 'DarkTower.WarMachine.InboxZeroWitness.staleObservationRefused' does not depend on any axioms
+info: DarkTower/WarMachine/InboxZeroWitness.lean:217:0: 'DarkTower.WarMachine.InboxZeroWitness.newDirtBreaksMonotonicity' depends on axioms: [propext]
+info: DarkTower/WarMachine/InboxZeroWitness.lean:218:0: 'DarkTower.WarMachine.InboxZeroWitness.zeroCommitBreaksT4' does not depend on any axioms
+Build completed successfully (459 jobs).
