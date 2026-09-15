@@ -1,4 +1,4 @@
-import DarkTower.WarMachine.PolicyPosterior
+import DarkTower.WarMachine.CascadeEFEPolicies
 
 /-!
 # G over cascades — the ratified policy grain
@@ -31,14 +31,11 @@ Sources (the intention, by record):
   core concepts, from the glossary, from the equations, and from the effort
   I put in to clarify what was meant by policy, G, cascades …").
 
-What this module adds is deliberately small, because every ingredient
-already existed and had never been joined: `Holes.G` is polymorphic in its
-`PolicyIndex`, `Holes.Cascade` is closed by record, and
-`PolicyPosterior.softmaxWithFPi` supplies "distributions over". The
-definitions below instantiate the ratified grain, prove that the grain
-distinction has mathematical content (a composition-blind score cannot
-separate what a cascade-grain score separates), and record as a HOLE the
-production seam still owed.
+The canonical mathematical definition is now CascadeEFE.scoreCascade, built
+from filtered guarded transitions, finite predictions and their common joint.
+CascadeEFE derives ambiguity + risk = pragmatic cost - information gain.
+CascadeEFEPolicies supplies admissible candidate priors and model-derived
+composition controls. None of those results proves the F13 runtime seam.
 -/
 
 universe u
@@ -49,33 +46,20 @@ open DarkTower.WarMachine.Holes
 
 noncomputable section
 
-/-- CLOSED-BY-RECORD · owner: F-wm-piloted-2026-06-12 §Sortie-12 ·
-holder: by-record · decided 2026-06-12, transcribed 2026-09-15 · A policy at
-the ratified grain is a cascade. Scoring any thinner object as `G` is the
-degenerate case M-G-over-cascades §1 names, not this definition. -/
-abbrev CascadePolicy (P : Type u) := Cascade P
+/-- An interpreted policy retains the cascade and its precedence, with explicit
+decidable node membership. Candidate admissibility is supplied separately by
+CascadeEFEPolicies.CandidateFamily. -/
+abbrev CascadePolicy (P : Type u) := CascadeEFE.Policy P
 
-/-- CLOSED-BY-RECORD · owner: F-wm-piloted-2026-06-12 §Sortie-12 ·
-M-G-over-cascades §1 · holder: by-record · Policy-grade expected free energy
-ranges over cascades: the join of `Holes.G` (P-validated-R5 §2a′, risk minus
-epistemic gain) with `Holes.Cascade` (P-validated-R5 §3e). The risk and gain
-legs take the whole cascade — nodes, edges, precedence — never a per-node
-summary. This one-line definition is the arrow the ratified records required
-and the corpus did not contain. -/
-def cascadeGrainG {P : Type u} (risk eig : Cascade P → ℝ) :
-    Cascade P → ExpectedFreeEnergyValue :=
-  G risk eig
+/-- One canonical cascade G: the checked model-based scoring interface, including
+typed missing-interpretation and inadmissible-risk refusals. This is an alias,
+not another risk/eig functional. -/
+abbrev cascadeGrainG := @CascadeEFE.scoreCascade
 
-/-- CLOSED-BY-RECORD · owner: F-wm-piloted-2026-06-12 §Sortie-12
-("distributions over CASCADES") · sec-glossary.tex ¶Policy-prior-E ·
-holder: by-record · The selection object over the ratified grain: the full
-policy posterior Q(π) ∝ exp(ln E(π) − G(π)/τ − F_π(π)) instantiated at
-`PolicyIndex := Cascade P`. -/
-def cascadePolicyPosterior {P : Type u} (exp log : ℝ → ℝ)
-    (habit : Cascade P → ℝ) (risk eig : Cascade P → ℝ)
-    (fPi : Cascade P → ℝ) (tau : ℝ) (cascades : List (Cascade P)) : List ℝ :=
-  DarkTower.WarMachine.PolicyPosterior.softmaxWithFPi exp log habit
-    (cascadeGrainG risk eig) fPi tau cascades
+/- The former cascadePolicyPosterior (arbitrary exp/log, risk/eig and F callbacks)
+is retired. CascadeEFEPolicies.family_priors proves the four stated policy
+PRIOR forms on successfully scored admissible candidates. Per-policy F and the
+observed-data posterior remain deferred; there is no replacement callback. -/
 
 /-- The empty relation reaches nothing, so it descends acyclically. -/
 theorem acyclicDescent_empty {α : Type u} :
@@ -127,19 +111,10 @@ theorem compositionBlind_cannot_separate
   rw [hf, hf]
   rfl
 
-/-- M-G-over-cascades §2, the other half: the cascade grain CAN separate
-them — a risk leg that reads the composition induces distinct `G` values on
-an equal bag. Together with `compositionBlind_cannot_separate` this is the
-formal content of "per-pattern scoring discards exactly the information
-that matters": the two grains are not interdefinable. -/
-theorem cascadeGrain_separates_sameBag :
-    ∃ risk eig : Cascade Bool → ℝ,
-      cascadeGrainG risk eig sameBagFirst ≠
-        cascadeGrainG risk eig sameBagSecond := by
-  refine ⟨fun c => if c.precedence = [true, false] then 1 else 0,
-          fun _ => 0, fun h => ?_⟩
-  have hv := congrArg ExpectedFreeEnergyValue.value h
-  simp [cascadeGrainG, G, sameBagFirst, sameBagSecond] at hv
+/-- Control 6 now derives the separation from two overlapping guarded operators
+and the shared predictive joint. See CascadeEFEPolicies.composition_control
+and composition_outcomes_differ; no indicator score is used. -/
+alias cascadeGrain_separates_sameBag := CascadeEFEPolicies.composition_control
 
 /-- HOLE · contract kind HOLE intentionally · owner: F-wm-piloted-2026-06-12
 §Sortie-12 · M-G-over-cascades §7 (stop-the-line before INSTANTIATE) ·
@@ -152,7 +127,9 @@ defect-dG-nil-for-cascades.md records production writing `:G-total 0.0`
 placeholders on 293/293 rows · falsifier: a production selection seam that
 presents `Cascade`-typed policies to `G`, with a witness module citing THIS
 definition as its specification, elaborates — at which point this marker's
-`owed` constructor is retired. The seam is owed; until it exists, no
+`owed` constructor is retired. The mathematical definition and decomposition now exist in CascadeEFE, with
+model-derived controls in CascadeEFEPolicies. The running War Machine production
+seam remains owed; until it exists, no
 production quantity may be reported at the name `G(π)` at policy grain. -/
 inductive CascadeGrainSeam where
   | owed
