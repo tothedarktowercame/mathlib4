@@ -21,7 +21,7 @@ def gaussianReference : GaussianReference :=
 /-- Independent Gaussian fixture: fourteen identical channels with precision 2
 and error 1 have `F = 1/2 * mean(2 * 1^2) = 1`. -/
 theorem constantGaussianReference :
-    variationalFreeEnergy (fun _ => gaussianReference.precision)
+    variationalFreeEnergy (fun _ => ⟨gaussianReference.precision, by norm_num [gaussianReference]⟩)
         (fun _ => gaussianReference.predictionError) =
       ⟨gaussianReference.expectedVariationalF⟩ := by
   norm_num [gaussianReference, variationalFreeEnergy, Channel.all]

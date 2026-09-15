@@ -16,6 +16,8 @@ noncomputable def selectedKernel (posterior : Posterior)
   support _ := Status.all
   mass _ := posterior
   nonnegative _ s := hn s
+  support_nodup := by intro; simp [Status.all]
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all [Status.all]
   normalised _ := h₁
 
 theorem selectedKernel_normalised (posterior : Posterior)

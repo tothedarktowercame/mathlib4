@@ -16,12 +16,16 @@ private def Q : PredictiveOutcomeKernel TestPolicy TestObservation where
   support := fun _ => [datum]
   mass := fun _ _ => 1
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v, x⟩; cases x <;> simp_all [datum]
   normalised := by intros; norm_num
 
 private def Cdist : PreferenceDistribution TestObservation where
   support := fun _ => [datum]
   mass := fun _ _ => 1
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v, x⟩; cases x <;> simp_all [datum]
   normalised := by intros; norm_num
 
 private theorem positivePreference :

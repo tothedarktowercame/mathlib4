@@ -12,12 +12,16 @@ def predictedState : ProbabilityKernel Policy State where
   support := fun _ => [.certain]
   mass := fun _ _ => 1
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intro; norm_num
 
 def observationModel : observationKernel State Observation where
   support := fun _ => [.seen]
   mass := fun _ _ => 1
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intro; norm_num
 
 structure AmbiguityReference where

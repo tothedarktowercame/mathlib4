@@ -30,6 +30,8 @@ noncomputable def machineC : PreferenceDistribution SeedObs where
   support := fun _ => machineSupport.map organisationOutcome
   mass := seed.mass
   nonnegative := seed.nonnegative
+  support_nodup := by intro; simp [machineSupport, organisationOutcome]
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v, x⟩; cases v <;> cases x <;> simp_all [machineSupport, organisationOutcome, seed]
   normalised := by intro _; norm_num [machineSupport, organisationOutcome, seed]
 
 theorem machineC_normalised :

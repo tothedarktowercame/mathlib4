@@ -20,12 +20,16 @@ private def Q : PredictiveOutcomeKernel TestPolicy TestObservation where
   support := fun _ => [outcome]
   mass := fun _ _ => 1
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v, x⟩; cases x <;> simp_all [outcome]
   normalised := by intros; norm_num
 
 private def prior : ParameterPriorKernel TestPolicy Parameter where
   support := fun _ => [.a, .b]
   mass := fun _ _ => 1 / 2
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intros; norm_num
 
 private def posterior : ParameterPosteriorKernel TestPolicy TestObservation Parameter where
@@ -34,6 +38,8 @@ private def posterior : ParameterPosteriorKernel TestPolicy TestObservation Para
   nonnegative := by
     intro _ θ
     cases θ <;> norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intros; norm_num
 
 private theorem positivePrior :

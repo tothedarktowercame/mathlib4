@@ -19,6 +19,8 @@ noncomputable def controlled : TransitionKernel Status Action where
   support := fun _ => Status.all
   mass := fun (sa : Status × Action) s' => if s' = next sa.1 sa.2 then 1 else 0
   nonnegative := by intros; split <;> norm_num
+  support_nodup := by intro; simp [Status.all]
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all [Status.all]
   normalised := by
     intro sa
     rcases sa with ⟨s, a⟩
@@ -48,6 +50,8 @@ noncomputable def uncontrolled : TransitionKernel Status Action where
   support := fun _ => Status.all
   mass := fun sa s' => if s' = sa.1 then 1 else 0
   nonnegative := by intros; split <;> norm_num
+  support_nodup := by intro; simp [Status.all]
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all [Status.all]
   normalised := by intro sa; rcases sa with ⟨s, _⟩; cases s <;> simp [Status.all]
 
 theorem uncontrolledActionsIndistinguishable (s : Status) :

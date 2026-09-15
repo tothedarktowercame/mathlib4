@@ -15,6 +15,8 @@ noncomputable def machineParameterPrior (Policy : Type) :
   support _ := Theta.all
   mass _ _ := 1 / 2
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp [Theta.all]
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all [Theta.all]
   normalised := by intros; norm_num [Theta.all]
 
 structure RegisteredLikelihood (Obs : Vertex → Type) where
@@ -36,6 +38,8 @@ noncomputable def machineParameterPosterior (Policy : Type)
     intro po t
     exact div_nonneg (mul_nonneg (by norm_num) (l.nonnegative t po.2))
       (le_of_lt (positive po.2))
+  support_nodup := by intro; simp [Theta.all]
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all [Theta.all]
   normalised := by
     intro po
     have hs : l.mass .identityTransition po.2 + l.mass .controlledTransition po.2 ≠ 0 := by

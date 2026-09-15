@@ -17,6 +17,8 @@ def constantConditional {Observation Disposition : Type*}
   support := fun _ => distribution.support ()
   mass := fun _ => distribution.mass ()
   nonnegative := fun _ => distribution.nonnegative ()
+  support_nodup := fun _ => distribution.support_nodup ()
+  mass_eq_zero_of_not_mem := fun _ => distribution.mass_eq_zero_of_not_mem ()
   normalised := fun _ => distribution.normalised ()
 
 /-- Finite stochastic composition, with the same marginalisation as the ladder. -/

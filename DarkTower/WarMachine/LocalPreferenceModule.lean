@@ -11,12 +11,16 @@ structure ExactTable (O : Type) where
   mass : O → ℚ
   nonnegative : ∀ o, 0 ≤ mass o
   normalised : (support.map mass).sum = 1
+  support_nodup : support.Nodup
+  mass_eq_zero_of_not_mem : ∀ o, o ∉ support → mass o = 0
 
 noncomputable def ExactTable.kernel {O : Type} (t : ExactTable O) :
     ProbabilityKernel Unit O where
   support := fun _ => t.support
   mass := fun _ o => (t.mass o : ℝ)
   nonnegative := by intro _ o; exact_mod_cast t.nonnegative o
+  support_nodup := fun _ => t.support_nodup
+  mass_eq_zero_of_not_mem := by intro s o h; simp [t.mass_eq_zero_of_not_mem o h]
   normalised := by
     intro _
     have cast_sum : ∀ xs : List O,
@@ -60,6 +64,8 @@ def binaryTable (p : ℚ) (hlo : 0 ≤ p) (hhi : p ≤ 1) :
     intro o
     rcases o with ⟨v, b⟩
     cases v <;> cases b <;> simp_all
+  support_nodup := by simp [yes, no]
+  mass_eq_zero_of_not_mem := by intro o h; rcases o with ⟨v,b⟩; cases v <;> cases b <;> simp_all [yes, no]
   normalised := by simp [yes, no]
 
 noncomputable def softBinary (p : ℚ) (hlo : 1 / 2 < p) (hhi : p < 1) :

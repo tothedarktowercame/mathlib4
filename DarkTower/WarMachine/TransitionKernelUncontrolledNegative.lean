@@ -5,9 +5,16 @@ open DarkTower.WarMachine.TransitionKernelWitness
 
 noncomputable def uncontrolled : ProbabilityKernel State State where
   support := fun s => [s]
-  mass := fun _ _ => 1
-  nonnegative := by intros; norm_num
-  normalised := by intro; norm_num
+  mass := by
+    classical
+    exact fun s o => if o ∈ [s] then 1 else 0
+  nonnegative := by intros; split <;> norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; simp_all
+  normalised := by
+    intro s
+    classical
+    norm_num
 
 -- Must fail: B is conditioned jointly on state and action.
 /--

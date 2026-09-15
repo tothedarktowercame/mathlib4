@@ -16,9 +16,14 @@ noncomputable def predictive : PredictiveOutcomeKernel Policy Obs where
   support
     | .inspect => [clear]
     | .repair => [fixed]
-  mass := fun _ _ => 1
-  nonnegative := by intros; norm_num
-  normalised := by intro p; cases p <;> simp
+  mass := fun p o => match p, o with
+    | .inspect, ⟨.evidence, .clear⟩ => 1
+    | .repair, ⟨.evidence, .fixed⟩ => 1
+    | _, _ => 0
+  nonnegative := by intro p o; rcases o with ⟨v, x⟩; cases p <;> cases v <;> cases x <;> norm_num
+  support_nodup := by intro p; cases p <;> simp
+  mass_eq_zero_of_not_mem := by intro p o h; rcases o with ⟨v, x⟩; cases p <;> cases v <;> cases x <;> simp_all [clear, fixed]
+  normalised := by intro p; cases p <;> simp [clear, fixed]
 
 theorem inspectRowMass :
     ((predictive.support .inspect).map (predictive.mass .inspect)).sum = 1 :=

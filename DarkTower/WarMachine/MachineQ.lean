@@ -71,9 +71,9 @@ obligation rather than assumed:
 
 * `states` / `outcomes` -- the finite carriers the composition sums over. The
   support hypotheses say the model's rows are all stated over these same two
-  lists, which is what makes a row sum meaningful: `ProbabilityKernel` fixes no
-  mass off its own support, so summing an observation row over any list other
-  than its declared support would be summing an unconstrained quantity.
+  lists. Each row has distinct support and zero mass outside it; these
+  equalities let composition reuse row normalization and transfer the
+  finite-support obligations to the resulting kernel.
 * `plan` -- the controlled step the policy commits to. `Holes.TransitionKernel`
   is conditioned on an `Action` and `Q(o∣π)` on a `PolicyIndex`; `plan` is the
   projection between them, and `rowsEqualOfEqualPlans` below states exactly how
@@ -143,6 +143,24 @@ noncomputable def machinePredictedStateKernel
   support _ := reading.states
   mass := predictedStateMass model reading belief
   nonnegative := predictedStateMass_nonneg model reading belief
+  support_nodup := by
+    intro π
+    cases hs : reading.states with
+    | nil =>
+      have h := reading.beliefNormalised belief
+      simp [hs] at h
+    | cons s ss =>
+      simpa only [reading.transitionSupport, hs] using
+        model.transition.support_nodup (s, reading.plan π)
+  mass_eq_zero_of_not_mem := by
+    intro π o h
+    unfold predictedStateMass
+    apply List.sum_eq_zero
+    intro x hx
+    obtain ⟨s, _, rfl⟩ := List.mem_map.mp hx
+    rw [model.transition.mass_eq_zero_of_not_mem (s, reading.plan π) o
+      (by simpa only [reading.transitionSupport] using h)]
+    simp
   normalised := predictedStateMass_sum model reading belief
 
 /-! ## Q(o∣π): the predictive outcome kernel -/
@@ -191,6 +209,23 @@ noncomputable def machinePredictiveOutcomeKernel
   support _ := reading.outcomes
   mass := predictiveOutcomeMass model reading belief
   nonnegative := predictiveOutcomeMass_nonneg model reading belief
+  support_nodup := by
+    intro π
+    cases hs : reading.states with
+    | nil =>
+      have h := reading.beliefNormalised belief
+      simp [hs] at h
+    | cons s ss =>
+      simpa only [reading.observationSupport] using model.observation.support_nodup s
+  mass_eq_zero_of_not_mem := by
+    intro π o h
+    unfold predictiveOutcomeMass
+    apply List.sum_eq_zero
+    intro x hx
+    obtain ⟨s, _, rfl⟩ := List.mem_map.mp hx
+    rw [model.observation.mass_eq_zero_of_not_mem s o
+      (by simpa only [reading.observationSupport] using h)]
+    simp
   normalised := predictiveOutcomeMass_sum model reading belief
 
 /-! ## How much of the policy the construction sees -/

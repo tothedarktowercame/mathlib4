@@ -8,6 +8,8 @@ private def kernel : observationKernel Channel Channel where
   support s := [s]
   mass s o := if s = o then 1 else 0
   nonnegative s o := by split <;> norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; simp_all [eq_comm]
   normalised s := by simp
 
 private def learningRate : NonnegativeReal := ⟨1, by norm_num⟩

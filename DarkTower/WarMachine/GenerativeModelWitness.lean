@@ -21,6 +21,8 @@ private def observation : ProbabilityKernel TestState (Outcome TestObservation) 
   support := fun _ => [passOutcome, failOutcome]
   mass := fun _ _ => 1 / 2
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp [passOutcome, failOutcome]
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v, x⟩; cases x <;> simp_all [passOutcome, failOutcome]
   normalised := by intros; norm_num
 
 /-- Used only by the executable structural negative control: its state type is
@@ -29,18 +31,24 @@ private def wrongObservation : ProbabilityKernel OtherState (Outcome TestObserva
   support := fun _ => [passOutcome, failOutcome]
   mass := fun _ _ => 1 / 2
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp [passOutcome, failOutcome]
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v, x⟩; cases x <;> simp_all [passOutcome, failOutcome]
   normalised := by intros; norm_num
 
 private def transition : TransitionKernel TestState TestAction where
   support := fun _ => [.ready]
   mass := fun _ _ => 1
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intros; norm_num
 
 private def policyPrior : PolicyPriorKernel TestPolicy where
   support := fun _ => [.inspect]
   mass := fun _ _ => 1
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intros; norm_num
 
 private def model : GenerativeModel TestObservation TestState TestAction TestPolicy where

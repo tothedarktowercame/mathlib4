@@ -7,6 +7,8 @@ noncomputable def habit : PolicyPriorKernel Policy where
   support := fun _ => [.inspect, .repair]
   mass := fun _ _ => 1 / 2
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intro; norm_num
 
 -- Must fail: Q(pi) is unconditioned and ranges over policies, not parameters.

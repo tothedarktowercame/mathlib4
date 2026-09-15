@@ -7017,6 +7017,8 @@ structure ProbabilityKernel (S O : Type*) where
   mass : S → O → ℝ
   nonnegative : ∀ s o, 0 ≤ mass s o
   normalised : ∀ s, ((support s).map (mass s)).sum = 1
+  support_nodup : ∀ s, (support s).Nodup
+  mass_eq_zero_of_not_mem : ∀ s o, o ∉ support s → mass s o = 0
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:23 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeKernelWitness · falsifier: an unconditional outcome distribution or softmax policy vector is accepted as policy-conditioned `Q(o∣π)` · `Q(o∣π)` is a normalized finite-support predictive distribution over vertex-tagged outcomes for each policy. -/
 abbrev PredictiveOutcomeKernel (PolicyIndex : Type*) (Obs : Vertex → Type*) :=
@@ -7089,10 +7091,24 @@ structure VariationalFreeEnergyValue where
   value : ℝ
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:19 · P-glossary-mathematics · holder: by-record · evidence: VariationalFreeEnergyWitness · falsifier: the Gaussian reference value disagrees, or an expected-free-energy value is accepted as variational F · F = ½ · mean_k (Π_k · ε_k²), over Channel.all. -/
-def variationalFreeEnergy (precision error : Channel → ℝ) : VariationalFreeEnergyValue :=
+def variationalFreeEnergy (precision : PrecisionMap) (error : Channel → ℝ) : VariationalFreeEnergyValue :=
   ⟨(1 / 2 : ℝ) *
-    ((Channel.all.map fun k => precision k * (error k) ^ 2).foldl (· + ·) 0 /
+    ((Channel.all.map fun k => (precision k).value * (error k) ^ 2).foldl (· + ·) 0 /
       Channel.all.length)⟩
+
+/-- Nonnegative precision weights squared errors by nonnegative amounts. -/
+theorem variationalFreeEnergy_nonnegative (precision : PrecisionMap) (error : Channel → ℝ) :
+    0 ≤ (variationalFreeEnergy precision error).value := by
+  have hsum : ∀ (xs : List Channel) (a : ℝ), 0 ≤ a →
+      0 ≤ (xs.map fun k => (precision k).value * (error k) ^ 2).foldl (· + ·) a := by
+    intro xs
+    induction xs with
+    | nil => intro a ha; exact ha
+    | cons k xs ih =>
+      intro a ha
+      exact ih _ (add_nonneg ha (mul_nonneg (precision k).nonnegative (sq_nonneg _)))
+  exact mul_nonneg (by norm_num)
+    (div_nonneg (hsum _ 0 (le_refl 0)) (Nat.cast_nonneg _))
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:31 · P-glossary-mathematics · holder: by-record · decided 2026-08-31 · The computed mass of a kernel row; `ProbabilityKernel.normalised` proves it is one. -/
 def observationKernelRowMass {State Observation : Type*}
@@ -7120,9 +7136,9 @@ def beliefUpdate (learningRate sensorNoiseFloor : NonnegativeReal)
         (1 - learningRate.value * w.value) * (prior.variance k).value +
           learningRate.value * w.value *
             ((predictionError observation prior.mean k) ^ 2 + sensorNoiseFloor.value)) ∧
-  (variationalFreeEnergy (fun k => (precision k).value)
+  (variationalFreeEnergy precision
       (predictionError observation posterior.mean)).value ≤
-    (variationalFreeEnergy (fun k => (precision k).value)
+    (variationalFreeEnergy precision
       (predictionError observation prior.mean)).value
 
 /-- CLOSED-BY-RECORD · owner: sec-glossary.tex:21,27 · P-glossary-mathematics · holder: by-record · evidence: PredictiveOutcomeRiskWitness · falsifier: predictive support contains an outcome with zero preference mass, or the KL value disagrees with the reference · The risk term `KL[Q(o∣π)‖C]`, over the predictive kernel's declared finite
@@ -7249,23 +7265,32 @@ private def eigCounterOutcome : Outcome EIGCounterObs := ⟨.evidence, ()⟩
 private def eigCounterPredictive :
     PredictiveOutcomeKernel EIGCounterPolicy EIGCounterObs :=
   { support := fun _ => [eigCounterOutcome]
-    mass := fun _ _ => 1
-    nonnegative := by intros; norm_num
-    normalised := by intros; norm_num }
+    mass := fun _ o => if o.1 = .evidence then 1 else 0
+    nonnegative := by intros; split <;> norm_num
+    normalised := by intros; norm_num [eigCounterOutcome]
+    support_nodup := by intro; simp
+    mass_eq_zero_of_not_mem := by
+      intro s o h
+      rcases o with ⟨v, u⟩
+      cases v <;> cases u <;> simp_all [eigCounterOutcome, EIGCounterObs] }
 
 private def eigCounterPrior :
     ParameterPriorKernel EIGCounterPolicy EIGCounterParameter :=
   { support := fun _ => [.only]
     mass := fun _ _ => 1
     nonnegative := by intros; norm_num
-    normalised := by intros; norm_num }
+    normalised := by intros; norm_num
+    support_nodup := by intro; simp
+    mass_eq_zero_of_not_mem := by intro s o h; cases o; simp_all }
 
 private def eigCounterPosterior :
     ParameterPosteriorKernel EIGCounterPolicy EIGCounterObs EIGCounterParameter :=
   { support := fun _ => [.only]
     mass := fun _ _ => 1
     nonnegative := by intros; norm_num
-    normalised := by intros; norm_num }
+    normalised := by intros; norm_num
+    support_nodup := by intro; simp
+    mass_eq_zero_of_not_mem := by intro s o h; cases o; simp_all }
 
 private theorem eigCounterPositivePrior :
     ∀ π o θ, θ ∈ eigCounterPosterior.support (π, o) →

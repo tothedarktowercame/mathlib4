@@ -48,6 +48,18 @@ noncomputable def fullPlanOutcomeKernel (a : MachineA Obs) (q : Posterior)
     simp only [List.mem_map] at hx
     obtain ⟨s, _, rfl⟩ := hx
     exact mul_nonneg (terminalNonnegative q plan hn s) (a.kernel.nonnegative s o)
+  support_nodup := by
+    intro plan
+    simpa only [a.supportExact] using a.kernel.support_nodup .spawned
+  mass_eq_zero_of_not_mem := by
+    intro plan o h
+    unfold fullPlanOutcomeMass
+    apply List.sum_eq_zero
+    intro x hx
+    obtain ⟨s, _, rfl⟩ := List.mem_map.mp hx
+    rw [a.kernel.mass_eq_zero_of_not_mem s o
+      (by simpa only [a.supportExact] using h)]
+    simp
   normalised := by
     intro plan
     have hT := terminalNormalised q plan hn hq

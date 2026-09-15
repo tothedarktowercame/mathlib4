@@ -48,12 +48,16 @@ private def deterministicPredictedState : ProbabilityKernel Unit Unit where
   support _ := [()]
   mass _ _ := 1
   nonnegative _ _ := by norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised _ := by norm_num
 
 private def deterministicObservation : observationKernel Unit Unit where
   support _ := [()]
   mass _ _ := 1
   nonnegative _ _ := by norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised _ := by norm_num
 
 theorem deterministicCategoricalAmbiguity_is_zero :

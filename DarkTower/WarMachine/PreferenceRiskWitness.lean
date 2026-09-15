@@ -15,6 +15,8 @@ def groundedPrediction : ProbabilityKernel Unit (Outcome SeedObs) where
     | ⟨.organization, .groundedChange⟩ => 1
     | _ => 0
   nonnegative := by intro _ o; rcases o with ⟨v, o⟩; cases v <;> cases o <;> norm_num
+  support_nodup := by intro; simp [FlightDisposition.all, organisationOutcome]
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v, x⟩; cases v <;> cases x <;> simp_all [FlightDisposition.all, organisationOutcome]
   normalised := by intro _; norm_num [FlightDisposition.all, organisationOutcome]
 
 theorem grounded_admissible : riskAdmissible groundedPrediction seed := by

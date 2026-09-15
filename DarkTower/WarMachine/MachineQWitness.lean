@@ -129,10 +129,14 @@ noncomputable def aRow : DemoState → EvidenceOutcome → ℝ
 /-- `A : S ⇝ O`, over the declared alphabet. -/
 noncomputable def demoObservation : ProbabilityKernel DemoState (Outcome DemoObs) where
   support _ := demoAlphabet
-  mass s o := aRow s o.2
+  mass := fun s o => if o.1 = .evidence then aRow s o.2 else 0
   nonnegative := by
     intro s o
-    cases s <;> cases (o.2 : EvidenceOutcome) <;> norm_num [aRow]
+    split
+    · cases s <;> cases (o.2 : EvidenceOutcome) <;> norm_num [aRow]
+    · norm_num
+  support_nodup := by intro; simp [demoAlphabet, EvidenceOutcome.all, out]
+  mass_eq_zero_of_not_mem := by intro s o h; rcases o with ⟨v,x⟩; cases v <;> cases x <;> simp_all [demoAlphabet, EvidenceOutcome.all, out]
   normalised := by
     intro s
     cases s <;> norm_num [demoAlphabet, EvidenceOutcome.all, out, aRow]
@@ -153,6 +157,8 @@ noncomputable def demoTransition : TransitionKernel DemoState DemoAction where
   nonnegative := by
     rintro ⟨_, u⟩ s'
     cases u <;> cases s' <;> norm_num [bRow]
+  support_nodup := by intro; simp [demoStates]
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all [demoStates]
   normalised := by
     rintro ⟨_, u⟩
     cases u <;> norm_num [demoStates, bRow]
@@ -162,6 +168,8 @@ noncomputable def demoPolicyPrior : PolicyPriorKernel DemoPolicy where
   support _ := [.acquisition, .review]
   mass _ _ := 1/2
   nonnegative := by intros; norm_num
+  support_nodup := by intro; simp
+  mass_eq_zero_of_not_mem := by intro s o h; cases o <;> simp_all
   normalised := by intro; norm_num
 
 /-- The generative model the kernel is constructed from. -/
