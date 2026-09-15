@@ -79,12 +79,16 @@ def compose (q : S → ℚ) (o : O) : ℚ :=
 
 def advanceTwiceRow : FloatCarriedRow O where
   support := allO
+  support_nodup := by simp [allO]
+  mass_eq_zero_of_not_mem := by intro o h; cases o <;> simp_all [allO]
   mass := advanceTwiceMass
   nonnegative := by intro o; cases o <;> norm_num [advanceTwiceMass]
   nearNormalised := by norm_num [allO, advanceTwiceMass, floatRowBound]
 
 def cascadeRow : FloatCarriedRow O where
   support := allO
+  support_nodup := by simp [allO]
+  mass_eq_zero_of_not_mem := by intro o h; cases o <;> simp_all [allO]
   mass := cascadeMass
   nonnegative := by intro o; cases o <;> norm_num [cascadeMass]
   nearNormalised := by norm_num [allO, cascadeMass, floatRowBound]

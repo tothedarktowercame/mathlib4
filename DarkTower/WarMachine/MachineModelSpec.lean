@@ -113,6 +113,8 @@ structure FloatCarriedRow (O : Type) where
   support : List O
   mass : O → ℚ
   nonnegative : ∀ o, 0 ≤ mass o
+  support_nodup : support.Nodup
+  mass_eq_zero_of_not_mem : ∀ o, o ∉ support → mass o = 0
   nearNormalised : |((support.map mass).sum) - 1| ≤ floatRowBound
 
 /-- Exact rows satisfy the v1.1 criterion trivially: the two admissions agree
@@ -122,5 +124,43 @@ theorem exact_row_admissible {O : Type} (support : List O) (mass : O → ℚ)
     |((support.map mass).sum) - 1| ≤ floatRowBound := by
   rw [h]
   norm_num [floatRowBound]
+
+/-- The existing tolerance rules out empty support; no extra field is needed. -/
+theorem FloatCarriedRow.support_ne_nil {O : Type} (r : FloatCarriedRow O) :
+    r.support ≠ [] := by
+  intro h
+  have bound := r.nearNormalised
+  rw [h] at bound
+  norm_num [floatRowBound] at bound
+
+/-- Preserve the rational coordinates. Exact normalization is an explicit premise,
+not a consequence of approximate admission. No renormalization is performed. -/
+noncomputable def FloatCarriedRow.toProbabilityKernel {O : Type}
+    (r : FloatCarriedRow O) (h : (r.support.map r.mass).sum = 1) :
+    ProbabilityKernel Unit O where
+  support _ := r.support
+  mass _ o := (r.mass o : ℝ)
+  nonnegative _ o := by exact_mod_cast r.nonnegative o
+  normalised _ := by
+    have cast_sum : ∀ xs : List O,
+        (xs.map (fun o => (r.mass o : ℝ))).sum = ((xs.map r.mass).sum : ℚ) := by
+      intro xs
+      induction xs with
+      | nil => simp
+      | cons o xs ih => simp [ih]
+    rw [cast_sum, h]
+    norm_num
+  support_nodup _ := r.support_nodup
+  mass_eq_zero_of_not_mem _ o ho := by simp [r.mass_eq_zero_of_not_mem o ho]
+
+theorem FloatCarriedRow.toProbabilityKernel_coordinate {O : Type}
+    (r : FloatCarriedRow O) (h : (r.support.map r.mass).sum = 1) (o : O) :
+    (r.toProbabilityKernel h).mass () o = (r.mass o : ℝ) := rfl
+
+theorem FloatCarriedRow.toProbabilityKernel_normalised {O : Type}
+    (r : FloatCarriedRow O) (h : (r.support.map r.mass).sum = 1) :
+    ((r.toProbabilityKernel h).support () |>.map
+      ((r.toProbabilityKernel h).mass ())).sum = 1 :=
+  (r.toProbabilityKernel h).normalised ()
 
 end DarkTower.WarMachine.MachineModelSpec
