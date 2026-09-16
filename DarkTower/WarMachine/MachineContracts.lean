@@ -13,6 +13,8 @@ import DarkTower.WarMachine.TokenObservation
 import DarkTower.WarMachine.TokenPreference
 import DarkTower.WarMachine.PolicyHorizon
 import DarkTower.WarMachine.ExactBeliefTrajectory
+import DarkTower.WarMachine.PolicySelection
+import DarkTower.WarMachine.ActionMarginal
 
 /-!
 Leaf registry for the War Machine's Lean→Clojure contracts. Checked name quotations
@@ -305,7 +307,25 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:648"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:642"
         "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:238"
-        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] },
+  { schemaVersion := 1, contractId := "wm-policy-selection",
+    moduleName := "DarkTower.WarMachine.PolicySelection",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.PolicySelection.selectionPosterior notLivePath "2026-09-16"
+        "WM-11 (P7): sigma(log E - F - gamma G) over extended G with gamma = 1/beta (PolicyPrecision.policyPrecision); infinite-G candidates at probability 0. Declared runtime reduction: Double log-space with log-sum-exp, not exact ENNReal. Not on the live path until P11 step 3 (Joe's word)"
+        "futon2/src/futon2/aif/cascade_selection.clj:51"
+        "futon2/test/futon2/aif/cascade_selection_test.clj:36"
+        "mathlib4/DarkTower/WarMachine/PolicySelection.lean:63"
+        "An infinite-G candidate receives nonzero mass (selectionPosterior_eq_zero_of_risk_top :40; selection-infinite-excluded); p2/p1 != exp((G1-G2)/beta) at equal habit and F; p2/p1 != exp(F1-F2) at equal G and habit (the +F sign bug; selection-posterior-f-and-habit-enter-with-lean-signs)."] },
+  { schemaVersion := 1, contractId := "wm-action-marginal",
+    moduleName := "DarkTower.WarMachine.ActionMarginal",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.ActionMarginal.IsBayesAction notLivePath "2026-09-16"
+        "WM-11 (P7, Da Costa eq. 11): the chosen action maximises posterior mass summed over the policies taking it (per observed state: exists_bayesAction_at_state). Declared choice: ties broken by ascending action name; the Lean predicate admits any maximiser"
+        "futon2/src/futon2/aif/cascade_selection.clj:104"
+        "futon2/test/futon2/aif/cascade_selection_test.clj:88"
+        "mathlib4/DarkTower/WarMachine/ActionMarginal.lean:161"
+        "Masses 1:1:1:e with three policies on :a and one on :b: a per-policy argmax chooses :b, eq. 11 chooses :a (fixture_bayes_a :161)."] }
   ]
 
 def main : IO Unit := do

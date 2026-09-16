@@ -40,6 +40,8 @@ EXPECTED[PREFIX + 'PolicyHorizon'] = [PREFIX + 'PolicyHorizon.' + n
                                       for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE', 'horizonEFE', 'horizonEFE']]
 EXPECTED[PREFIX + 'ExactBeliefTrajectory'] = [PREFIX + 'ExactBeliefTrajectory.exactUpdate',
                                               PREFIX + 'ExactBeliefTrajectory.tokenBeliefAt']
+EXPECTED[PREFIX + 'PolicySelection'] = [PREFIX + 'PolicySelection.selectionPosterior']
+EXPECTED[PREFIX + 'ActionMarginal'] = [PREFIX + 'ActionMarginal.IsBayesAction']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path',
            'runtime-correspondence-live-shadow', 'runtime-correspondence-lagging'}
 # 'runtime-correspondence-live-selection' is reserved for P11 step 3 and is refused
@@ -80,6 +82,14 @@ RUNTIME_FORMS = {
         {'clojure-locus': ('defn', 'cascade-kernel'),
          'fixture': ('deftest', 'cascade-transition-p10-five-situations'),
          'evidence': ('theorem', 'fixture_situation_v_renewal')}],
+    PREFIX + 'PolicySelection.selectionPosterior': {
+        'clojure-locus': ('defn', 'selection-posterior'),
+        'fixture': ('deftest', 'selection-posterior-lean-correspondence'),
+        'evidence': ('theorem', 'selectionPosterior_finite')},
+    PREFIX + 'ActionMarginal.IsBayesAction': {
+        'clojure-locus': ('defn', 'bayes-choice'),
+        'fixture': ('deftest', 'bayes-choice-aggregates'),
+        'evidence': ('theorem', 'fixture_bayes_a')},
     PREFIX + 'CascadeTransition.guard': {
         'clojure-locus': ('defn', 'guard-holds?'),
         'fixture': ('deftest', 'cascade-transition-p10-achieved-first-is-skipped'),
