@@ -1,5 +1,4 @@
 import DarkTower.WarMachine.StatePredictionError
-import DarkTower.WarMachine.PolicyRollout
 
 /-!
 # The stored belief: `μ_t` is the belief after the update at `t − 1`
@@ -9,22 +8,31 @@ Row `:belief-state` (audit A2 §5), under P9's categorical model. Registry forma
 admitted non-distributions and a reconciliation step that dropped carried beliefs.
 
 The update is the stationary belief of Parr et al. 2022 eq. 4.13 (see
-`StatePredictionError`) in its online form: the future message is absent (uniform),
-so `s_t(x) ∝ A(o_t|x) · exp(Σ_{s₀} s_{t−1}(s₀) ln B(x|s₀))`. The source's logarithms
+`StatePredictionError`) in an online filtering form, so
+`s_t(x) ∝ A(o_t|x) · exp(Σ_{s₀} s_{t−1}(s₀) ln B(x|s₀))`.
+
+**Declared online reductions.** (a) The future term is taken as zero (constant in
+`x`): no policy-predicted `s_{t+1}` message enters the stored belief. (b) Stored past
+beliefs are never revised (filtering, not smoothing). (c) There is one belief along
+the executed actions, not one `s_πτ` per policy. (d) `μ_0 = q₀` is already
+conditioned on the record (P4), so `o_0` is not reused; B.4 would instead update
+`D` with `o_1`. The source's logarithms
 are `ln 0 = −∞`; written multiplicatively that is
 `exp(Σ_{s₀ ∈ supp s_{t−1}} s_{t−1}(s₀) ln B(x|s₀)) = Π_{s₀ ∈ supp s_{t−1}} B(x|s₀)^{s_{t−1}(s₀)}`,
 with `0^p = 0` for `p > 0`, so zero probabilities are represented exactly (a state
 the past rules out gets weight `0`) rather than through Lean's `Real.log 0 = 0`.
 
-If the observation is impossible under every state the prior allows, the weights
-all vanish and there is no posterior: the update returns `none`, a typed refusal,
-instead of dropping or inventing a belief. The carrier is a fixed finite type (under
+If every weight vanishes there is no posterior (the source's `σ` is undefined at
+`v = −∞` everywhere): the update returns `none`, a typed refusal carried forward,
+instead of dropping or inventing a belief. **This is not only an impossible
+observation.** Under the mean-field convention one support point with `B(x|s₀) = 0`
+rules `x` out, so an uncertain belief pushed through a deterministic transition can
+zero every state even when the observation has positive exact-Bayes probability
+(`fixture_meanField_refuses_possible`); under P3 this arises whenever `θ = 1`. The carrier is a fixed finite type (under
 P2/P4 the token-state type `Finset V`), so no entity-domain reconciliation occurs.
 -/
 
 namespace DarkTower.WarMachine.BeliefTrajectory
-
-open DarkTower.WarMachine.PolicyRollout
 
 variable {S O : Type*} [Fintype S] [DecidableEq S]
 
@@ -34,8 +42,8 @@ noncomputable def stateWeight (A : S → O → ℝ) (B : S → S → ℝ) (o : O
   A x o * ∏ s₀ ∈ Finset.univ.filter (fun s₀ => 0 < sPrev s₀), B s₀ x ^ sPrev s₀
 
 open Classical in
-/-- The online update of eq. 4.13: the normalised weights, or `none` when the
-observation is impossible under the prior. -/
+/-- The online update of eq. 4.13: the normalised weights, or `none` when every
+weight is zero. -/
 noncomputable def beliefUpdate (A : S → O → ℝ) (B : S → S → ℝ) (o : O) (sPrev : S → ℝ) :
     Option (S → ℝ) :=
   if ∑ y, stateWeight A B o sPrev y = 0 then none
@@ -84,14 +92,15 @@ theorem beliefUpdate_eq_none_iff (hA : ∀ x, 0 ≤ A x o) (hB : ∀ s x, 0 ≤ 
 end
 
 /-- **Agreement with eq. 4.13's stationary belief.** Where every log is finite
-(`LogDefined`, with the future term absent), the update is
+(`LogDefined`, with the future term zero; `B'` is then irrelevant), the update is
 `StatePredictionError.statePosterior`. -/
 theorem beliefUpdate_eq_statePosterior [Nonempty S] (A : S → O → ℝ) (B B' : S → S → ℝ) (o : O)
     (sPrev : S → ℝ) (hp : ∀ s, 0 ≤ sPrev s)
-    (hA : ∀ x, 0 < A x o) (hB : ∀ s₀ x, 0 < sPrev s₀ → 0 < B s₀ x)
-    (hfut : ∀ x, StatePredictionError.futureTerm B' (fun _ => 0) x = 0) :
+    (hA : ∀ x, 0 < A x o) (hB : ∀ s₀ x, 0 < sPrev s₀ → 0 < B s₀ x) :
     beliefUpdate A B o sPrev
       = some (StatePredictionError.statePosterior A B B' o sPrev (fun _ => 0)) := by
+  have hfut : ∀ x, StatePredictionError.futureTerm B' (fun _ => 0) x = 0 := fun x => by
+    simp [StatePredictionError.futureTerm]
   have hw : ∀ x, stateWeight A B o sPrev x
       = Real.exp (StatePredictionError.logMessage A B B' o sPrev (fun _ => 0) x) := fun x => by
     rw [StatePredictionError.logMessage, hfut x, add_zero, Real.exp_add,
@@ -164,7 +173,8 @@ theorem beliefAt_dist {U : Type*} (A : S → O → ℝ) (B : U → S → S → �
     exact beliefUpdate_dist A (B (u t)) (o (t + 1)) s' (fun x => hA x _) (hB (u t)) hs
 
 /-- The belief at `t` depends only on the actions before `t` and the observations up
-to `t`: nothing later is carried back and nothing earlier is dropped. -/
+to `t`: nothing later is carried back. (`o_0` is included in the hypothesis for
+uniformity although it is not read.) -/
 theorem beliefAt_congr {U : Type*} (A : S → O → ℝ) (B : U → S → S → ℝ) (q₀ : S → ℝ)
     {u u' : ℕ → U} {o o' : ℕ → O} :
     ∀ t, (∀ m < t, u m = u' m) → (∀ m ≤ t, o m = o' m) →
@@ -208,5 +218,23 @@ theorem fixture_impossible_refused :
   cases x
   · exact stateWeight_eq_zero _ _ _ _ _ (Or.inl (by simp))
   · exact stateWeight_eq_zero _ _ _ _ _ (Or.inr ⟨false, by simp, by simp [fxB]⟩)
+
+/-- Likelihood with every entry positive. -/
+noncomputable def fxAnoisy : Bool → Bool → ℝ := fun s ob => if s = ob then 9 / 10 else 1 / 10
+
+/-- **Mean-field refusal of a possible observation (declared).** A uniform belief
+pushed through the deterministic flip rules out both states (each is the image of
+one support point only), so the update refuses, although under exact Bayes the
+observation has probability 1/2. -/
+theorem fixture_meanField_refuses_possible :
+    beliefUpdate fxAnoisy (fxB true) true (fun _ => 1 / 2) = none ∧
+      ∑ x, fxAnoisy x true * ∑ s₀, fxB true s₀ x * (1 / 2 : ℝ) = 1 / 2 := by
+  refine ⟨?_, by simp [fxAnoisy, fxB, Fintype.sum_bool]; norm_num⟩
+  rw [beliefUpdate_eq_none_iff _ _ _ _ (fun x => by simp only [fxAnoisy]; split_ifs <;> norm_num)
+    (fun s x => by simp only [fxB]; split_ifs <;> norm_num)]
+  intro x
+  cases x
+  · exact stateWeight_eq_zero _ _ _ _ _ (Or.inr ⟨false, by norm_num, by simp [fxB]⟩)
+  · exact stateWeight_eq_zero _ _ _ _ _ (Or.inr ⟨true, by norm_num, by simp [fxB]⟩)
 
 end DarkTower.WarMachine.BeliefTrajectory
