@@ -137,6 +137,21 @@ RUNTIME_FORMS = {
 }
 
 
+def committed_lines(path):
+    """Lines of a cross-repo pointer target at its repository's HEAD, not the working tree.
+
+    Contract pointers name committed code: an owner's uncommitted edit elsewhere in the
+    same file must neither break nor satisfy verification. `path` is `<repo>/<rest>`
+    relative to the parent of this checkout (e.g. futon2/src/...)."""
+    repo, rest = path.split('/', 1)
+    target = ROOT.parent / path
+    require(target.resolve().is_relative_to(ROOT.parent), 'foreign pointer: ' + path)
+    out = subprocess.run(['git', '-C', str(ROOT.parent / repo), 'show', 'HEAD:' + rest],
+                         capture_output=True)
+    require(out.returncode == 0, 'pointer not committed at HEAD: ' + path)
+    return out.stdout.decode().splitlines()
+
+
 def form_at(line):
     """(head, name) of a Clojure `(defn name` / `(deftest name` or Lean `theorem name` line."""
     t = line.strip()
@@ -254,9 +269,7 @@ def verify(manifest_path):
             require(not runtime or d['name'] in RUNTIME_FORMS, 'runtime entry without named forms: ' + d['name'])
             for key in ['fixture', 'evidence', 'clojure-locus']:
                 path, line = d[key].rsplit(':', 1)
-                target = ROOT.parent / path
-                require(target.resolve().is_relative_to(ROOT.parent) and target.is_file(), 'unresolved ' + key)
-                lines = target.read_text().splitlines()
+                lines = committed_lines(path)
                 require(1 <= int(line) <= len(lines), 'bad pointer ' + key)
                 if runtime:
                     options = RUNTIME_FORMS[d['name']]
@@ -272,13 +285,10 @@ def verify(manifest_path):
                 # live-call-site=path:line) and that line must call the runtime function.
                 m = LIVE_SITE_RE.search(d['owner'])
                 require(m is not None, 'live entry without live-call-site: ' + d['name'])
-                site = ROOT.parent / m.group(1)
-                require(site.resolve().is_relative_to(ROOT.parent) and site.is_file(),
-                        'unresolved live-call-site: ' + d['name'])
-                site_lines = site.read_text().splitlines()
+                site_lines = committed_lines(m.group(1))
                 require(1 <= int(m.group(2)) <= len(site_lines), 'bad live-call-site line: ' + d['name'])
                 path, line = d['clojure-locus'].rsplit(':', 1)
-                fn = form_at((ROOT.parent / path).read_text().splitlines()[int(line) - 1])[1]
+                fn = form_at(committed_lines(path)[int(line) - 1])[1]
                 call = site_lines[int(m.group(2)) - 1]
                 require(__import__('re').search(r'(^|[\s(/])' + __import__('re').escape(fn) + r'([\s)]|$)', call)
                         is not None,
@@ -288,7 +298,7 @@ def verify(manifest_path):
                 options = options if isinstance(options, list) else [options]
                 def at(key):
                     path, line = d[key].rsplit(':', 1)
-                    return form_at((ROOT.parent / path).read_text().splitlines()[int(line) - 1])
+                    return form_at(committed_lines(path)[int(line) - 1])
                 require(any(all(at(k) == o[k] for k in o) for o in options),
                         'pointers do not form one declared (locus, fixture, evidence) triple: ' + d['name'])
     return m
