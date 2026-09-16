@@ -145,5 +145,76 @@ theorem interpret_eq_none_iff (slots : List (PatternSlot V)) :
           · exact absurd h2 (by simp)
           · exact ⟨s, hm, h2⟩
 
+/-! ## Rollout compatibility -/
+
+variable {O : Type*} [Fintype O] [DecidableEq O]
+
+/-- A forward model whose transition is the cascade kernel of the policy
+(a precedence list), given any observation kernel `A` and initial belief
+`q₀` with their normalisation facts. -/
+noncomputable def cascadeForwardModel
+    (A : Finset V → O → ℝ) (A_nonneg : ∀ s o, 0 ≤ A s o) (A_colsum : ∀ s, ∑ o, A s o = 1)
+    (q₀ : Finset V → ℝ) (q₀_nonneg : ∀ s, 0 ≤ q₀ s) (q₀_sum : ∑ s, q₀ s = 1) :
+    PolicyRollout.ForwardModel (Finset V) O (List (InterpretedPattern V)) where
+  B := fun π s s' => cascadeKernel π s s'
+  B_nonneg := fun _ s s' => cascadeKernel_nonneg _ s s'
+  B_rowsum := fun _ s => cascadeKernel_rowsum _ s
+  A := A
+  A_nonneg := A_nonneg
+  A_colsum := A_colsum
+  q₀ := q₀
+  q₀_nonneg := q₀_nonneg
+  q₀_sum := q₀_sum
+
+/-! ## Depth fixture: V = Fin 3, two chained patterns -/
+
+open DarkTower.WarMachine.PolicyRollout
+
+private def fp1 (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern (Fin 3) where
+  consumes := ∅
+  produces := {0, 1}
+  theta := t
+  theta_nonneg := h1
+  theta_le_one := h2
+
+private def fp2 (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern (Fin 3) where
+  consumes := {0, 1}
+  produces := {2}
+  theta := t
+  theta_nonneg := h1
+  theta_le_one := h2
+
+private def fprec0 (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1) (h2 : 0 ≤ t2) (h2' : t2 ≤ 1) :
+    List (InterpretedPattern (Fin 3)) := [fp1 t1 h1 h1', fp2 t2 h2 h2']
+
+private def fprec1 (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1) (h2 : 0 ≤ t2) (h2' : t2 ≤ 1) :
+    List (InterpretedPattern (Fin 3)) := [fp2 t2 h2 h2', fp1 t1 h1 h1']
+
+private def fA : Finset (Fin 3) → Unit → ℝ := fun _ _ => 1
+
+private def fq₀ : Finset (Fin 3) → ℝ := fun s => if s = ∅ then 1 else 0
+
+private noncomputable def fModel :
+    ForwardModel (Finset (Fin 3)) Unit (List (InterpretedPattern (Fin 3))) :=
+  cascadeForwardModel fA (fun _ _ => by simp [fA]) (fun _ => by simp [fA])
+    fq₀ (fun s => by unfold fq₀; split_ifs <;> norm_num)
+    (by simp [fq₀, Finset.sum_ite_eq'])
+
+/-- One step from the point mass at `∅` is just the kernel at `∅`. -/
+private theorem oneStep (prec : List (InterpretedPattern (Fin 3)))
+    (π : ℕ → List (InterpretedPattern (Fin 3))) (h0 : π 0 = prec)
+    (s' : Finset (Fin 3)) :
+    rolloutState fModel π 1 s' = cascadeKernel prec ∅ s' := by
+  have hr : rolloutState fModel π 1 s'
+      = ∑ s : Finset (Fin 3), fModel.B (π 0) s s' * fModel.q₀ s := rfl
+  rw [hr, h0]
+  have hq : ∀ s : Finset (Fin 3), fModel.B prec s s' * fModel.q₀ s
+      = if s = (∅ : Finset (Fin 3)) then fModel.B prec ∅ s' else 0 := by
+    intro s
+    by_cases hs : s = ∅ <;> simp [fModel, cascadeForwardModel, fq₀, hs]
+  rw [Finset.sum_congr rfl fun s _ => hq s, Finset.sum_ite_eq']
+  simp only [Finset.mem_univ, if_true]
+  rfl
+
 end DarkTower.WarMachine.CascadeTransition
 
