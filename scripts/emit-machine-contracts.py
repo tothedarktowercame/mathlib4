@@ -37,6 +37,8 @@ EXPECTED[PREFIX + 'TokenPreference'] = [PREFIX + 'TokenPreference.PreferenceSpec
                                         PREFIX + 'TokenPreference.PreferenceSpec.preference']
 EXPECTED[PREFIX + 'PolicyHorizon'] = [PREFIX + 'PolicyHorizon.' + n
                                       for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE', 'horizonEFE']]
+EXPECTED[PREFIX + 'ExactBeliefTrajectory'] = [PREFIX + 'ExactBeliefTrajectory.exactUpdate',
+                                              PREFIX + 'ExactBeliefTrajectory.tokenBeliefAt']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path',
            'runtime-correspondence-live-shadow'}
 # 'runtime-correspondence-live-selection' is reserved for P11 step 3 and is refused
@@ -124,6 +126,14 @@ RUNTIME_FORMS = {
         {'clojure-locus': ('defn', 'horizon-g-sparse'),
          'fixture': ('deftest', 'sparse-g-equals-enumerating-g'),
          'evidence': ('theorem', 'horizonEFE_eq_top_iff')}],
+    PREFIX + 'ExactBeliefTrajectory.exactUpdate': {
+        'clojure-locus': ('defn', 'exact-update'),
+        'fixture': ('deftest', 'exact-belief-lean-fixture-correspondence'),
+        'evidence': ('theorem', 'exactUpdate_vfe_le')},
+    PREFIX + 'ExactBeliefTrajectory.tokenBeliefAt': {
+        'clojure-locus': ('defn', 'token-belief-at'),
+        'fixture': ('deftest', 'exact-belief-properties'),
+        'evidence': ('theorem', 'tokenBeliefAt_dist')},
 }
 
 
