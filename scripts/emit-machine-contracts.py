@@ -37,7 +37,12 @@ EXPECTED[PREFIX + 'TokenPreference'] = [PREFIX + 'TokenPreference.PreferenceSpec
                                         PREFIX + 'TokenPreference.PreferenceSpec.preference']
 EXPECTED[PREFIX + 'PolicyHorizon'] = [PREFIX + 'PolicyHorizon.' + n
                                       for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE', 'horizonEFE']]
-HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
+HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path',
+           'runtime-correspondence-live-shadow'}
+# 'runtime-correspondence-live-selection' is reserved for P11 step 3 and is refused
+# until Joe's word adds it here.
+LIVE_HOLDERS = {'runtime-correspondence-live-shadow'}
+LIVE_SITE_RE = __import__('re').compile(r'live-call-site=(\S+):(\d+)')
 # Runtime-correspondence entries must point at the named forms, not merely at an
 # existing line: pointer -> (form head, name) expected at that line. A locus that
 # drifts onto another defn/deftest/theorem refuses (ALIGNMENT.md item 5).
@@ -249,6 +254,22 @@ def verify(manifest_path):
                     require(any(form_at(lines[int(line) - 1]) == o[key] for o in options),
                             'pointer does not name an expected form: %s %s -> %r'
                             % (d['name'], key, lines[int(line) - 1].strip()))
+            if d['holder'] in LIVE_HOLDERS:
+                # A live claim must name the live call site (in the owner string as
+                # live-call-site=path:line) and that line must call the runtime function.
+                m = LIVE_SITE_RE.search(d['owner'])
+                require(m is not None, 'live entry without live-call-site: ' + d['name'])
+                site = ROOT.parent / m.group(1)
+                require(site.resolve().is_relative_to(ROOT.parent) and site.is_file(),
+                        'unresolved live-call-site: ' + d['name'])
+                site_lines = site.read_text().splitlines()
+                require(1 <= int(m.group(2)) <= len(site_lines), 'bad live-call-site line: ' + d['name'])
+                path, line = d['clojure-locus'].rsplit(':', 1)
+                fn = form_at((ROOT.parent / path).read_text().splitlines()[int(line) - 1])[1]
+                call = site_lines[int(m.group(2)) - 1]
+                require(__import__('re').search(r'(^|[\s(/])' + __import__('re').escape(fn) + r'([\s)]|$)', call)
+                        is not None,
+                        'live-call-site does not call %s: %r' % (fn, call.strip()))
             if runtime:
                 options = RUNTIME_FORMS[d['name']]
                 options = options if isinstance(options, list) else [options]
