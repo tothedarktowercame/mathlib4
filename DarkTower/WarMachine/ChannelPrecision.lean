@@ -58,8 +58,15 @@ theorem channelPrecision_le_inv_eps0 (eps0 : ℝ) (h0 : 0 < eps0)
 /-- Buckley et al. 2017 eq. (84): the precision is `Λ = 1/σ` for the floored
 variance `σ := max (errorVariance errors) eps0`, which is strictly positive. -/
 theorem channelPrecision_eq84 (eps0 : ℝ) (h0 : 0 < eps0) (errors : Fin (n + 1) → ℝ) :
-    ∃ σ > 0, channelPrecision eps0 h0 errors = 1 / σ :=
-  ⟨max (errorVariance errors) eps0, lt_of_lt_of_le h0 (le_max_right _ _), rfl⟩
+    0 < max (errorVariance errors) eps0 ∧
+      channelPrecision eps0 h0 errors = 1 / max (errorVariance errors) eps0 :=
+  ⟨lt_of_lt_of_le h0 (le_max_right _ _), rfl⟩
+
+/-- Above the floor the precision is exactly the inverse centred variance. -/
+theorem channelPrecision_of_eps0_le (eps0 : ℝ) (h0 : 0 < eps0) (errors : Fin (n + 1) → ℝ)
+    (h : eps0 ≤ errorVariance errors) :
+    channelPrecision eps0 h0 errors = 1 / errorVariance errors := by
+  rw [channelPrecision, max_eq_left h]
 
 /-- A constant error sample has mean equal to the constant. -/
 theorem errorMean_const (c : ℝ) : errorMean (fun _ : Fin (n + 1) => c) = c := by
