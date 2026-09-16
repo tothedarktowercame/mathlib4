@@ -96,6 +96,87 @@ theorem coverage_mono (want : Finset V) (hwant : want.Nonempty) {s s' : TokenSta
   rw [coverage, coverage, hrw, add_div]
   linarith
 
+/-! ## Independent belief: adjudication uncertainty -/
+
+/-- Adjudication uncertainty: each token is established independently with
+probability `p v`; a state `s` has probability the product over tokens. -/
+def independentBelief (p : V → ℝ) (hp : ∀ v, 0 ≤ p v ∧ p v ≤ 1) : TokenState V → ℝ :=
+  fun s => ∏ v, if v ∈ s then p v else 1 - p v
+
+theorem independentBelief_nonneg (p : V → ℝ) (hp : ∀ v, 0 ≤ p v ∧ p v ≤ 1)
+    (s : TokenState V) : 0 ≤ independentBelief p hp s := by
+  refine Finset.prod_nonneg fun v _ => ?_
+  by_cases hv : v ∈ s
+  · simp only [independentBelief, if_pos hv]
+    exact (hp v).1
+  · simp only [independentBelief, if_neg hv]
+    exact sub_nonneg.mpr (hp v).2
+
+/-- Membership as a Boolean function, and its inverse: the bridge between
+`tactical states` and `V → Bool`. -/
+private def toBoolFun (s : Finset V) : V → Bool := fun v => decide (v ∈ s)
+
+private def ofBoolFun (h : V → Bool) : Finset V := Finset.univ.filter (fun v => h v = true)
+
+private theorem ofBoolFun_toBoolFun (s : Finset V) : ofBoolFun (toBoolFun s) = s := by
+  ext v
+  simp [ofBoolFun, toBoolFun]
+
+private theorem toBoolFun_ofBoolFun (h : V → Bool) : toBoolFun (ofBoolFun h) = h := by
+  funext v
+  cases hv : h v <;> simp [toBoolFun, ofBoolFun, hv]
+
+/-- Tactical states are in bijection with `V → Bool` membership functions. -/
+private def stateBoolEquiv : Finset V ≃ (V → Bool) where
+  toFun := toBoolFun
+  invFun := ofBoolFun
+  left_inv := ofBoolFun_toBoolFun
+  right_inv := toBoolFun_ofBoolFun
+
+theorem independentBelief_sum (p : V → ℝ) (hp : ∀ v, 0 ≤ p v ∧ p v ≤ 1) :
+    ∑ s : TokenState V, independentBelief p hp s = (1:ℝ) := by
+  classical
+  have key1 : ∑ s : TokenState V, independentBelief p hp s
+      = ∑ h : V → Bool, ∏ v, if h v then p v else 1 - p v := by
+    refine Fintype.sum_equiv stateBoolEquiv _ _ fun s => ?_
+    show (∏ v, if v ∈ s then p v else 1 - p v)
+        = ∏ x, if toBoolFun s x = true then p x else 1 - p x
+    simp only [toBoolFun, decide_eq_true_eq]
+  have step2 : (∑ h : V → Bool, ∏ v, if h v then p v else 1 - p v)
+      = ∏ v, ∑ b : Bool, if b then p v else 1 - p v :=
+    (Fintype.prod_sum (fun (v : V) (b : Bool) => if b then p v else 1 - p v)).symm
+  rw [key1, step2]
+  refine Finset.prod_eq_one fun v _ => ?_
+  rw [Fintype.sum_bool]
+  simp
+
+theorem independentBelief_eq_observedBelief (s₀ : TokenState V) (p : V → ℝ)
+    (hp : ∀ v, 0 ≤ p v ∧ p v ≤ 1) (hpp : ∀ v, p v = if v ∈ s₀ then 1 else 0)
+    (s : TokenState V) : independentBelief p hp s = observedBelief s₀ s := by
+  by_cases h : s = s₀
+  · subst h
+    have h1 : independentBelief p hp s = 1 := Finset.prod_eq_one fun v _ => by
+      by_cases hv : v ∈ s <;> simp [independentBelief, hpp v, hv]
+    rw [h1]
+    simp [observedBelief]
+  · have hdis : ∃ v : V, (v ∈ s ∧ v ∉ s₀) ∨ (v ∉ s ∧ v ∈ s₀) := by
+      by_contra hcon
+      apply h
+      apply Finset.ext
+      intro v
+      by_cases h1 : v ∈ s <;> by_cases h2 : v ∈ s₀
+      · exact ⟨fun _ => h2, fun _ => h1⟩
+      · exact absurd ⟨v, Or.inl ⟨h1, h2⟩⟩ hcon
+      · exact absurd ⟨v, Or.inr ⟨h1, h2⟩⟩ hcon
+      · exact ⟨fun hv => absurd hv h1, fun hv => absurd hv h2⟩
+    obtain ⟨v, hv | hv⟩ := hdis
+    · have hz : independentBelief p hp s = 0 :=
+        Finset.prod_eq_zero (Finset.mem_univ v) (by simp [independentBelief, hpp v, hv])
+      rw [hz, observedBelief, if_neg h]
+    · have hz : independentBelief p hp s = 0 :=
+        Finset.prod_eq_zero (Finset.mem_univ v) (by simp [independentBelief, hpp v, hv])
+      rw [hz, observedBelief, if_neg h]
+
 /-! ## Fixture: V = Fin 3, concrete numbers -/
 
 section Fixture
