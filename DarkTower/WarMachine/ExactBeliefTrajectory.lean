@@ -1,5 +1,8 @@
 import DarkTower.WarMachine.BeliefTrajectory
 import DarkTower.WarMachine.PolicyVariationalFreeEnergy
+import DarkTower.WarMachine.TokenState
+import DarkTower.WarMachine.CascadeTransition
+import DarkTower.WarMachine.TokenObservation
 
 /-!
 # The stored belief as the exact categorical posterior (design P12)
@@ -25,6 +28,15 @@ and Parr et al. 2022 eq. 4.13 remains the stated inference scheme
 
 The alternatives not taken (mean-field 4.13 as the stored update with declared
 refusals; flooring `B` as in SPM practice) are recorded in the plop-2026 paper.
+
+**Declared reductions against eq. 4.13.** (a) Exact categorical posterior, not the
+mean-field fixed point (P12; they agree, refusal included, at a point mass). (b) One
+belief along the executed actions, not `s_πτ` per policy. (c) No future message
+`(ln B_{τ+1})ᵀ s_{τ+1}`. (d) Filtering only: stored beliefs are never revised.
+(e) Closed form, not the `v̇` gradient flow. (f) `q₀` (P4) in place of B.4's
+`ln D + ln A·o₁`, so `o₀` is not read. (g) B.2 is used per step, as a filtering
+instance with prior `B s_{t−1}`; that the stored belief is the time-`t` marginal of
+the B.1 trajectory posterior is true but not formalised here. (h) Not B.6.
 -/
 
 namespace DarkTower.WarMachine.ExactBeliefTrajectory
@@ -72,16 +84,18 @@ theorem exactUpdate_dist (hA : ∀ x, 0 ≤ A x o) (hB : ∀ s x, 0 ≤ B s x) (
   rw [← Finset.sum_div]
   exact div_self hz
 
-/-- **The exact update refuses only an impossible observation**: exactly when its
-predictive probability is zero. -/
+/-- **The exact update refuses only an impossible observation**: exactly when
+`P(o) = 0`. With `A`, `B` and `s_prev` nonnegative that is zero predictive
+probability; the lemma itself carries no sign hypotheses. -/
 theorem exactUpdate_eq_none_iff :
     exactUpdate A B o sPrev = none ↔ observationProbability A B o sPrev = 0 := by
   unfold exactUpdate
   split_ifs with hz <;> simp [hz]
 
-/-- **The exact update is the unique minimiser of the variational free energy** of
-Parr eq. B.2, with likelihood `A(o|·)` and prior `B s_prev`: a belief `q` attains
-`F = −ln P(o)` iff it is the exact update. -/
+/-- **Equality case of Parr eq. B.2**, with likelihood `A(o|·)` and prior `B s_prev`:
+a belief `q` attains `F = −ln P(o)` iff it is the exact update. Together with
+`exactUpdate_vfe_le` (the bound `F ≥ −ln P(o)`), the exact update is the unique
+minimiser. -/
 theorem exactUpdate_minimises_vfe (hA : ∀ x, 0 ≤ A x o) (hB : ∀ s x, 0 ≤ B s x)
     (hB1 : ∀ s, ∑ x, B s x = 1) (hp : ∀ s, 0 ≤ sPrev s) (hp1 : ∑ s, sPrev s = 1)
     (hZ : 0 < observationProbability A B o sPrev) (q : S → ℝ) (hq0 : ∀ x, 0 ≤ q x)
@@ -108,6 +122,22 @@ theorem exactUpdate_minimises_vfe (hA : ∀ x, 0 ≤ A x o) (hB : ∀ s x, 0 ≤
     have := congrFun (Option.some.inj h) x
     rw [← this]
     rfl
+
+/-- **The exact update minimises the variational free energy**: its `F` is `−ln P(o)`,
+and no distribution has smaller `F` (Parr B.2's bound, `vfe_ge_neg_log_evidence`). -/
+theorem exactUpdate_vfe_le (hA : ∀ x, 0 ≤ A x o) (hB : ∀ s x, 0 ≤ B s x)
+    (hB1 : ∀ s, ∑ x, B s x = 1) (hp : ∀ s, 0 ≤ sPrev s) (hp1 : ∑ s, sPrev s = 1)
+    (hZ : 0 < observationProbability A B o sPrev) {s : S → ℝ}
+    (hs : exactUpdate A B o sPrev = some s) (q : S → ℝ) (hq0 : ∀ x, 0 ≤ q x)
+    (hq1 : ∑ x, q x = 1) :
+    PolicyVariationalFreeEnergy.variationalFreeEnergy (fun x => A x o) (predictedState B sPrev) s
+      ≤ PolicyVariationalFreeEnergy.variationalFreeEnergy (fun x => A x o)
+          (predictedState B sPrev) q := by
+  have hsd := exactUpdate_dist A B o sPrev hA hB hp hs
+  rw [(exactUpdate_minimises_vfe A B o sPrev hA hB hB1 hp hp1 hZ s hsd.1 hsd.2).mpr hs]
+  exact PolicyVariationalFreeEnergy.vfe_ge_neg_log_evidence (fun x => A x o)
+    (predictedState B sPrev) q hA (predictedState_nonneg B sPrev hB hp)
+    (predictedState_sum B sPrev hB1 hp1) hq0 hq1 hZ
 
 end
 
@@ -180,6 +210,50 @@ theorem exactBeliefAt_congr {U : Type*} (A : S → O → ℝ) (B : U → S → S
       exactBeliefAt_congr A B q₀ t (fun m hm => hu m (Nat.lt_succ_of_lt hm))
         (fun m hm => ho m (Nat.le_succ_of_le hm)),
       hu t (Nat.lt_succ_self t), ho (t + 1) le_rfl]
+
+/-! ## Over the approved carriers (P2–P5)
+
+The same trajectory with the approved carriers: states are token sets (`TokenState`),
+`q₀` is the observed token set (P4, `observedBelief`), transitions are cascade kernels
+indexed by precedence list (P3, `CascadeTransition.cascadeKernel`), and observation is
+per-token adjudication (P5, `TokenObservation.tokenLikelihood`). -/
+
+section TokenCarriers
+
+open DarkTower.WarMachine.TokenState DarkTower.WarMachine.CascadeTransition
+  DarkTower.WarMachine.TokenObservation
+
+variable {V : Type*} [Fintype V] [DecidableEq V]
+
+/-- The stored belief over token states: `μ_0` is the observed token set `s₀`, and the
+cascade `plans t` with observation `o (t+1)` produces `μ_{t+1}`. -/
+noncomputable def tokenBeliefAt (r : AdjudicationRates V) (s₀ : TokenState V)
+    (plans : ℕ → List (InterpretedPattern V)) (o : ℕ → Finset V) :
+    ℕ → Option (TokenState V → ℝ) :=
+  exactBeliefAt (fun s ob => tokenLikelihood r s ob) (fun p s s' => cascadeKernel p s s')
+    (observedBelief s₀) plans o
+
+/-- Every stored token-state belief is a distribution; the hypotheses are discharged by
+the carriers' own theorems. -/
+theorem tokenBeliefAt_dist (r : AdjudicationRates V) (s₀ : TokenState V)
+    (plans : ℕ → List (InterpretedPattern V)) (o : ℕ → Finset V) (t : ℕ)
+    {s : TokenState V → ℝ} (h : tokenBeliefAt r s₀ plans o t = some s) :
+    (∀ x, 0 ≤ s x) ∧ ∑ x, s x = 1 :=
+  exactBeliefAt_dist _ _ _ _ _ (fun x ob => tokenLikelihood_nonneg r x ob)
+    (fun p x y => cascadeKernel_nonneg p x y) (observedBelief_nonneg s₀) (observedBelief_sum s₀)
+    t h
+
+/-- From the observed token set, the first stored belief is the same under exact Bayes
+and under eq. 4.13's mean-field update. -/
+theorem tokenBeliefAt_one_eq_meanField (r : AdjudicationRates V) (s₀ : TokenState V)
+    (plans : ℕ → List (InterpretedPattern V)) (o : ℕ → Finset V) :
+    tokenBeliefAt r s₀ plans o 1
+      = BeliefTrajectory.beliefUpdate (fun s ob => tokenLikelihood r s ob)
+          (fun s s' => cascadeKernel (plans 0) s s') (o 1) (observedBelief s₀) := by
+  simp only [tokenBeliefAt, exactBeliefAt_succ, exactBeliefAt, Option.bind_some]
+  exact exactUpdate_eq_meanField_observed _ _ _ s₀
+
+end TokenCarriers
 
 /-! ## Fixture: the input on which mean-field refused -/
 
