@@ -1,0 +1,101 @@
+{
+  "bundle": {
+    "file": "machine-contracts.json",
+    "sha256": "ef2d7b9a27e7804f2966988a92f4aee1096cfcf3a677a9d15075dbc3d035d08e"
+  },
+  "expected-modules": [
+    "DarkTower.WarMachine.Holes",
+    "DarkTower.WarMachine.MachineAction",
+    "DarkTower.WarMachine.MachineBeliefState",
+    "DarkTower.WarMachine.MachineBeliefUpdate",
+    "DarkTower.WarMachine.MachineDepth",
+    "DarkTower.WarMachine.MachineObservation",
+    "DarkTower.WarMachine.MachinePrecision",
+    "DarkTower.WarMachine.MachinePredictionError",
+    "DarkTower.WarMachine.MachineTemperature",
+    "DarkTower.WarMachine.TokenState"
+  ],
+  "holes-component": {
+    "path": "DarkTower/WarMachine/holes-contract.json",
+    "sha256": "46d73de9b80bb397b6c79982093249c4d56652e9ffa3a3aa406639ba5234377b"
+  },
+  "schema": "wm-machine-contract-manifest-v2",
+  "scope": "per-entry-holder",
+  "sources": [
+    {
+      "commit": "3869cfeed0c5ab3148125d1ce8dcb6c06b8d44df",
+      "path": "DarkTower/WarMachine/MachineContracts.lean",
+      "sha256": "6bf8a42640e637d3b6d459a43516215860b54d5e7bfcf6af6f0b4d9b0dc43260"
+    },
+    {
+      "commit": "3869cfeed0c5ab3148125d1ce8dcb6c06b8d44df",
+      "path": "scripts/emit-machine-contracts.py",
+      "sha256": "0e2a9e43aa3d2c1cf8cb2d55ad190788ccadb0effc9370a5fc57a7fd1e42f962"
+    },
+    {
+      "commit": "76ec2cce43f221c365ff5fbc19d46f57c44abe7f",
+      "path": "scripts/emit_machine_contracts.lean",
+      "sha256": "3f1b85ddd96bff16c417e7c60cdb5a7987e808ba27b72c334fed4479c5f40ec1"
+    },
+    {
+      "commit": "25d1771d368b5a4c111b66c987de6b7591f59aef",
+      "path": "DarkTower/Contract/Emit.lean",
+      "sha256": "498ce2126f727b95100b317c2c3f40e378c919db5a11aed26d5f110ac2aea12d"
+    },
+    {
+      "commit": "d568c8c09630de097a046763c17b9ea99f95f950",
+      "path": "lean-toolchain",
+      "sha256": "33cbab0d3ba76bdf58d9f3638748f12cb9e3befb1336b223ddbd3567589a09e8"
+    },
+    {
+      "commit": "480a666ad27c18477b4b9df86e11862be3930d50",
+      "path": "DarkTower/WarMachine/Holes.lean",
+      "sha256": "7f137e4f85b2aae18b699942bdc505faa3f311752a096718704fb2ca7b7a07d3"
+    },
+    {
+      "commit": "461720489008ecadc5eef01f4cc1c0c323e7b86f",
+      "path": "DarkTower/WarMachine/MachineAction.lean",
+      "sha256": "473182ceb96aba566ff2803d1fbf6f13154d3713d3c95d314180a676574bc692"
+    },
+    {
+      "commit": "3a8e26f61e2ef3f4e96c92c96d39743442133db9",
+      "path": "DarkTower/WarMachine/MachineBeliefState.lean",
+      "sha256": "da2c648860c1a4ee48f58106c5f7fc60a5150d914bc2089a2440eea801a7521e"
+    },
+    {
+      "commit": "0e89cc1cb5622b252b43ced54dbfa65959043a5b",
+      "path": "DarkTower/WarMachine/MachineBeliefUpdate.lean",
+      "sha256": "344afaf5e9c103de711e00989f9be3ccf000d91740a65b840eb56a1b3984bb70"
+    },
+    {
+      "commit": "9eef38b6a1117924fcf6476671ec21c3d4dd8a6b",
+      "path": "DarkTower/WarMachine/MachineDepth.lean",
+      "sha256": "ba3b7ca7fb5eb8ba405db3c78d41a91a3f916b5c1e391b49387700a2e262871d"
+    },
+    {
+      "commit": "a4c2276d515730a32db27f97f1fd955a9bae1433",
+      "path": "DarkTower/WarMachine/MachineObservation.lean",
+      "sha256": "f864610a2d794b57fa18d8b3b457faf7c426015f4c01ec5c989df292adbb10a0"
+    },
+    {
+      "commit": "e2e8ee9649908a5564da6237b7d8def80a4bbaf5",
+      "path": "DarkTower/WarMachine/MachinePrecision.lean",
+      "sha256": "d8eb677df9e402b93ee7e7c67eef19840dcb20f6000527a2a3defa6c7b21d1de"
+    },
+    {
+      "commit": "1282b75e3223d3f94d536ebabbb5b4125989722d",
+      "path": "DarkTower/WarMachine/MachinePredictionError.lean",
+      "sha256": "86c68198ec18fb072c5035c989fdf8e3ef61965b6f12f8ef7994be59bd19014f"
+    },
+    {
+      "commit": "b31e5db2e494a0f11c4c35077c25d7399b1d19c9",
+      "path": "DarkTower/WarMachine/MachineTemperature.lean",
+      "sha256": "6809fb9cac3d43092b0a8e9eefd8cde5a823a7ff072d56d878de71291453b6ba"
+    },
+    {
+      "commit": "17fb61d038deadc88e04f651a618ea8013f11b99",
+      "path": "DarkTower/WarMachine/TokenState.lean",
+      "sha256": "c9dbf5c07fa6f41f1eb5973add0479683cf3de914994b114daf19ea2c984a85a"
+    }
+  ]
+}

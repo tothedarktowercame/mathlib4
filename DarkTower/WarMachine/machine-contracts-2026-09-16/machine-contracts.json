@@ -1,0 +1,292 @@
+{
+  "contracts": [
+    {
+      "contract-id": "wm-machine-observe",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/observation.clj:103",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachineObservationWitness.lean:1",
+          "falsifier": "Envelope variant/value mismatch is accepted, or declared coordinate reference differs.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-observe/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachineObservation.machineObservation",
+          "owner": "R2: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachineObservation.machineObservation",
+          "source": {
+            "git-sha": "a4c2276d515730a32db27f97f1fd955a9bae1433",
+            "module": "DarkTower.WarMachine.MachineObservation",
+            "sha256": "f864610a2d794b57fa18d8b3b457faf7c426015f4c01ec5c989df292adbb10a0"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "a4c2276d515730a32db27f97f1fd955a9bae1433",
+        "module": "DarkTower.WarMachine.MachineObservation",
+        "sha256": "f864610a2d794b57fa18d8b3b457faf7c426015f4c01ec5c989df292adbb10a0"
+      }
+    },
+    {
+      "contract-id": "wm-machine-belief-state",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/belief.clj:510",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachineBeliefStateWitness.lean:1",
+          "falsifier": "Carry loses a surviving posterior, loses a new prior, or retains an absent entity.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-belief-state/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachineBeliefState.machineBeliefState",
+          "owner": "R1: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachineBeliefState.machineBeliefState",
+          "source": {
+            "git-sha": "3a8e26f61e2ef3f4e96c92c96d39743442133db9",
+            "module": "DarkTower.WarMachine.MachineBeliefState",
+            "sha256": "da2c648860c1a4ee48f58106c5f7fc60a5150d914bc2089a2440eea801a7521e"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "3a8e26f61e2ef3f4e96c92c96d39743442133db9",
+        "module": "DarkTower.WarMachine.MachineBeliefState",
+        "sha256": "da2c648860c1a4ee48f58106c5f7fc60a5150d914bc2089a2440eea801a7521e"
+      }
+    },
+    {
+      "contract-id": "wm-machine-belief-update",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/belief.clj:297",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachineBeliefUpdateWitness.lean:1",
+          "falsifier": "Zero inconsistency moves a normalized prior, or declared categorical tempering differs.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-belief-update/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachineBeliefUpdate.machineBeliefUpdate",
+          "owner": "R3: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachineBeliefUpdate.machineBeliefUpdate",
+          "source": {
+            "git-sha": "0e89cc1cb5622b252b43ced54dbfa65959043a5b",
+            "module": "DarkTower.WarMachine.MachineBeliefUpdate",
+            "sha256": "344afaf5e9c103de711e00989f9be3ccf000d91740a65b840eb56a1b3984bb70"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "0e89cc1cb5622b252b43ced54dbfa65959043a5b",
+        "module": "DarkTower.WarMachine.MachineBeliefUpdate",
+        "sha256": "344afaf5e9c103de711e00989f9be3ccf000d91740a65b840eb56a1b3984bb70"
+      }
+    },
+    {
+      "contract-id": "wm-machine-precision",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/precision.clj:116",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachinePrecisionWitness.lean:1",
+          "falsifier": "Window variance, separate-mode salience, floor or cap disagrees with declared parameters.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-precision/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachinePrecision.machinePrecision",
+          "owner": "R7: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachinePrecision.machinePrecision",
+          "source": {
+            "git-sha": "e2e8ee9649908a5564da6237b7d8def80a4bbaf5",
+            "module": "DarkTower.WarMachine.MachinePrecision",
+            "sha256": "d8eb677df9e402b93ee7e7c67eef19840dcb20f6000527a2a3defa6c7b21d1de"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "e2e8ee9649908a5564da6237b7d8def80a4bbaf5",
+        "module": "DarkTower.WarMachine.MachinePrecision",
+        "sha256": "d8eb677df9e402b93ee7e7c67eef19840dcb20f6000527a2a3defa6c7b21d1de"
+      }
+    },
+    {
+      "contract-id": "wm-machine-depth",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/efe.clj:633",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachineDepthWitness.lean:1",
+          "falsifier": "Four-term depth tuple differs; a single-depth claim hides unequal component depths.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-depth/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachineDepth.machineDepth",
+          "owner": "R13: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachineDepth.machineDepth",
+          "source": {
+            "git-sha": "9eef38b6a1117924fcf6476671ec21c3d4dd8a6b",
+            "module": "DarkTower.WarMachine.MachineDepth",
+            "sha256": "ba3b7ca7fb5eb8ba405db3c78d41a91a3f916b5c1e391b49387700a2e262871d"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "9eef38b6a1117924fcf6476671ec21c3d4dd8a6b",
+        "module": "DarkTower.WarMachine.MachineDepth",
+        "sha256": "ba3b7ca7fb5eb8ba405db3c78d41a91a3f916b5c1e391b49387700a2e262871d"
+      }
+    },
+    {
+      "contract-id": "wm-machine-temperature",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/policy.clj:77",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachineTemperatureWitness.lean:1",
+          "falsifier": "Wrong mode temperature, floored valid beta, or accepted invalid variational beta.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-temperature/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachineTemperature.machineTemperature",
+          "owner": "R14: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachineTemperature.machineTemperature",
+          "source": {
+            "git-sha": "b31e5db2e494a0f11c4c35077c25d7399b1d19c9",
+            "module": "DarkTower.WarMachine.MachineTemperature",
+            "sha256": "6809fb9cac3d43092b0a8e9eefd8cde5a823a7ff072d56d878de71291453b6ba"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "b31e5db2e494a0f11c4c35077c25d7399b1d19c9",
+        "module": "DarkTower.WarMachine.MachineTemperature",
+        "sha256": "6809fb9cac3d43092b0a8e9eefd8cde5a823a7ff072d56d878de71291453b6ba"
+      }
+    },
+    {
+      "contract-id": "wm-machine-action",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/policy.clj:672",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachineActionWitness.lean:1",
+          "falsifier": "Declared boundary/law choice, tie rule, fallback or no-op exclusion differs.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-action/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachineAction.machineAction",
+          "owner": "R16: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachineAction.machineAction",
+          "source": {
+            "git-sha": "461720489008ecadc5eef01f4cc1c0c323e7b86f",
+            "module": "DarkTower.WarMachine.MachineAction",
+            "sha256": "473182ceb96aba566ff2803d1fbf6f13154d3713d3c95d314180a676574bc692"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "461720489008ecadc5eef01f4cc1c0c323e7b86f",
+        "module": "DarkTower.WarMachine.MachineAction",
+        "sha256": "473182ceb96aba566ff2803d1fbf6f13154d3713d3c95d314180a676574bc692"
+      }
+    },
+    {
+      "contract-id": "wm-machine-prediction-error",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/free_energy.clj:203",
+          "decided": "2026-09-12",
+          "evidence": "mathlib4/DarkTower/WarMachine/MachinePredictionErrorWitness.lean:1",
+          "falsifier": "Prediction triple refusal/absence/present precedence or observed-minus-mean differs.",
+          "fixture": "futon2/holes/labs/wm-contract/runs/F8-prediction-error/clojure-readback.txt:1",
+          "holder": "model-transcription-only",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.MachinePredictionError.machineChannelPredictionError",
+          "owner": "R3a-host-proposed: machine-model transcription; no runtime correspondence claim",
+          "signature": "checked-reference:DarkTower.WarMachine.MachinePredictionError.machineChannelPredictionError",
+          "source": {
+            "git-sha": "1282b75e3223d3f94d536ebabbb5b4125989722d",
+            "module": "DarkTower.WarMachine.MachinePredictionError",
+            "sha256": "86c68198ec18fb072c5035c989fdf8e3ef61965b6f12f8ef7994be59bd19014f"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "1282b75e3223d3f94d536ebabbb5b4125989722d",
+        "module": "DarkTower.WarMachine.MachinePredictionError",
+        "sha256": "86c68198ec18fb072c5035c989fdf8e3ef61965b6f12f8ef7994be59bd19014f"
+      }
+    },
+    {
+      "contract-id": "wm-token-state",
+      "declarations": [
+        {
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:114",
+          "decided": "2026-09-16",
+          "evidence": "mathlib4/DarkTower/WarMachine/TokenState.lean:45",
+          "falsifier": "The runtime row is not a point mass summing to 1 on the observed token set.",
+          "fixture": "futon2/test/futon2/aif/cascade_model_manifest_test.clj:58",
+          "holder": "runtime-correspondence-not-live-path",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.TokenState.observedBelief",
+          "owner": "WM-02 (P2/P4): point-mass q0 on the observed token set",
+          "signature": "checked-reference:DarkTower.WarMachine.TokenState.observedBelief",
+          "source": {
+            "git-sha": "17fb61d038deadc88e04f651a618ea8013f11b99",
+            "module": "DarkTower.WarMachine.TokenState",
+            "sha256": "c9dbf5c07fa6f41f1eb5973add0479683cf3de914994b114daf19ea2c984a85a"
+          }
+        },
+        {
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:124",
+          "decided": "2026-09-16",
+          "evidence": "mathlib4/DarkTower/WarMachine/TokenState.lean:136",
+          "falsifier": "(independent-belief {\"t0\" 3/2 \"t1\" 1/2} #{\"t0\" \"t1\"}) does not refuse with :invalid-token-probability; or all-0/1 probabilities do not reduce to observed-belief (independentBelief_eq_observedBelief, TokenState.lean:153).",
+          "fixture": "futon2/test/futon2/aif/cascade_model_manifest_test.clj:71",
+          "holder": "runtime-correspondence-not-live-path",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.TokenState.independentBelief",
+          "owner": "WM-02 (P2/P4): independent-token q0 over the token powerset",
+          "signature": "checked-reference:DarkTower.WarMachine.TokenState.independentBelief",
+          "source": {
+            "git-sha": "17fb61d038deadc88e04f651a618ea8013f11b99",
+            "module": "DarkTower.WarMachine.TokenState",
+            "sha256": "c9dbf5c07fa6f41f1eb5973add0479683cf3de914994b114daf19ea2c984a85a"
+          }
+        },
+        {
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:145",
+          "decided": "2026-09-16",
+          "evidence": "mathlib4/DarkTower/WarMachine/TokenState.lean:56",
+          "falsifier": "(coverage #{} state) does not refuse with :empty-want-signature; or coverage leaves [0,1], is 1 without want ⊆ s, or decreases as s grows (coverage_le_one :60, coverage_eq_one_iff :65, coverage_mono :83).",
+          "fixture": "futon2/test/futon2/aif/cascade_model_manifest_test.clj:71",
+          "holder": "runtime-correspondence-not-live-path",
+          "kind": "closed",
+          "name": "DarkTower.WarMachine.TokenState.coverage",
+          "owner": "WM-02 (P2): want-signature coverage |want ∩ s| / |want|",
+          "signature": "checked-reference:DarkTower.WarMachine.TokenState.coverage",
+          "source": {
+            "git-sha": "17fb61d038deadc88e04f651a618ea8013f11b99",
+            "module": "DarkTower.WarMachine.TokenState",
+            "sha256": "c9dbf5c07fa6f41f1eb5973add0479683cf3de914994b114daf19ea2c984a85a"
+          }
+        }
+      ],
+      "schema-version": 1,
+      "source": {
+        "git-sha": "17fb61d038deadc88e04f651a618ea8013f11b99",
+        "module": "DarkTower.WarMachine.TokenState",
+        "sha256": "c9dbf5c07fa6f41f1eb5973add0479683cf3de914994b114daf19ea2c984a85a"
+      }
+    }
+  ],
+  "schema": "wm-machine-contract-bundle-v1",
+  "scope": "per-entry-holder"
+}
