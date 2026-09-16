@@ -6,10 +6,16 @@ import DarkTower.WarMachine.MachineDepth
 import DarkTower.WarMachine.MachineTemperature
 import DarkTower.WarMachine.MachineAction
 import DarkTower.WarMachine.MachinePredictionError
+import DarkTower.WarMachine.TokenState
 
 /-!
-Leaf registry for machine-model transcription. Checked name quotations bind each
-reference to an elaborated declaration. No runtime certification is asserted.
+Leaf registry for the War Machine's Lean→Clojure contracts. Checked name quotations
+bind each reference to an elaborated declaration. Each entry's `holder` states its
+claim: `model-transcription-only` entries (2026-09-12) assert no runtime
+correspondence; `runtime-correspondence-not-live-path` entries assert that the named
+Clojure function computes the Lean declaration, checked by the named behavioural
+fixture test, and that the function is not yet called on the live War Machine path
+(`p4ng/wm-walkthroughs/build-loop/closure/ALIGNMENT.md` item 4).
 Registration date is the date of this registry, not a historical closure date.
 Holes imports none of these registries. The companion script pins emitted bytes
 and checks each owning source against its committed tree before and after emission.
@@ -23,6 +29,17 @@ private def entry (decl : Name) (owner locus fixture evidence falsifier : String
     owner := owner, holder := "model-transcription-only", decided := "2026-09-12"
     clojureLocus := some locus, fixture := some fixture
     evidence := some evidence, falsifier := some falsifier }
+
+/-- An aligned entry: a runtime function that computes the Lean declaration. -/
+private def runtimeEntry (decl : Name) (holder decided owner locus fixture evidence falsifier : String) :
+    DarkTower.Contract.Emit.Declaration :=
+  { name := decl.toString, kind := .closed
+    signature := "checked-reference:" ++ decl.toString
+    owner := owner, holder := holder, decided := decided
+    clojureLocus := some locus, fixture := some fixture
+    evidence := some evidence, falsifier := some falsifier }
+
+private def notLivePath : String := "runtime-correspondence-not-live-path"
 
 def registries : List Registry := [
   { schemaVersion := 1, contractId := "wm-machine-observe",
@@ -88,7 +105,28 @@ def registries : List Registry := [
       "futon2/src/futon2/aif/free_energy.clj:203"
       "futon2/holes/labs/wm-contract/runs/F8-prediction-error/clojure-readback.txt:1"
       "mathlib4/DarkTower/WarMachine/MachinePredictionErrorWitness.lean:1"
-      "Prediction triple refusal/absence/present precedence or observed-minus-mean differs."] }
+      "Prediction triple refusal/absence/present precedence or observed-minus-mean differs."] },
+  { schemaVersion := 1, contractId := "wm-token-state",
+    moduleName := "DarkTower.WarMachine.TokenState",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.TokenState.observedBelief notLivePath "2026-09-16"
+        "WM-02 (P2/P4): point-mass q0 on the observed token set"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:114"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:58"
+        "mathlib4/DarkTower/WarMachine/TokenState.lean:45"
+        "The runtime row is not a point mass summing to 1 on the observed token set.",
+      runtimeEntry ``DarkTower.WarMachine.TokenState.independentBelief notLivePath "2026-09-16"
+        "WM-02 (P2/P4): independent-token q0 over the token powerset"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:124"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:71"
+        "mathlib4/DarkTower/WarMachine/TokenState.lean:136"
+        "(independent-belief {\"t0\" 3/2 \"t1\" 1/2} #{\"t0\" \"t1\"}) does not refuse with :invalid-token-probability; or all-0/1 probabilities do not reduce to observed-belief (independentBelief_eq_observedBelief, TokenState.lean:153).",
+      runtimeEntry ``DarkTower.WarMachine.TokenState.coverage notLivePath "2026-09-16"
+        "WM-02 (P2): want-signature coverage |want ∩ s| / |want|"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:145"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:71"
+        "mathlib4/DarkTower/WarMachine/TokenState.lean:56"
+        "(coverage #{} state) does not refuse with :empty-want-signature; or coverage leaves [0,1], is 1 without want ⊆ s, or decreases as s grows (coverage_le_one :60, coverage_eq_one_iff :65, coverage_mono :83)."] }
   ]
 
 def main : IO Unit := do
@@ -97,6 +135,6 @@ def main : IO Unit := do
     pure (r.toJson commit)
   IO.println (Json.mkObj [
     ("schema", Json.str "wm-machine-contract-bundle-v1"),
-    ("scope", Json.str "model-transcription-only"),
+    ("scope", Json.str "per-entry-holder"),
     ("contracts", Json.arr contracts.toArray)]).compress
 end DarkTower.WarMachine.MachineContracts

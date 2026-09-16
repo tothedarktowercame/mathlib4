@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit/verify the machine-transcription bundle; never regenerate Holes.
+"""Emit/verify the machine contract bundle; never regenerate Holes.
 
 Manifest pins contract bytes separately (no circular self-digest). Git revisions
 pin ownership; SHA-256 pins exact bytes. Run from the canonical mathlib checkout.
@@ -19,8 +19,14 @@ NAMES = dict(zip(
     ['machineObservation', 'machineBeliefState', 'machineBeliefUpdate',
      'machinePrecision', 'machineDepth', 'machineTemperature', 'machineAction',
      'machineChannelPredictionError']))
-EXPECTED = {PREFIX + 'Machine' + k: PREFIX + 'Machine' + k + '.' + v
+EXPECTED = {PREFIX + 'Machine' + k: [PREFIX + 'Machine' + k + '.' + v]
             for k, v in NAMES.items()}
+# Aligned modules (ALIGNMENT.md): runtime-correspondence entries, possibly several per module.
+EXPECTED[PREFIX + 'TokenState'] = [PREFIX + 'TokenState.' + n
+                                   for n in ['observedBelief', 'independentBelief', 'coverage']]
+HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
+SCOPE = 'per-entry-holder'
+SCHEMA = 'wm-machine-contract-manifest-v2'
 EMITTER = 'DarkTower/WarMachine/MachineContracts.lean'
 HOLES = 'DarkTower/WarMachine/holes-contract.json'
 TEN = {'name', 'kind', 'signature', 'owner', 'holder', 'decided',
@@ -78,9 +84,9 @@ def encode(value):
 
 def verify(manifest_path):
     m = strict_json(manifest_path.read_bytes())
-    require(m['schema'] == 'wm-machine-contract-manifest-v1', 'manifest schema')
+    require(m['schema'] == SCHEMA, 'manifest schema')
     require(m['expected-modules'] == sorted([PREFIX + 'Holes', *EXPECTED]), 'population')
-    require(m['scope'] == 'model-transcription-only', 'scope')
+    require(m['scope'] == SCOPE, 'scope')
     expected_paths = {EMITTER, 'scripts/emit-machine-contracts.py',
                       'scripts/emit_machine_contracts.lean', 'DarkTower/Contract/Emit.lean', 'lean-toolchain',
                       *[k.replace('.', '/') + '.lean' for k in EXPECTED],
@@ -106,26 +112,26 @@ def verify(manifest_path):
     require(bundle['schema'] == 'wm-machine-contract-bundle-v1' and
             bundle['scope'] == m['scope'], 'bundle schema/scope')
     contracts = bundle['contracts']
-    require(len(contracts) == 8 and {c['source']['module'] for c in contracts} == set(EXPECTED),
-            'module population')
-    require(len({c['contract-id'] for c in contracts}) == 8, 'duplicate contract id')
+    require(len(contracts) == len(EXPECTED) and
+            {c['source']['module'] for c in contracts} == set(EXPECTED), 'module population')
+    require(len({c['contract-id'] for c in contracts}) == len(EXPECTED), 'duplicate contract id')
     for c in contracts:
         mod = c['source']['module']
         p = sources[mod.replace('.', '/') + '.lean']
         require(c['schema-version'] == 1 and c['source'] ==
                 {'module': mod, 'git-sha': p['commit'], 'sha256': p['sha256']}, 'module ownership')
-        require(len(c['declarations']) == 1, 'declaration population')
-        d = c['declarations'][0]
-        require(set(d) == TEN | {'source'}, 'declaration fields')
-        require(all(isinstance(d[k], str) and d[k].strip() for k in TEN), 'missing entry metadata')
-        require(d['source'] == c['source'] and d['name'] == EXPECTED[mod], 'entry identity')
-        require(d['signature'] == 'checked-reference:' + d['name'], 'checked reference')
-        require(d['kind'] == 'closed' and d['holder'] == 'model-transcription-only', 'disposition')
-        for key in ['fixture', 'evidence', 'clojure-locus']:
-            path, line = d[key].rsplit(':', 1)
-            target = ROOT.parent / path
-            require(target.resolve().is_relative_to(ROOT.parent) and target.is_file(), 'unresolved ' + key)
-            require(1 <= int(line) <= len(target.read_text().splitlines()), 'bad pointer ' + key)
+        require([d['name'] for d in c['declarations']] == EXPECTED[mod], 'declaration population')
+        for d in c['declarations']:
+            require(set(d) == TEN | {'source'}, 'declaration fields')
+            require(all(isinstance(d[k], str) and d[k].strip() for k in TEN), 'missing entry metadata')
+            require(d['source'] == c['source'], 'entry identity')
+            require(d['signature'] == 'checked-reference:' + d['name'], 'checked reference')
+            require(d['kind'] == 'closed' and d['holder'] in HOLDERS, 'disposition')
+            for key in ['fixture', 'evidence', 'clojure-locus']:
+                path, line = d[key].rsplit(':', 1)
+                target = ROOT.parent / path
+                require(target.resolve().is_relative_to(ROOT.parent) and target.is_file(), 'unresolved ' + key)
+                require(1 <= int(line) <= len(target.read_text().splitlines()), 'bad pointer ' + key)
     return m
 
 
@@ -145,7 +151,7 @@ def emit(destination):
         for d in c['declarations']:
             d['source'] = dict(c['source'])
     raw = encode(bundle)
-    manifest = {'schema': 'wm-machine-contract-manifest-v1', 'scope': 'model-transcription-only',
+    manifest = {'schema': SCHEMA, 'scope': SCOPE,
                 'expected-modules': sorted([PREFIX + 'Holes', *EXPECTED]),
                 'sources': pins, 'holes-component': {'path': HOLES, 'sha256': digest(holes_bytes)},
                 'bundle': {'file': 'machine-contracts.json', 'sha256': digest(raw)}}
@@ -178,6 +184,7 @@ if __name__ == '__main__':
             emit(args.directory)
         else:
             verify(args.manifest)
-        print('PASS: eight machine contracts plus unchanged Holes; source and contract pins verified')
+        print('PASS: %d machine contracts plus unchanged Holes; source and contract pins verified'
+              % len(EXPECTED))
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, 'REFUSED: ' + str(exc) + '\n')
