@@ -216,5 +216,113 @@ private theorem oneStep (prec : List (InterpretedPattern (Fin 3)))
   simp only [Finset.mem_univ, if_true]
   rfl
 
+/-- The policy: precedence `[p1, p2]` at step 0, reversed `[p2, p1]` at step 1
+and after. -/
+private def fπ (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1) (h2 : 0 ≤ t2) (h2' : t2 ≤ 1) :
+    ℕ → List (InterpretedPattern (Fin 3)) := fun n =>
+  if n = 0 then fprec0 t1 t2 h1 h1' h2 h2' else fprec1 t1 t2 h1 h1' h2 h2'
+
+theorem fixture_rollout_two (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
+    (h2 : 0 ≤ t2) (h2' : t2 ≤ 1) :
+    rolloutState fModel (fπ t1 t2 h1 h1' h2 h2') 2 Finset.univ = t1 * t2 := by
+  -- Step 2 is the kernel at π 1 composed with the step-1 distribution.
+  have hr : rolloutState fModel (fπ t1 t2 h1 h1' h2 h2') 2 Finset.univ
+      = ∑ s : Finset (Fin 3), cascadeKernel (fprec1 t1 t2 h1 h1' h2 h2') s Finset.univ
+          * rolloutState fModel (fπ t1 t2 h1 h1' h2 h2') 1 s := by
+    have hr0 : ∀ s'' : Finset (Fin 3), rolloutState fModel (fπ t1 t2 h1 h1' h2 h2') 2 s''
+        = ∑ s : Finset (Fin 3), fModel.B (fπ t1 t2 h1 h1' h2 h2' 1) s s''
+            * rolloutState fModel (fπ t1 t2 h1 h1' h2 h2') 1 s := fun _ => rfl
+    rw [hr0]
+    have hp1 : fπ t1 t2 h1 h1' h2 h2' 1 = fprec1 t1 t2 h1 h1' h2 h2' := by simp [fπ]
+    rw [hp1]
+    exact Finset.sum_congr rfl fun s _ => rfl
+  -- Step 1 is the p1 kernel at ∅: mass t1 at {0,1}, 1 - t1 at ∅.
+  have hroll1 : ∀ s : Finset (Fin 3),
+      rolloutState fModel (fπ t1 t2 h1 h1' h2 h2') 1 s
+        = (if s = ({0, 1} : Finset (Fin 3)) then t1 else 0)
+          + (if s = ∅ then 1 - t1 else 0) := by
+    intro s
+    rw [oneStep _ _ (show fπ t1 t2 h1 h1' h2 h2' 0 = fprec0 t1 t2 h1 h1' h2 h2' by
+        simp [fπ]) s, cascadeKernel,
+      show firstEnabled (fprec0 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
+        simp [fprec0, firstEnabled, fp1, fp2]]
+    simp [patternKernel, fp1]
+  -- A two-point mass sums against any kernel at its two support points.
+  have hsum2 : ∀ (k : Finset (Fin 3) → ℝ) (a b : Finset (Fin 3)) (u v : ℝ),
+      (∑ s : Finset (Fin 3), k s * ((if s = a then u else 0) + (if s = b then v else 0)))
+        = u * k a + v * k b := by
+    intro k a b u v
+    have step : ∀ s : Finset (Fin 3),
+        k s * ((if s = a then u else 0) + (if s = b then v else 0))
+          = (if s = a then k s * u else 0) + (if s = b then k s * v else 0) := by
+      intro s
+      rw [mul_add]
+      split_ifs <;> ring
+    rw [Finset.sum_congr rfl fun s _ => step s, Finset.sum_add_distrib]
+    simp only [Finset.sum_ite_eq', Finset.mem_univ, if_true]
+    ring
+  -- Evaluate the kernel at the two support points.
+  have hu : (Finset.univ : Finset (Fin 3)) = {0, 1, 2} := by decide
+  have hu2 : ({0, 1} : Finset (Fin 3)) ∪ {2} = {0, 1, 2} := by decide
+  have hu0 : (∅ : Finset (Fin 3)) ∪ {0, 1} = {0, 1} := by decide
+  have hne : (Finset.univ : Finset (Fin 3)) ≠ {0, 1} := by decide
+  have hne' : (Finset.univ : Finset (Fin 3)) ≠ ∅ := by decide
+  have ha : cascadeKernel (fprec1 t1 t2 h1 h1' h2 h2') ({0, 1} : Finset (Fin 3))
+      Finset.univ = t2 := by
+    rw [cascadeKernel,
+      show firstEnabled (fprec1 t1 t2 h1 h1' h2 h2') {0, 1} = some (fp2 t2 h2 h2') by
+        simp [fprec1, firstEnabled, fp2]]
+    simp only [patternKernel, fp2]
+    rw [hu2, if_pos hu, if_neg hne]
+    ring
+  have hb : cascadeKernel (fprec1 t1 t2 h1 h1' h2 h2') (∅ : Finset (Fin 3))
+      Finset.univ = 0 := by
+    rw [cascadeKernel,
+      show firstEnabled (fprec1 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
+        simp [fprec1, firstEnabled, fp1, fp2]]
+    simp only [patternKernel, fp1]
+    rw [hu0, if_neg hne, if_neg hne']
+    ring
+  rw [hr, Finset.sum_congr rfl fun s _ => by rw [hroll1 s],
+    hsum2 (fun s => cascadeKernel (fprec1 t1 t2 h1 h1' h2 h2') s Finset.univ)
+      ({0, 1} : Finset (Fin 3)) ∅ t1 (1 - t1), ha, hb]
+  ring
+
+/-- With θ₁ = θ₂ = 1 the two-step rollout from `∅` reaches the full state
+with probability θ₁ · θ₂ = 1. -/
+theorem fixture_rollout_two_one :
+    rolloutState fModel (fπ 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)) 2
+      Finset.univ = 1 := by
+  rw [fixture_rollout_two 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)]
+  norm_num
+
+/-- Reversed precedence gives the same one-step result, because at `∅` only
+`p1` is enabled in either order. -/
+theorem fixture_one_step_reversed (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
+    (h2 : 0 ≤ t2) (h2' : t2 ≤ 1) (s' : Finset (Fin 3)) :
+    rolloutState fModel (fun _ => fprec1 t1 t2 h1 h1' h2 h2') 1 s'
+      = rolloutState fModel (fπ t1 t2 h1 h1' h2 h2') 1 s' := by
+  rw [oneStep (fprec1 t1 t2 h1 h1' h2 h2') (fun _ => fprec1 t1 t2 h1 h1' h2 h2')
+      (rfl) s',
+    oneStep (fprec0 t1 t2 h1 h1' h2 h2') (fπ t1 t2 h1 h1' h2 h2')
+      (show fπ t1 t2 h1 h1' h2 h2' 0 = fprec0 t1 t2 h1 h1' h2 h2' by simp [fπ]) s',
+    cascadeKernel,
+    show firstEnabled (fprec1 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
+      simp [fprec1, firstEnabled, fp1, fp2],
+    cascadeKernel,
+    show firstEnabled (fprec0 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
+      simp [fprec0, firstEnabled, fp1, fp2]]
+
+#print axioms patternKernel_nonneg
+#print axioms patternKernel_rowsum
+#print axioms patternKernel_of_achieved
+#print axioms cascadeKernel_nonneg
+#print axioms cascadeKernel_rowsum
+#print axioms cascadeKernel_of_noEnabled
+#print axioms interpret_eq_none_iff
+#print axioms fixture_rollout_two
+#print axioms fixture_rollout_two_one
+#print axioms fixture_one_step_reversed
+
 end DarkTower.WarMachine.CascadeTransition
 
