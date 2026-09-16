@@ -54,6 +54,34 @@ theorem policySeq_lt {T : ℕ} (hT : 0 < T) (π : Fin T → U) (n : ℕ) (h : n 
     policySeq hT π n = π ⟨n, h⟩ := by
   simp only [policySeq, dif_pos h]
 
+/-- `Q(s_τ | π)` reads only the first `τ` actions: two action sequences that
+agree before `τ` give the same predicted state at `τ`. -/
+theorem rolloutState_congr (M : ForwardModel S O U) {π π' : ℕ → U} (τ : ℕ)
+    (h : ∀ n < τ, π n = π' n) : rolloutState M π τ = rolloutState M π' τ := by
+  induction τ with
+  | zero => rfl
+  | succ n ih =>
+    funext s'
+    rw [rolloutState_succ, rolloutState_succ, h n (Nat.lt_succ_self n),
+      ih fun m hm => h m (Nat.lt_succ_of_lt hm)]
+
+/-- The depth-`T` rollout of a policy `π = (u_1, …, u_T)`, at `τ ≤ T`. -/
+noncomputable def rolloutAt (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T)
+    (π : Fin T → U) (τ : Fin (T + 1)) : S → ℝ :=
+  rolloutState M (policySeq hT π) τ
+
+/-- The padding `policySeq` uses past the horizon is never read: at any
+`τ ≤ T`, every action sequence extending `π` gives the same predicted state. -/
+theorem rolloutAt_eq_of_extends (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T)
+    (π : Fin T → U) (τ : Fin (T + 1)) (σ : ℕ → U)
+    (hσ : ∀ n (h : n < T), σ n = π ⟨n, h⟩) :
+    rolloutAt M hT π τ = rolloutState M σ τ := by
+  unfold rolloutAt
+  apply rolloutState_congr
+  intro n hn
+  have hnT : n < T := lt_of_lt_of_le hn (Nat.lt_succ_iff.mp τ.isLt)
+  rw [policySeq_lt hT π n hnT, hσ n hnT]
+
 theorem rolloutState_nonneg (M : ForwardModel S O U) (π : ℕ → U) (n : ℕ) (s : S) :
     0 ≤ rolloutState M π n s := by
   induction n generalizing s with
