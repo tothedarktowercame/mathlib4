@@ -26,7 +26,7 @@ EXPECTED[PREFIX + 'TokenState'] = [PREFIX + 'TokenState.' + n
                                    for n in ['observedBelief', 'independentBelief', 'coverage']]
 EXPECTED[PREFIX + 'CascadeTransition'] = [PREFIX + 'CascadeTransition.' + n
                                           for n in ['patternKernel', 'firstEnabled', 'cascadeKernel', 'interpret',
-                                                    'guard', 'firstEnabled', 'cascadeKernel']]
+                                                    'guard', 'firstEnabled', 'cascadeKernel', 'cascadeKernel']]
 EXPECTED[PREFIX + 'PolicyRollout'] = [PREFIX + 'PolicyRollout.rolloutState',
                                       PREFIX + 'PolicyRollout.predictedOutcome']
 EXPECTED[PREFIX + 'TokenObservation'] = [PREFIX + 'TokenObservation.tokenLikelihood',
@@ -43,10 +43,11 @@ EXPECTED[PREFIX + 'ExactBeliefTrajectory'] = [PREFIX + 'ExactBeliefTrajectory.ex
 EXPECTED[PREFIX + 'PolicySelection'] = [PREFIX + 'PolicySelection.selectionPosterior']
 EXPECTED[PREFIX + 'ActionMarginal'] = [PREFIX + 'ActionMarginal.IsBayesAction']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path',
-           'runtime-correspondence-live-shadow', 'runtime-correspondence-lagging'}
+           'runtime-correspondence-live-shadow', 'runtime-correspondence-live-enactment',
+           'runtime-correspondence-lagging'}
 # 'runtime-correspondence-live-selection' is reserved for P11 step 3 and is refused
 # until Joe's word adds it here.
-LIVE_HOLDERS = {'runtime-correspondence-live-shadow'}
+LIVE_HOLDERS = {'runtime-correspondence-live-shadow', 'runtime-correspondence-live-enactment'}
 LIVE_SITE_RE = __import__('re').compile(r'live-call-site=(\S+):(\d+)')
 # Runtime-correspondence entries must point at the named forms, not merely at an
 # existing line: pointer -> (form head, name) expected at that line. A locus that
@@ -81,6 +82,9 @@ RUNTIME_FORMS = {
          'evidence': ('theorem', 'cascadeKernel_rowsum')},
         {'clojure-locus': ('defn', 'cascade-kernel'),
          'fixture': ('deftest', 'cascade-transition-p10-five-situations'),
+         'evidence': ('theorem', 'fixture_situation_v_renewal')},
+        {'clojure-locus': ('defn', 'acting-order'),
+         'fixture': ('deftest', 'acting-order-rechecks-guards-and-completes-by-achievement'),
          'evidence': ('theorem', 'fixture_situation_v_renewal')}],
     PREFIX + 'PolicySelection.selectionPosterior': {
         'clojure-locus': ('defn', 'selection-posterior'),

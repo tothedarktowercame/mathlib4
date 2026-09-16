@@ -44,6 +44,19 @@ while i < len(lines):
             best = (dist, new, opt)
     if best is None:
         problems.append(f'{name} at MachineContracts line {i+1}: no option resolves uniquely'); i += 1; continue
+    site = re.search(r'live-call-site=(\S+):(\d+)', lines[i + 1])
+    if site:
+        fn = best[2]['clojure-locus'][1]
+        src = emit.committed_lines(site.group(1))
+        pat = re.compile(r'(^|[\s(/])' + re.escape(fn) + r'([\s)]|$)')
+        hits = [n + 1 for n, l in enumerate(src) if pat.search(l) and not emit.form_at(l)[0] in ('defn', 'deftest')]
+        if len(hits) == 1:
+            if hits[0] != int(site.group(2)):
+                changes.append(f'{name}: live-call-site {site.group(1)} {site.group(2)} -> {hits[0]}')
+                lines[i + 1] = lines[i + 1].replace(f'live-call-site={site.group(1)}:{site.group(2)}',
+                                                    f'live-call-site={site.group(1)}:{hits[0]}', 1)
+        else:
+            problems.append(f'{name}: live-call-site call of {fn} found {len(hits)} times; not rebased')
     for j, p, n in zip(ptr_idx, ptrs, best[1]):
         if int(p.group(2)) != n:
             changes.append(f'{name}: {p.group(1)} {p.group(2)} -> {n}')
