@@ -199,4 +199,29 @@ theorem fixture_policy3_strict (π : Fin 4) (hπ : π ≠ 3) :
   unfold fixtureQ
   exact (div_lt_div_iff_of_pos_right (by positivity)).mpr (Real.exp_lt_exp.mpr hs)
 
+/-! ## State-dependent policy projections
+
+Under the approved cascade design (P3), the action a policy takes at `t` is
+the first enabled pattern in its precedence list at the current state,
+`p*(s_t)`, not a fixed `π_t`. When `s_t` is observed at decision time (P4),
+eq. (11) applies unchanged at that state: the projection is `proj · s_t`. -/
+
+section StateDependent
+
+variable {Policy U State : Type*} [Fintype Policy] [Fintype U] [DecidableEq U]
+
+/-- Eq. (11) at an observed state `s`, for a projection that reads the state. -/
+theorem exists_bayesAction_at_state [Nonempty U] (proj : Policy → State → U)
+    (Q : Policy → ℝ) (s : State) :
+    ∃ u, IsBayesAction (fun π => proj π s) Q u :=
+  exists_bayesAction
+
+/-- At an observed state, the action marginals of a posterior sum to one. -/
+theorem actionMarginal_sum_at_state (proj : Policy → State → U) (Q : Policy → ℝ)
+    (s : State) (hsum : ∑ π, Q π = 1) :
+    ∑ u, actionMarginal (fun π => proj π s) Q u = 1 :=
+  actionMarginal_sum hsum
+
+end StateDependent
+
 end DarkTower.WarMachine.ActionMarginal
