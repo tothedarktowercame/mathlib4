@@ -25,6 +25,36 @@ EXPECTED = {PREFIX + 'Machine' + k: [PREFIX + 'Machine' + k + '.' + v]
 EXPECTED[PREFIX + 'TokenState'] = [PREFIX + 'TokenState.' + n
                                    for n in ['observedBelief', 'independentBelief', 'coverage']]
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
+# Runtime-correspondence entries must point at the named forms, not merely at an
+# existing line: pointer -> (form head, name) expected at that line. A locus that
+# drifts onto another defn/deftest/theorem refuses (ALIGNMENT.md item 5).
+RUNTIME_FORMS = {
+    PREFIX + 'TokenState.observedBelief': {
+        'clojure-locus': ('defn', 'observed-belief'),
+        'fixture': ('deftest', 'token-state-lean-fixture-correspondence'),
+        'evidence': ('theorem', 'observedBelief_sum')},
+    PREFIX + 'TokenState.independentBelief': {
+        'clojure-locus': ('defn', 'independent-belief'),
+        'fixture': ('deftest', 'token-state-lean-theorem-properties'),
+        'evidence': ('theorem', 'independentBelief_sum')},
+    PREFIX + 'TokenState.coverage': {
+        'clojure-locus': ('defn', 'coverage'),
+        'fixture': ('deftest', 'token-state-lean-theorem-properties'),
+        'evidence': ('theorem', 'coverage_nonneg')},
+}
+
+
+def form_at(line):
+    """(head, name) of a Clojure `(defn name` / `(deftest name` or Lean `theorem name` line."""
+    t = line.strip()
+    if t.startswith('('):
+        parts = t[1:].split()
+        head = parts[0] if parts else ''
+        if head == 'defn-':
+            head = 'defn'
+        return head, (parts[1] if len(parts) > 1 else '')
+    parts = t.split()
+    return (parts[0] if parts else ''), (parts[1] if len(parts) > 1 else '')
 SCOPE = 'per-entry-holder'
 SCHEMA = 'wm-machine-contract-manifest-v2'
 EMITTER = 'DarkTower/WarMachine/MachineContracts.lean'
@@ -127,11 +157,18 @@ def verify(manifest_path):
             require(d['source'] == c['source'], 'entry identity')
             require(d['signature'] == 'checked-reference:' + d['name'], 'checked reference')
             require(d['kind'] == 'closed' and d['holder'] in HOLDERS, 'disposition')
+            runtime = d['holder'] != 'model-transcription-only'
+            require(not runtime or d['name'] in RUNTIME_FORMS, 'runtime entry without named forms: ' + d['name'])
             for key in ['fixture', 'evidence', 'clojure-locus']:
                 path, line = d[key].rsplit(':', 1)
                 target = ROOT.parent / path
                 require(target.resolve().is_relative_to(ROOT.parent) and target.is_file(), 'unresolved ' + key)
-                require(1 <= int(line) <= len(target.read_text().splitlines()), 'bad pointer ' + key)
+                lines = target.read_text().splitlines()
+                require(1 <= int(line) <= len(lines), 'bad pointer ' + key)
+                if runtime:
+                    require(form_at(lines[int(line) - 1]) == RUNTIME_FORMS[d['name']][key],
+                            'pointer does not name the expected form: %s %s -> %r'
+                            % (d['name'], key, lines[int(line) - 1].strip()))
     return m
 
 

@@ -112,19 +112,19 @@ def registries : List Registry := [
       runtimeEntry ``DarkTower.WarMachine.TokenState.observedBelief notLivePath "2026-09-16"
         "WM-02 (P2/P4): point-mass q0 on the observed token set"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:114"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:58"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:59"
         "mathlib4/DarkTower/WarMachine/TokenState.lean:45"
         "The runtime row is not a point mass summing to 1 on the observed token set.",
       runtimeEntry ``DarkTower.WarMachine.TokenState.independentBelief notLivePath "2026-09-16"
         "WM-02 (P2/P4): independent-token q0 over the token powerset"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:124"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:71"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:72"
         "mathlib4/DarkTower/WarMachine/TokenState.lean:136"
         "(independent-belief {\"t0\" 3/2 \"t1\" 1/2} #{\"t0\" \"t1\"}) does not refuse with :invalid-token-probability; or all-0/1 probabilities do not reduce to observed-belief (independentBelief_eq_observedBelief, TokenState.lean:153).",
       runtimeEntry ``DarkTower.WarMachine.TokenState.coverage notLivePath "2026-09-16"
         "WM-02 (P2): want-signature coverage |want ∩ s| / |want|"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:145"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:71"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:72"
         "mathlib4/DarkTower/WarMachine/TokenState.lean:56"
         "(coverage #{} state) does not refuse with :empty-want-signature; or coverage leaves [0,1], is 1 without want ⊆ s, or decreases as s grows (coverage_le_one :60, coverage_eq_one_iff :65, coverage_mono :83)."] }
   ]
