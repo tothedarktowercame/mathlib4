@@ -1,4 +1,5 @@
 import DarkTower.WarMachine.Holes
+import DarkTower.WarMachine.ChannelFintype
 import Mathlib.Probability.Distributions.Gaussian.Real
 
 /-!
@@ -23,11 +24,6 @@ namespace DarkTower.WarMachine.GaussianPolicyFreeEnergy
 
 open DarkTower.WarMachine.Holes
 
-/-- Coverage by type: the fourteen declared channels are the whole type
-(`Holes.lean:1369–1382`). -/
-instance : Fintype Channel := Fintype.ofList Channel.all (by
-  intro x
-  cases x <;> simp [Channel.all])
 
 /-- A per-policy Gaussian predictive distribution: a predictive mean and a
 strictly positive predictive variance at every channel. -/

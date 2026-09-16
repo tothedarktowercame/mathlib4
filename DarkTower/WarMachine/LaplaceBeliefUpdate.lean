@@ -1,4 +1,5 @@
 import DarkTower.WarMachine.SensoryPredictionError
+import DarkTower.WarMachine.ChannelFintype
 
 /-!
 # Belief updating as gradient descent on the Laplace free energy
@@ -17,12 +18,6 @@ That derivation is proved here, not assumed.
 namespace DarkTower.WarMachine.LaplaceBeliefUpdate
 
 open DarkTower.WarMachine.Holes DarkTower.WarMachine.SensoryPredictionError
-
-private theorem channel_mem_all (c : Channel) : c ∈ Channel.all := by
-  cases c <;> simp [Channel.all]
-
-/-- The fourteen declared channels as a finite carrier. -/
-instance : Fintype Channel := Fintype.ofList Channel.all channel_mem_all
 
 /-- The identity observation map: the predicted observation is the belief mean. -/
 def identityMap (μ : Channel → ℝ) : Channel → ℝ := μ
