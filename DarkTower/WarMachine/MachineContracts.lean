@@ -9,6 +9,7 @@ import DarkTower.WarMachine.MachinePredictionError
 import DarkTower.WarMachine.TokenState
 import DarkTower.WarMachine.CascadeTransition
 import DarkTower.WarMachine.PolicyRollout
+import DarkTower.WarMachine.TokenObservation
 
 /-!
 Leaf registry for the War Machine's Lean→Clojure contracts. Checked name quotations
@@ -170,7 +171,29 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:298"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:265"
-        "The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :265), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :341)."] }
+        "The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :265), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :341).",
+      runtimeEntry ``DarkTower.WarMachine.PolicyRollout.predictedOutcome notLivePath "2026-09-16"
+        "WM-04 (P5): Q(o|pi) = sum_s A(s,o) q(s) with A = TokenObservation.tokenLikelihood"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:217"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:198"
+        "mathlib4/DarkTower/WarMachine/TokenObservation.lean:157"
+        "With zero rates the predicted observation distribution differs from the state distribution q (predictedOutcome_eq_rolloutState :157); or a rate refusal does not propagate."] },
+  { schemaVersion := 1, contractId := "wm-token-observation",
+    moduleName := "DarkTower.WarMachine.TokenObservation",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.TokenObservation.tokenLikelihood notLivePath "2026-09-16"
+        "WM-04 (P5): per-token adjudication likelihood A(o|s)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:174"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:180"
+        "mathlib4/DarkTower/WarMachine/TokenObservation.lean:109"
+        "(token-likelihood rates s o) with false-neg 3/2 does not refuse with :invalid-adjudication-rate; or a state token with no rate entry does not refuse; or zero rates do not give the identity kernel (tokenLikelihood_checkable :109)."
+      ,
+      runtimeEntry ``DarkTower.WarMachine.TokenObservation.observationKernelOK notLivePath "2026-09-16"
+        "WM-04 (P5): the observation row over every subset is a distribution (the ForwardModel A obligations)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:200"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:198"
+        "mathlib4/DarkTower/WarMachine/TokenObservation.lean:84"
+        "An observation row has a negative entry or does not sum to exactly 1 (tokenLikelihood_nonneg :43, tokenLikelihood_colsum :84)."] }
   ]
 
 def main : IO Unit := do

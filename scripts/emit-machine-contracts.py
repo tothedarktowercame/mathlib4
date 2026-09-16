@@ -26,7 +26,10 @@ EXPECTED[PREFIX + 'TokenState'] = [PREFIX + 'TokenState.' + n
                                    for n in ['observedBelief', 'independentBelief', 'coverage']]
 EXPECTED[PREFIX + 'CascadeTransition'] = [PREFIX + 'CascadeTransition.' + n
                                           for n in ['patternKernel', 'firstEnabled', 'cascadeKernel', 'interpret']]
-EXPECTED[PREFIX + 'PolicyRollout'] = [PREFIX + 'PolicyRollout.rolloutState']
+EXPECTED[PREFIX + 'PolicyRollout'] = [PREFIX + 'PolicyRollout.rolloutState',
+                                      PREFIX + 'PolicyRollout.predictedOutcome']
+EXPECTED[PREFIX + 'TokenObservation'] = [PREFIX + 'TokenObservation.tokenLikelihood',
+                                         PREFIX + 'TokenObservation.observationKernelOK']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
 # Runtime-correspondence entries must point at the named forms, not merely at an
 # existing line: pointer -> (form head, name) expected at that line. A locus that
@@ -64,6 +67,18 @@ RUNTIME_FORMS = {
         'clojure-locus': ('defn', 'rollout'),
         'fixture': ('deftest', 'cascade-transition-lean-fixture-correspondence'),
         'evidence': ('theorem', 'fixture_rollout_two')},
+    PREFIX + 'PolicyRollout.predictedOutcome': {
+        'clojure-locus': ('defn', 'predict-observations'),
+        'fixture': ('deftest', 'token-observation-lean-theorem-properties'),
+        'evidence': ('theorem', 'predictedOutcome_eq_rolloutState')},
+    PREFIX + 'TokenObservation.tokenLikelihood': {
+        'clojure-locus': ('defn', 'token-likelihood'),
+        'fixture': ('deftest', 'token-observation-lean-fixture-correspondence'),
+        'evidence': ('theorem', 'tokenLikelihood_checkable')},
+    PREFIX + 'TokenObservation.observationKernelOK': {
+        'clojure-locus': ('defn', 'observation-distribution'),
+        'fixture': ('deftest', 'token-observation-lean-theorem-properties'),
+        'evidence': ('theorem', 'tokenLikelihood_colsum')},
 }
 
 
