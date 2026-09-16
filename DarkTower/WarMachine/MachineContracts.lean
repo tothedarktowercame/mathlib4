@@ -216,7 +216,19 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:399"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:306"
         "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76"
-        "The distribution does not sum to 1 within 1e-12 (preference_sum :76), is nonzero on a zeroed outcome, or zero off it (preference_eq_zero_iff :105, preference_pos_iff :98)."] },
+        "The distribution does not sum to 1 within 1e-12 (preference_sum :76), is nonzero on a zeroed outcome, or zero off it (preference_eq_zero_iff :105, preference_pos_iff :98).",
+      runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference notLivePath "2026-09-16"
+        "WM-10 (P11 1b-i): the same distribution in closed form at mission scale (Z without powerset enumeration, over an explicit common :universe); equal to preference-distribution on small universes"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:536"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:427"
+        "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76"
+        "Any 2-4 token case where preference-fn differs from preference-distribution; a universe that disagrees with the enumerating one (preference-fn-universe-matches-enumerating :528).",
+      runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference notLivePath "2026-09-16"
+        "WM-10 (P11 1b-i): log-space closed form (log Z, overflow-safe near 1000 tokens; zeroed check safe past 62 tokens)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:497"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:543"
+        "mathlib4/DarkTower/WarMachine/TokenPreference.lean:105"
+        "A zeroed outcome gets finite log-preference, or a non-zeroed one gets -inf (preference_eq_zero_iff :105); overflow or wrap at scale."] },
   { schemaVersion := 1, contractId := "wm-policy-horizon",
     moduleName := "DarkTower.WarMachine.PolicyHorizon",
     declarations := [
@@ -237,7 +249,13 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:450"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:385"
         "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
-        "A constant-C runtime fails the ranking reversal (fixture_stepIndexed_preference :300); G is finite although some step has infinite risk (horizonEFE_eq_top_iff :167); extending the horizon does not add exactly the new step (horizonEFE_succ :114)."] }
+        "A constant-C runtime fails the ranking reversal (fixture_stepIndexed_preference :300); G is finite although some step has infinite risk (horizonEFE_eq_top_iff :167); extending the horizon does not add exactly the new step (horizonEFE_succ :114).",
+      runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.horizonEFE notLivePath "2026-09-16"
+        "WM-10 (P11 1b-i): exact sparse G at mission scale, with closed-form C_tau and identity A at zero adjudication rates (TokenObservation.tokenLikelihood_checkable). Declared limitation: non-zero judgement rates are refused at scale"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:566"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:440"
+        "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
+        "Any 2-4 token case where sparse and enumerating G differ (sparse-g-equals-enumerating-g :440); a universe offset other than T*k*ln 2 (horizon-g-sparse-universe-offset :559); a non-zero judgement rate accepted at scale."] }
   ]
 
 def main : IO Unit := do

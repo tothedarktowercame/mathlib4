@@ -32,9 +32,11 @@ EXPECTED[PREFIX + 'TokenObservation'] = [PREFIX + 'TokenObservation.tokenLikelih
                                          PREFIX + 'TokenObservation.observationKernelOK']
 EXPECTED[PREFIX + 'TokenPreference'] = [PREFIX + 'TokenPreference.PreferenceSpec',
                                         PREFIX + 'TokenPreference.PreferenceSpec.utility',
+                                        PREFIX + 'TokenPreference.PreferenceSpec.preference',
+                                        PREFIX + 'TokenPreference.PreferenceSpec.preference',
                                         PREFIX + 'TokenPreference.PreferenceSpec.preference']
 EXPECTED[PREFIX + 'PolicyHorizon'] = [PREFIX + 'PolicyHorizon.' + n
-                                      for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE']]
+                                      for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE', 'horizonEFE']]
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
 # Runtime-correspondence entries must point at the named forms, not merely at an
 # existing line: pointer -> (form head, name) expected at that line. A locus that
@@ -92,10 +94,16 @@ RUNTIME_FORMS = {
         'clojure-locus': ('defn', 'token-utility'),
         'fixture': ('deftest', 'token-preference-lean-fixture-correspondence'),
         'evidence': ('theorem', 'preference_lt_of_want_lt')},
-    PREFIX + 'TokenPreference.PreferenceSpec.preference': {
-        'clojure-locus': ('defn', 'preference-distribution'),
-        'fixture': ('deftest', 'token-preference-lean-theorem-properties'),
-        'evidence': ('theorem', 'preference_sum')},
+    PREFIX + 'TokenPreference.PreferenceSpec.preference': [
+        {'clojure-locus': ('defn', 'preference-distribution'),
+         'fixture': ('deftest', 'token-preference-lean-theorem-properties'),
+         'evidence': ('theorem', 'preference_sum')},
+        {'clojure-locus': ('defn', 'preference-fn'),
+         'fixture': ('deftest', 'preference-fn-equals-distribution'),
+         'evidence': ('theorem', 'preference_sum')},
+        {'clojure-locus': ('defn', 'log-preference-fn'),
+         'fixture': ('deftest', 'log-preference-fn-scales-and-zeroed-check-safe'),
+         'evidence': ('theorem', 'preference_eq_zero_iff')}],
     PREFIX + 'PolicyHorizon.stepRisk': {
         'clojure-locus': ('defn', 'outcome-risk'),
         'fixture': ('deftest', 'outcome-risk-properties'),
@@ -104,10 +112,13 @@ RUNTIME_FORMS = {
         'clojure-locus': ('defn', 'step-ambiguity'),
         'fixture': ('deftest', 'horizon-g-lean-fixture-correspondence'),
         'evidence': ('theorem', 'stepAmbiguity_nonneg')},
-    PREFIX + 'PolicyHorizon.horizonEFE': {
-        'clojure-locus': ('defn', 'horizon-g'),
-        'fixture': ('deftest', 'horizon-g-infinite-risk'),
-        'evidence': ('theorem', 'horizonEFE_eq_top_iff')},
+    PREFIX + 'PolicyHorizon.horizonEFE': [
+        {'clojure-locus': ('defn', 'horizon-g'),
+         'fixture': ('deftest', 'horizon-g-infinite-risk'),
+         'evidence': ('theorem', 'horizonEFE_eq_top_iff')},
+        {'clojure-locus': ('defn', 'horizon-g-sparse'),
+         'fixture': ('deftest', 'sparse-g-equals-enumerating-g'),
+         'evidence': ('theorem', 'horizonEFE_eq_top_iff')}],
 }
 
 
@@ -233,9 +244,19 @@ def verify(manifest_path):
                 lines = target.read_text().splitlines()
                 require(1 <= int(line) <= len(lines), 'bad pointer ' + key)
                 if runtime:
-                    require(form_at(lines[int(line) - 1]) == RUNTIME_FORMS[d['name']][key],
-                            'pointer does not name the expected form: %s %s -> %r'
+                    options = RUNTIME_FORMS[d['name']]
+                    options = options if isinstance(options, list) else [options]
+                    require(any(form_at(lines[int(line) - 1]) == o[key] for o in options),
+                            'pointer does not name an expected form: %s %s -> %r'
                             % (d['name'], key, lines[int(line) - 1].strip()))
+            if runtime:
+                options = RUNTIME_FORMS[d['name']]
+                options = options if isinstance(options, list) else [options]
+                def at(key):
+                    path, line = d[key].rsplit(':', 1)
+                    return form_at((ROOT.parent / path).read_text().splitlines()[int(line) - 1])
+                require(any(all(at(k) == o[k] for k in o) for o in options),
+                        'pointers do not form one declared (locus, fixture, evidence) triple: ' + d['name'])
     return m
 
 
