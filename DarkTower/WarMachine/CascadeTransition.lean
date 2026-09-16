@@ -22,15 +22,18 @@ variable {V : Type*} [Fintype V] [DecidableEq V]
 structure InterpretedPattern (V : Type*) [Fintype V] [DecidableEq V] where
   consumes : Finset V
   produces : Finset V
+  forbids : Finset V
   theta : ℝ
   theta_nonneg : 0 ≤ theta
   theta_le_one : theta ≤ 1
 
-/-- The guard of `p` holds at `s` iff `p.consumes ⊆ s`. -/
-def guard (p : InterpretedPattern V) (s : Finset V) : Prop := p.consumes ⊆ s
+/-- The guard of `p` holds at `s` iff `p.consumes ⊆ s` (the IF / present tokens)
+and `p.forbids` is disjoint from `s` (the HOWEVER / "not X" part). -/
+def guard (p : InterpretedPattern V) (s : Finset V) : Prop :=
+  p.consumes ⊆ s ∧ Disjoint p.forbids s
 
 instance (p : InterpretedPattern V) (s : Finset V) : Decidable (guard p s) :=
-  inferInstanceAs (Decidable (p.consumes ⊆ s))
+  inferInstanceAs (Decidable (p.consumes ⊆ s ∧ Disjoint p.forbids s))
 
 /-- The interpreted kernel of one pattern: to `s ∪ produces` with probability
 `θ_p`, stay with probability `1 − θ_p`. -/
@@ -70,7 +73,14 @@ theorem patternKernel_of_achieved (p : InterpretedPattern V) (s s' : Finset V)
 /-- The first pattern in precedence whose guard holds at `s`. -/
 def firstEnabled : List (InterpretedPattern V) → Finset V → Option (InterpretedPattern V)
   | [], _ => none
-  | p :: ps, s => if p.consumes ⊆ s then some p else firstEnabled ps s
+  | p :: ps, s => if guard p s then some p else firstEnabled ps s
+
+/-- A pattern whose HOWEVER clause fails (a forbidden token is present) is
+skipped, exactly like one whose IF clause fails. -/
+theorem firstEnabled_skips_forbidden (p : InterpretedPattern V)
+    (ps : List (InterpretedPattern V)) (s : Finset V) (h : ¬ Disjoint p.forbids s) :
+    firstEnabled (p :: ps) s = firstEnabled ps s := by
+  simp only [firstEnabled, guard, h, and_false, if_false]
 
 /-- The cascade kernel: the pattern kernel of the first enabled pattern, or
 the identity when no pattern is enabled. -/
@@ -110,23 +120,24 @@ present it is bounded in `[0,1]` (SPEC A1, A4, §2). -/
 structure PatternSlot (V : Type*) [Fintype V] [DecidableEq V] where
   consumes : Finset V
   produces : Finset V
+  forbids : Finset V
   interp : Option ℝ
   interp_bounded : ∀ x ∈ interp, 0 ≤ x ∧ x ≤ 1
 
 /-- Interpret every slot, or `none` if any slot lacks an interpretation. -/
 def interpret : List (PatternSlot V) → Option (List (InterpretedPattern V))
   | [] => some []
-  | ⟨_, _, none, _⟩ :: _ => none
-  | ⟨c, pr, some x, hb⟩ :: slots =>
+  | ⟨_, _, _, none, _⟩ :: _ => none
+  | ⟨c, pr, f, some x, hb⟩ :: slots =>
       (interpret slots).map fun rest =>
-        ⟨c, pr, x, (hb x (by simp)).1, (hb x (by simp)).2⟩ :: rest
+        ⟨c, pr, f, x, (hb x (by simp)).1, (hb x (by simp)).2⟩ :: rest
 
 theorem interpret_eq_none_iff (slots : List (PatternSlot V)) :
     interpret slots = none ↔ ∃ slot ∈ slots, slot.interp = none := by
   induction slots with
   | nil => simp [interpret]
   | cons slot slots ih =>
-    rcases slot with ⟨c, pr, interp, hb⟩
+    rcases slot with ⟨c, pr, f, interp, hb⟩
     cases interp with
     | none =>
         rw [interpret]
@@ -173,6 +184,7 @@ open DarkTower.WarMachine.PolicyRollout
 private def fp1 (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern (Fin 3) where
   consumes := ∅
   produces := {0, 1}
+  forbids := ∅
   theta := t
   theta_nonneg := h1
   theta_le_one := h2
@@ -180,9 +192,37 @@ private def fp1 (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern (Fi
 private def fp2 (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern (Fin 3) where
   consumes := {0, 1}
   produces := {2}
+  forbids := ∅
   theta := t
   theta_nonneg := h1
   theta_le_one := h2
+
+/-- The HOWEVER fixture: `p3` is blocked by token `2`. -/
+private def fp3 (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern (Fin 3) where
+  consumes := ∅
+  produces := {0}
+  forbids := {2}
+  theta := t
+  theta_nonneg := h1
+  theta_le_one := h2
+
+/-- `p3` is enabled at `∅` (IF holds, HOWEVER vacuous). -/
+theorem fixture_p3_enabled_at_empty (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) :
+    guard (fp3 t h1 h2) ∅ := by
+  simp [guard, fp3]
+
+/-- `p3` is not enabled at `{2}`: a forbidden token is present. -/
+theorem fixture_p3_not_enabled_at_two (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) :
+    ¬ guard (fp3 t h1 h2) {2} := by
+  simp [guard, fp3]
+
+/-- With `p3` blocked, the cascade kernel is the identity at `{2}`. -/
+theorem fixture_p3_identity_when_blocked (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1)
+    (s' : Finset (Fin 3)) :
+    cascadeKernel [fp3 t h1 h2] {2} s' = if s' = ({2} : Finset (Fin 3)) then 1 else 0 := by
+  rw [cascadeKernel,
+    show firstEnabled [fp3 t h1 h2] {2} = none by
+      simp [firstEnabled, guard, fp3]]
 
 private def fprec0 (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1) (h2 : 0 ≤ t2) (h2' : t2 ≤ 1) :
     List (InterpretedPattern (Fin 3)) := [fp1 t1 h1 h1', fp2 t2 h2 h2']
@@ -245,7 +285,7 @@ theorem fixture_rollout_two (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
     rw [oneStep _ _ (show fπ t1 t2 h1 h1' h2 h2' 0 = fprec0 t1 t2 h1 h1' h2 h2' by
         simp [fπ]) s, cascadeKernel,
       show firstEnabled (fprec0 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
-        simp [fprec0, firstEnabled, fp1, fp2]]
+        simp [fprec0, firstEnabled, guard, fp1, fp2]]
     simp [patternKernel, fp1]
   -- A two-point mass sums against any kernel at its two support points.
   have hsum2 : ∀ (k : Finset (Fin 3) → ℝ) (a b : Finset (Fin 3)) (u v : ℝ),
@@ -271,7 +311,7 @@ theorem fixture_rollout_two (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
       Finset.univ = t2 := by
     rw [cascadeKernel,
       show firstEnabled (fprec1 t1 t2 h1 h1' h2 h2') {0, 1} = some (fp2 t2 h2 h2') by
-        simp [fprec1, firstEnabled, fp2]]
+        simp [fprec1, firstEnabled, guard, fp2]]
     simp only [patternKernel, fp2]
     rw [hu2, if_pos hu, if_neg hne]
     ring
@@ -279,7 +319,7 @@ theorem fixture_rollout_two (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
       Finset.univ = 0 := by
     rw [cascadeKernel,
       show firstEnabled (fprec1 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
-        simp [fprec1, firstEnabled, fp1, fp2]]
+        simp [fprec1, firstEnabled, guard, fp1, fp2]]
     simp only [patternKernel, fp1]
     rw [hu0, if_neg hne, if_neg hne']
     ring
@@ -308,10 +348,10 @@ theorem fixture_one_step_reversed (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
       (show fπ t1 t2 h1 h1' h2 h2' 0 = fprec0 t1 t2 h1 h1' h2 h2' by simp [fπ]) s',
     cascadeKernel,
     show firstEnabled (fprec1 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
-      simp [fprec1, firstEnabled, fp1, fp2],
+      simp [fprec1, firstEnabled, guard, fp1, fp2],
     cascadeKernel,
     show firstEnabled (fprec0 t1 t2 h1 h1' h2 h2') ∅ = some (fp1 t1 h1 h1') by
-      simp [fprec0, firstEnabled, fp1, fp2]]
+      simp [fprec0, firstEnabled, guard, fp1, fp2]]
 
 #print axioms patternKernel_nonneg
 #print axioms patternKernel_rowsum
@@ -323,6 +363,10 @@ theorem fixture_one_step_reversed (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
 #print axioms fixture_rollout_two
 #print axioms fixture_rollout_two_one
 #print axioms fixture_one_step_reversed
+#print axioms firstEnabled_skips_forbidden
+#print axioms fixture_p3_enabled_at_empty
+#print axioms fixture_p3_not_enabled_at_two
+#print axioms fixture_p3_identity_when_blocked
 
 end DarkTower.WarMachine.CascadeTransition
 
