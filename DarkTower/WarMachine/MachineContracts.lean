@@ -158,18 +158,18 @@ def registries : List Registry := [
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:57"
         "(pattern-kernel p s) with theta = 3/2 does not refuse with :invalid-pattern-interpretation; or a row does not sum to 1 (patternKernel_rowsum :50), or an achieved pattern moves the state (patternKernel_of_achieved :57).",
-      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.firstEnabled lagging "2026-09-16"
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.firstEnabled notLivePath "2026-09-16"
         "WM-03 (P3): first enabled pattern in precedence; guard consumes ⊆ s ∧ Disjoint forbids s"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:262"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:82"
-        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :82).",
-      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.cascadeKernel lagging "2026-09-16"
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :82).",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.cascadeKernel notLivePath "2026-09-16"
         "WM-03 (P3): first-enabled cascade kernel; identity when no pattern is enabled; add-only effects"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:277"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:116"
-        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: A cascade row does not sum to 1 (cascadeKernel_rowsum :116), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :126; fixture_p3_identity_when_blocked :241).",
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: A cascade row does not sum to 1 (cascadeKernel_rowsum :116), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :126; fixture_p3_identity_when_blocked :241).",
       runtimeEntry ``DarkTower.WarMachine.CascadeTransition.interpret notLivePath "2026-09-16"
         "WM-03 (P3): a precedence with an uninterpreted pattern is a typed hole"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:269"
@@ -179,12 +179,12 @@ def registries : List Registry := [
   { schemaVersion := 1, contractId := "wm-policy-rollout",
     moduleName := "DarkTower.WarMachine.PolicyRollout",
     declarations := [
-      runtimeEntry ``DarkTower.WarMachine.PolicyRollout.rolloutState lagging "2026-09-16"
+      runtimeEntry ``DarkTower.WarMachine.PolicyRollout.rolloutState notLivePath "2026-09-16"
         "WM-03/WM-05 (P3): Q(s_tau|pi) rolled forward by the cascade kernel; add-only effects"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:298"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:286"
-        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :286), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :514).",
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :286), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :514).",
       runtimeEntry ``DarkTower.WarMachine.PolicyRollout.predictedOutcome notLivePath "2026-09-16"
         "WM-04 (P5): Q(o|pi) = sum_s A(s,o) q(s) with A = TokenObservation.tokenLikelihood"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:217"
@@ -213,31 +213,31 @@ def registries : List Registry := [
       runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec notLivePath "2026-09-16"
         "WM-06 (P6): preference specification (want, evidence, lam > 0, mu >= 0, zeroed proper)"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:359"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:329"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:379"
         "mathlib4/DarkTower/WarMachine/TokenPreference.lean:59"
         "lam = 0 or an empty want does not refuse with :invalid-preference-spec (the Lean structure requires lam_pos and want_nonempty; Z_pos :59 depends on them).",
       runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.utility notLivePath "2026-09-16"
         "WM-06 (P6): utility = lam * coverage + mu * evidence count; exact rationals in the runtime"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:388"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:286"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:336"
         "mathlib4/DarkTower/WarMachine/TokenPreference.lean:122"
         "Utility is not strictly increasing in want coverage at equal evidence count (preference_lt_of_want_lt :122), or depends on token content beyond membership (preference_congr).",
       runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference notLivePath "2026-09-16"
         "WM-06 (P6): exp(utility)/Z off zeroed, 0 on zeroed. Runtime uses Math/exp on doubles; correspondence is checked to 1e-12, not exactly"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:399"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:306"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:356"
         "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76"
         "The distribution does not sum to 1 within 1e-12 (preference_sum :76), is nonzero on a zeroed outcome, or zero off it (preference_eq_zero_iff :105, preference_pos_iff :98).",
       runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference notLivePath "2026-09-16"
         "WM-10 (P11 1b-i): the same distribution in closed form at mission scale (Z without powerset enumeration, over an explicit common :universe); equal to preference-distribution on small universes"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:536"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:427"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:477"
         "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76"
         "Any 2-4 token case where preference-fn differs from preference-distribution; a universe that disagrees with the enumerating one (preference-fn-universe-matches-enumerating :528).",
       runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference notLivePath "2026-09-16"
         "WM-10 (P11 1b-i): log-space closed form (log Z, overflow-safe near 1000 tokens; zeroed check safe past 62 tokens)"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:497"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:543"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:593"
         "mathlib4/DarkTower/WarMachine/TokenPreference.lean:105"
         "A zeroed outcome gets finite log-preference, or a non-zeroed one gets -inf (preference_eq_zero_iff :105); overflow or wrap at scale."] },
   { schemaVersion := 1, contractId := "wm-policy-horizon",
@@ -246,25 +246,25 @@ def registries : List Registry := [
       runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.stepRisk notLivePath "2026-09-16"
         "WM-10 (P7/P11 1a): per-step risk KL[Q(o_tau|pi) || C_tau] in EReal; the runtime is also tested against OutcomeRiskKL.outcomeRisk's top condition (the Lean equality of the two carriers is not proved)"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:418"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:402"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:452"
         "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:80"
         "A smoothed risk returns a finite value where some outcome has positive predicted mass and zero preference (the :infinite assertion); or risk is negative for a distribution C (stepRisk_nonneg :80).",
       runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.stepAmbiguity notLivePath "2026-09-16"
         "WM-10 (P7): per-step ambiguity E_Q(s_tau) H[A(.|s)] read at the same rollout step as risk"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:430"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:365"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:415"
         "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:75"
         "Ambiguity is negative, or is read at a different step from risk.",
       runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.horizonEFE notLivePath "2026-09-16"
         "WM-10 (P7/P11 1a): G(pi) = sum over tau=1..T of risk + ambiguity with step-indexed C_tau; runtime enumerates token powersets (small universes only)"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:450"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:385"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:435"
         "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
         "A constant-C runtime fails the ranking reversal (fixture_stepIndexed_preference :300); G is finite although some step has infinite risk (horizonEFE_eq_top_iff :167); extending the horizon does not add exactly the new step (horizonEFE_succ :114).",
       runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.horizonEFE notLivePath "2026-09-16"
         "WM-10 (P11 1b-i): exact sparse G at mission scale, with closed-form C_tau and identity A at zero adjudication rates (TokenObservation.tokenLikelihood_checkable). Declared limitation: non-zero judgement rates are refused at scale"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:566"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:440"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:490"
         "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
         "Any 2-4 token case where sparse and enumerating G differ (sparse-g-equals-enumerating-g :440); a universe offset other than T*k*ln 2 (horizon-g-sparse-universe-offset :559); a non-zero judgement rate accepted at scale.",
       runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.horizonEFE liveShadow "2026-09-16"
@@ -279,15 +279,15 @@ def registries : List Registry := [
       runtimeEntry ``DarkTower.WarMachine.ExactBeliefTrajectory.exactUpdate notLivePath "2026-09-16"
         "WM-02 (P12, R3): exact categorical update s(x) = A(o|x)(B s_prev)(x)/P(o); unique B.2 free-energy minimiser; typed refusal exactly at P(o) = 0"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:620"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:584"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:634"
         "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:128"
         "A mean-field-style update refuses the fixture input that exact-update accepts at 9/10 (fixture_exact_accepts :263; exact-belief-falsifiers :637); a P(o) = 0 observation does not give :zero-predictive-probability, or a P(o) > 0 one does (exactUpdate_eq_none_iff :90).",
-      runtimeEntry ``DarkTower.WarMachine.ExactBeliefTrajectory.tokenBeliefAt lagging "2026-09-16"
+      runtimeEntry ``DarkTower.WarMachine.ExactBeliefTrajectory.tokenBeliefAt notLivePath "2026-09-16"
         "WM-02 (P12, R1): stored belief over token states (q0 = observed token set, B = cascade kernel, A = token likelihood); filtering only, refusal carried forward"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:648"
-        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:592"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:642"
         "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:238"
-        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
   ]
 
 def main : IO Unit := do
