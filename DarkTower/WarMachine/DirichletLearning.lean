@@ -1,4 +1,4 @@
-import DarkTower.WarMachine.Holes
+import Mathlib
 
 /-!
 # Dirichlet accumulation (Da Costa et al. 2020, eq. 21)
@@ -241,14 +241,5 @@ theorem fixture_total :
 
 end Fixture
 
-#print axioms ext
-#print axioms accumulate_conc
-#print axioms accumulate_append
-#print axioms accumulate_nil
-#print axioms accumulate_onehot
-#print axioms accumulate_total
-#print axioms accumulate_total_of_normalized
-#print axioms fixture_accumulate
-#print axioms fixture_total
 
 end DarkTower.WarMachine.DirichletLearning
