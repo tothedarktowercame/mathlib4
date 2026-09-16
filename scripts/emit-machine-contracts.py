@@ -30,6 +30,9 @@ EXPECTED[PREFIX + 'PolicyRollout'] = [PREFIX + 'PolicyRollout.rolloutState',
                                       PREFIX + 'PolicyRollout.predictedOutcome']
 EXPECTED[PREFIX + 'TokenObservation'] = [PREFIX + 'TokenObservation.tokenLikelihood',
                                          PREFIX + 'TokenObservation.observationKernelOK']
+EXPECTED[PREFIX + 'TokenPreference'] = [PREFIX + 'TokenPreference.PreferenceSpec',
+                                        PREFIX + 'TokenPreference.PreferenceSpec.utility',
+                                        PREFIX + 'TokenPreference.PreferenceSpec.preference']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
 # Runtime-correspondence entries must point at the named forms, not merely at an
 # existing line: pointer -> (form head, name) expected at that line. A locus that
@@ -79,6 +82,18 @@ RUNTIME_FORMS = {
         'clojure-locus': ('defn', 'observation-distribution'),
         'fixture': ('deftest', 'token-observation-lean-theorem-properties'),
         'evidence': ('theorem', 'tokenLikelihood_colsum')},
+    PREFIX + 'TokenPreference.PreferenceSpec': {
+        'clojure-locus': ('defn', 'preference-spec'),
+        'fixture': ('deftest', 'token-preference-lean-falsifiers'),
+        'evidence': ('theorem', 'Z_pos')},
+    PREFIX + 'TokenPreference.PreferenceSpec.utility': {
+        'clojure-locus': ('defn', 'token-utility'),
+        'fixture': ('deftest', 'token-preference-lean-fixture-correspondence'),
+        'evidence': ('theorem', 'preference_lt_of_want_lt')},
+    PREFIX + 'TokenPreference.PreferenceSpec.preference': {
+        'clojure-locus': ('defn', 'preference-distribution'),
+        'fixture': ('deftest', 'token-preference-lean-theorem-properties'),
+        'evidence': ('theorem', 'preference_sum')},
 }
 
 

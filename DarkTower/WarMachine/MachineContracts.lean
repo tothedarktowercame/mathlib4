@@ -10,6 +10,7 @@ import DarkTower.WarMachine.TokenState
 import DarkTower.WarMachine.CascadeTransition
 import DarkTower.WarMachine.PolicyRollout
 import DarkTower.WarMachine.TokenObservation
+import DarkTower.WarMachine.TokenPreference
 
 /-!
 Leaf registry for the War Machine's Lean→Clojure contracts. Checked name quotations
@@ -193,7 +194,28 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:200"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:198"
         "mathlib4/DarkTower/WarMachine/TokenObservation.lean:84"
-        "An observation row has a negative entry or does not sum to exactly 1 (tokenLikelihood_nonneg :43, tokenLikelihood_colsum :84)."] }
+        "An observation row has a negative entry or does not sum to exactly 1 (tokenLikelihood_nonneg :43, tokenLikelihood_colsum :84)."] },
+  { schemaVersion := 1, contractId := "wm-token-preference",
+    moduleName := "DarkTower.WarMachine.TokenPreference",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec notLivePath "2026-09-16"
+        "WM-06 (P6): preference specification (want, evidence, lam > 0, mu >= 0, zeroed proper)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:359"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:329"
+        "mathlib4/DarkTower/WarMachine/TokenPreference.lean:59"
+        "lam = 0 or an empty want does not refuse with :invalid-preference-spec (the Lean structure requires lam_pos and want_nonempty; Z_pos :59 depends on them).",
+      runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.utility notLivePath "2026-09-16"
+        "WM-06 (P6): utility = lam * coverage + mu * evidence count; exact rationals in the runtime"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:388"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:286"
+        "mathlib4/DarkTower/WarMachine/TokenPreference.lean:122"
+        "Utility is not strictly increasing in want coverage at equal evidence count (preference_lt_of_want_lt :122), or depends on token content beyond membership (preference_congr).",
+      runtimeEntry ``DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference notLivePath "2026-09-16"
+        "WM-06 (P6): exp(utility)/Z off zeroed, 0 on zeroed. Runtime uses Math/exp on doubles; correspondence is checked to 1e-12, not exactly"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:399"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:306"
+        "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76"
+        "The distribution does not sum to 1 within 1e-12 (preference_sum :76), is nonzero on a zeroed outcome, or zero off it (preference_eq_zero_iff :105, preference_pos_iff :98)."] }
   ]
 
 def main : IO Unit := do
