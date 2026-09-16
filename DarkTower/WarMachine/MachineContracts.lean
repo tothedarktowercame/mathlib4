@@ -11,6 +11,7 @@ import DarkTower.WarMachine.CascadeTransition
 import DarkTower.WarMachine.PolicyRollout
 import DarkTower.WarMachine.TokenObservation
 import DarkTower.WarMachine.TokenPreference
+import DarkTower.WarMachine.PolicyHorizon
 
 /-!
 Leaf registry for the War Machine's Lean→Clojure contracts. Checked name quotations
@@ -215,7 +216,28 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:399"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:306"
         "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76"
-        "The distribution does not sum to 1 within 1e-12 (preference_sum :76), is nonzero on a zeroed outcome, or zero off it (preference_eq_zero_iff :105, preference_pos_iff :98)."] }
+        "The distribution does not sum to 1 within 1e-12 (preference_sum :76), is nonzero on a zeroed outcome, or zero off it (preference_eq_zero_iff :105, preference_pos_iff :98)."] },
+  { schemaVersion := 1, contractId := "wm-policy-horizon",
+    moduleName := "DarkTower.WarMachine.PolicyHorizon",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.stepRisk notLivePath "2026-09-16"
+        "WM-10 (P7/P11 1a): per-step risk KL[Q(o_tau|pi) || C_tau] in EReal; the runtime is also tested against OutcomeRiskKL.outcomeRisk's top condition (the Lean equality of the two carriers is not proved)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:418"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:402"
+        "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:80"
+        "A smoothed risk returns a finite value where some outcome has positive predicted mass and zero preference (the :infinite assertion); or risk is negative for a distribution C (stepRisk_nonneg :80).",
+      runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.stepAmbiguity notLivePath "2026-09-16"
+        "WM-10 (P7): per-step ambiguity E_Q(s_tau) H[A(.|s)] read at the same rollout step as risk"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:430"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:365"
+        "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:75"
+        "Ambiguity is negative, or is read at a different step from risk.",
+      runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.horizonEFE notLivePath "2026-09-16"
+        "WM-10 (P7/P11 1a): G(pi) = sum over tau=1..T of risk + ambiguity with step-indexed C_tau; runtime enumerates token powersets (small universes only)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:450"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:385"
+        "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
+        "A constant-C runtime fails the ranking reversal (fixture_stepIndexed_preference :300); G is finite although some step has infinite risk (horizonEFE_eq_top_iff :167); extending the horizon does not add exactly the new step (horizonEFE_succ :114)."] }
   ]
 
 def main : IO Unit := do

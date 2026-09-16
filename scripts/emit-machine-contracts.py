@@ -33,6 +33,8 @@ EXPECTED[PREFIX + 'TokenObservation'] = [PREFIX + 'TokenObservation.tokenLikelih
 EXPECTED[PREFIX + 'TokenPreference'] = [PREFIX + 'TokenPreference.PreferenceSpec',
                                         PREFIX + 'TokenPreference.PreferenceSpec.utility',
                                         PREFIX + 'TokenPreference.PreferenceSpec.preference']
+EXPECTED[PREFIX + 'PolicyHorizon'] = [PREFIX + 'PolicyHorizon.' + n
+                                      for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE']]
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
 # Runtime-correspondence entries must point at the named forms, not merely at an
 # existing line: pointer -> (form head, name) expected at that line. A locus that
@@ -94,6 +96,18 @@ RUNTIME_FORMS = {
         'clojure-locus': ('defn', 'preference-distribution'),
         'fixture': ('deftest', 'token-preference-lean-theorem-properties'),
         'evidence': ('theorem', 'preference_sum')},
+    PREFIX + 'PolicyHorizon.stepRisk': {
+        'clojure-locus': ('defn', 'outcome-risk'),
+        'fixture': ('deftest', 'outcome-risk-properties'),
+        'evidence': ('theorem', 'stepRisk_nonneg')},
+    PREFIX + 'PolicyHorizon.stepAmbiguity': {
+        'clojure-locus': ('defn', 'step-ambiguity'),
+        'fixture': ('deftest', 'horizon-g-lean-fixture-correspondence'),
+        'evidence': ('theorem', 'stepAmbiguity_nonneg')},
+    PREFIX + 'PolicyHorizon.horizonEFE': {
+        'clojure-locus': ('defn', 'horizon-g'),
+        'fixture': ('deftest', 'horizon-g-infinite-risk'),
+        'evidence': ('theorem', 'horizonEFE_eq_top_iff')},
 }
 
 
