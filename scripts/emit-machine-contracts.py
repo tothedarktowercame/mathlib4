@@ -40,7 +40,7 @@ EXPECTED[PREFIX + 'PolicyHorizon'] = [PREFIX + 'PolicyHorizon.' + n
 EXPECTED[PREFIX + 'ExactBeliefTrajectory'] = [PREFIX + 'ExactBeliefTrajectory.exactUpdate',
                                               PREFIX + 'ExactBeliefTrajectory.tokenBeliefAt']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path',
-           'runtime-correspondence-live-shadow'}
+           'runtime-correspondence-live-shadow', 'runtime-correspondence-lagging'}
 # 'runtime-correspondence-live-selection' is reserved for P11 step 3 and is refused
 # until Joe's word adds it here.
 LIVE_HOLDERS = {'runtime-correspondence-live-shadow'}
@@ -264,6 +264,9 @@ def verify(manifest_path):
                     require(any(form_at(lines[int(line) - 1]) == o[key] for o in options),
                             'pointer does not name an expected form: %s %s -> %r'
                             % (d['name'], key, lines[int(line) - 1].strip()))
+            if d['holder'] == 'runtime-correspondence-lagging':
+                require(d['falsifier'].startswith('LAGGING'),
+                        'lagging entry must name the lag first in its falsifier: ' + d['name'])
             if d['holder'] in LIVE_HOLDERS:
                 # A live claim must name the live call site (in the owner string as
                 # live-call-site=path:line) and that line must call the runtime function.

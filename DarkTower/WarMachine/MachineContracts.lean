@@ -53,6 +53,11 @@ private def runtimeEntry (decl : Name) (holder decided owner locus fixture evide
 
 private def notLivePath : String := "runtime-correspondence-not-live-path"
 
+/-- The named Clojure function computes the Lean declaration except on a known,
+named input class, recorded first in the falsifier: the Lean moved ahead (an approved
+design change) and the runtime has not caught up. -/
+private def lagging : String := "runtime-correspondence-lagging"
+
 def registries : List Registry := [
   { schemaVersion := 1, contractId := "wm-machine-observe",
     moduleName := "DarkTower.WarMachine.MachineObservation",
@@ -146,35 +151,35 @@ def registries : List Registry := [
         "WM-03 (P3): interpreted pattern kernel, success probability theta; add-only effects"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:242"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
-        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:55"
-        "(pattern-kernel p s) with theta = 3/2 does not refuse with :invalid-pattern-interpretation; or a row does not sum to 1 (patternKernel_rowsum :48), or an achieved pattern moves the state (patternKernel_of_achieved :55).",
-      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.firstEnabled notLivePath "2026-09-16"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:57"
+        "(pattern-kernel p s) with theta = 3/2 does not refuse with :invalid-pattern-interpretation; or a row does not sum to 1 (patternKernel_rowsum :50), or an achieved pattern moves the state (patternKernel_of_achieved :57).",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.firstEnabled lagging "2026-09-16"
         "WM-03 (P3): first enabled pattern in precedence; guard consumes ⊆ s ∧ Disjoint forbids s"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:262"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
-        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:80"
-        "A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :80).",
-      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.cascadeKernel notLivePath "2026-09-16"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:82"
+        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :82).",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.cascadeKernel lagging "2026-09-16"
         "WM-03 (P3): first-enabled cascade kernel; identity when no pattern is enabled; add-only effects"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:277"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
-        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:101"
-        "A cascade row does not sum to 1 (cascadeKernel_rowsum :101), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :111; fixture_p3_identity_when_blocked :220).",
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:116"
+        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: A cascade row does not sum to 1 (cascadeKernel_rowsum :116), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :126; fixture_p3_identity_when_blocked :241).",
       runtimeEntry ``DarkTower.WarMachine.CascadeTransition.interpret notLivePath "2026-09-16"
         "WM-03 (P3): a precedence with an uninterpreted pattern is a typed hole"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:269"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:159"
-        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:135"
-        "A precedence containing an uninterpreted pattern does not yield :missing-pattern-interpretation (interpret_eq_none_iff :135)."] },
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:156"
+        "A precedence containing an uninterpreted pattern does not yield :missing-pattern-interpretation (interpret_eq_none_iff :156)."] },
   { schemaVersion := 1, contractId := "wm-policy-rollout",
     moduleName := "DarkTower.WarMachine.PolicyRollout",
     declarations := [
-      runtimeEntry ``DarkTower.WarMachine.PolicyRollout.rolloutState notLivePath "2026-09-16"
+      runtimeEntry ``DarkTower.WarMachine.PolicyRollout.rolloutState lagging "2026-09-16"
         "WM-03/WM-05 (P3): Q(s_tau|pi) rolled forward by the cascade kernel; add-only effects"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:298"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
-        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:265"
-        "The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :265), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :341).",
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:286"
+        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :286), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :514).",
       runtimeEntry ``DarkTower.WarMachine.PolicyRollout.predictedOutcome notLivePath "2026-09-16"
         "WM-04 (P5): Q(o|pi) = sum_s A(s,o) q(s) with A = TokenObservation.tokenLikelihood"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:217"
@@ -266,12 +271,12 @@ def registries : List Registry := [
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:584"
         "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:128"
         "A mean-field-style update refuses the fixture input that exact-update accepts at 9/10 (fixture_exact_accepts :263; exact-belief-falsifiers :637); a P(o) = 0 observation does not give :zero-predictive-probability, or a P(o) > 0 one does (exactUpdate_eq_none_iff :90).",
-      runtimeEntry ``DarkTower.WarMachine.ExactBeliefTrajectory.tokenBeliefAt notLivePath "2026-09-16"
+      runtimeEntry ``DarkTower.WarMachine.ExactBeliefTrajectory.tokenBeliefAt lagging "2026-09-16"
         "WM-02 (P12, R1): stored belief over token states (q0 = observed token set, B = cascade kernel, A = token likelihood); filtering only, refusal carried forward"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:648"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:592"
         "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:238"
-        "A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
+        "LAGGING (P10, mathlib4 95127698bd): the Lean guard adds ¬(produces ⊆ s); Clojure guard-holds? (cascade_model_manifest.clj:105) does not yet, so runtime and Lean disagree whenever an achieved pattern is first in precedence. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
   ]
 
 def main : IO Unit := do
