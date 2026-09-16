@@ -12,6 +12,7 @@ import DarkTower.WarMachine.PolicyRollout
 import DarkTower.WarMachine.TokenObservation
 import DarkTower.WarMachine.TokenPreference
 import DarkTower.WarMachine.PolicyHorizon
+import DarkTower.WarMachine.ExactBeliefTrajectory
 
 /-!
 Leaf registry for the War Machine's Lean→Clojure contracts. Checked name quotations
@@ -255,7 +256,22 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:566"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:440"
         "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
-        "Any 2-4 token case where sparse and enumerating G differ (sparse-g-equals-enumerating-g :440); a universe offset other than T*k*ln 2 (horizon-g-sparse-universe-offset :559); a non-zero judgement rate accepted at scale."] }
+        "Any 2-4 token case where sparse and enumerating G differ (sparse-g-equals-enumerating-g :440); a universe offset other than T*k*ln 2 (horizon-g-sparse-universe-offset :559); a non-zero judgement rate accepted at scale."] },
+  { schemaVersion := 1, contractId := "wm-exact-belief",
+    moduleName := "DarkTower.WarMachine.ExactBeliefTrajectory",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.ExactBeliefTrajectory.exactUpdate notLivePath "2026-09-16"
+        "WM-02 (P12, R3): exact categorical update s(x) = A(o|x)(B s_prev)(x)/P(o); unique B.2 free-energy minimiser; typed refusal exactly at P(o) = 0"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:620"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:584"
+        "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:128"
+        "A mean-field-style update refuses the fixture input that exact-update accepts at 9/10 (fixture_exact_accepts :263; exact-belief-falsifiers :637); a P(o) = 0 observation does not give :zero-predictive-probability, or a P(o) > 0 one does (exactUpdate_eq_none_iff :90).",
+      runtimeEntry ``DarkTower.WarMachine.ExactBeliefTrajectory.tokenBeliefAt notLivePath "2026-09-16"
+        "WM-02 (P12, R1): stored belief over token states (q0 = observed token set, B = cascade kernel, A = token likelihood); filtering only, refusal carried forward"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:648"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:592"
+        "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:238"
+        "A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
   ]
 
 def main : IO Unit := do
