@@ -116,7 +116,7 @@ theorem tokenLikelihood_checkable (r : AdjudicationRates V)
       refine Finset.prod_eq_one fun v _ => ?_
       by_cases hv : v ∈ o
       · simp [hfn v, hv]
-      · simp [hfn v, hv]
+      · simp [hfp v, hv]
     rw [h1]
     simp
   · have hdis : ∃ v : V, (v ∈ s ∧ v ∉ o) ∨ (v ∉ s ∧ v ∈ o) := by
