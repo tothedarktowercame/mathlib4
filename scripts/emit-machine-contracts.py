@@ -24,6 +24,9 @@ EXPECTED = {PREFIX + 'Machine' + k: [PREFIX + 'Machine' + k + '.' + v]
 # Aligned modules (ALIGNMENT.md): runtime-correspondence entries, possibly several per module.
 EXPECTED[PREFIX + 'TokenState'] = [PREFIX + 'TokenState.' + n
                                    for n in ['observedBelief', 'independentBelief', 'coverage']]
+EXPECTED[PREFIX + 'CascadeTransition'] = [PREFIX + 'CascadeTransition.' + n
+                                          for n in ['patternKernel', 'firstEnabled', 'cascadeKernel', 'interpret']]
+EXPECTED[PREFIX + 'PolicyRollout'] = [PREFIX + 'PolicyRollout.rolloutState']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path'}
 # Runtime-correspondence entries must point at the named forms, not merely at an
 # existing line: pointer -> (form head, name) expected at that line. A locus that
@@ -41,6 +44,26 @@ RUNTIME_FORMS = {
         'clojure-locus': ('defn', 'coverage'),
         'fixture': ('deftest', 'token-state-lean-theorem-properties'),
         'evidence': ('theorem', 'coverage_nonneg')},
+    PREFIX + 'CascadeTransition.patternKernel': {
+        'clojure-locus': ('defn', 'pattern-kernel'),
+        'fixture': ('deftest', 'cascade-transition-lean-fixture-correspondence'),
+        'evidence': ('theorem', 'patternKernel_of_achieved')},
+    PREFIX + 'CascadeTransition.firstEnabled': {
+        'clojure-locus': ('defn', 'first-enabled'),
+        'fixture': ('deftest', 'cascade-transition-lean-theorem-properties'),
+        'evidence': ('theorem', 'firstEnabled_skips_forbidden')},
+    PREFIX + 'CascadeTransition.cascadeKernel': {
+        'clojure-locus': ('defn', 'cascade-kernel'),
+        'fixture': ('deftest', 'cascade-transition-lean-theorem-properties'),
+        'evidence': ('theorem', 'cascadeKernel_rowsum')},
+    PREFIX + 'CascadeTransition.interpret': {
+        'clojure-locus': ('defn', 'missing-interpretation'),
+        'fixture': ('deftest', 'cascade-transition-lean-falsifiers'),
+        'evidence': ('theorem', 'interpret_eq_none_iff')},
+    PREFIX + 'PolicyRollout.rolloutState': {
+        'clojure-locus': ('defn', 'rollout'),
+        'fixture': ('deftest', 'cascade-transition-lean-fixture-correspondence'),
+        'evidence': ('theorem', 'fixture_rollout_two')},
 }
 
 

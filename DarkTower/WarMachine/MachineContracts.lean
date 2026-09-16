@@ -7,6 +7,8 @@ import DarkTower.WarMachine.MachineTemperature
 import DarkTower.WarMachine.MachineAction
 import DarkTower.WarMachine.MachinePredictionError
 import DarkTower.WarMachine.TokenState
+import DarkTower.WarMachine.CascadeTransition
+import DarkTower.WarMachine.PolicyRollout
 
 /-!
 Leaf registry for the War Machine's Lean→Clojure contracts. Checked name quotations
@@ -16,6 +18,12 @@ correspondence; `runtime-correspondence-not-live-path` entries assert that the n
 Clojure function computes the Lean declaration, checked by the named behavioural
 fixture test, and that the function is not yet called on the live War Machine path
 (`p4ng/wm-walkthroughs/build-loop/closure/ALIGNMENT.md` item 4).
+
+Scope of the `wm-cascade-transition` and `wm-policy-rollout` claims: they cover
+add-only pattern effects. When effects retract established tokens, enactment
+(`receipt_construction` acting order) and prediction are known to differ; the test
+`enactment-prediction-divergence-with-retraction` asserts that difference, and
+proposal P10 (with Joe) decides it. No correspondence is claimed there.
 Registration date is the date of this registry, not a historical closure date.
 Holes imports none of these registries. The companion script pins emitted bytes
 and checks each owning source against its committed tree before and after emission.
@@ -126,7 +134,43 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:145"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:72"
         "mathlib4/DarkTower/WarMachine/TokenState.lean:56"
-        "(coverage #{} state) does not refuse with :empty-want-signature; or coverage leaves [0,1], is 1 without want ⊆ s, or decreases as s grows (coverage_le_one :60, coverage_eq_one_iff :65, coverage_mono :83)."] }
+        "(coverage #{} state) does not refuse with :empty-want-signature; or coverage leaves [0,1], is 1 without want ⊆ s, or decreases as s grows (coverage_le_one :60, coverage_eq_one_iff :65, coverage_mono :83)."] },
+  { schemaVersion := 1, contractId := "wm-cascade-transition",
+    moduleName := "DarkTower.WarMachine.CascadeTransition",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.patternKernel notLivePath "2026-09-16"
+        "WM-03 (P3): interpreted pattern kernel, success probability theta; add-only effects"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:242"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:55"
+        "(pattern-kernel p s) with theta = 3/2 does not refuse with :invalid-pattern-interpretation; or a row does not sum to 1 (patternKernel_rowsum :48), or an achieved pattern moves the state (patternKernel_of_achieved :55).",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.firstEnabled notLivePath "2026-09-16"
+        "WM-03 (P3): first enabled pattern in precedence; guard consumes ⊆ s ∧ Disjoint forbids s"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:262"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:80"
+        "A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :80).",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.cascadeKernel notLivePath "2026-09-16"
+        "WM-03 (P3): first-enabled cascade kernel; identity when no pattern is enabled; add-only effects"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:277"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:101"
+        "A cascade row does not sum to 1 (cascadeKernel_rowsum :101), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :111; fixture_p3_identity_when_blocked :220).",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.interpret notLivePath "2026-09-16"
+        "WM-03 (P3): a precedence with an uninterpreted pattern is a typed hole"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:269"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:159"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:135"
+        "A precedence containing an uninterpreted pattern does not yield :missing-pattern-interpretation (interpret_eq_none_iff :135)."] },
+  { schemaVersion := 1, contractId := "wm-policy-rollout",
+    moduleName := "DarkTower.WarMachine.PolicyRollout",
+    declarations := [
+      runtimeEntry ``DarkTower.WarMachine.PolicyRollout.rolloutState notLivePath "2026-09-16"
+        "WM-03/WM-05 (P3): Q(s_tau|pi) rolled forward by the cascade kernel; add-only effects"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:298"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:265"
+        "The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :265), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :341)."] }
   ]
 
 def main : IO Unit := do
