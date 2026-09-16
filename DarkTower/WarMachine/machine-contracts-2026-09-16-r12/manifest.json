@@ -1,0 +1,149 @@
+{
+  "bundle": {
+    "file": "machine-contracts.json",
+    "sha256": "4495e754356e601aa74d81629f50f5890a2fd3dc2f2fb32667e57715df6922ea"
+  },
+  "expected-modules": [
+    "DarkTower.WarMachine.ActionMarginal",
+    "DarkTower.WarMachine.CascadeTransition",
+    "DarkTower.WarMachine.ExactBeliefTrajectory",
+    "DarkTower.WarMachine.Holes",
+    "DarkTower.WarMachine.MachineAction",
+    "DarkTower.WarMachine.MachineBeliefState",
+    "DarkTower.WarMachine.MachineBeliefUpdate",
+    "DarkTower.WarMachine.MachineDepth",
+    "DarkTower.WarMachine.MachineObservation",
+    "DarkTower.WarMachine.MachinePrecision",
+    "DarkTower.WarMachine.MachinePredictionError",
+    "DarkTower.WarMachine.MachineTemperature",
+    "DarkTower.WarMachine.PolicyHorizon",
+    "DarkTower.WarMachine.PolicyRollout",
+    "DarkTower.WarMachine.PolicySelection",
+    "DarkTower.WarMachine.TokenObservation",
+    "DarkTower.WarMachine.TokenPreference",
+    "DarkTower.WarMachine.TokenState"
+  ],
+  "holes-component": {
+    "path": "DarkTower/WarMachine/holes-contract.json",
+    "sha256": "46d73de9b80bb397b6c79982093249c4d56652e9ffa3a3aa406639ba5234377b"
+  },
+  "schema": "wm-machine-contract-manifest-v2",
+  "scope": "per-entry-holder",
+  "sources": [
+    {
+      "commit": "7e6760dba5a83c05780ee0e353f92bc5b3a002d9",
+      "path": "DarkTower/WarMachine/MachineContracts.lean",
+      "sha256": "3265279b071a909b5a4a63ac659d66b2d5c54c0fa86e80adc600a7b48acc9fd8"
+    },
+    {
+      "commit": "7e6760dba5a83c05780ee0e353f92bc5b3a002d9",
+      "path": "scripts/emit-machine-contracts.py",
+      "sha256": "5fc7e03982ba20d881680822d093d4bcdab2f5419edee59fe1f8c853ea7a5168"
+    },
+    {
+      "commit": "76ec2cce43f221c365ff5fbc19d46f57c44abe7f",
+      "path": "scripts/emit_machine_contracts.lean",
+      "sha256": "3f1b85ddd96bff16c417e7c60cdb5a7987e808ba27b72c334fed4479c5f40ec1"
+    },
+    {
+      "commit": "25d1771d368b5a4c111b66c987de6b7591f59aef",
+      "path": "DarkTower/Contract/Emit.lean",
+      "sha256": "498ce2126f727b95100b317c2c3f40e378c919db5a11aed26d5f110ac2aea12d"
+    },
+    {
+      "commit": "d568c8c09630de097a046763c17b9ea99f95f950",
+      "path": "lean-toolchain",
+      "sha256": "33cbab0d3ba76bdf58d9f3638748f12cb9e3befb1336b223ddbd3567589a09e8"
+    },
+    {
+      "commit": "480a666ad27c18477b4b9df86e11862be3930d50",
+      "path": "DarkTower/WarMachine/Holes.lean",
+      "sha256": "7f137e4f85b2aae18b699942bdc505faa3f311752a096718704fb2ca7b7a07d3"
+    },
+    {
+      "commit": "4da0bb794937a44e133402867ea9601a55ec929f",
+      "path": "DarkTower/WarMachine/ActionMarginal.lean",
+      "sha256": "afba4f41036296ccbdd2878177a07180dd54cecd1e3925f5f2ee47df6b930cfb"
+    },
+    {
+      "commit": "95127698bd3194c77bad208dde3e68bb03c57601",
+      "path": "DarkTower/WarMachine/CascadeTransition.lean",
+      "sha256": "3fe1d71dc4421ff77c3cb4b8599c634512216d9795b30b64bab40cb0c2873775"
+    },
+    {
+      "commit": "ba0eda16df6b33facfd6c6546bd59d85da916413",
+      "path": "DarkTower/WarMachine/ExactBeliefTrajectory.lean",
+      "sha256": "bcd9daed4483fe607d3b812346678a3de092fbd6731830ffcfe77b92eec57be0"
+    },
+    {
+      "commit": "461720489008ecadc5eef01f4cc1c0c323e7b86f",
+      "path": "DarkTower/WarMachine/MachineAction.lean",
+      "sha256": "473182ceb96aba566ff2803d1fbf6f13154d3713d3c95d314180a676574bc692"
+    },
+    {
+      "commit": "3a8e26f61e2ef3f4e96c92c96d39743442133db9",
+      "path": "DarkTower/WarMachine/MachineBeliefState.lean",
+      "sha256": "da2c648860c1a4ee48f58106c5f7fc60a5150d914bc2089a2440eea801a7521e"
+    },
+    {
+      "commit": "0e89cc1cb5622b252b43ced54dbfa65959043a5b",
+      "path": "DarkTower/WarMachine/MachineBeliefUpdate.lean",
+      "sha256": "344afaf5e9c103de711e00989f9be3ccf000d91740a65b840eb56a1b3984bb70"
+    },
+    {
+      "commit": "9eef38b6a1117924fcf6476671ec21c3d4dd8a6b",
+      "path": "DarkTower/WarMachine/MachineDepth.lean",
+      "sha256": "ba3b7ca7fb5eb8ba405db3c78d41a91a3f916b5c1e391b49387700a2e262871d"
+    },
+    {
+      "commit": "a4c2276d515730a32db27f97f1fd955a9bae1433",
+      "path": "DarkTower/WarMachine/MachineObservation.lean",
+      "sha256": "f864610a2d794b57fa18d8b3b457faf7c426015f4c01ec5c989df292adbb10a0"
+    },
+    {
+      "commit": "e2e8ee9649908a5564da6237b7d8def80a4bbaf5",
+      "path": "DarkTower/WarMachine/MachinePrecision.lean",
+      "sha256": "d8eb677df9e402b93ee7e7c67eef19840dcb20f6000527a2a3defa6c7b21d1de"
+    },
+    {
+      "commit": "1282b75e3223d3f94d536ebabbb5b4125989722d",
+      "path": "DarkTower/WarMachine/MachinePredictionError.lean",
+      "sha256": "86c68198ec18fb072c5035c989fdf8e3ef61965b6f12f8ef7994be59bd19014f"
+    },
+    {
+      "commit": "b31e5db2e494a0f11c4c35077c25d7399b1d19c9",
+      "path": "DarkTower/WarMachine/MachineTemperature.lean",
+      "sha256": "6809fb9cac3d43092b0a8e9eefd8cde5a823a7ff072d56d878de71291453b6ba"
+    },
+    {
+      "commit": "6d80f56f5dfdff5f14732ccf874f4e39f8028091",
+      "path": "DarkTower/WarMachine/PolicyHorizon.lean",
+      "sha256": "0dec0093a6ca5987835167a85f2dd55294d21d9fa5b6f08641fa9f32d040af2a"
+    },
+    {
+      "commit": "452692fababa5247180d06d17ad96175417d6377",
+      "path": "DarkTower/WarMachine/PolicyRollout.lean",
+      "sha256": "d3a6b837a4b857629bdc38bb57720a14e5817db6f9da634448dd39236f616c73"
+    },
+    {
+      "commit": "a434947c63ad74f2382b7f8c14d74d644519d1a5",
+      "path": "DarkTower/WarMachine/PolicySelection.lean",
+      "sha256": "79bb6e490e4d08d6db53d1422310a73c3d758c9348e43a0d15d5e414f038bfeb"
+    },
+    {
+      "commit": "889429e6bf6f239ae4ca7bdc5668ffd7dee5b4f1",
+      "path": "DarkTower/WarMachine/TokenObservation.lean",
+      "sha256": "e84a75a7b8bb1d0129aade4f9a821e3a29a9780331192c0d8c8cbdc9123e05d7"
+    },
+    {
+      "commit": "678c797666bd60e8f498ca7dddd6d63a4b52ebb5",
+      "path": "DarkTower/WarMachine/TokenPreference.lean",
+      "sha256": "1f68423ef459e7bddd3d4705b8e82dab5906b2222dcfdb486b35f90ae556647b"
+    },
+    {
+      "commit": "17fb61d038deadc88e04f651a618ea8013f11b99",
+      "path": "DarkTower/WarMachine/TokenState.lean",
+      "sha256": "c9dbf5c07fa6f41f1eb5973add0479683cf3de914994b114daf19ea2c984a85a"
+    }
+  ]
+}
