@@ -81,6 +81,16 @@ theorem beliefUpdate_is_gradient_step (α : ℝ) (prec : Channel → ℝ) (o : O
   simp only [beliefUpdate]
   ring
 
+/-- The update is the gradient step on `laplaceFreeEnergy` itself: for any `d`
+that is the partial derivative of the free energy in `μ_k`, the update at `k`
+is `μ_k − α d`. -/
+theorem beliefUpdate_eq_sub_deriv (α : ℝ) (prec : Channel → ℝ) (o : ObservationVector)
+    (μ : Channel → ℝ) (k : Channel) {d : ℝ}
+    (hd : HasDerivAt (fun t => laplaceFreeEnergy prec o (Function.update μ k t)) d (μ k)) :
+    beliefUpdate α prec o μ k = μ k - α * d := by
+  rw [hd.unique (hasDerivAt_laplaceFreeEnergy prec o μ k)]
+  exact beliefUpdate_is_gradient_step α prec o μ k
+
 /-- After the step each channel's error is scaled by `1 − α Π_k`. -/
 theorem error_after_update (α : ℝ) (prec : Channel → ℝ) (o : ObservationVector)
     (μ : Channel → ℝ) (k : Channel) :
