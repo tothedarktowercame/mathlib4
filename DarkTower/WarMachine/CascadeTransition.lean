@@ -27,13 +27,15 @@ structure InterpretedPattern (V : Type*) [Fintype V] [DecidableEq V] where
   theta_nonneg : 0 ≤ theta
   theta_le_one : theta ≤ 1
 
-/-- The guard of `p` holds at `s` iff `p.consumes ⊆ s` (the IF / present tokens)
-and `p.forbids` is disjoint from `s` (the HOWEVER / "not X" part). -/
+/-- The guard of `p` holds at `s` iff `p.consumes ⊆ s` (the IF / present
+tokens), `p.forbids` is disjoint from `s` (the HOWEVER / "not X" part), and
+`p.produces` is not already established (a completed pattern does not keep
+winning precedence; guards are re-evaluated at every step). -/
 def guard (p : InterpretedPattern V) (s : Finset V) : Prop :=
-  p.consumes ⊆ s ∧ Disjoint p.forbids s
+  p.consumes ⊆ s ∧ Disjoint p.forbids s ∧ ¬ (p.produces ⊆ s)
 
 instance (p : InterpretedPattern V) (s : Finset V) : Decidable (guard p s) :=
-  inferInstanceAs (Decidable (p.consumes ⊆ s ∧ Disjoint p.forbids s))
+  inferInstanceAs (Decidable (p.consumes ⊆ s ∧ Disjoint p.forbids s ∧ ¬ (p.produces ⊆ s)))
 
 /-- The interpreted kernel of one pattern: to `s ∪ produces` with probability
 `θ_p`, stay with probability `1 − θ_p`. -/
@@ -80,7 +82,20 @@ skipped, exactly like one whose IF clause fails. -/
 theorem firstEnabled_skips_forbidden (p : InterpretedPattern V)
     (ps : List (InterpretedPattern V)) (s : Finset V) (h : ¬ Disjoint p.forbids s) :
     firstEnabled (p :: ps) s = firstEnabled ps s := by
-  simp only [firstEnabled, guard, h, and_false, if_false]
+  simp [firstEnabled, guard, h, if_false]
+
+/-- A pattern whose guard fails for any reason is skipped. -/
+theorem firstEnabled_skips_disabled (p : InterpretedPattern V)
+    (ps : List (InterpretedPattern V)) (s : Finset V) (h : ¬ guard p s) :
+    firstEnabled (p :: ps) s = firstEnabled ps s := by
+  simp only [firstEnabled, h, if_false]
+
+/-- A pattern whose produces are already established is skipped: a completed
+pattern does not keep winning precedence and blocking the next one. -/
+theorem firstEnabled_skips_achieved (p : InterpretedPattern V)
+    (ps : List (InterpretedPattern V)) (s : Finset V) (h : p.produces ⊆ s) :
+    firstEnabled (p :: ps) s = firstEnabled ps s := by
+  exact firstEnabled_skips_disabled p ps s (fun hg => hg.2.2 h)
 
 /-- The cascade kernel: the pattern kernel of the first enabled pattern, or
 the identity when no pattern is enabled. -/
@@ -111,6 +126,12 @@ theorem cascadeKernel_rowsum (precedence : List (InterpretedPattern V)) (s : Fin
 theorem cascadeKernel_of_noEnabled (precedence : List (InterpretedPattern V)) (s s' : Finset V)
     (h : firstEnabled precedence s = none) :
     cascadeKernel precedence s s' = if s' = s then 1 else 0 := by
+  simp only [cascadeKernel, h]
+
+/-- The cascade kernel depends on the precedence only through `firstEnabled`. -/
+theorem cascadeKernel_congr {π π' : List (InterpretedPattern V)} {s s' : Finset V}
+    (h : firstEnabled π s = firstEnabled π' s) :
+    cascadeKernel π s s' = cascadeKernel π' s s' := by
   simp only [cascadeKernel, h]
 
 /-! ## Typed hole: a firing pattern with no interpretation -/
@@ -336,6 +357,158 @@ theorem fixture_rollout_two_one :
   rw [fixture_rollout_two 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)]
   norm_num
 
+/-- With the continuing guard, the SAME precedence `[p1, p2]` at every step
+chains the rollout: at `{0, 1}` the achieved p1 is skipped and p2 fires, so
+the two-step rollout from ∅ reaches the full state with probability 1
+(θ₁ = θ₂ = 1). This is the case the old guard got wrong: a completed pattern
+kept winning precedence and p2 never fired. -/
+private def fπc : ℕ → List (InterpretedPattern (Fin 3)) :=
+  fun _ => fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)
+
+theorem fixture_same_precedence_chain :
+    rolloutState fModel fπc 2 (Finset.univ : Finset (Fin 3)) = 1 := by
+  have hr : rolloutState fModel fπc 2 Finset.univ
+      = ∑ s : Finset (Fin 3),
+          cascadeKernel (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)) s
+            Finset.univ * rolloutState fModel fπc 1 s := by
+    have hr0 : ∀ s'' : Finset (Fin 3), rolloutState fModel fπc 2 s''
+        = ∑ s : Finset (Fin 3), fModel.B (fπc 1) s s'' * rolloutState fModel fπc 1 s :=
+      fun _ => rfl
+    rw [hr0]
+    have hp : fπc 1 = fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num) := rfl
+    rw [hp]
+    exact Finset.sum_congr rfl fun s _ => rfl
+  have hroll1 : ∀ s : Finset (Fin 3),
+      rolloutState fModel fπc 1 s = if s = ({0, 1} : Finset (Fin 3)) then 1 else 0 := by
+    intro s
+    rw [oneStep _ _ rfl,
+      show fπc 0 = fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num) from rfl,
+      cascadeKernel,
+      show firstEnabled (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)) ∅
+          = some (fp1 1 (by norm_num) (by norm_num)) by
+        simp [fprec0, firstEnabled, guard, fp1, fp2]]
+    simp only [patternKernel, fp1, Finset.empty_union]
+    by_cases hs : s = ({0, 1} : Finset (Fin 3)) <;> simp [hs]
+  have hker : cascadeKernel (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num))
+      ({0, 1} : Finset (Fin 3)) Finset.univ = 1 := by
+    rw [cascadeKernel,
+      show firstEnabled (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num))
+          ({0, 1} : Finset (Fin 3)) = some (fp2 1 (by norm_num) (by norm_num)) by
+        simp [fprec0, firstEnabled, guard, fp1, fp2]]
+    simp only [patternKernel, fp2]
+    have hU : ({0, 1} : Finset (Fin 3)) ∪ {2} = Finset.univ := by decide
+    have hne : (Finset.univ : Finset (Fin 3)) ≠ ({0, 1} : Finset (Fin 3)) := by decide
+    rw [hU, if_pos rfl, if_neg hne]
+    norm_num
+  have hsum : ∑ s : Finset (Fin 3),
+      cascadeKernel (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)) s
+        Finset.univ * (if s = ({0, 1} : Finset (Fin 3)) then 1 else 0)
+    = cascadeKernel (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num))
+        ({0, 1} : Finset (Fin 3)) Finset.univ := by
+    have step : ∀ s : Finset (Fin 3),
+        cascadeKernel (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)) s
+            Finset.univ * (if s = ({0, 1} : Finset (Fin 3)) then 1 else 0)
+          = if s = ({0, 1} : Finset (Fin 3)) then
+              cascadeKernel (fprec0 1 1 (by norm_num) (by norm_num) (by norm_num) (by norm_num)) s
+                Finset.univ
+            else 0 := by
+      intro s
+      by_cases hs : s = ({0, 1} : Finset (Fin 3)) <;> simp [hs]
+    rw [Finset.sum_congr rfl fun s _ => step s, Finset.sum_ite_eq']
+    simp
+  rw [hr, Finset.sum_congr rfl fun s _ => by rw [hroll1 s], hsum, hker]
+
+/-! ## Joe's five situations: permission, withdrawal, renewal -/
+
+private inductive FTok
+  | perm | withdrawn | aOut | bOut | perm2 | withdrawn2
+  deriving DecidableEq, Fintype
+
+private def patA (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern FTok where
+  consumes := {FTok.perm}
+  produces := {FTok.aOut}
+  forbids := {FTok.withdrawn}
+  theta := t
+  theta_nonneg := h1
+  theta_le_one := h2
+
+private def patB (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern FTok where
+  consumes := {FTok.perm}
+  produces := {FTok.bOut}
+  forbids := {FTok.withdrawn}
+  theta := t
+  theta_nonneg := h1
+  theta_le_one := h2
+
+private def patB2 (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) : InterpretedPattern FTok where
+  consumes := {FTok.perm2}
+  produces := {FTok.bOut}
+  forbids := {FTok.withdrawn2}
+  theta := t
+  theta_nonneg := h1
+  theta_le_one := h2
+
+/-- (i) While the permission holds and aOut is not yet achieved, A is
+enabled. -/
+theorem fixture_situation_i (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) :
+    guard (patA t h1 h2) {FTok.perm} := by
+  simp [guard, patA]
+
+/-- (ii) With θ < 1 a failed attempt leaves the state unchanged (mass
+1 − θ stays at `{perm}`), and A is still enabled there at the next step. -/
+theorem fixture_situation_ii (t : ℝ) (h1 : 0 ≤ t) (h2 : t < 1) :
+    patternKernel (patA t h1 (le_of_lt h2)) {FTok.perm} {FTok.perm} = 1 - t
+      ∧ guard (patA t h1 (le_of_lt h2)) {FTok.perm} := by
+  constructor
+  · have hu : ({FTok.perm} : Finset FTok) ∪ {FTok.aOut} = {FTok.perm, FTok.aOut} := by decide
+    have hne : ({FTok.perm} : Finset FTok) ≠ {FTok.perm} ∪ {FTok.aOut} := by
+      rw [hu]; decide
+    simp only [patternKernel, patA]
+    rw [if_neg hne]
+    simp
+  · simp [guard, patA]
+
+/-- (iii) At `{perm, withdrawn}` neither A nor B is enabled: the cascade
+kernel is the identity, so activity stops. -/
+theorem fixture_situation_iii (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) (s' : Finset FTok) :
+    cascadeKernel [patA t h1 h2, patB t h1 h2] {FTok.perm, FTok.withdrawn} s'
+      = if s' = {FTok.perm, FTok.withdrawn} then 1 else 0 := by
+  rw [cascadeKernel,
+    show firstEnabled [patA t h1 h2, patB t h1 h2] {FTok.perm, FTok.withdrawn} = none by
+      simp [firstEnabled, guard, patA, patB]]
+
+/-- (iv) Withdrawal present before B starts means B is not enabled. -/
+theorem fixture_situation_iv (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) :
+    ¬ guard (patB t h1 h2) {FTok.perm, FTok.withdrawn} := by
+  simp [guard, patB]
+
+/-- (v, first half) At `{perm, withdrawn}` B stays disabled under every
+precedence order of the A/B patterns: the kernel is the identity whatever
+the order. -/
+theorem fixture_situation_v_disabled (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) :
+    ∀ π : List (InterpretedPattern FTok),
+      (∀ q ∈ π, q = patA t h1 h2 ∨ q = patB t h1 h2) →
+      ∀ s' : Finset FTok,
+        cascadeKernel π {FTok.perm, FTok.withdrawn} s'
+          = if s' = {FTok.perm, FTok.withdrawn} then 1 else 0 := by
+  intro π
+  induction π with
+  | nil => intro _ s'; exact cascadeKernel_of_noEnabled [] _ s' rfl
+  | cons q qs ih =>
+    intro hm s'
+    rcases hm q (by simp) with rfl | rfl
+    · rw [cascadeKernel_congr (firstEnabled_skips_disabled _ _ _ (by simp [guard, patA]))]
+      exact (ih fun q hq => hm q (List.mem_cons_of_mem _ hq)) s'
+    · rw [cascadeKernel_congr (firstEnabled_skips_disabled _ _ _ (by simp [guard, patB]))]
+      exact (ih fun q hq => hm q (List.mem_cons_of_mem _ hq)) s'
+
+/-- (v, second half) Only a renewed permission `perm2` with its own pattern
+B2 can enable production of `bOut` after the withdrawal. -/
+theorem fixture_situation_v_renewal (t : ℝ) (h1 : 0 ≤ t) (h2 : t ≤ 1) :
+    firstEnabled [patB2 t h1 h2, patA t h1 h2, patB t h1 h2]
+        {FTok.perm, FTok.withdrawn, FTok.perm2} = some (patB2 t h1 h2) := by
+  simp [firstEnabled, guard, patB2, patA, patB]
+
 /-- Reversed precedence gives the same one-step result, because at `∅` only
 `p1` is enabled in either order. -/
 theorem fixture_one_step_reversed (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
@@ -367,6 +540,15 @@ theorem fixture_one_step_reversed (t1 t2 : ℝ) (h1 : 0 ≤ t1) (h1' : t1 ≤ 1)
 #print axioms fixture_p3_enabled_at_empty
 #print axioms fixture_p3_not_enabled_at_two
 #print axioms fixture_p3_identity_when_blocked
+#print axioms firstEnabled_skips_achieved
+#print axioms firstEnabled_skips_disabled
+#print axioms fixture_same_precedence_chain
+#print axioms fixture_situation_i
+#print axioms fixture_situation_ii
+#print axioms fixture_situation_iii
+#print axioms fixture_situation_iv
+#print axioms fixture_situation_v_disabled
+#print axioms fixture_situation_v_renewal
 
 end DarkTower.WarMachine.CascadeTransition
 
