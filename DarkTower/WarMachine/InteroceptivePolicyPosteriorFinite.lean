@@ -42,11 +42,26 @@ noncomputable def normalizer (habit g fPi : Fin n → ℝ) (beta : ℝ) : ℝ :=
 noncomputable def weight (habit g fPi : Fin n → ℝ) (beta : ℝ) (i : Fin n) : ℝ :=
   rawWeight habit g fPi beta i / normalizer habit g fPi beta
 
+/-- The occurrence-index policy list is nonempty whenever `Fin n` is. -/
+theorem ofFn_id_ne [Nonempty (Fin n)] : (List.ofFn (id : Fin n → Fin n)) ≠ [] := by
+  intro h
+  obtain ⟨i⟩ := ‹Nonempty (Fin n)›
+  have h0 : 0 < n := lt_of_le_of_lt (Nat.zero_le i) i.isLt
+  have hlen : (List.ofFn (id : Fin n → Fin n)).length = n := List.length_ofFn
+  rw [h] at hlen
+  simp only [List.length_nil] at hlen
+  exact absurd hlen (by omega)
+
+/-- The occurrence-index policy list is duplicate-free. -/
+theorem ofFn_id_nodup : (List.ofFn (id : Fin n → Fin n)).Nodup :=
+  List.nodup_ofFn.mpr (fun _ _ h => h)
+
 /-- Exact equality to the frozen canonical list carrier, specialized to
 `Real.exp`, `Real.log`, occurrence-index support, and `tau = beta`. -/
-theorem canonicalList_eq_ofFn (habit g fPi : Fin n → ℝ) (beta : ℝ) :
-    PolicyPosterior.softmaxWithFPi Real.exp Real.log habit (gradeOf g) fPi beta
-      (List.ofFn id) = List.ofFn (weight habit g fPi beta) := by
+theorem canonicalList_eq_ofFn [Nonempty (Fin n)] (habit g fPi : Fin n → ℝ) (beta : ℝ)
+    (hhabit : ∀ i, 0 < habit i) (hbeta : 0 < beta) :
+    PolicyPosterior.softmaxWithFPi habit (gradeOf g) fPi beta (List.ofFn id)
+      hhabit hbeta ofFn_id_ne ofFn_id_nodup = List.ofFn (weight habit g fPi beta) := by
   simp only [PolicyPosterior.softmaxWithFPi, gradeOf, List.map_ofFn,
     List.foldl_eq_foldr]
   apply congrArg List.ofFn
@@ -86,10 +101,11 @@ theorem weights_normalised [Nonempty (Fin n)] (habit g fPi : Fin n → ℝ)
 
 /-- Ordered support has exactly `n` occurrence indices; equal candidate values
 do not merge positions. -/
-theorem canonicalList_length (habit g fPi : Fin n → ℝ) (beta : ℝ) :
-    (PolicyPosterior.softmaxWithFPi Real.exp Real.log habit (gradeOf g) fPi beta
-      (List.ofFn id)).length = n := by
-  rw [canonicalList_eq_ofFn]
+theorem canonicalList_length [Nonempty (Fin n)] (habit g fPi : Fin n → ℝ) (beta : ℝ)
+    (hhabit : ∀ i, 0 < habit i) (hbeta : 0 < beta) :
+    (PolicyPosterior.softmaxWithFPi habit (gradeOf g) fPi beta (List.ofFn id)
+      hhabit hbeta ofFn_id_ne ofFn_id_nodup).length = n := by
+  rw [canonicalList_eq_ofFn habit g fPi beta hhabit hbeta]
   simp
 
 theorem score_continuousOn_positive (habit g fPi : Fin n → ℝ) (i : Fin n) :

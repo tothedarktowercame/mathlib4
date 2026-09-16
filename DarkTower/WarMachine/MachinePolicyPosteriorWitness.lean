@@ -6,13 +6,16 @@ namespace DarkTower.WarMachine.MachinePolicyPosteriorWitness
 uses the declared raw-exponential normalization and never reads retained Q. -/
 
 /-- The record's absent F_pi branch is the closed softmax branch of the general carrier. -/
-theorem fAbsentBranchCompatibility {PolicyIndex : Type*} (exp log : ℝ → ℝ)
-    (habit : PolicyIndex → ℝ)
+theorem fAbsentBranchCompatibility {PolicyIndex : Type*} (habit : PolicyIndex → ℝ)
     (grade : PolicyIndex → DarkTower.WarMachine.Holes.ExpectedFreeEnergyValue)
-    (tau : ℝ) (policies : List PolicyIndex) :
-    DarkTower.WarMachine.PolicyPosterior.softmaxWithFPi exp log habit grade (fun _ => 0) tau policies =
-      DarkTower.WarMachine.Holes.softmax exp log habit grade tau policies := by
-  exact DarkTower.WarMachine.PolicyPosterior.softmaxWithFPi_zero exp log habit grade tau policies
+    (tau : ℝ) (policies : List PolicyIndex)
+    (hhabit : ∀ π, 0 < habit π) (htau : 0 < tau)
+    (hne : policies ≠ []) (hnodup : policies.Nodup) :
+    DarkTower.WarMachine.PolicyPosterior.softmaxWithFPi habit grade (fun _ => 0) tau policies
+      hhabit htau hne hnodup =
+      DarkTower.WarMachine.Holes.softmax Real.exp Real.log habit grade tau policies := by
+  exact DarkTower.WarMachine.PolicyPosterior.softmaxWithFPi_zero habit grade tau policies
+    hhabit htau hne hnodup
 
 /-- Rank 1: retained posterior versus raw-exp carrier reference. -/
 theorem coordinate001 : (4971256597298457 / 288230376151711744 : ℚ) = (621407074662307 / 36028797018963968 : ℚ) + (1 / 288230376151711744 : ℚ) ∧ |(1 / 288230376151711744 : ℚ)| ≤ (1 / 2^45 : ℚ) := by
