@@ -103,4 +103,47 @@ theorem cascadeKernel_of_noEnabled (precedence : List (InterpretedPattern V)) (s
     cascadeKernel precedence s s' = if s' = s then 1 else 0 := by
   simp only [cascadeKernel, h]
 
+/-! ## Typed hole: a firing pattern with no interpretation -/
+
+/-- A pattern slot whose interpretation may be missing (`interp = none`); when
+present it is bounded in `[0,1]` (SPEC A1, A4, §2). -/
+structure PatternSlot (V : Type*) [Fintype V] [DecidableEq V] where
+  consumes : Finset V
+  produces : Finset V
+  interp : Option ℝ
+  interp_bounded : ∀ x ∈ interp, 0 ≤ x ∧ x ≤ 1
+
+/-- Interpret every slot, or `none` if any slot lacks an interpretation. -/
+def interpret : List (PatternSlot V) → Option (List (InterpretedPattern V))
+  | [] => some []
+  | ⟨_, _, none, _⟩ :: _ => none
+  | ⟨c, pr, some x, hb⟩ :: slots =>
+      (interpret slots).map fun rest =>
+        ⟨c, pr, x, (hb x (by simp)).1, (hb x (by simp)).2⟩ :: rest
+
+theorem interpret_eq_none_iff (slots : List (PatternSlot V)) :
+    interpret slots = none ↔ ∃ slot ∈ slots, slot.interp = none := by
+  induction slots with
+  | nil => simp [interpret]
+  | cons slot slots ih =>
+    rcases slot with ⟨c, pr, interp, hb⟩
+    cases interp with
+    | none =>
+        rw [interpret]
+        constructor
+        · intro _
+          exact ⟨_, List.mem_cons_self .., rfl⟩
+        · intro _
+          rfl
+    | some x =>
+        rw [interpret, Option.map_eq_none_iff, ih]
+        constructor
+        · rintro ⟨s, hs2, h2⟩
+          exact ⟨s, List.mem_cons_of_mem _ hs2, h2⟩
+        · rintro ⟨s, hs2, h2⟩
+          rcases List.mem_cons.mp hs2 with rfl | hm
+          · exact absurd h2 (by simp)
+          · exact ⟨s, hm, h2⟩
+
 end DarkTower.WarMachine.CascadeTransition
+
