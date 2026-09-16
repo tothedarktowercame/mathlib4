@@ -1,4 +1,5 @@
 import DarkTower.WarMachine.Holes
+import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
 
 /-! The risk term of expected free energy as an exact extended-real
 KL divergence, per Da Costa et al. 2020 eq. (44)
@@ -392,6 +393,80 @@ theorem outcomeRisk_disjoint_deltas : outcomeRisk qDeltaA cDeltaB () = ⊤ := by
       · norm_num [qDeltaA, outcomeA]
       · simp [cDeltaB, outcomeA]⟩
   rw [outcomeRisk, if_pos hany]
+
+/-! ## Infinite risk gives posterior probability zero
+
+The policy posterior `Q(π) = σ(ln E − F − G)` (Parr et al. 2022 eq. B.9;
+`PolicyPosterior.softmaxWithFPi` for finite `G`) written with an extended `G`,
+so that a policy of infinite risk is admitted rather than excluded. Its
+unnormalised weight is `E(π) · exp(−G(π) − F(π))` in `ℝ≥0∞`, using
+`EReal.exp` (`exp ⊥ = 0`). This is what makes the exclusion of a policy that
+predicts a zero-preference outcome a consequence of the model, not a rule. -/
+
+section PosteriorZero
+
+variable {PolicyIndex : Type*}
+
+/-- Unnormalised policy weight `E(π) · exp(−G(π) − F(π))`, with `G` extended. -/
+def policyWeight (habit F : PolicyIndex → ℝ) (G : PolicyIndex → EReal)
+    (π : PolicyIndex) : ENNReal :=
+  ENNReal.ofReal (habit π) * EReal.exp (-(G π) - (F π : EReal))
+
+/-- The policy posterior with extended `G`. -/
+def policyPosterior [Fintype PolicyIndex] (habit F : PolicyIndex → ℝ)
+    (G : PolicyIndex → EReal) (π : PolicyIndex) : ENNReal :=
+  policyWeight habit F G π / ∑ π', policyWeight habit F G π'
+
+/-- A policy whose expected free energy is `⊤` has weight zero. -/
+theorem policyWeight_eq_zero_of_top (habit F : PolicyIndex → ℝ)
+    (G : PolicyIndex → EReal) (π : PolicyIndex) (hG : G π = ⊤) :
+    policyWeight habit F G π = 0 := by
+  simp [policyWeight, hG]
+
+/-- On finite `G` the weight is the real softmax weight
+`E(π) · exp(−G(π) − F(π))` of `PolicyPosterior.softmaxWithFPi` (τ = 1). -/
+theorem policyWeight_coe (habit F g : PolicyIndex → ℝ) (hhabit : ∀ π, 0 ≤ habit π)
+    (π : PolicyIndex) :
+    policyWeight habit F (fun π => (g π : EReal)) π
+      = ENNReal.ofReal (habit π * Real.exp (-(g π) - F π)) := by
+  rw [policyWeight, ENNReal.ofReal_mul (hhabit π)]
+  congr 1
+
+/-- The posterior sums to one whenever some policy has positive finite weight
+(the total is neither `0` nor `⊤`). -/
+theorem policyPosterior_sum [Fintype PolicyIndex] (habit F : PolicyIndex → ℝ)
+    (G : PolicyIndex → EReal)
+    (h0 : ∑ π', policyWeight habit F G π' ≠ 0)
+    (htop : ∑ π', policyWeight habit F G π' ≠ ⊤) :
+    ∑ π, policyPosterior habit F G π = 1 := by
+  simp only [policyPosterior, div_eq_mul_inv]
+  rw [← Finset.sum_mul]
+  exact ENNReal.mul_inv_cancel h0 htop
+
+/-- **Infinite risk gives posterior probability zero.** If `π` predicts, with
+positive mass, an outcome the preference distribution `C` gives zero mass, its
+risk is `⊤` (`outcomeRisk_eq_top_iff`), so `G(π) = risk + ambiguity` is `⊤` for
+any finite ambiguity and `Q(π) = 0`. -/
+theorem policyPosterior_eq_zero_of_risk_top [Fintype PolicyIndex] {Obs : Vertex → Type*}
+    (Q : PredictiveOutcomeKernel PolicyIndex Obs) (C : PreferenceDistribution Obs)
+    (habit F ambiguity : PolicyIndex → ℝ) (π : PolicyIndex)
+    (hrisk : outcomeRisk Q C π = ⊤) :
+    policyPosterior habit F (fun π => outcomeRisk Q C π + (ambiguity π : EReal)) π = 0 := by
+  rw [policyPosterior, policyWeight_eq_zero_of_top _ _ _ _ (by simp [hrisk]),
+    ENNReal.zero_div]
+
+/-- The same conclusion stated from the outcome: positive predicted mass on a
+zero-preference outcome excludes the policy. -/
+theorem policyPosterior_eq_zero_of_unpreferred_outcome [Fintype PolicyIndex]
+    {Obs : Vertex → Type*}
+    (Q : PredictiveOutcomeKernel PolicyIndex Obs) (C : PreferenceDistribution Obs)
+    (habit F ambiguity : PolicyIndex → ℝ) (π : PolicyIndex) (o : Outcome Obs)
+    (ho : o ∈ Q.support π) (hq : 0 < Q.mass π o) (hc : C.mass () o = 0) :
+    policyPosterior habit F (fun π => outcomeRisk Q C π + (ambiguity π : EReal)) π = 0 :=
+  policyPosterior_eq_zero_of_risk_top Q C habit F ambiguity π
+    ((outcomeRisk_eq_top_iff Q C π).mpr ⟨o, ho, hq, hc⟩)
+
+end PosteriorZero
 
 end
 end DarkTower.WarMachine.OutcomeRiskKL
