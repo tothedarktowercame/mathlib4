@@ -53,6 +53,11 @@ private def runtimeEntry (decl : Name) (holder decided owner locus fixture evide
 
 private def notLivePath : String := "runtime-correspondence-not-live-path"
 
+/-- The runtime function is called on the live War Machine path, but its result is only
+recorded; it does not select or change enacted output. The owner string names the live
+call site as `live-call-site=path:line`, which the verifier resolves to a call. -/
+private def liveShadow : String := "runtime-correspondence-live-shadow"
+
 /-- The named Clojure function computes the Lean declaration except on a known,
 named input class, recorded first in the falsifier: the Lean moved ahead (an approved
 design change) and the runtime has not caught up. -/
@@ -261,7 +266,13 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:566"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:440"
         "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
-        "Any 2-4 token case where sparse and enumerating G differ (sparse-g-equals-enumerating-g :440); a universe offset other than T*k*ln 2 (horizon-g-sparse-universe-offset :559); a non-zero judgement rate accepted at scale."] },
+        "Any 2-4 token case where sparse and enumerating G differ (sparse-g-equals-enumerating-g :440); a universe offset other than T*k*ln 2 (horizon-g-sparse-universe-offset :559); a non-zero judgement rate accepted at scale.",
+      runtimeEntry ``DarkTower.WarMachine.PolicyHorizon.horizonEFE liveShadow "2026-09-16"
+        "WM-05/WM-10 (P11 step 1): live shadow G. shadow-cascade-g delegates to horizon-g-sparse (whose Lean value replay is sparse-g-equals-enumerating-g and horizon-g-lean-fixture-correspondence); called on the live path in receipt_construction/construct and recorded only as :score-before/:score-after, never selecting or changing enacted output. live-call-site=futon2/src/futon2/aif/receipt_construction.clj:566 (the score closure reading these results feeds organise at :578). Declared reductions: zero adjudication rates; lam = mu = 1; empty evidence and zeroed sets; horizon 3 (AUTH-horizon-semantics proposes T = 2, awaiting Joe); documented-default theta"
+        "futon2/src/futon2/aif/shadow_cascade_g.clj:135"
+        "futon2/test/futon2/aif/shadow_cascade_g_test.clj:58"
+        "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:167"
+        "A construction whose arms are scored over per-arm universes rather than one common universe (G shifts by T*k*ln 2); a shown order that differs between the shadow scorer and the constant scorer (shadow-does-not-change-shown :119); a refusal not surfaced (shadow-g-refusals :89)."] },
   { schemaVersion := 1, contractId := "wm-exact-belief",
     moduleName := "DarkTower.WarMachine.ExactBeliefTrajectory",
     declarations := [

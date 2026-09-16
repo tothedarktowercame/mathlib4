@@ -36,7 +36,7 @@ EXPECTED[PREFIX + 'TokenPreference'] = [PREFIX + 'TokenPreference.PreferenceSpec
                                         PREFIX + 'TokenPreference.PreferenceSpec.preference',
                                         PREFIX + 'TokenPreference.PreferenceSpec.preference']
 EXPECTED[PREFIX + 'PolicyHorizon'] = [PREFIX + 'PolicyHorizon.' + n
-                                      for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE', 'horizonEFE']]
+                                      for n in ['stepRisk', 'stepAmbiguity', 'horizonEFE', 'horizonEFE', 'horizonEFE']]
 EXPECTED[PREFIX + 'ExactBeliefTrajectory'] = [PREFIX + 'ExactBeliefTrajectory.exactUpdate',
                                               PREFIX + 'ExactBeliefTrajectory.tokenBeliefAt']
 HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path',
@@ -125,6 +125,9 @@ RUNTIME_FORMS = {
          'evidence': ('theorem', 'horizonEFE_eq_top_iff')},
         {'clojure-locus': ('defn', 'horizon-g-sparse'),
          'fixture': ('deftest', 'sparse-g-equals-enumerating-g'),
+         'evidence': ('theorem', 'horizonEFE_eq_top_iff')},
+        {'clojure-locus': ('defn', 'shadow-cascade-g'),
+         'fixture': ('deftest', 'shadow-g-computed-on-fixture'),
          'evidence': ('theorem', 'horizonEFE_eq_top_iff')}],
     PREFIX + 'ExactBeliefTrajectory.exactUpdate': {
         'clojure-locus': ('defn', 'exact-update'),
