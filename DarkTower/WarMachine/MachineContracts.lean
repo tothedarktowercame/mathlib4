@@ -163,19 +163,37 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:262"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:82"
-        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :82).",
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :82).",
       runtimeEntry ``DarkTower.WarMachine.CascadeTransition.cascadeKernel notLivePath "2026-09-16"
         "WM-03 (P3): first-enabled cascade kernel; identity when no pattern is enabled; add-only effects"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:277"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:141"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:116"
-        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: A cascade row does not sum to 1 (cascadeKernel_rowsum :116), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :126; fixture_p3_identity_when_blocked :241).",
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A cascade row does not sum to 1 (cascadeKernel_rowsum :116), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :126; fixture_p3_identity_when_blocked :241).",
       runtimeEntry ``DarkTower.WarMachine.CascadeTransition.interpret notLivePath "2026-09-16"
         "WM-03 (P3): a precedence with an uninterpreted pattern is a typed hole"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:269"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:159"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:156"
-        "A precedence containing an uninterpreted pattern does not yield :missing-pattern-interpretation (interpret_eq_none_iff :156)."] },
+        "A precedence containing an uninterpreted pattern does not yield :missing-pattern-interpretation (interpret_eq_none_iff :156).",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.guard notLivePath "2026-09-16"
+        "WM-03 (P10 revised + P3): guard p s := consumes ⊆ s ∧ Disjoint forbids s ∧ ¬(produces ⊆ s); a completed pattern does not keep winning precedence (futon2 8222c700, prediction side)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:105"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:326"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:95"
+        "An achieved pattern first in precedence is not skipped (firstEnabled_skips_achieved :95); empty produces treated as not achieved; a forbidden token present does not disable the guard.",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.firstEnabled notLivePath "2026-09-16"
+        "WM-03 (P10): the same precedence list carries a chain forward as earlier patterns complete (fixture_same_precedence_chain)"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:262"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:291"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:368"
+        "An achieved pattern first in precedence is selected, so the chain stalls at its first completed step.",
+      runtimeEntry ``DarkTower.WarMachine.CascadeTransition.cascadeKernel notLivePath "2026-09-16"
+        "WM-03 (P10): the five approved situations (i)-(v, disabled and renewal) of the continuing guard"
+        "futon2/src/futon2/aif/cascade_model_manifest.clj:277"
+        "futon2/test/futon2/aif/cascade_model_manifest_test.clj:304"
+        "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:507"
+        "Any of the five situations gives a different transition row from the Lean fixtures fixture_situation_i :453, _ii :459, _iii :473, _iv :481, _v_disabled :488, _v_renewal :507."] },
   { schemaVersion := 1, contractId := "wm-policy-rollout",
     moduleName := "DarkTower.WarMachine.PolicyRollout",
     declarations := [
@@ -184,7 +202,7 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:298"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:120"
         "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:286"
-        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :286), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :514).",
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :286), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :514).",
       runtimeEntry ``DarkTower.WarMachine.PolicyRollout.predictedOutcome notLivePath "2026-09-16"
         "WM-04 (P5): Q(o|pi) = sum_s A(s,o) q(s) with A = TokenObservation.tokenLikelihood"
         "futon2/src/futon2/aif/cascade_model_manifest.clj:217"
@@ -287,7 +305,7 @@ def registries : List Registry := [
         "futon2/src/futon2/aif/cascade_model_manifest.clj:648"
         "futon2/test/futon2/aif/cascade_model_manifest_test.clj:642"
         "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:238"
-        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); claude-4 review pending): an achieved pattern first in precedence is not skipped. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
+        "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField)."] }
   ]
 
 def main : IO Unit := do

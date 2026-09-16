@@ -25,7 +25,8 @@ EXPECTED = {PREFIX + 'Machine' + k: [PREFIX + 'Machine' + k + '.' + v]
 EXPECTED[PREFIX + 'TokenState'] = [PREFIX + 'TokenState.' + n
                                    for n in ['observedBelief', 'independentBelief', 'coverage']]
 EXPECTED[PREFIX + 'CascadeTransition'] = [PREFIX + 'CascadeTransition.' + n
-                                          for n in ['patternKernel', 'firstEnabled', 'cascadeKernel', 'interpret']]
+                                          for n in ['patternKernel', 'firstEnabled', 'cascadeKernel', 'interpret',
+                                                    'guard', 'firstEnabled', 'cascadeKernel']]
 EXPECTED[PREFIX + 'PolicyRollout'] = [PREFIX + 'PolicyRollout.rolloutState',
                                       PREFIX + 'PolicyRollout.predictedOutcome']
 EXPECTED[PREFIX + 'TokenObservation'] = [PREFIX + 'TokenObservation.tokenLikelihood',
@@ -65,14 +66,24 @@ RUNTIME_FORMS = {
         'clojure-locus': ('defn', 'pattern-kernel'),
         'fixture': ('deftest', 'cascade-transition-lean-fixture-correspondence'),
         'evidence': ('theorem', 'patternKernel_of_achieved')},
-    PREFIX + 'CascadeTransition.firstEnabled': {
-        'clojure-locus': ('defn', 'first-enabled'),
-        'fixture': ('deftest', 'cascade-transition-lean-theorem-properties'),
-        'evidence': ('theorem', 'firstEnabled_skips_forbidden')},
-    PREFIX + 'CascadeTransition.cascadeKernel': {
-        'clojure-locus': ('defn', 'cascade-kernel'),
-        'fixture': ('deftest', 'cascade-transition-lean-theorem-properties'),
-        'evidence': ('theorem', 'cascadeKernel_rowsum')},
+    PREFIX + 'CascadeTransition.firstEnabled': [
+        {'clojure-locus': ('defn', 'first-enabled'),
+         'fixture': ('deftest', 'cascade-transition-lean-theorem-properties'),
+         'evidence': ('theorem', 'firstEnabled_skips_forbidden')},
+        {'clojure-locus': ('defn', 'first-enabled'),
+         'fixture': ('deftest', 'cascade-transition-p10-same-precedence-chain'),
+         'evidence': ('theorem', 'fixture_same_precedence_chain')}],
+    PREFIX + 'CascadeTransition.cascadeKernel': [
+        {'clojure-locus': ('defn', 'cascade-kernel'),
+         'fixture': ('deftest', 'cascade-transition-lean-theorem-properties'),
+         'evidence': ('theorem', 'cascadeKernel_rowsum')},
+        {'clojure-locus': ('defn', 'cascade-kernel'),
+         'fixture': ('deftest', 'cascade-transition-p10-five-situations'),
+         'evidence': ('theorem', 'fixture_situation_v_renewal')}],
+    PREFIX + 'CascadeTransition.guard': {
+        'clojure-locus': ('defn', 'guard-holds?'),
+        'fixture': ('deftest', 'cascade-transition-p10-achieved-first-is-skipped'),
+        'evidence': ('theorem', 'firstEnabled_skips_achieved')},
     PREFIX + 'CascadeTransition.interpret': {
         'clojure-locus': ('defn', 'missing-interpretation'),
         'fixture': ('deftest', 'cascade-transition-lean-falsifiers'),
