@@ -10,11 +10,15 @@ time `τ` (Da Costa et al. 2020 eq. 42, `refs/dacosta2020.txt:1403`, which has n
 sum over `τ`; `:1304–1309` identifies the horizon as `T`). Here `T` is a single
 depth: every term reads risk and ambiguity from the same predicted state
 `Q(s_τ|π)` of `PolicyRollout`, so no term can be evaluated at a different `τ`.
+The preference is a family `C_τ` indexed by step (Friston's `U_τ = ln P(o_τ)`,
+`refs/friston2017.txt:290`; SPEC §2 `Gτ = KL(Qτ‖Cτ) + …`; design P6), so a
+constant `C` is the special case, not the definition. Step `0` is the present
+belief `q₀`; the sum runs over the `T` predicted future steps.
 
 **Horizon is not construction length** (SPEC-cascade-policy-semantics Stage 0,
 "Horizon and the book"). The monotonicity proved here is in the prediction horizon
-`T` for a fixed candidate policy. Candidates are compared only at a common declared
-`T`. The cascade construction index `k` is not `T`, and nothing in this module
+`T` for a fixed candidate policy. Candidates must be compared only at a common
+declared `T` (a usage rule: the types do not enforce it). The cascade construction index `k` is not `T`, and nothing in this module
 scores construction length.
 -/
 
@@ -42,18 +46,19 @@ noncomputable def stepRisk (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (
   else ↑(∑ o, if 0 < predictedOutcome M σ n o then
       predictedOutcome M σ n o * Real.log (predictedOutcome M σ n o / C o) else 0)
 
-/-- `G(π, n)`: risk plus ambiguity, both at the same step `n`. -/
-noncomputable def stepTerm (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (C : O → ℝ) : EReal :=
-  stepRisk M σ n C + ↑(stepAmbiguity M σ n)
+/-- `G(π, n)`: risk against `C_n` plus ambiguity, both at the same step `n`. -/
+noncomputable def stepTerm (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (C : ℕ → O → ℝ) :
+    EReal :=
+  stepRisk M σ n (C n) + ↑(stepAmbiguity M σ n)
 
-/-- `G(π) = Σ_{τ=1}^{T} G(π, τ)` for a depth-`T` policy. -/
+/-- `G(π) = Σ_{τ=1}^{T} G(π, τ)` for a depth-`T` policy and a step-indexed preference. -/
 noncomputable def horizonEFE (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T) (π : Fin T → U)
-    (C : O → ℝ) : EReal :=
+    (C : ℕ → O → ℝ) : EReal :=
   ∑ i : Fin T, stepTerm M (policySeq hT π) (i.val + 1) C
 
 /-! ## Each term depends only on the actions before its step -/
 
-theorem stepTerm_congr (M : ForwardModel S O U) {σ σ' : ℕ → U} (n : ℕ) (C : O → ℝ)
+theorem stepTerm_congr (M : ForwardModel S O U) {σ σ' : ℕ → U} (n : ℕ) (C : ℕ → O → ℝ)
     (h : ∀ m < n, σ m = σ' m) : stepTerm M σ n C = stepTerm M σ' n C := by
   have hr := rolloutState_congr M n h
   simp only [stepTerm, stepRisk, stepAmbiguity, predictedOutcome, hr]
@@ -97,9 +102,9 @@ theorem stepRisk_nonneg (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (C :
     calc (0 : ℝ) = ∑ o, (q o - C o) := hsum.symm
       _ ≤ _ := Finset.sum_le_sum fun o _ => key o
 
-theorem stepTerm_nonneg (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (C : O → ℝ)
-    (hC0 : ∀ o, 0 ≤ C o) (hC1 : ∑ o, C o = 1) : 0 ≤ stepTerm M σ n C :=
-  add_nonneg (stepRisk_nonneg M σ n C hC0 hC1) (EReal.coe_nonneg.mpr (stepAmbiguity_nonneg M σ n))
+theorem stepTerm_nonneg (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (C : ℕ → O → ℝ)
+    (hC0 : ∀ o, 0 ≤ C n o) (hC1 : ∑ o, C n o = 1) : 0 ≤ stepTerm M σ n C :=
+  add_nonneg (stepRisk_nonneg M σ n (C n) hC0 hC1) (EReal.coe_nonneg.mpr (stepAmbiguity_nonneg M σ n))
 
 /-! ## One range: extending the horizon adds exactly the next step -/
 
@@ -107,7 +112,7 @@ theorem stepTerm_nonneg (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (C :
 `G_{T+1}(π) = G_T(π|T) + G(π, T+1)`: the new term is the risk and ambiguity at the
 one new step, and every earlier term is unchanged. -/
 theorem horizonEFE_succ (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T) (π : Fin (T + 1) → U)
-    (C : O → ℝ) :
+    (C : ℕ → O → ℝ) :
     horizonEFE M (Nat.succ_pos T) π C
       = horizonEFE M hT (fun i => π i.castSucc) C
         + stepTerm M (policySeq (Nat.succ_pos T) π) (T + 1) C := by
@@ -123,13 +128,13 @@ theorem horizonEFE_succ (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T) (π : Fi
 /-- **Monotone in the prediction horizon, for a fixed candidate.** This is not a
 statement about construction length: compare candidates only at a common `T`. -/
 theorem horizonEFE_mono (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T) (π : Fin (T + 1) → U)
-    (C : O → ℝ) (hC0 : ∀ o, 0 ≤ C o) (hC1 : ∑ o, C o = 1) :
+    (C : ℕ → O → ℝ) (hC0 : ∀ n o, 0 ≤ C n o) (hC1 : ∀ n, ∑ o, C n o = 1) :
     horizonEFE M hT (fun i => π i.castSucc) C ≤ horizonEFE M (Nat.succ_pos T) π C := by
   rw [horizonEFE_succ M hT π C]
-  exact le_add_of_nonneg_right (stepTerm_nonneg M _ _ C hC0 hC1)
+  exact le_add_of_nonneg_right (stepTerm_nonneg M _ _ C (hC0 _) (hC1 _))
 
 /-- At `T = 1`, `G` is the one-step risk plus ambiguity. -/
-theorem horizonEFE_one (M : ForwardModel S O U) (π : Fin 1 → U) (C : O → ℝ) :
+theorem horizonEFE_one (M : ForwardModel S O U) (π : Fin 1 → U) (C : ℕ → O → ℝ) :
     horizonEFE M Nat.one_pos π C = stepTerm M (policySeq Nat.one_pos π) 1 C := by
   simp [horizonEFE]
 
@@ -160,16 +165,17 @@ private theorem sum_eq_top_iff {ι : Type*} (s : Finset ι) (f : ι → EReal)
 
 /-- `G = ⊤` iff some step within the horizon has infinite risk. -/
 theorem horizonEFE_eq_top_iff (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T) (π : Fin T → U)
-    (C : O → ℝ) (hC0 : ∀ o, 0 ≤ C o) (hC1 : ∑ o, C o = 1) :
-    horizonEFE M hT π C = ⊤ ↔ ∃ i : Fin T, stepRisk M (policySeq hT π) (i.val + 1) C = ⊤ := by
+    (C : ℕ → O → ℝ) (hC0 : ∀ n o, 0 ≤ C n o) (hC1 : ∀ n, ∑ o, C n o = 1) :
+    horizonEFE M hT π C = ⊤ ↔
+      ∃ i : Fin T, stepRisk M (policySeq hT π) (i.val + 1) (C (i.val + 1)) = ⊤ := by
   have hnb : ∀ i ∈ (Finset.univ : Finset (Fin T)),
       stepTerm M (policySeq hT π) (i.val + 1) C ≠ ⊥ := fun i _ =>
-    ne_bot_of_le_ne_bot (by simp) (stepTerm_nonneg M _ _ C hC0 hC1)
+    ne_bot_of_le_ne_bot (by simp) (stepTerm_nonneg M _ _ C (hC0 _) (hC1 _))
   rw [horizonEFE, sum_eq_top_iff _ _ hnb]
   simp only [Finset.mem_univ, true_and]
   refine exists_congr fun i => ?_
-  have hrb : stepRisk M (policySeq hT π) (i.val + 1) C ≠ ⊥ :=
-    ne_bot_of_le_ne_bot (by simp) (stepRisk_nonneg M _ _ C hC0 hC1)
+  have hrb : stepRisk M (policySeq hT π) (i.val + 1) (C (i.val + 1)) ≠ ⊥ :=
+    ne_bot_of_le_ne_bot (by simp) (stepRisk_nonneg M _ _ _ (hC0 _) (hC1 _))
   rw [stepTerm]
   constructor
   · intro h
@@ -204,16 +210,19 @@ private theorem fx_rowEntropy (s : Bool) : rowEntropy fxModel s = 0 := by
 
 /-- A point-mass prediction at an outcome of positive preference has risk
 `ln (1 / C o₀)`. -/
-private theorem fx_stepRisk_point (σ : ℕ → Bool) (n : ℕ) (o₀ : Bool)
+private theorem fx_stepRisk_point (C : Bool → ℝ) (hCt : 0 < C true) (hCf : 0 < C false)
+    (σ : ℕ → Bool) (n : ℕ) (o₀ : Bool)
     (hq : ∀ o, predictedOutcome fxModel σ n o = if o = o₀ then 1 else 0) :
-    stepRisk fxModel σ n fxC = ↑(Real.log (1 / fxC o₀)) := by
-  have hne : ¬ ∃ o, 0 < predictedOutcome fxModel σ n o ∧ fxC o = 0 := by
+    stepRisk fxModel σ n C = ↑(Real.log (1 / C o₀)) := by
+  have hne : ¬ ∃ o, 0 < predictedOutcome fxModel σ n o ∧ C o = 0 := by
     rintro ⟨o, h1, h2⟩
-    cases o <;> simp [fxC] at h2
+    cases o
+    · exact hCf.ne' h2
+    · exact hCt.ne' h2
   rw [stepRisk, if_neg hne]
   congr 1
   rw [Fintype.sum_bool, hq true, hq false]
-  cases o₀ <;> simp [fxC]
+  cases o₀ <;> simp
 
 private theorem fx_rollout (σ : ℕ → Bool) (n : ℕ) (b : Bool)
     (h : rolloutState fxModel σ n = fun s => if s = b then 1 else 0) (o : Bool) :
@@ -249,22 +258,22 @@ private theorem fx_state_two_flip :
 /-- The two depth-2 policies share their first action, so their first-step terms
 are equal: `ln (4/3)` each. -/
 theorem fixture_first_step_equal :
-    stepTerm fxModel (policySeq (by norm_num) πstay) 1 fxC
-      = stepTerm fxModel (policySeq (by norm_num) πflip) 1 fxC := by
+    stepTerm fxModel (policySeq (by norm_num) πstay) 1 (fun _ => fxC)
+      = stepTerm fxModel (policySeq (by norm_num) πflip) 1 (fun _ => fxC) := by
   simp only [stepTerm, fx_stepAmbiguity]
-  rw [fx_stepRisk_point _ 1 false (fx_rollout _ 1 false (fx_state_one πstay rfl)),
-    fx_stepRisk_point _ 1 false (fx_rollout _ 1 false (fx_state_one πflip rfl))]
+  rw [fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 1 false (fx_rollout _ 1 false (fx_state_one πstay rfl)),
+    fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 1 false (fx_rollout _ 1 false (fx_state_one πflip rfl))]
 
 /-- At depth 2 they differ: `2 ln (4/3)` against `ln (4/3) + ln 4`. -/
 theorem fixture_depth_two_differs :
-    horizonEFE fxModel (by norm_num) πstay fxC = ↑(2 * Real.log (4 / 3)) ∧
-      horizonEFE fxModel (by norm_num) πflip fxC = ↑(Real.log (4 / 3) + Real.log 4) ∧
+    horizonEFE fxModel (by norm_num) πstay (fun _ => fxC) = ↑(2 * Real.log (4 / 3)) ∧
+      horizonEFE fxModel (by norm_num) πflip (fun _ => fxC) = ↑(Real.log (4 / 3) + Real.log 4) ∧
       (2 * Real.log (4 / 3) : ℝ) ≠ Real.log (4 / 3) + Real.log 4 := by
   refine ⟨?_, ?_, ?_⟩
   · rw [horizonEFE, Fin.sum_univ_two]
     simp only [Fin.val_zero, Fin.val_one, zero_add, stepTerm, fx_stepAmbiguity]
-    rw [fx_stepRisk_point _ 1 false (fx_rollout _ 1 false (fx_state_one πstay rfl)),
-      fx_stepRisk_point _ 2 false (fx_rollout _ 2 false fx_state_two_stay)]
+    rw [fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 1 false (fx_rollout _ 1 false (fx_state_one πstay rfl)),
+      fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 2 false (fx_rollout _ 2 false fx_state_two_stay)]
     simp only [fxC, Bool.false_eq_true, if_false, EReal.coe_zero, add_zero]
     rw [← EReal.coe_add]
     norm_num
@@ -272,8 +281,8 @@ theorem fixture_depth_two_differs :
     ring
   · rw [horizonEFE, Fin.sum_univ_two]
     simp only [Fin.val_zero, Fin.val_one, zero_add, stepTerm, fx_stepAmbiguity]
-    rw [fx_stepRisk_point _ 1 false (fx_rollout _ 1 false (fx_state_one πflip rfl)),
-      fx_stepRisk_point _ 2 true (fx_rollout _ 2 true fx_state_two_flip)]
+    rw [fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 1 false (fx_rollout _ 1 false (fx_state_one πflip rfl)),
+      fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 2 true (fx_rollout _ 2 true fx_state_two_flip)]
     simp only [fxC, Bool.false_eq_true, if_false, if_true, EReal.coe_zero, add_zero]
     rw [← EReal.coe_add]
     norm_num
@@ -281,5 +290,40 @@ theorem fixture_depth_two_differs :
     have h3 : Real.log (4 / 3) = Real.log 4 := by linarith
     have := Real.log_injOn_pos (by norm_num : (0 : ℝ) < 4 / 3) (by norm_num : (0 : ℝ) < 4) h3
     norm_num at this
+
+/-- The reversed preference: outcome `true` preferred 3/4. -/
+private noncomputable def fxC' : Bool → ℝ := fun o => if o then 3 / 4 else 1 / 4
+
+/-- **The preference is indexed by step.** With `C_1 = fxC` and `C_2 = fxC'` the
+ranking reverses against a constant `C`: the policy that flips at step 2 now scores
+`2 ln (4/3)`, and the one that stays `ln (4/3) + ln 4`. No constant `C` gives both. -/
+theorem fixture_stepIndexed_preference :
+    horizonEFE fxModel (by norm_num) πstay (fun n => if n = 2 then fxC' else fxC)
+        = ↑(Real.log (4 / 3) + Real.log 4) ∧
+      horizonEFE fxModel (by norm_num) πflip (fun n => if n = 2 then fxC' else fxC)
+        = ↑(2 * Real.log (4 / 3)) := by
+  refine ⟨?_, ?_⟩
+  · rw [horizonEFE, Fin.sum_univ_two]
+    simp only [Fin.val_zero, Fin.val_one, zero_add, stepTerm, fx_stepAmbiguity]
+    simp only [show (1 : ℕ) ≠ 2 by decide, if_false, if_true, Nat.reduceAdd]
+    rw [fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 1 false
+        (fx_rollout _ 1 false (fx_state_one πstay rfl)),
+      fx_stepRisk_point fxC' (by norm_num [fxC']) (by norm_num [fxC']) _ 2 false
+        (fx_rollout _ 2 false fx_state_two_stay)]
+    simp only [fxC, fxC', Bool.false_eq_true, if_false, EReal.coe_zero, add_zero]
+    rw [← EReal.coe_add]
+    norm_num
+  · rw [horizonEFE, Fin.sum_univ_two]
+    simp only [Fin.val_zero, Fin.val_one, zero_add, stepTerm, fx_stepAmbiguity]
+    simp only [show (1 : ℕ) ≠ 2 by decide, if_false, if_true, Nat.reduceAdd]
+    rw [fx_stepRisk_point fxC (by norm_num [fxC]) (by norm_num [fxC]) _ 1 false
+        (fx_rollout _ 1 false (fx_state_one πflip rfl)),
+      fx_stepRisk_point fxC' (by norm_num [fxC']) (by norm_num [fxC']) _ 2 true
+        (fx_rollout _ 2 true fx_state_two_flip)]
+    simp only [fxC, fxC', Bool.false_eq_true, if_false, if_true, EReal.coe_zero, add_zero]
+    rw [← EReal.coe_add]
+    norm_num
+    norm_cast
+    ring
 
 end DarkTower.WarMachine.PolicyHorizon

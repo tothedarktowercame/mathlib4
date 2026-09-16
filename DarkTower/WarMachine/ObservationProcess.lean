@@ -6,15 +6,22 @@ import DarkTower.WarMachine.TokenObservation
 
 Row `:observe` (audit A2 §1). Registry formal:
 `o_t <- structured observation of the world after action u_{t-1}`. The audit found
-no world, action or time relation in the old binding. Friston et al. 2017 eq. 2.1
-(`refs/friston2017.txt:323–334`) states the generative process that relates them:
-`P(o_t | s_t) = Cat(A)` and `P(s_{t+1} | s_t, π) = Cat(B(u = π(t)))`.
+no world, action or time relation in the old binding. Friston et al. 2017 separate
+the generative *process* R(õ, s̃, ũ), which produces outcomes from hidden states and
+action (`refs/friston2017.txt:227–245`), from the generative *model*, whose
+categorical form is eq. 2.1 (`:323–334`): `P(o_t | s_t) = Cat(A)`,
+`P(s_{t+1} | s_t, π) = Cat(B(u = π(t)))`. The source does not give R in that form.
+
+**Declared stack assumption:** the world is taken to be a finite categorical process
+of the same form as eq. 2.1, on the model's carriers (under P5, established-token
+sets). The process and the agent's model are identified only where a theorem says so.
 
 So, from the world state `s_{t−1}` and the action `u_{t−1}`, the observation
 distribution is `P(o_t | s_{t−1}, u_{t−1}) = Σ_{s_t} B(s_t | s_{t−1}, u_{t−1}) A(o_t | s_t)`.
 The world's own state is used here, not a belief. Under the approved observation
 design P5 (`TokenObservation`), the world state is the established-token set, and
-with every token checkable the observation reports that set exactly.
+only when every adjudication rate is zero does the observation report that set
+exactly; with a nonzero rate the reported set is not the world state.
 -/
 
 namespace DarkTower.WarMachine.ObservationProcess
@@ -44,20 +51,22 @@ theorem observationAfter_eq_of_rows (M : ForwardModel S O U) (sPrev : S) (u u' :
     observationAfter M sPrev u o = observationAfter M sPrev u' o := by
   simp only [observationAfter, h]
 
-/-- The model started from the observed world state (a point mass at `s_{t−1}`). -/
-noncomputable def fromObserved (M : ForwardModel S O U) (sPrev : S) : ForwardModel S O U :=
+/-- The model started from a known world state (a point mass at `s_{t−1}`). Under P5
+the state is known from its observation only when every adjudication rate is zero. -/
+noncomputable def fromKnownState (M : ForwardModel S O U) (sPrev : S) : ForwardModel S O U :=
   { M with
     q₀ := fun s => if s = sPrev then 1 else 0
     q₀_nonneg := fun s => by split_ifs <;> norm_num
     q₀_sum := by simp }
 
-/-- When the agent's model is the process and the previous world state is observed,
-the one-step predicted outcome is exactly the process's observation distribution. -/
-theorem predictedOutcome_fromObserved (M : ForwardModel S O U) (sPrev : S) (π : ℕ → U)
+/-- **Hypothesis: the agent's model is the process.** Started from the known previous
+world state, the one-step predicted outcome is exactly the process's observation
+distribution. -/
+theorem predictedOutcome_fromKnownState (M : ForwardModel S O U) (sPrev : S) (π : ℕ → U)
     (o : O) :
-    predictedOutcome (fromObserved M sPrev) π 1 o = observationAfter M sPrev (π 0) o := by
+    predictedOutcome (fromKnownState M sPrev) π 1 o = observationAfter M sPrev (π 0) o := by
   rw [predictedOutcome_one]
-  simp only [fromObserved, observationAfter]
+  simp only [fromKnownState, observationAfter]
   refine Finset.sum_congr rfl fun s _ => ?_
   simp
 
