@@ -25,7 +25,15 @@ P4's q0 provides) and a uniform future term, it is the exact Bayes posterior
 point is generally *not* the exact posterior (`fixture_meanField_not_bayes`).
 
 Logarithms of zero probabilities are `−∞` in the source; Mathlib's `Real.log 0 = 0`
-is not, so the theorems that read the log terms carry positivity hypotheses.
+is not, so a zero probability would silently count as probability one. The
+definitions below agree with eq. 4.13 only on `LogDefined`: `A(o|x) > 0`, and
+`B`, `B_{τ+1}` positive wherever `s_{τ−1}`, `s_{τ+1}` put weight. The theorems that
+speak of eq. 4.13 carry that hypothesis. States the source rules out (a `−∞` term)
+are not represented here.
+
+The link "`ṡ = 0` under `s = σ(v)` iff `v̇ = ε` is constant across states" is the
+argument above, not a formalised dynamic: the theorems characterise the stationary
+belief algebraically.
 -/
 
 namespace DarkTower.WarMachine.StatePredictionError
@@ -43,7 +51,7 @@ noncomputable def pastTerm (B : S → S → ℝ) (sPrev : S → ℝ) (x : S) : �
 noncomputable def futureTerm (B' : S → S → ℝ) (sNext : S → ℝ) (x : S) : ℝ :=
   ∑ s₁, sNext s₁ * Real.log (B' x s₁)
 
-/-- `v` at its fixed point: `ln A·o + ln B·s_{τ−1} + ln B·s_{τ+1}`. -/
+/-- `v` at its fixed point: `ln A·o + (ln B)·s_{τ−1} + (ln B')ᵀ·s_{τ+1}`. -/
 noncomputable def logMessage (A : S → O → ℝ) (B B' : S → S → ℝ) (o : O)
     (sPrev sNext : S → ℝ) (x : S) : ℝ :=
   likTerm A o x + pastTerm B sPrev x + futureTerm B' sNext x
@@ -53,7 +61,13 @@ noncomputable def statePredictionError (A : S → O → ℝ) (B B' : S → S →
     (sPrev sNext s : S → ℝ) (x : S) : ℝ :=
   logMessage A B B' o sPrev sNext x - Real.log (s x)
 
-/-- The belief at the fixed point of eq. 4.13: `σ(ln A·o + ln B·s_{τ−1} + ln B·s_{τ+1})`. -/
+/-- The domain on which the definitions here are eq. 4.13: every log that carries
+weight is the log of a positive probability. -/
+def LogDefined (A : S → O → ℝ) (B B' : S → S → ℝ) (o : O) (sPrev sNext : S → ℝ) : Prop :=
+  (∀ x, 0 < A x o) ∧ (∀ s₀ x, 0 < sPrev s₀ → 0 < B s₀ x) ∧
+    (∀ x s₁, 0 < sNext s₁ → 0 < B' x s₁)
+
+/-- The stationary belief of eq. 4.13: `σ(ln A·o + (ln B)·s_{τ−1} + (ln B')ᵀ·s_{τ+1})`. -/
 noncomputable def statePosterior (A : S → O → ℝ) (B B' : S → S → ℝ) (o : O)
     (sPrev sNext : S → ℝ) (x : S) : ℝ :=
   Real.exp (logMessage A B B' o sPrev sNext x) /
@@ -73,9 +87,12 @@ theorem statePosterior_sum [Nonempty S] : ∑ x, statePosterior A B B' o sPrev s
   simp only [statePosterior, ← Finset.sum_div]
   exact div_self (partition_pos A B B' o sPrev sNext).ne'
 
-/-- **R3: the fixed point.** For a belief `s` in the open simplex, the error of
-eq. 4.13 is the same at every state exactly when `s = σ(v)`. -/
-theorem error_const_iff_posterior (s : S → ℝ) (hs : ∀ x, 0 < s x) (hs1 : ∑ x, s x = 1) :
+/-- **R3: the stationary belief.** On `LogDefined`, for a belief `s` in the open
+simplex, the error of eq. 4.13 is the same at every state exactly when `s = σ(v)`.
+(The algebra holds for the Lean definitions without `LogDefined`; outside it they
+are not eq. 4.13.) -/
+theorem error_const_iff_posterior (_hdom : LogDefined A B B' o sPrev sNext)
+    (s : S → ℝ) (hs : ∀ x, 0 < s x) (hs1 : ∑ x, s x = 1) :
     (∃ c, ∀ x, statePredictionError A B B' o sPrev sNext s x = c)
       ↔ s = statePosterior A B B' o sPrev sNext := by
   have hne : Nonempty S := by
@@ -99,9 +116,9 @@ theorem error_const_iff_posterior (s : S → ℝ) (hs : ∀ x, 0 < s x) (hs1 : �
       Real.log_exp]
     ring
 
-/-- At the fixed point the error is `ln Z` at every state, so it is `0` only when
-the unnormalised weights already sum to one. -/
-theorem error_at_posterior [Nonempty S] (x : S) :
+/-- On `LogDefined`, at the stationary belief the error is `ln Z` at every state, so
+it is `0` only when the unnormalised weights already sum to one. -/
+theorem error_at_posterior [Nonempty S] (_hdom : LogDefined A B B' o sPrev sNext) (x : S) :
     statePredictionError A B B' o sPrev sNext (statePosterior A B B' o sPrev sNext) x
       = Real.log (∑ y, Real.exp (logMessage A B B' o sPrev sNext y)) := by
   rw [statePredictionError, statePosterior,
@@ -163,7 +180,9 @@ noncomputable def controlB : Bool → Bool → ℝ := fun s s' =>
 /-- **Mean-field is not exact Bayes under an uncertain previous state.** With a
 uniform previous belief, eq. 4.13's past-term weights satisfy
 `(w_true / w_false)² = 3`, whereas the exact predictive prior `B s_{τ−1}` gives
-`(5/8 / 3/8)² = 25/9`. -/
+`(5/8 / 3/8)² = 25/9`. This compares the prior-side weights; with any positive
+likelihood and a constant future term the posterior ratios differ by the same
+factors, so the stationary belief is not the Bayes posterior. -/
 theorem fixture_meanField_not_bayes :
     Real.exp (2 * (pastTerm controlB fixtureUniform true - pastTerm controlB fixtureUniform false))
         = 3 ∧
