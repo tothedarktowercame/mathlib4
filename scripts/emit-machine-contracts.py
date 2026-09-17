@@ -3,6 +3,10 @@
 
 Manifest pins contract bytes separately (no circular self-digest). Git revisions
 pin ownership; SHA-256 pins exact bytes. Run from the canonical mathlib checkout.
+
+emit builds MachineContracts through the futon3c Test Registry and pins the build
+warrant in the manifest (--author <agent>; --no-warrant records none). verify
+checks that warrant without rebuilding. Needs sibling ../futon3c and Agency :7070.
 """
 import argparse
 import hashlib
@@ -198,6 +202,14 @@ SCOPE = 'per-entry-holder'
 SCHEMA = 'wm-machine-contract-manifest-v2'
 EMITTER = 'DarkTower/WarMachine/MachineContracts.lean'
 HOLES = 'DarkTower/WarMachine/holes-contract.json'
+# Build warrant: the MachineContracts build registered in the futon3c Test
+# Registry (futon3c.test-registry), pinned in the manifest. It is evidence that
+# this exact source closure built clean and sorry-free under a pinned toolchain;
+# it never licenses skipping a build. Manifests without one (or emitted with
+# --no-warrant) verify as before and say so.
+BUILD_MODULE = PREFIX + 'MachineContracts'
+BUILD_COMMAND = ['lake', 'build', BUILD_MODULE]
+REGISTRY_ROOT = ROOT.parent / 'futon3c'
 TEN = {'name', 'kind', 'signature', 'owner', 'holder', 'decided',
        'clojure-locus', 'fixture', 'evidence', 'falsifier'}
 
@@ -251,6 +263,64 @@ def encode(value):
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + '\n').encode()
 
 
+def edn_str(s):
+    return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
+def registry(operation, fields):
+    """Run a futon3c.test-registry operation; return its JSON result. FIELDS
+    maps EDN keyword names to strings, lists of strings, or pre-rendered EDN."""
+    def render(v):
+        if isinstance(v, list):
+            return '[' + ' '.join(edn_str(x) for x in v) + ']'
+        return edn_str(v) if isinstance(v, str) else v.edn
+    with tempfile.NamedTemporaryFile('w', suffix='.edn', prefix='wm-warrant-') as cfg:
+        cfg.write('{' + ' '.join(':%s %s' % (k, render(v)) for k, v in fields.items()) + ' :output :json}')
+        cfg.flush()
+        out = subprocess.run(['clojure', '-M', '-m', 'futon3c.test-registry', operation, cfg.name],
+                             cwd=REGISTRY_ROOT, capture_output=True, text=True)
+    lines = out.stdout.strip().splitlines()
+    require(bool(lines), 'test registry produced no result: ' + out.stderr[-400:])
+    return strict_json(lines[-1].encode())
+
+
+def register_build_warrant(author, source_paths, artifact_dir):
+    """Build MachineContracts THROUGH the registry (this is the emission build)."""
+    row = registry('run', {'agency-url': 'http://localhost:7070', 'repo-root': str(ROOT),
+                           'command': BUILD_COMMAND, 'author': author,
+                           'code-paths': sorted(p for p in source_paths if p.endswith('.lean')),
+                           'test-paths': ['scripts/emit_machine_contracts.lean'],
+                           'artifact-dir': str(artifact_dir)})
+    require(row.get('evidence/id', '').startswith('test-registry-') and row['payload']['warrant?'] is True,
+            'build warrant refused: %s' % json.dumps(row.get('payload', row).get('results', row))[:600])
+    return {'entry-id': row['evidence/id'], 'command': BUILD_COMMAND,
+            'registry': 'futon3c.test-registry'}
+
+
+def check_build_warrant(w, sources):
+    """Registry check (no rebuild), then bind the warrant to THIS manifest: same
+    command, clean results, and every pinned Lean source in its import closure at
+    the pinned bytes."""
+    require(set(w) == {'entry-id', 'command', 'registry'} and w['command'] == BUILD_COMMAND and
+            w['registry'] == 'futon3c.test-registry', 'malformed build warrant')
+    check = registry('check', {'agency-url': 'http://localhost:7070', 'entry-id': w['entry-id'],
+                               'repo-root': str(ROOT), 'changed-paths': []})
+    require(check.get('warrant?') is True,
+            'build warrant does not check: %s %s' % (check.get('reason'), json.dumps(check.get('details'))[:600]))
+    record = check['record']
+    require(record['command'] == BUILD_COMMAND, 'build warrant is for another command')
+    r = record['results']
+    require(r['exit'] == 0 and r['error-count'] == 0 and r['sorry-count'] == 0, 'build warrant results not clean')
+    closure = {e['path']: e['sha256'] for e in record['load-closure']}
+    for path, p in sources.items():
+        if path.endswith('.lean') and path != 'scripts/emit_machine_contracts.lean':
+            require(closure.get(path) == p['sha256'], 'build warrant does not cover pinned source: ' + path)
+    return w['entry-id']
+
+
+VERIFIED_WARRANT = {}
+
+
 def verify(manifest_path):
     m = strict_json(manifest_path.read_bytes())
     require(m['schema'] == SCHEMA, 'manifest schema')
@@ -284,6 +354,12 @@ def verify(manifest_path):
     require(len(contracts) == len(EXPECTED) and
             {c['source']['module'] for c in contracts} == set(EXPECTED), 'module population')
     require(len({c['contract-id'] for c in contracts}) == len(EXPECTED), 'duplicate contract id')
+    warrant = m.get('build-warrant')
+    if warrant is None or warrant.get('status') == 'none':
+        warrant_note = 'no build warrant (%s)' % ('predates build warrants' if warrant is None else warrant['reason'])
+    else:
+        warrant_note = 'build warrant ' + check_build_warrant(warrant, sources)
+    VERIFIED_WARRANT[manifest_path.resolve()] = warrant_note
     for c in contracts:
         mod = c['source']['module']
         p = sources[mod.replace('.', '/') + '.lean']
@@ -338,13 +414,18 @@ def verify(manifest_path):
     return m
 
 
-def emit(destination):
+def emit(destination, author=None, warrant=True):
     paths = [EMITTER, 'scripts/emit-machine-contracts.py', 'scripts/emit_machine_contracts.lean', 'DarkTower/Contract/Emit.lean',
              'lean-toolchain', 'DarkTower/WarMachine/Holes.lean',
              *[m.replace('.', '/') + '.lean' for m in sorted(EXPECTED)]]
     pins = [pin(p) for p in paths]
     holes_bytes = local(HOLES).read_bytes()
-    run('lake', 'build', 'DarkTower.WarMachine.MachineContracts')
+    if warrant:
+        require(bool(author), 'a build warrant needs --author (or pass --no-warrant)')
+        build_warrant = register_build_warrant(author, paths, destination.resolve() / 'build-warrant')
+    else:
+        run(*BUILD_COMMAND)
+        build_warrant = {'status': 'none', 'reason': 'emitted with --no-warrant'}
     bundle = strict_json(run('lake', 'env', 'lean', 'scripts/emit_machine_contracts.lean'))
     by_path = {p['path']: p for p in pins}
     for c in bundle['contracts']:
@@ -357,7 +438,8 @@ def emit(destination):
     manifest = {'schema': SCHEMA, 'scope': SCOPE,
                 'expected-modules': sorted([PREFIX + 'Holes', *EXPECTED]),
                 'sources': pins, 'holes-component': {'path': HOLES, 'sha256': digest(holes_bytes)},
-                'bundle': {'file': 'machine-contracts.json', 'sha256': digest(raw)}}
+                'bundle': {'file': 'machine-contracts.json', 'sha256': digest(raw)},
+                'build-warrant': build_warrant}
     with tempfile.TemporaryDirectory(prefix='wm-contracts-') as tmp:
         stage = Path(tmp)
         (stage / 'machine-contracts.json').write_bytes(raw)
@@ -379,15 +461,21 @@ def emit(destination):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
-    sub.add_parser('emit').add_argument('directory', type=Path)
+    emit_parser = sub.add_parser('emit')
+    emit_parser.add_argument('directory', type=Path)
+    emit_parser.add_argument('--author', help='agent id registering the build warrant')
+    emit_parser.add_argument('--no-warrant', action='store_true',
+                             help='build without the test registry; the manifest records no warrant')
     sub.add_parser('verify').add_argument('manifest', type=Path)
     args = parser.parse_args()
     try:
         if args.command == 'emit':
-            emit(args.directory)
+            emit(args.directory, author=args.author, warrant=not args.no_warrant)
+            manifest = args.directory / 'manifest.json'
         else:
             verify(args.manifest)
-        print('PASS: %d machine contracts plus unchanged Holes; source and contract pins verified'
-              % len(EXPECTED))
+            manifest = args.manifest
+        print('PASS: %d machine contracts plus unchanged Holes; source and contract pins verified; %s'
+              % (len(EXPECTED), VERIFIED_WARRANT[manifest.resolve()]))
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, 'REFUSED: ' + str(exc) + '\n')
