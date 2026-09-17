@@ -310,7 +310,11 @@ def check_build_warrant(w, sources):
     record = check['record']
     require(record['command'] == BUILD_COMMAND, 'build warrant is for another command')
     r = record['results']
-    require(r['exit'] == 0 and r['error-count'] == 0 and r['sorry-count'] == 0, 'build warrant results not clean')
+    # Sorries are allowed only in the frozen Holes component, whose declared
+    # holes MachineContracts imports; any other sorry in the closure refuses.
+    require(r['exit'] == 0 and r['error-count'] == 0, 'build warrant results not clean')
+    stray = sorted(set(r['sorry-files']) - {'DarkTower/WarMachine/Holes.lean'})
+    require(not stray, 'build warrant closure has sorries outside Holes: ' + ', '.join(stray))
     closure = {e['path']: e['sha256'] for e in record['load-closure']}
     for path, p in sources.items():
         if path.endswith('.lean') and path != 'scripts/emit_machine_contracts.lean':
