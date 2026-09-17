@@ -1,5 +1,6 @@
 import DarkTower.WarMachine.F12RuledCarrier
 import DarkTower.WarMachine.MachineAction
+import DarkTower.WarMachine.GOverCascades
 
 /-!
 # Machine candidate action space π
@@ -9,12 +10,30 @@ two strategic laws decide how that list is consumed; they do not introduce a
 different candidate carrier.  This module exposes the list's extensional
 space through the `CandidateActionSpace` already used by F12's ruled organise
 signature.
+
+**NON-CONFORMANT policy grain (2026-09-17).** This module faithfully transcribes
+today's production selection, which ranges over flat `Candidate` actions
+(id/score/noOp) on all three dispatches. It is **not** the approved policy type:
+`GOverCascades` fixes the conformant carrier as cascades (`CascadePolicy`) and
+proves composition-blind scoring cannot separate what cascade G separates
+(`compositionBlind_cannot_separate`). No G, EFE or selection statement may be
+bound to `Candidate` or to `machinePolicySet`. Audit:
+`p4ng/wm-walkthroughs/build-loop/closure/AUDIT-flat-action-grain-2026-09-17.md`
+rows 13–16; decision pending: `PROPOSAL-P0-production-cascade-decision.md`.
+The registry row `:policy-set` is rebound to a cascade-typed selection space
+when the production switch lands (P0 step 4), not before.
 -/
 
 namespace DarkTower.WarMachine.MachinePolicySet
 
 open DarkTower.WarMachine.Holes
 open DarkTower.WarMachine.MachineAction
+
+/-- Tooling-checkable marker: this module's policy carrier is non-conformant
+against the named conformant carrier. The name is elaborated, so renaming or
+removing the target breaks this build. `scripts/emit-machine-contracts.py`
+refuses runtime-correspondence entries for declarations in this module. -/
+def nonConformantAgainst : Lean.Name := ``DarkTower.WarMachine.GOverCascades.CascadePolicy
 
 /-- The candidate action space represented by the ranked list consumed by
 `select-action` (`futon2:src/futon2/aif/policy.clj:672-862`). -/

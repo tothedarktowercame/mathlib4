@@ -47,6 +47,9 @@ HOLDERS = {'model-transcription-only', 'runtime-correspondence-not-live-path',
            'runtime-correspondence-lagging'}
 # 'runtime-correspondence-live-selection' is reserved for P11 step 3 and is refused
 # until Joe's word adds it here.
+# Modules whose policy carrier is non-conformant (MachinePolicySet.nonConformantAgainst):
+# they may be transcribed, never certified as runtime correspondence.
+NON_CONFORMANT_MODULES = {'DarkTower.WarMachine.MachinePolicySet'}
 LIVE_HOLDERS = {'runtime-correspondence-live-shadow', 'runtime-correspondence-live-enactment'}
 LIVE_SITE_RE = __import__('re').compile(r'live-call-site=(\S+):(\d+)')
 # Runtime-correspondence entries must point at the named forms, not merely at an
@@ -305,6 +308,9 @@ def verify(manifest_path):
                     require(any(form_at(lines[int(line) - 1]) == o[key] for o in options),
                             'pointer does not name an expected form: %s %s -> %r'
                             % (d['name'], key, lines[int(line) - 1].strip()))
+            if d['holder'] != 'model-transcription-only':
+                require(not any(d['name'].startswith(m + '.') for m in NON_CONFORMANT_MODULES),
+                        'runtime correspondence refused for a non-conformant policy grain: ' + d['name'])
             if d['holder'] == 'runtime-correspondence-lagging':
                 require(d['falsifier'].startswith('LAGGING'),
                         'lagging entry must name the lag first in its falsifier: ' + d['name'])
