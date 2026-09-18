@@ -133,10 +133,18 @@ production behaviour realises the theory. The theory (book eq. 4.9) has
 the epistemic half is identically inert, so this is a known-failing test
 against the full decomposition — held in the same spirit as any
 known-failing test: honestly red, with the passing condition not yet
-fully specified. What makes it pass is a non-degenerate observation model
-(the categorical successor rows; or finite `ζ` via `temperedLikelihood`
-over one), sequenced on the closure DAG and decided by computed evidence.
-This is a theory-conformance fact, not a matter of operator opinion. -/
+fully specified. REFINED by the D3/T3 census round (2026-09-18): the
+non-degenerate forms are BUILT — `token-likelihood` with error rates
+(matching Lean `TokenObservation`), `observation-rates` (real rates from
+admitted-label error counts), `likelihood-precision`'s `temper-a` (this
+module's `temperedLikelihood`, R7's shape) — and none has a live
+consumer; the live call site constructs identity rates itself and the
+sparse evaluator refuses non-zero rates as
+`:judgement-rates-not-supported-at-scale`. What makes this pass is
+therefore a SCALABLE non-degenerate evaluation path plus wiring the
+built producers — an engineering sequencing matter on the closure DAG,
+not new modeling. This is a theory-conformance fact, not a matter of
+operator opinion. -/
 
 section IdentityReduction
 
