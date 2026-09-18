@@ -8,6 +8,14 @@ The registry's Bayesian argmax describes one non-default arm. Production also
 contains controller-head selection, an actuation habit-prior argmax with the
 opposite tie rule, and downstream first-passing-gate enactment. This module
 states those functions separately and exposes their disagreements.
+
+**HISTORICAL as of 2026-09-18.** The production code this module transcribed
+(the flat selection block, `policy.clj:672-862` pre-deletion) was deliberately
+removed by Joe's H6b ruling (futon2 `0d29c706`, 2026-09-17). Its machine-contract
+entry is retired (see MachineContracts.lean); the module and its witnesses stay
+as the record of what the deleted machinery was. The surviving action law is
+`select-action-cascades`, covered by `ActionMarginal.IsBayesAction` and
+`PolicySelection.selectionPosterior`.
 -/
 namespace DarkTower.WarMachine.MachineAction
 

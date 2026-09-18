@@ -119,14 +119,17 @@ def registries : List Registry := [
       "futon2/holes/labs/wm-contract/runs/F8-temperature/clojure-readback.txt:1"
       "mathlib4/DarkTower/WarMachine/MachineTemperatureWitness.lean:1"
       "Wrong mode temperature, floored valid beta, or accepted invalid variational beta."] },
-  { schemaVersion := 1, contractId := "wm-machine-action",
-    moduleName := "DarkTower.WarMachine.MachineAction",
-    declarations := [entry ``DarkTower.WarMachine.MachineAction.machineAction
-      "R16: machine-model transcription; no runtime correspondence claim"
-      "futon2/src/futon2/aif/policy.clj:672"
-      "futon2/holes/labs/wm-contract/runs/F8-action/clojure-readback.txt:1"
-      "mathlib4/DarkTower/WarMachine/MachineActionWitness.lean:1"
-      "Declared boundary/law choice, tie rule, fallback or no-op exclusion differs."] },
+  -- RETIRED 2026-09-18 (claude-12, model layer): "wm-machine-action"
+  -- (`MachineAction.machineAction`, transcription-only, R16). The code it
+  -- transcribed — the flat :softmax-weights/:full-score-posterior selection
+  -- block at policy.clj:672-862 — was deliberately deleted by Joe's H6b
+  -- ruling (futon2 0d29c706, 2026-09-17; 971 → 232 lines), not moved. The
+  -- surviving action law (`select-action-cascades`) is a different theorem
+  -- and already carries its own runtime entries (ActionMarginal.IsBayesAction,
+  -- PolicySelection.selectionPosterior). Re-pointing would have asserted the
+  -- flat-argmax transcription describes the cascade law. The MachineAction
+  -- module and its witnesses remain as the historical transcription of the
+  -- retired machinery.
   { schemaVersion := 1, contractId := "wm-machine-prediction-error",
     moduleName := "DarkTower.WarMachine.MachinePredictionError",
     declarations := [entry ``DarkTower.WarMachine.MachinePredictionError.machineChannelPredictionError
