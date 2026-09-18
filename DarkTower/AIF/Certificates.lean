@@ -85,14 +85,6 @@ structure GCertificate where
   total : ℝ
   /-- Which C form ran. -/
   cForm : CForm
-  /-- Caller-declared β (there is deliberately no default in production). -/
-  betaDeclared : ℝ
-  /-- Habit input and how it arose. -/
-  habit : ℝ
-  habitStatus : QuantityStatus
-  /-- Per-policy F input and how it arose. -/
-  f : ℝ
-  fStatus : QuantityStatus
   /-- The zero-adjudication-rates precondition, as observed on this run. -/
   ratesAllZero : Bool
   /-- Size of the token universe the computation ranged over. -/
@@ -114,6 +106,31 @@ def GCertificate.valid (ε : ℝ) (c : GCertificate) : Prop :=
   -- the zero-rate reduction is admissible only if the precondition held
   ((∃ s ∈ c.steps, ∃ r, s.ambiguityStatus = .reducedIdenticallyZero r) →
     c.ratesAllZero = true)
+
+/-- **Correction record (WIRE-1 review, 2026-09-18).** The first cut of
+`GCertificate` carried `betaDeclared`, `habit` and `f`. The census (D2)
+located β on the cascade problem, read at the SELECTION seam — it is not
+an input of the G computation, and the emission slice could not fill it
+truthfully at the G seam. The spec now follows the term structure: the
+G certificate carries the computation's fields; `SelectionCertificate`
+carries the selection law's inputs, assembled where they live. -/
+structure SelectionCertificate where
+  /-- Caller-declared β (no default exists in production; a certificate
+  with β requires it positive). -/
+  betaDeclared : ℝ
+  /-- Habit input and how it arose. -/
+  habit : ℝ
+  habitStatus : QuantityStatus
+  /-- Per-policy F input and how it arose. -/
+  f : ℝ
+  fStatus : QuantityStatus
+
+/-- Validity of a selection certificate: β positive (PolicyTemperature's
+own constraint), and declared-neutral statuses honest about their values. -/
+def SelectionCertificate.valid (c : SelectionCertificate) : Prop :=
+  0 < c.betaDeclared ∧
+  (c.habitStatus = .declaredNeutral → c.habit = 1) ∧
+  (c.fStatus = .declaredNeutral → c.f = 0)
 
 /-- A certificate whose every step's risk is `computed` witnesses that risk
 was computed at every step — Joe's detectability example, as a predicate. -/
