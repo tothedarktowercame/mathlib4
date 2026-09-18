@@ -66,8 +66,14 @@ Predictions and functionals:
 - risk — `PolicyHorizon.stepRisk`; ambiguity — `PolicyHorizon.stepAmbiguity`;
   **G** — `PolicyHorizon.horizonEFE = Σₙ (stepRisk + stepAmbiguity)`, wrapped
   here as `expectedFreeEnergy` over a `Preference`.
-- policy posterior `σ(ln E − F − G)` — `OutcomeRiskKL.policyPosterior`,
-  wrapped here over a `Habit`.
+- policy posterior — TWO theory-legitimate laws (census correction
+  2026-09-18, T2): the base `σ(ln E − F − G)` (eq. 4.14 + habit;
+  `OutcomeRiskKL.policyPosterior`, wrapped here) and the
+  precision-tempered `σ(ln E − F − γG)`, `γ = 1/β` (book B.2.4;
+  `PolicySelection.selectionPosterior`, wrapped in `AIF.Selection`).
+  **Production implements the tempered law.** The first census cut bound
+  only the base law; comparisons against production must use
+  `AIF.Selection.temperedPolicyPosterior`.
 
 Bound this pass (2026-09-18, second sitting):
 - **F** (per-policy variational free energy, book eqs. B.1–B.2 / discrete
@@ -197,9 +203,11 @@ theorem expectedFreeEnergy_def (M : ForwardModel S O U) {T : ℕ} (hT : 0 < T)
     (π : Fin T → U) (C : Preference O) :
     expectedFreeEnergy M hT π C = horizonEFE M hT π C.log := rfl
 
-/-- The policy posterior `σ(ln E − F − G)` over a `Habit`, delegating to the
-audited `OutcomeRiskKL.policyPosterior`. The book's base model (eq. 4.14,
-no habit) is recovered at `Habit.uniform`. -/
+/-- The BASE policy posterior `σ(ln E − F − G)` over a `Habit`, delegating
+to the audited `OutcomeRiskKL.policyPosterior`. The book's base model
+(eq. 4.14, no habit) is recovered at `Habit.uniform`. Production runs the
+γ-tempered law instead — see `AIF.Selection.temperedPolicyPosterior`
+(census correction 2026-09-18). -/
 noncomputable def policyPosterior {P : Type*} [Fintype P] (E : Habit P)
     (F : P → ℝ) (G : P → EReal) (π : P) : ENNReal :=
   DarkTower.WarMachine.OutcomeRiskKL.policyPosterior E.weight F G π
