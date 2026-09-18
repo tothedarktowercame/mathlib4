@@ -1,0 +1,553 @@
+ℹ [2701/2765] Replayed DarkTower.WarMachine.CascadeOrder
+info: DarkTower/WarMachine/CascadeOrder.lean:143:0: 'attempt001_2026_07_14_two_cycle_is_refused' depends on axioms: [propext]
+info: DarkTower/WarMachine/CascadeOrder.lean:144:0: 'dropping_reverse_edge_is_acyclic_but_not_a_semilattice' depends on axioms: [propext]
+info: DarkTower/WarMachine/CascadeOrder.lean:145:0: 'attempt008_2026_07_16_descent_is_accepted' depends on axioms: [propext]
+⚠ [2703/2765] Replayed DarkTower.WarMachine.Holes
+warning: DarkTower/WarMachine/Holes.lean:157:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:999:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7403:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7426:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7437:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7965:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7968:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7971:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7974:4: declaration uses `sorry`
+ℹ [8503/8523] Replayed DarkTower.WarMachine.CommitmentTemperature
+info: DarkTower/WarMachine/CommitmentTemperature.lean:293:0: 'DarkTower.WarMachine.CommitmentTemperature.factorsThroughDiscard_iff_temperatureInvariant' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:294:0: 'DarkTower.WarMachine.CommitmentTemperature.not_governs_iff_factorsThroughDiscard' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CommitmentTemperature.lean:295:0: 'DarkTower.WarMachine.CommitmentTemperature.discard_absorbs_upstream' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:296:0: 'DarkTower.WarMachine.CommitmentTemperature.live_selector_factors_through_discard' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:297:0: 'DarkTower.WarMachine.CommitmentTemperature.mode_only_ignores_temperature' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:298:0: 'DarkTower.WarMachine.CommitmentTemperature.live_selector_does_not_govern' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:299:0: 'DarkTower.WarMachine.CommitmentTemperature.single_term_argmax_annihilates_temperature' depends on axioms: [propext,
+ Quot.sound]
+info: DarkTower/WarMachine/CommitmentTemperature.lean:300:0: 'DarkTower.WarMachine.CommitmentTemperature.repairing_r8_changes_no_action' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:301:0: 'DarkTower.WarMachine.CommitmentTemperature.live_gain_repair_changes_no_action' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:302:0: 'DarkTower.WarMachine.CommitmentTemperature.default_branch_gain_repair_changes_no_action' depends on axioms: [propext,
+ Quot.sound]
+info: DarkTower/WarMachine/CommitmentTemperature.lean:303:0: 'DarkTower.WarMachine.CommitmentTemperature.record_sensitivity_is_not_governance' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:304:0: 'DarkTower.WarMachine.CommitmentTemperature.scores_move_action_does_not' does not depend on any axioms
+info: DarkTower/WarMachine/CommitmentTemperature.lean:305:0: 'DarkTower.WarMachine.CommitmentTemperature.habit_prior_governs' does not depend on any axioms
+⚠ [8505/8523] Replayed DarkTower.WarMachine.PolicyPosterior
+warning: DarkTower/WarMachine/PolicyPosterior.lean:18:5: Variable name `hhabit` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPosterior.lean:18:33: Variable name `htau` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPosterior.lean:19:5: Variable name `hne` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPosterior.lean:19:27: Variable name `hnodup` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+⚠ [8506/8523] Replayed DarkTower.WarMachine.PolicyPrecision
+warning: DarkTower/WarMachine/PolicyPrecision.lean:43:19: Variable name `hhabit` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPrecision.lean:48:19: Variable name `hhabit` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPrecision.lean:75:51: Variable name `hG` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPrecision.lean:94:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.PolicyPrecision.sum_map_enum`:
+  [Nonempty ι]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Nonempty ι] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+⚠ [8508/8523] Replayed DarkTower.WarMachine.PolicySelection
+warning: DarkTower/WarMachine/PolicySelection.lean:34:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.PolicySelection.selectionWeight_top`:
+  [Fintype ι]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Fintype ι] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/PolicySelection.lean:48:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.PolicySelection.selectionWeight_coe`:
+  [Fintype ι]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Fintype ι] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+ℹ [8511/8523] Replayed DarkTower.WarMachine.MachineTemperature
+info: DarkTower/WarMachine/MachineTemperature.lean:279:0: 'DarkTower.WarMachine.MachineTemperature.gRange' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:280:0: 'DarkTower.WarMachine.MachineTemperature.adaptiveTemperature' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:281:0: 'DarkTower.WarMachine.MachineTemperature.adaptiveTemperatureReference' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:282:0: 'DarkTower.WarMachine.MachineTemperature.emptySpreadIsTheFloor' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:283:0: 'DarkTower.WarMachine.MachineTemperature.degenerateSpreadIsTheFloor' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:284:0: 'DarkTower.WarMachine.MachineTemperature.probeOpts' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:285:0: 'DarkTower.WarMachine.MachineTemperature.threeLawsDisagree' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:286:0: 'DarkTower.WarMachine.MachineTemperature.machineGamma' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:287:0: 'DarkTower.WarMachine.MachineTemperature.variationalGammaIsInverseBeta' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:288:0: 'DarkTower.WarMachine.MachineTemperature.engineeringGammaIsNotInverseBeta' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:289:0: 'DarkTower.WarMachine.MachineTemperature.gainFloorPreventsDivisionByZero' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:290:0: 'DarkTower.WarMachine.MachineTemperature.selectionScore' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:291:0: 'DarkTower.WarMachine.MachineTemperature.largerTemperatureFlattensScores' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:292:0: 'DarkTower.WarMachine.MachineTemperature.zeroPriorOrderIsTemperatureInvariant' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:293:0: 'DarkTower.WarMachine.MachineTemperature.habitPriorMakesOrderTemperatureDependent' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:294:0: 'DarkTower.WarMachine.MachineTemperature.TauMode' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:295:0: 'DarkTower.WarMachine.MachineTemperature.MachineNumber' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:296:0: 'DarkTower.WarMachine.MachineTemperature.TemperatureOpts' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:297:0: 'DarkTower.WarMachine.MachineTemperature.TemperatureError' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:298:0: 'DarkTower.WarMachine.MachineTemperature.machineTemperature' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:299:0: 'DarkTower.WarMachine.MachineTemperature.gainOneReductions' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:300:0: 'DarkTower.WarMachine.MachineTemperature.betaIsNotFloored' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:301:0: 'DarkTower.WarMachine.MachineTemperature.missingBetaNeverFallsBack' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:302:0: 'DarkTower.WarMachine.MachineTemperature.policyFunctionDefault' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:303:0: 'DarkTower.WarMachine.MachineTemperature.liveArenaDefault' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:304:0: 'DarkTower.WarMachine.MachineTemperature.temperatureDefaultsDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:305:0: 'DarkTower.WarMachine.MachineTemperature.BetaSource' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:306:0: 'DarkTower.WarMachine.MachineTemperature.solvedThisTick' depends on axioms: [propext]
+info: DarkTower/WarMachine/MachineTemperature.lean:307:0: 'DarkTower.WarMachine.MachineTemperature.variationalModeCanCarryHeldBeta' depends on axioms: [propext]
+info: DarkTower/WarMachine/MachineTemperature.lean:308:0: 'DarkTower.WarMachine.MachineTemperature.temperatureScore' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineTemperature.lean:309:0: 'DarkTower.WarMachine.MachineTemperature.SelectionLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:310:0: 'DarkTower.WarMachine.MachineTemperature.temperatureReachesChoice' does not depend on any axioms
+info: DarkTower/WarMachine/MachineTemperature.lean:311:0: 'DarkTower.WarMachine.MachineTemperature.selectionLawControlsTemperatureChannel' does not depend on any axioms
+ℹ [8512/8523] Replayed DarkTower.WarMachine.MachineAction
+info: DarkTower/WarMachine/MachineAction.lean:223:0: 'DarkTower.WarMachine.MachineAction.Candidate' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:224:0: 'DarkTower.WarMachine.MachineAction.StrategicLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:225:0: 'DarkTower.WarMachine.MachineAction.SelectionBoundary' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:226:0: 'DarkTower.WarMachine.MachineAction.firstArgmax' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:227:0: 'DarkTower.WarMachine.MachineAction.lastArgmax' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:228:0: 'DarkTower.WarMachine.MachineAction.strategicCandidates' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:229:0: 'DarkTower.WarMachine.MachineAction.actuationCandidates' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:230:0: 'DarkTower.WarMachine.MachineAction.machineAction' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:231:0: 'DarkTower.WarMachine.MachineAction.headAndPosteriorDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:232:0: 'DarkTower.WarMachine.MachineAction.strategicAndActuationDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:233:0: 'DarkTower.WarMachine.MachineAction.tiedArgmaxesDisagree' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:234:0: 'DarkTower.WarMachine.MachineAction.requestedPosteriorCanBecomeHead' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:235:0: 'DarkTower.WarMachine.MachineAction.fullScoreIsPosteriorArgmax' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:236:0: 'DarkTower.WarMachine.MachineAction.noOpCandidateSetsDiffer' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:237:0: 'DarkTower.WarMachine.MachineAction.enactedAction' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:238:0: 'DarkTower.WarMachine.MachineAction.selectionScore' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:239:0: 'DarkTower.WarMachine.MachineAction.posteriorWeight' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:240:0: 'DarkTower.WarMachine.MachineAction.posteriorOrderIsScoreOrder' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:241:0: 'DarkTower.WarMachine.MachineAction.productionDefaultBoundary' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:242:0: 'DarkTower.WarMachine.MachineAction.productionDefaultLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:243:0: 'DarkTower.WarMachine.MachineAction.registryLaw' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:244:0: 'DarkTower.WarMachine.MachineAction.defaultRuleIsNotTheRegistryRule' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:245:0: 'DarkTower.WarMachine.MachineAction.defaultSelectionIsTheHead' depends on axioms: [propext]
+info: DarkTower/WarMachine/MachineAction.lean:246:0: 'DarkTower.WarMachine.MachineAction.habitPriorAloneMovesTheChoice' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:247:0: 'DarkTower.WarMachine.MachineAction.noOpExclusionMovesTheChoice' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:248:0: 'DarkTower.WarMachine.MachineAction.abstains' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:249:0: 'DarkTower.WarMachine.MachineAction.noOpArgmaxAbstains' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/MachineAction.lean:250:0: 'DarkTower.WarMachine.MachineAction.requestedPosteriorDependsOnFPiEntered' does not depend on any axioms
+info: DarkTower/WarMachine/MachineAction.lean:251:0: 'DarkTower.WarMachine.MachineAction.selectedAndEnactedDisagree' does not depend on any axioms
+⚠ [8514/8523] Replayed DarkTower.WarMachine.TokenState
+warning: DarkTower/WarMachine/TokenState.lean:29:7: The namespace 'TokenState' is duplicated in the declaration 'DarkTower.WarMachine.TokenState.TokenState'
+
+Note: This linter can be disabled with `set_option linter.dupNamespace false`
+warning: DarkTower/WarMachine/TokenState.lean:53:46: Variable name `hwant` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/TokenState.lean:103:35: Variable name `hp` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/TokenState.lean:110:15: This simp argument is unused:
+  independentBelief
+
+Hint: Omit it from the simp argument list.
+  simp only [̵i̵n̵d̵e̵p̵e̵n̵d̵e̵n̵t̵B̵e̵l̵i̵e̵f̵,̵ ̵i̵f̵_̵p̵o̵s̵[̲i̲f̲_̲p̲o̲s̲ hv]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenState.lean:112:15: This simp argument is unused:
+  independentBelief
+
+Hint: Omit it from the simp argument list.
+  simp only [̵i̵n̵d̵e̵p̵e̵n̵d̵e̵n̵t̵B̵e̵l̵i̵e̵f̵,̵ ̵i̵f̵_̵n̵e̵g̵[̲i̲f̲_̲n̲e̲g̲ hv]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenState.lean:159:36: This simp argument is unused:
+  independentBelief
+
+Hint: Omit it from the simp argument list.
+  simp [i̵n̵d̵e̵p̵e̵n̵d̵e̵n̵t̵B̵e̵l̵i̵e̵f̵,̵ ̵hpp v, hv]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenState.lean:174:58: This simp argument is unused:
+  independentBelief
+
+Hint: Omit it from the simp argument list.
+  simp [i̵n̵d̵e̵p̵e̵n̵d̵e̵n̵t̵B̵e̵l̵i̵e̵f̵,̵ ̵hpp v, hv]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenState.lean:177:58: This simp argument is unused:
+  independentBelief
+
+Hint: Omit it from the simp argument list.
+  simp [i̵n̵d̵e̵p̵e̵n̵d̵e̵n̵t̵B̵e̵l̵i̵e̵f̵,̵ ̵hpp v, hv]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+⚠ [8515/8523] Replayed DarkTower.WarMachine.CascadeTransition
+warning: DarkTower/WarMachine/CascadeTransition.lean:85:32: This simp argument is unused:
+  if_false
+
+Hint: Omit it from the simp argument list.
+  simp [firstEnabled, guard, h,̵ ̵i̵f̵_̵f̵a̵l̵s̵e̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/CascadeTransition.lean:510:36: This simp argument is unused:
+  patA
+
+Hint: Omit it from the simp argument list.
+  simp [firstEnabled, guard, patB2, patA̵,̵ ̵p̵a̵t̵B]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/CascadeTransition.lean:510:42: This simp argument is unused:
+  patB
+
+Hint: Omit it from the simp argument list.
+  simp [firstEnabled, guard, patB2, patA,̵ ̵p̵a̵t̵B̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+info: DarkTower/WarMachine/CascadeTransition.lean:529:0: 'DarkTower.WarMachine.CascadeTransition.patternKernel_nonneg' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:530:0: 'DarkTower.WarMachine.CascadeTransition.patternKernel_rowsum' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:531:0: 'DarkTower.WarMachine.CascadeTransition.patternKernel_of_achieved' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:532:0: 'DarkTower.WarMachine.CascadeTransition.cascadeKernel_nonneg' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:533:0: 'DarkTower.WarMachine.CascadeTransition.cascadeKernel_rowsum' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:534:0: 'DarkTower.WarMachine.CascadeTransition.cascadeKernel_of_noEnabled' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:535:0: 'DarkTower.WarMachine.CascadeTransition.interpret_eq_none_iff' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:536:0: 'DarkTower.WarMachine.CascadeTransition.fixture_rollout_two' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:537:0: 'DarkTower.WarMachine.CascadeTransition.fixture_rollout_two_one' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:538:0: 'DarkTower.WarMachine.CascadeTransition.fixture_one_step_reversed' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:539:0: 'DarkTower.WarMachine.CascadeTransition.firstEnabled_skips_forbidden' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:540:0: 'DarkTower.WarMachine.CascadeTransition.fixture_p3_enabled_at_empty' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:541:0: 'DarkTower.WarMachine.CascadeTransition.fixture_p3_not_enabled_at_two' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:542:0: 'DarkTower.WarMachine.CascadeTransition.fixture_p3_identity_when_blocked' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:543:0: 'DarkTower.WarMachine.CascadeTransition.firstEnabled_skips_achieved' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:544:0: 'DarkTower.WarMachine.CascadeTransition.firstEnabled_skips_disabled' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:545:0: 'DarkTower.WarMachine.CascadeTransition.fixture_same_precedence_chain' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:546:0: 'DarkTower.WarMachine.CascadeTransition.fixture_situation_i' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:547:0: 'DarkTower.WarMachine.CascadeTransition.fixture_situation_ii' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:548:0: 'DarkTower.WarMachine.CascadeTransition.fixture_situation_iii' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:549:0: 'DarkTower.WarMachine.CascadeTransition.fixture_situation_iv' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:550:0: 'DarkTower.WarMachine.CascadeTransition.fixture_situation_v_disabled' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/CascadeTransition.lean:551:0: 'DarkTower.WarMachine.CascadeTransition.fixture_situation_v_renewal' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+⚠ [8516/8523] Replayed DarkTower.WarMachine.TokenObservation
+warning: DarkTower/WarMachine/TokenObservation.lean:48:17: This simp argument is unused:
+  tokenLikelihood
+
+Hint: Omit it from the simp argument list.
+  simp only [̵t̵o̵k̵e̵n̵L̵i̵k̵e̵l̵i̵h̵o̵o̵d̵,̵ ̵i̵f̵_̵p̵o̵s̵[̲i̲f̲_̲p̲o̲s̲ hs, if_pos ho]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:50:17: This simp argument is unused:
+  tokenLikelihood
+
+Hint: Omit it from the simp argument list.
+  simp only [̵t̵o̵k̵e̵n̵L̵i̵k̵e̵l̵i̵h̵o̵o̵d̵,̵ ̵i̵f̵_̵p̵o̵s̵[̲i̲f̲_̲p̲o̲s̲ hs, if_neg ho]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:53:17: This simp argument is unused:
+  tokenLikelihood
+
+Hint: Omit it from the simp argument list.
+  simp only [̵t̵o̵k̵e̵n̵L̵i̵k̵e̵l̵i̵h̵o̵o̵d̵,̵ ̵i̵f̵_̵n̵e̵g̵[̲i̲f̲_̲n̲e̲g̲ hs, if_pos ho]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:55:17: This simp argument is unused:
+  tokenLikelihood
+
+Hint: Omit it from the simp argument list.
+  simp only [̵t̵o̵k̵e̵n̵L̵i̵k̵e̵l̵i̵h̵o̵o̵d̵,̵ ̵i̵f̵_̵n̵e̵g̵[̲i̲f̲_̲n̲e̲g̲ hs, if_neg ho]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:135:21: This simp argument is unused:
+  tokenLikelihood
+
+Hint: Omit it from the simp argument list.
+  simp only [̵t̵o̵k̵e̵n̵L̵i̵k̵e̵l̵i̵h̵o̵o̵d̵,̵ ̵i̵f̵_̵p̵o̵s̵[̲i̲f̲_̲p̲o̲s̲ hv.1, if_neg hv.2, hfn v]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:139:21: This simp argument is unused:
+  tokenLikelihood
+
+Hint: Omit it from the simp argument list.
+  simp only [̵t̵o̵k̵e̵n̵L̵i̵k̵e̵l̵i̵h̵o̵o̵d̵,̵ ̵i̵f̵_̵n̵e̵g̵[̲i̲f̲_̲n̲e̲g̲ hv.1, if_pos hv.2, hfp v]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:189:21: This simp argument is unused:
+  if_pos rfl
+
+Hint: Omit it from the simp argument list.
+  simp only [hv,̵ ̵i̵f̵_̵p̵o̵s̵ ̵r̵f̵l̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:191:21: This simp argument is unused:
+  if_neg
+
+Hint: Omit it from the simp argument list.
+  simp only [hv,̵ ̵i̵f̵_̵n̵e̵g̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:198:34: This simp argument is unused:
+  Finset.prod_insert
+
+Hint: Omit it from the simp argument list.
+  simp only [tokenLikelihood, hu, F̵i̵n̵s̵e̵t̵.̵p̵r̵o̵d̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵Finset.prod_singleton, Finset.mem_singleton, noisyRates]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:198:54: This simp argument is unused:
+  Finset.prod_singleton
+
+Hint: Omit it from the simp argument list.
+  simp only [tokenLikelihood, hu, Finset.prod_insert, Finset.p̵r̵o̵d̵_̵s̵i̵n̵g̵l̵e̵t̵o̵n̵,̵
+  ̵ ̵ ̵ ̵ ̵F̵i̵n̵s̵e̵t̵.̵mem_singleton, noisyRates]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:205:34: This simp argument is unused:
+  Finset.prod_insert
+
+Hint: Omit it from the simp argument list.
+  simp only [tokenLikelihood, hu, F̵i̵n̵s̵e̵t̵.̵p̵r̵o̵d̵_̵i̵n̵s̵e̵r̵t̵,̵ ̵Finset.prod_singleton, Finset.mem_singleton, noisyRates]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/TokenObservation.lean:205:54: This simp argument is unused:
+  Finset.prod_singleton
+
+Hint: Omit it from the simp argument list.
+  simp only [tokenLikelihood, hu, Finset.prod_insert, Finset.p̵r̵o̵d̵_̵s̵i̵n̵g̵l̵e̵t̵o̵n̵,̵
+  ̵ ̵ ̵ ̵ ̵F̵i̵n̵s̵e̵t̵.̵mem_singleton, noisyRates]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+ℹ [8517/8523] Replayed DarkTower.WarMachine.TokenPreference
+info: DarkTower/WarMachine/TokenPreference.lean:237:0: 'DarkTower.WarMachine.TokenPreference.PreferenceSpec.Z_pos' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/TokenPreference.lean:238:0: 'DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference_sum' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/TokenPreference.lean:239:0: 'DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference_pos_iff' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/TokenPreference.lean:240:0: 'DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference_eq_zero_iff' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/TokenPreference.lean:241:0: 'DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference_lt_of_want_lt' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/TokenPreference.lean:242:0: 'DarkTower.WarMachine.TokenPreference.PreferenceSpec.preference_congr' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound]
+info: DarkTower/WarMachine/TokenPreference.lean:243:0: 'DarkTower.WarMachine.TokenPreference.Fixture.fixture_chain' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: DarkTower/WarMachine/TokenPreference.lean:244:0: 'DarkTower.WarMachine.TokenPreference.Fixture.fixture_sum' depends on axioms: [propext, Classical.choice, Quot.sound]
+⚠ [8518/8523] Replayed DarkTower.WarMachine.PolicyHorizon
+warning: DarkTower/WarMachine/PolicyHorizon.lean:91:4: `push_neg` has been deprecated. Prefer using `push Not` instead.
+If you'd rather continue using `push_neg` in your project, you can implement it as follows:
+```
+open Lean.Parser.Tactic in
+macro "push_neg" cfg:optConfig loc:(location)? : tactic =>
+  `(tactic| push $cfg:optConfig Not $[$loc]?)
+```
+⚠ [8519/8523] Replayed DarkTower.WarMachine.StatePredictionError
+warning: DarkTower/WarMachine/StatePredictionError.lean:81:22: Variable name `y` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/StatePredictionError.lean:200:36: This simp argument is unused:
+  Fintype.sum_bool
+
+Hint: Omit it from the simp argument list.
+  simp [controlB, fixtureUniform,̵ ̵F̵i̵n̵t̵y̵p̵e̵.̵s̵u̵m̵_̵b̵o̵o̵l̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+⚠ [8520/8523] Replayed DarkTower.WarMachine.BeliefTrajectory
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:56:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.BeliefTrajectory.stateWeight_nonneg`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:61:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.BeliefTrajectory.stateWeight_eq_zero`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:87:15: This simp argument is unused:
+  reduceCtorEq
+
+Hint: Omit it from the simp argument list.
+  simp only [r̵e̵d̵u̵c̵e̵C̵t̵o̵r̵E̵q̵,̵ ̵false_iff, not_forall]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:97:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.BeliefTrajectory.beliefUpdate_eq_statePosterior`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:156:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.BeliefTrajectory.beliefAt_succ`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:206:74: This simp argument is unused:
+  Fintype.sum_bool
+
+Hint: Omit it from the simp argument list.
+  simp [fxA, fxB,̵ ̵F̵i̵n̵t̵y̵p̵e̵.̵s̵u̵m̵_̵b̵o̵o̵l̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:209:30: This simp argument is unused:
+  Fintype.sum_bool
+
+Hint: Omit it from the simp argument list.
+  simp [fxA, fxB,̵ ̵F̵i̵n̵t̵y̵p̵e̵.̵s̵u̵m̵_̵b̵o̵o̵l̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/BeliefTrajectory.lean:232:38: This simp argument is unused:
+  Fintype.sum_bool
+
+Hint: Omit it from the simp argument list.
+  simp [fxAnoisy, fxB,̵ ̵F̵i̵n̵t̵y̵p̵e̵.̵s̵u̵m̵_̵b̵o̵o̵l̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+⚠ [8521/8523] Replayed DarkTower.WarMachine.ExactBeliefTrajectory
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:65:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.ExactBeliefTrajectory.predictedState_nonneg`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:69:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.ExactBeliefTrajectory.predictedState_sum`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:90:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.ExactBeliefTrajectory.exactUpdate_eq_none_iff`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:182:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.ExactBeliefTrajectory.exactBeliefAt_succ`:
+  [DecidableEq S]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq S] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:253:28: This simp argument is unused:
+  exactBeliefAt_succ
+
+Hint: Omit it from the simp argument list.
+  simp only [tokenBeliefAt, e̵x̵a̵c̵t̵B̵e̵l̵i̵e̵f̵A̵t̵_̵s̵u̵c̵c̵,̵ ̵exactBeliefAt, Option.bind_some]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:270:28: This simp argument is unused:
+  Fintype.sum_bool
+
+Hint: Omit it from the simp argument list.
+  simp [observationProbability, predictedState, BeliefTrajectory.fxAnoisy, B̵e̵l̵i̵e̵f̵T̵r̵a̵j̵e̵c̵t̵o̵r̵y̵.̵f̵x̵B̵,̵ ̵F̵i̵n̵t̵y̵p̵e̵.̵s̵u̵m̵_̵b̵o̵o̵l̵]̵B̲e̲l̲i̲e̲f̲T̲r̲a̲j̲e̲c̲t̲o̲r̲y̲.̲f̲x̲B̲]̲
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:276:4: This simp argument is unused:
+  Fintype.sum_bool
+
+Hint: Omit it from the simp argument list.
+  simp [predictedState, BeliefTrajectory.fxAnoisy, BeliefTrajectory.fxB,̵
+  ̵ ̵ ̵ ̵ ̵F̵i̵n̵t̵y̵p̵e̵.̵s̵u̵m̵_̵b̵o̵o̵l̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:276:26: this tactic is never executed
+
+Note: This linter can be disabled with `set_option linter.unreachableTactic false`
+warning: DarkTower/WarMachine/ExactBeliefTrajectory.lean:276:26: 'norm_num' tactic does nothing
+
+Note: This linter can be disabled with `set_option linter.unusedTactic false`
+⚠ [8522/8523] Replayed DarkTower.WarMachine.ActionMarginal
+warning: DarkTower/WarMachine/ActionMarginal.lean:32:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.ActionMarginal.actionMarginal_nonneg`:
+  [Fintype U]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Fintype U] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/ActionMarginal.lean:62:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.ActionMarginal.bayesAction_of_injective`:
+  [Fintype U]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Fintype U] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/ActionMarginal.lean:96:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.ActionMarginal.bayesAction_marginal_ge_policy`:
+  [Fintype U]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Fintype U] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+Build completed successfully (8523 jobs).
