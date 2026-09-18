@@ -5,7 +5,10 @@
 # write status, permissions, or authority prose into it. Any change to a
 # core file fails this check until the pins are deliberately re-generated
 # in their own commit (operator-visible event):
-#   sha256sum DarkTower/AIF/*.lean > scripts/aif-core-pins.txt
+#   sha256sum <the five core files> > scripts/aif-core-pins.txt
+# (Terms, Institutions, Learning, Certificates, Selection ONLY: the
+#  checker and generated witnesses beside them are deliberately NOT
+#  frozen -- do not glob the directory)
 # New work goes in NEW modules, never edits to frozen ones
 # (futon memory: subject-file-freeze-for-admitted-pins).
 set -euo pipefail
