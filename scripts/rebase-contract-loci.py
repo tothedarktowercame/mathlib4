@@ -4,9 +4,17 @@ forms (RUNTIME_FORMS in emit-machine-contracts.py) now sit at each repository's 
 
 Only line numbers change, and only when the named form is found exactly once in the
 committed file; ambiguity or absence is reported and left for a person. Prints a diff
-summary; writes the file in place."""
+summary; writes the file in place.
+
+  --check   Do not write. Exit 1 if any pointer has drifted or could not be
+            resolved. This is ALIGNMENT.md item 5 -- "a test reads it and fails
+            if a clojureLocus file:line no longer resolves to the named form" --
+            which was specified and never built, so nothing has been telling us
+            when the Lean stopped describing the Clojure."""
 import importlib.util, re, sys
 from pathlib import Path
+
+CHECK = '--check' in sys.argv
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('emit', ROOT / 'scripts/emit-machine-contracts.py')
 emit = importlib.util.module_from_spec(spec); spec.loader.exec_module(emit)
@@ -62,7 +70,14 @@ while i < len(lines):
             changes.append(f'{name}: {p.group(1)} {p.group(2)} -> {n}')
             lines[j] = lines[j].replace(f'{p.group(1)}:{p.group(2)}"', f'{p.group(1)}:{n}"', 1)
     i += 1
-MC.write_text('\n'.join(lines))
+if not CHECK:
+    MC.write_text('\n'.join(lines))
 print('\n'.join(changes) or 'no changes')
 if problems:
-    print('PROBLEMS:\n' + '\n'.join(problems)); sys.exit(1)
+    print('PROBLEMS:\n' + '\n'.join(problems))
+if problems or (CHECK and changes):
+    print(f'FAIL: {len(changes)} stale pointer(s), {len(problems)} unresolvable'
+          if CHECK else 'PROBLEMS present')
+    sys.exit(1)
+if CHECK:
+    print('OK: every contract pointer resolves to its named form')
