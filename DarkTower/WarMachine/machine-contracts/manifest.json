@@ -5,7 +5,7 @@
       "build",
       "DarkTower.WarMachine.MachineContracts"
     ],
-    "entry-id": "test-registry-c7b4499e7170597848d3531213b56471b03b47a2a763e9563bfb96f188797f21",
+    "entry-id": "test-registry-1fc47fce55218672b0454343277c85406d1871b4f414419af5fa8f9fd26b0547",
     "registry": "futon3c.test-registry"
   },
   "bundle": {
@@ -44,9 +44,9 @@
       "sha256": "0ed3fc89aabc840ab8f856b18f14ba76a87b5b752b53c100126c1854cc4cd0de"
     },
     {
-      "commit": "d5d88bacaad0e72684a154372c09d652a156c071",
+      "commit": "926d10607e90c4df144e709c48c5b249f9450295",
       "path": "scripts/emit-machine-contracts.py",
-      "sha256": "fb5297cab30408173b815c8d70db948ac5f499d60aabe5de50210f7dbda2ba35"
+      "sha256": "05cae4bf16915b5267145ea0dd083c63a0a3eccf5d344ac85035e32a762151a0"
     },
     {
       "commit": "76ec2cce43f221c365ff5fbc19d46f57c44abe7f",

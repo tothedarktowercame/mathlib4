@@ -1,3 +1,0 @@
-Command: python3 scripts/emit-machine-contracts.py verify DarkTower/WarMachine/machine-contracts/manifest.json
-Exit: 0
-PASS: eight machine contracts plus unchanged Holes; source and contract pins verified
