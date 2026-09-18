@@ -164,6 +164,7 @@ variable [Fintype O] (g : O' → Option O)
 noncomputable def reachableSet : Finset O :=
   Finset.univ.filter (fun m => (fiber g m).Nonempty)
 
+omit [DecidableEq O'] in
 /-- Total pulled mass equals the reachable mission mass: unreachable
 mission-grain mass never arrives at cascade grain. `coverage` (the
 recorded quantity: reachable mass / total mass) is this sum divided by
