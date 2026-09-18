@@ -120,4 +120,42 @@ was computed at every step — Joe's detectability example, as a predicate. -/
 def GCertificate.riskComputedThroughout (c : GCertificate) : Prop :=
   ∀ s ∈ c.steps, s.riskStatus = .computed
 
+/-! ## The identity-A reduction, as a theorem
+
+The named reduction `"identity-A-zero-rates"` recorded by certificates is
+not folklore: a deterministic likelihood (every entry 0 or 1 — the identity
+kernel at zero adjudication rates is the special case) has zero row
+entropy, so the ambiguity half of `stepTerm` vanishes identically and the
+live `G = Σ_τ risk_τ` is exact, not approximate. This is why production
+legitimately does not *evaluate* ambiguity — and why only a status field,
+never the value, can distinguish that from an omission. -/
+
+section IdentityReduction
+
+open DarkTower.WarMachine.PolicyRollout DarkTower.WarMachine.PolicyHorizon
+
+variable {S O U : Type*} [Fintype S] [DecidableEq S] [Fintype O] [DecidableEq O]
+
+/-- A deterministic likelihood row (every entry 0 or 1) has zero entropy. -/
+theorem rowEntropy_of_deterministic (M : ForwardModel S O U) (s : S)
+    (h : ∀ o, M.A s o = 0 ∨ M.A s o = 1) : rowEntropy M s = 0 := by
+  simp only [rowEntropy]
+  rw [Finset.sum_eq_zero, neg_zero]
+  intro o _
+  rcases h o with h0 | h1
+  · rw [h0, zero_mul]
+  · rw [h1, Real.log_one, mul_zero]
+
+/-- The identity-A reduction: with a deterministic likelihood, ambiguity is
+identically zero at every horizon step — "the live G is the risk half only"
+as a theorem rather than a remark. -/
+theorem stepAmbiguity_eq_zero_of_deterministic (M : ForwardModel S O U)
+    (h : ∀ s o, M.A s o = 0 ∨ M.A s o = 1) (σ : ℕ → U) (n : ℕ) :
+    stepAmbiguity M σ n = 0 := by
+  simp only [stepAmbiguity]
+  refine Finset.sum_eq_zero fun s _ => ?_
+  rw [rowEntropy_of_deterministic M s (h s), mul_zero]
+
+end IdentityReduction
+
 end DarkTower.AIF
