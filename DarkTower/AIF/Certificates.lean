@@ -120,15 +120,22 @@ was computed at every step — Joe's detectability example, as a predicate. -/
 def GCertificate.riskComputedThroughout (c : GCertificate) : Prop :=
   ∀ s ∈ c.steps, s.riskStatus = .computed
 
-/-! ## The identity-A reduction, as a theorem
+/-! ## The identity-A reduction: a conditional, not an endorsement
 
-The named reduction `"identity-A-zero-rates"` recorded by certificates is
-not folklore: a deterministic likelihood (every entry 0 or 1 — the identity
-kernel at zero adjudication rates is the special case) has zero row
-entropy, so the ambiguity half of `stepTerm` vanishes identically and the
-live `G = Σ_τ risk_τ` is exact, not approximate. This is why production
-legitimately does not *evaluate* ambiguity — and why only a status field,
-never the value, can distinguish that from an omission. -/
+**Scope warning (Joe, 2026-09-18).** The theorems below prove a
+conditional: IF the likelihood is deterministic, THEN ambiguity vanishes
+identically. They exist so that a certificate claiming the
+`"identity-A-zero-rates"` reduction commits the checker only to the
+premise, never to unverified arithmetic — without them, a false reduction
+claim would be accepted. They do NOT prove the production behaviour is
+*wanted*. Whether it is wanted is an open operator ruling, and the
+conditional makes the stakes exact: a deterministic A means observation
+reveals state exactly, which switches off the entire epistemic (ambiguity)
+half of G — the live G is risk-only *because and only because* of that
+one modeling premise. Paths that would turn the term back on include a
+non-identity observation model on the categorical successor rows, or a
+finite likelihood precision `ζ` (`temperedLikelihood`) over one. Ruling
+status: OPEN, tracked in the correspondence ledger. -/
 
 section IdentityReduction
 
