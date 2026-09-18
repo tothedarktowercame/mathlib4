@@ -38,9 +38,15 @@ noncomputable def rowEntropy (M : ForwardModel S O U) (s : S) : ℝ :=
 noncomputable def stepAmbiguity (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) : ℝ :=
   ∑ s, rolloutState M σ n s * rowEntropy M s
 
-/-- Risk at step `n`: `D_KL[Q(o_n|π) ‖ C]` in `EReal` (as `OutcomeRiskKL`): `⊤` iff
-some outcome has positive predicted mass and zero preferred mass; otherwise the
-Gibbs sum over positive-mass outcomes. -/
+/-- Risk at step `n`: `D_KL[Q(o_n|π) ‖ C]` in `EReal` (as `OutcomeRiskKL`):
+`⊤` iff some outcome has positive predicted mass and zero preferred mass; otherwise the
+Gibbs sum over positive-mass outcomes. The citation is Da Costa et al. 2020
+eq. (44) (`futon2/holes/labs/wm-contract/refs/dacosta2020.txt:1418-1423`,
+`(Asπτ) · (log(Asπτ) − log C)`), carried by
+`OutcomeRiskKL.outcomeRisk`; `predictedOutcome M σ n o = ∑ s, M.A s o *
+rolloutState M σ n s` evaluates this term at the SAME predicted state and
+the SAME `M.A` as `stepAmbiguity M σ n` (`∑ s, rolloutState M σ n s *
+rowEntropy M s`). -/
 noncomputable def stepRisk (M : ForwardModel S O U) (σ : ℕ → U) (n : ℕ) (C : O → ℝ) : EReal :=
   if ∃ o, 0 < predictedOutcome M σ n o ∧ C o = 0 then ⊤
   else ↑(∑ o, if 0 < predictedOutcome M σ n o then
