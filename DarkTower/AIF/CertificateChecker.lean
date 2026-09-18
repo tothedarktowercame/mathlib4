@@ -180,6 +180,7 @@ def SelectionCertificateQ.check (c : SelectionCertificateQ) : Bool :=
    | _ => true) &&
   (match c.fStatus with
    | .declaredNeutral => decide (c.f = 0)
+   | .computedNotAttached _ => decide (c.f = 0)
    | _ => true)
 
 /-- **Soundness** for the selection certificate. -/
@@ -187,7 +188,7 @@ theorem SelectionCertificateQ.check_sound {c : SelectionCertificateQ}
     (h : c.check = true) : c.toSelectionCertificate.valid := by
   simp only [check, Bool.and_eq_true] at h
   obtain ⟨⟨hbeta, hhabit⟩, hf⟩ := h
-  refine ⟨?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_⟩
   · have hb : (0 : ℚ) < c.betaDeclared := of_decide_eq_true hbeta
     show (0 : ℝ) < (c.betaDeclared : ℝ)
     exact_mod_cast hb
@@ -199,6 +200,11 @@ theorem SelectionCertificateQ.check_sound {c : SelectionCertificateQ}
   · intro hn
     have hn' : c.fStatus = .declaredNeutral := hn
     rw [hn'] at hf
+    have : c.f = 0 := of_decide_eq_true hf
+    simp [toSelectionCertificate, this]
+  · intro r hr
+    have hr' : c.fStatus = .computedNotAttached r := hr
+    rw [hr'] at hf
     have : c.f = 0 := of_decide_eq_true hf
     simp [toSelectionCertificate, this]
 

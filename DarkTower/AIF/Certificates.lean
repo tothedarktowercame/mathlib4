@@ -53,6 +53,17 @@ inductive QuantityStatus
   | /-- The term was supplied as a declared-neutral input (e.g. `E = 1`,
     `F = 0`), not computed. -/
     declaredNeutral
+  | /-- Computed, found non-finite under a declared degenerate
+    configuration, and deliberately NOT attached to the law (WIRE-2
+    review, 2026-09-18: under identity-A every producing cascade has
+    `P(o|π) = 0`, so `F = ∞`; attaching it drove the posterior to NaN
+    for every candidate). The ℝ-typed certificate field then records the
+    neutral value that DID enter the law; the non-finite computed value
+    stays in the run record, whose Lean home is `horizonEFE_eq_top_iff`,
+    not finite arithmetic. The term starts flowing on its own when the
+    degenerate configuration ends — a declared current limitation, not
+    theory. -/
+    computedNotAttached (reason : String)
   deriving DecidableEq, Repr
 
 /-- Which preference form supplied C on this run: the declared constant
@@ -126,11 +137,15 @@ structure SelectionCertificate where
   fStatus : QuantityStatus
 
 /-- Validity of a selection certificate: β positive (PolicyTemperature's
-own constraint), and declared-neutral statuses honest about their values. -/
+own constraint), declared-neutral statuses honest about their values, and
+a computed-not-attached F honest that the value which entered the law was
+the neutral one (the non-finite computed value lives in the run record,
+not in this ℝ field). -/
 def SelectionCertificate.valid (c : SelectionCertificate) : Prop :=
   0 < c.betaDeclared ∧
   (c.habitStatus = .declaredNeutral → c.habit = 1) ∧
-  (c.fStatus = .declaredNeutral → c.f = 0)
+  (c.fStatus = .declaredNeutral → c.f = 0) ∧
+  (∀ r, c.fStatus = .computedNotAttached r → c.f = 0)
 
 /-- A certificate whose every step's risk is `computed` witnesses that risk
 was computed at every step — Joe's detectability example, as a predicate. -/
