@@ -401,13 +401,19 @@ def verify(manifest_path):
             if d['holder'] in LIVE_HOLDERS:
                 # A live claim must name the live call site (in the owner string as
                 # live-call-site=path:line) and that line must call the runtime function.
-                m = LIVE_SITE_RE.search(d['owner'])
-                require(m is not None, 'live entry without live-call-site: ' + d['name'])
-                site_lines = committed_lines(m.group(1))
-                require(1 <= int(m.group(2)) <= len(site_lines), 'bad live-call-site line: ' + d['name'])
+                # NB: not `m` — `m` is the manifest this function returns, and
+                # rebinding it here made verify() hand its callers the last regex
+                # Match instead (wm_contract_union.py died on
+                # manifest['bundle'] with "IndexError: no such group", which is
+                # what a Match raises for a string subscript). The CLI never saw
+                # it because it only uses verify for its side effects.
+                site = LIVE_SITE_RE.search(d['owner'])
+                require(site is not None, 'live entry without live-call-site: ' + d['name'])
+                site_lines = committed_lines(site.group(1))
+                require(1 <= int(site.group(2)) <= len(site_lines), 'bad live-call-site line: ' + d['name'])
                 path, line = d['clojure-locus'].rsplit(':', 1)
                 fn = form_at(committed_lines(path)[int(line) - 1])[1]
-                call = site_lines[int(m.group(2)) - 1]
+                call = site_lines[int(site.group(2)) - 1]
                 require(__import__('re').search(r'(^|[\s(/])' + __import__('re').escape(fn) + r'([\s)]|$)', call)
                         is not None,
                         'live-call-site does not call %s: %r' % (fn, call.strip()))
