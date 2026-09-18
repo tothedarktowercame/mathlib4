@@ -122,20 +122,21 @@ def GCertificate.riskComputedThroughout (c : GCertificate) : Prop :=
 
 /-! ## The identity-A reduction: a conditional, not an endorsement
 
-**Scope warning (Joe, 2026-09-18).** The theorems below prove a
-conditional: IF the likelihood is deterministic, THEN ambiguity vanishes
-identically. They exist so that a certificate claiming the
-`"identity-A-zero-rates"` reduction commits the checker only to the
-premise, never to unverified arithmetic — without them, a false reduction
-claim would be accepted. They do NOT prove the production behaviour is
-*wanted*. Whether it is wanted is an open operator ruling, and the
-conditional makes the stakes exact: a deterministic A means observation
-reveals state exactly, which switches off the entire epistemic (ambiguity)
-half of G — the live G is risk-only *because and only because* of that
-one modeling premise. Paths that would turn the term back on include a
-non-identity observation model on the categorical successor rows, or a
-finite likelihood precision `ζ` (`temperedLikelihood`) over one. Ruling
-status: OPEN, tracked in the correspondence ledger. -/
+**Status: KNOWN-FAILING relative to the full theory (Joe, 2026-09-18).**
+The theorems below prove a conditional: IF the likelihood is
+deterministic, THEN ambiguity vanishes identically. They exist so that a
+certificate claiming the `"identity-A-zero-rates"` reduction commits the
+checker only to the premise, never to unverified arithmetic — without
+them, a false reduction claim would be accepted. They do NOT prove the
+production behaviour realises the theory. The theory (book eq. 4.9) has
+`G = risk + ambiguity`; under the current deterministic-A configuration
+the epistemic half is identically inert, so this is a known-failing test
+against the full decomposition — held in the same spirit as any
+known-failing test: honestly red, with the passing condition not yet
+fully specified. What makes it pass is a non-degenerate observation model
+(the categorical successor rows; or finite `ζ` via `temperedLikelihood`
+over one), sequenced on the closure DAG and decided by computed evidence.
+This is a theory-conformance fact, not a matter of operator opinion. -/
 
 section IdentityReduction
 
