@@ -17,11 +17,15 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = 'DarkTower.WarMachine.'
+# 'Action'/'machineAction' RETIRED 2026-09-18 (claude-12): its transcribed code
+# (the flat selection block, policy.clj:672-862) was deleted by Joe's H6b ruling
+# (futon2 0d29c706); the surviving action law is carried by ActionMarginal and
+# PolicySelection below. See the retirement record in MachineContracts.lean.
 NAMES = dict(zip(
     ['Observation', 'BeliefState', 'BeliefUpdate', 'Precision', 'Depth',
-     'Temperature', 'Action', 'PredictionError'],
+     'Temperature', 'PredictionError'],
     ['machineObservation', 'machineBeliefState', 'machineBeliefUpdate',
-     'machinePrecision', 'machineDepth', 'machineTemperature', 'machineAction',
+     'machinePrecision', 'machineDepth', 'machineTemperature',
      'machineChannelPredictionError']))
 EXPECTED = {PREFIX + 'Machine' + k: [PREFIX + 'Machine' + k + '.' + v]
             for k, v in NAMES.items()}
