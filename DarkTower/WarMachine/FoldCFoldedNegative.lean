@@ -1,3 +1,5 @@
+-- NEGATIVE-WITNESS: this module is EXPECTED NOT to elaborate; a nonzero
+-- `lake env lean` exit is the demonstration, not a defect.
 import DarkTower.WarMachine.FoldCWitness
 
 open DarkTower.WarMachine.Holes
