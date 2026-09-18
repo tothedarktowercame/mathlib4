@@ -91,7 +91,7 @@ architecture.
   (IAD/Ostrom lineage).
 - The domain-general frame — learning through design patterns as a move
   beyond AlphaZero's game-locked self-play — is
-  `futon2:docs/futonzero-alphazero.md` (2026-06-09, Fable with claude-1/-3/-4;
+  `futon2:docs/futonzero-alphazero.md` (2026-06-09, Fable with claude-1, -3, -4;
   includes Fable's honest caveat that v1 was architecture, not the closed
   loop). GFlowNets entered as Fable's suggestion in that early line; the
   specific suggestion has not panned out (above), the frame stands.
