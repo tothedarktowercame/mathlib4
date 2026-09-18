@@ -207,7 +207,16 @@ theorem sum_pullWeight {s : O' → ℝ} {w : O → ℝ} (hs : FiberSplit g s) :
           pushforward_pullWeight g hs (Finset.mem_filter.mp hm).2
 
 /-- The hard-zero (`zeroed`) mechanism pulls back as the exact preimage:
-a cascade outcome is zeroed iff it closes a zeroed mission event. -/
+a cascade outcome is zeroed iff it closes a zeroed mission event.
+
+**Amplification warning (claude-4's D-ZERO-PATH interaction, 2026-09-18):**
+exact preservation means a mission-grain zero fans out to its entire
+fiber. Under non-zero observation rates Q has full support, so a hard
+zero anywhere in that preimage refuses the whole comparison family —
+a mission-level "never do this" is a strictly stronger constraint at
+cascade grain than the same zero declared there directly. This is the
+intended semantics of exact preservation, stated here so a refusal is
+traceable to the zero its author declared two grains away. -/
 def pullZeroed (Z : Finset O) : Finset O' :=
   Finset.univ.filter (fun o' => ∃ m ∈ Z, g o' = some m)
 
