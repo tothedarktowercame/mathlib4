@@ -156,7 +156,7 @@ structure Preference (O : Type*) where
 /-- Book-canonical admissibility (eq. 4.10, `parr2022.txt:3764`): at every
 step the preferences exponentiate to a probability distribution,
 `P(oτ|C) = Cat(Cτ)`. -/
-def Preference.IsCanonical [Fintype O] (C : Preference O) : Prop :=
+def Preference.IsCanonical (C : Preference O) : Prop :=
   ∀ τ : ℕ, ∑ o : O, Real.exp (C.log τ o) = 1
 
 /-- The constant family: one log-preference vector declared at every step.
