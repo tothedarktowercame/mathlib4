@@ -70,6 +70,31 @@ partially-rejected Clojure takes (`beta_habit`, `habit_prior`,
 the "this way and that way" churn a typed `LearnedVariable` target is
 meant to end. Registry `:learning` remains unruled; this module gives the
 ruling a typed proposal to accept, amend, or reject.
+
+**The cautionary precedent for `reformCascade` (Joe, 2026-09-18):** the
+GFlowNets "slush" line (`futon2:holes/labs/slush-demo/`,
+`futon2:holes/E-gflownets-fold.md`) attempted exactly this move — learning
+how cascades reform for reuse in a later run — and its slice-2 was a
+facade: the GFN was never actually trained (12 gradient steps at batch 1
+against a known-working 3000; the evaluated "policy" was its
+zero-initialised feature ranking — `futon2:holes/TN-gflownets-fable-review.md`
+F1, 2026-07-10). The lesson is the module's charter in miniature: a
+learning lane that cannot exhibit its `LearnedVariable` instance —
+evidence, update actually applied on its schedule, persistent state that
+moved, a consumer that read it — is a facade regardless of its
+architecture.
+
+## Lineage
+
+- Institutions as learning's repository: Joe's institutional-computing
+  paper, https://metameso.org/~joe/papers/corneli2016institutional.pdf
+  (IAD/Ostrom lineage).
+- The domain-general frame — learning through design patterns as a move
+  beyond AlphaZero's game-locked self-play — is
+  `futon2:docs/futonzero-alphazero.md` (2026-06-09, Fable with claude-1/-3/-4;
+  includes Fable's honest caveat that v1 was architecture, not the closed
+  loop). GFlowNets entered as Fable's suggestion in that early line; the
+  specific suggestion has not panned out (above), the frame stands.
 -/
 
 namespace DarkTower.AIF
