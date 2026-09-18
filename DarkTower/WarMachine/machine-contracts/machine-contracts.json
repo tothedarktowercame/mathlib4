@@ -381,7 +381,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/receipt_construction.clj:48",
+          "clojure-locus": "futon2/src/futon2/aif/receipt_construction.clj:49",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:507",
           "falsifier": "An achieved pattern acts again; a retracting effect is accepted; enacted true facts differ from the theta = 1 rollout support under the same precedence (fixture_situation_i :453 .. _v_renewal :507).",
@@ -389,7 +389,7 @@
           "holder": "runtime-correspondence-live-enactment",
           "kind": "closed",
           "name": "DarkTower.WarMachine.CascadeTransition.cascadeKernel",
-          "owner": "WM-03 (P10 part 2, futon2 cb5f8b1288): enactment. acting-order rechecks guards every step, completes by achievement and refuses retracting effects; at theta = 1 its enacted true facts equal the cascade-kernel rollout support under the same precedence. live-call-site=futon2/src/futon2/aif/receipt_construction.clj:569 (in construct :547, producing :shown). Further fixtures: cascade_model_manifest_test enactment-prediction-agreement-add-only, retraction-refused-withdrawal-token-agrees, p10-five-situations-enactment-agrees. DECLARED REDUCTION: enactment evaluates guards in strong Kleene logic over a fact map; agreement with the token-set Lean holds when q0 assigns every token in the universe true or false (the tests fix this closed world explicitly, p10-token-universe). An unknown fact makes a [:not ...] guard not fire where the closed-world Lean state would; open finding against P4",
+          "owner": "WM-03 (P10 part 2, futon2 cb5f8b1288): enactment. acting-order rechecks guards every step, completes by achievement and refuses retracting effects; at theta = 1 its enacted true facts equal the cascade-kernel rollout support under the same precedence. live-call-site=futon2/src/futon2/aif/receipt_construction.clj:570 (in construct :547, producing :shown). Further fixtures: cascade_model_manifest_test enactment-prediction-agreement-add-only, retraction-refused-withdrawal-token-agrees, p10-five-situations-enactment-agrees. DECLARED REDUCTION: enactment evaluates guards in strong Kleene logic over a fact map; agreement with the token-set Lean holds when q0 assigns every token in the universe true or false (the tests fix this closed world explicitly, p10-token-universe). An unknown fact makes a [:not ...] guard not fire where the closed-world Lean state would; open finding against P4",
           "signature": "checked-reference:DarkTower.WarMachine.CascadeTransition.cascadeKernel",
           "source": {
             "git-sha": "95127698bd3194c77bad208dde3e68bb03c57601",
@@ -671,7 +671,7 @@
           "holder": "runtime-correspondence-live-shadow",
           "kind": "closed",
           "name": "DarkTower.WarMachine.PolicyHorizon.horizonEFE",
-          "owner": "WM-05/WM-10 (P11 step 1): live shadow G. shadow-cascade-g delegates to horizon-g-sparse (whose Lean value replay is sparse-g-equals-enumerating-g and horizon-g-lean-fixture-correspondence); called on the live path in receipt_construction/construct and recorded only as :score-before/:score-after, never selecting or changing enacted output. live-call-site=futon2/src/futon2/aif/receipt_construction.clj:580 (in construct :547; the score closure reading these results feeds organise at :591). Declared reductions: zero adjudication rates; lam = mu = 1; empty evidence and zeroed sets; horizon 3 (AUTH-horizon-semantics proposes T = 2, awaiting Joe); documented-default theta",
+          "owner": "WM-05/WM-10 (P11 step 1): live shadow G. shadow-cascade-g delegates to horizon-g-sparse (whose Lean value replay is sparse-g-equals-enumerating-g and horizon-g-lean-fixture-correspondence); called on the live path in receipt_construction/construct and recorded only as :score-before/:score-after, never selecting or changing enacted output. live-call-site=futon2/src/futon2/aif/receipt_construction.clj:581 (in construct :547; the score closure reading these results feeds organise at :591). Declared reductions: zero adjudication rates; lam = mu = 1; empty evidence and zeroed sets; horizon 3 (AUTH-horizon-semantics proposes T = 2, awaiting Joe); documented-default theta",
           "signature": "checked-reference:DarkTower.WarMachine.PolicyHorizon.horizonEFE",
           "source": {
             "git-sha": "4d7c845e0352b9ae8920fb39d7b82f05254e9372",

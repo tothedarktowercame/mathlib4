@@ -5,12 +5,12 @@
       "build",
       "DarkTower.WarMachine.MachineContracts"
     ],
-    "entry-id": "test-registry-1fc47fce55218672b0454343277c85406d1871b4f414419af5fa8f9fd26b0547",
+    "entry-id": "test-registry-246a7c21e8f1d353d50922dce97e44ac9227943907fbb6a25e68c6449edd4248",
     "registry": "futon3c.test-registry"
   },
   "bundle": {
     "file": "machine-contracts.json",
-    "sha256": "4c7c45193127b1a822128a9cad066ce99b3a242b9f0df5565259f0a5ce5b16ab"
+    "sha256": "997f227a613ee52e75f40e417b7af9295146afe786cb04f55c25f703ea4d87fd"
   },
   "expected-modules": [
     "DarkTower.WarMachine.ActionMarginal",
@@ -39,9 +39,9 @@
   "scope": "per-entry-holder",
   "sources": [
     {
-      "commit": "72569c13e95999435e7fbbdc7fd38f747b07efa7",
+      "commit": "b52d417523fbea7358cc8e576cf681f49366bb64",
       "path": "DarkTower/WarMachine/MachineContracts.lean",
-      "sha256": "0ed3fc89aabc840ab8f856b18f14ba76a87b5b752b53c100126c1854cc4cd0de"
+      "sha256": "7cf48b5b39c7cce2d33be8ce04fe7ec651f44557fcccf65af49280a2063a1ed4"
     },
     {
       "commit": "926d10607e90c4df144e709c48c5b249f9450295",
