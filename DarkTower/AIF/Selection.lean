@@ -58,6 +58,7 @@ theorem temperedPolicyPosterior_def (t : PolicyTemperature) (E : Habit P)
     temperedPolicyPosterior t E F G π =
       selectionPosterior t E.weight F G π := rfl
 
+omit [Fintype P] in
 /-- At `β = 1` (so `γ = 1`) the tempered weight is the base law's weight:
 the two recorded laws agree exactly there, which is why a census carrying
 only one of them could pass every β=1 fixture while mis-binding
