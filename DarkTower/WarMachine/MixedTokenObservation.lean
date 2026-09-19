@@ -78,4 +78,81 @@ theorem tokenLikelihood_checkable_marginal
       · simp [ho]
     simp [hzero, hreported]
 
+/-! ## Finite latent mixtures -/
+
+variable {Z : Type*} [Fintype Z]
+
+/-- A finite latent mixture of conditionally independent token-observation
+kernels.  Dependence between token reports arises after marginalising `z`. -/
+def mixtureLikelihood (weight : Z → ℝ) (rates : Z → AdjudicationRates V)
+    (s o : Finset V) : ℝ :=
+  ∑ z, weight z * tokenLikelihood (rates z) s o
+
+theorem mixtureLikelihood_colsum (weight : Z → ℝ)
+    (rates : Z → AdjudicationRates V) (hweight : ∑ z, weight z = 1)
+    (s : Finset V) :
+    ∑ o : Finset V, mixtureLikelihood weight rates s o = 1 := by
+  unfold mixtureLikelihood
+  rw [Finset.sum_comm]
+  simp_rw [← Finset.mul_sum, tokenLikelihood_colsum]
+  simpa using hweight
+
+/-- Every component of a mixture vanishes on a checkable mismatch when its
+checkable rates vanish, hence so does the mixture. -/
+theorem mixtureLikelihood_eq_zero_of_checkable_mismatch
+    (weight : Z → ℝ) (rates : Z → AdjudicationRates V)
+    (checkable s o : Finset V)
+    (hfn : ∀ z v, v ∈ checkable → (rates z).falseNeg v = 0)
+    (hfp : ∀ z v, v ∈ checkable → (rates z).falsePos v = 0)
+    (hmismatch : o ∩ checkable ≠ s ∩ checkable) :
+    mixtureLikelihood weight rates s o = 0 := by
+  simp only [mixtureLikelihood,
+    tokenLikelihood_eq_zero_of_checkable_mismatch _ checkable s o
+      (fun v hv => hfn _ v hv) (fun v hv => hfp _ v hv) hmismatch,
+    mul_zero, Finset.sum_const_zero]
+
+/-- **Coupled mixed-rates marginal theorem.**  A normalized finite latent
+mixture may induce arbitrary dependence among judgement-token reports.  If
+both error rates vanish on every checkable token in every latent component,
+marginalising the judgement coordinates still reports the true checkable part
+of the state with probability one. -/
+theorem mixtureLikelihood_checkable_marginal
+    (weight : Z → ℝ) (rates : Z → AdjudicationRates V)
+    (hweight : ∑ z, weight z = 1)
+    (hweight_nonneg : ∀ z, 0 ≤ weight z)
+    (checkable s reported : Finset V)
+    (hfn : ∀ z v, v ∈ checkable → (rates z).falseNeg v = 0)
+    (hfp : ∀ z v, v ∈ checkable → (rates z).falsePos v = 0) :
+    (∑ o : Finset V,
+      if o ∩ checkable = reported then mixtureLikelihood weight rates s o else 0)
+      = if reported = s ∩ checkable then 1 else 0 := by
+  have hkernel_nonneg : ∀ o, 0 ≤ mixtureLikelihood weight rates s o := by
+    intro o
+    exact Finset.sum_nonneg fun z _ =>
+      mul_nonneg (hweight_nonneg z) (tokenLikelihood_nonneg (rates z) s o)
+  by_cases hreported : reported = s ∩ checkable
+  · subst reported
+    have hterm : ∀ o : Finset V,
+        (if o ∩ checkable = s ∩ checkable then mixtureLikelihood weight rates s o else 0)
+          = mixtureLikelihood weight rates s o := by
+      intro o
+      by_cases ho : o ∩ checkable = s ∩ checkable
+      · simp [ho]
+      · simp [ho, mixtureLikelihood_eq_zero_of_checkable_mismatch
+          weight rates checkable s o hfn hfp ho]
+    simp only [hterm, mixtureLikelihood_colsum weight rates hweight]
+    simp
+  · have hzero : ∀ o : Finset V,
+        (if o ∩ checkable = reported then mixtureLikelihood weight rates s o else 0) = 0 := by
+      intro o
+      by_cases ho : o ∩ checkable = reported
+      · have hmismatch : o ∩ checkable ≠ s ∩ checkable := by
+          intro heq
+          apply hreported
+          exact ho.symm.trans heq
+        simp [ho, mixtureLikelihood_eq_zero_of_checkable_mismatch
+          weight rates checkable s o hfn hfp hmismatch]
+      · simp [ho]
+    simp [hzero, hreported]
+
 end DarkTower.WarMachine.MixedTokenObservation
