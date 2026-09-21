@@ -80,7 +80,8 @@ structure ArmOneCascade (P : Type*) where
   selected : Set P
   admittedBy : Set P
 
-/-- Arm one's proposed organise type, corresponding to `Holes.lean:861`. -/
+/-- Arm one's proposed organise implementation type, corresponding to the
+historical function signature (before the 2026-09-21 contract repair). -/
 abbrev armOneOrganiseType (Policy P : Type*) :=
   ArmOneCascade Policy → Set P → Repository P → ArmOneCascade P
 

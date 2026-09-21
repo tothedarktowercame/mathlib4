@@ -15,7 +15,9 @@ namespace DarkTower.WarMachine.Holes
 
 noncomputable section
 
-/-- F12 slice 6 signature, identical to `organise` at `Holes.lean:861`. -/
+/-- F12 slice 6 historical implementation signature. Since 2026-09-21,
+`Holes.organise` names the receipt-bearing contract instead. These O1--O3
+experiments remain about this function type; they do not discharge that contract. -/
 abbrev OrganiseType (Policy P : Type*) :=
   Cascade Policy → Set P → Repository P → Cascade P
 

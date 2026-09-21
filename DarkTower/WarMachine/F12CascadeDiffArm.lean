@@ -280,7 +280,7 @@ theorem cascadeDiffRecordedAllLaws :
 C550 and the registry entry record arm two's price as "a `Score` type parameter
 the declared signature does not have" (`F12D1Arms.lean:119` against
 `Holes.lean:861`), which reads as a notational inconvenience.  It is not only
-that.  `organise`'s declared type has an implementation at every instantiation --
+that.  the historical `OrganiseType` has an implementation at every instantiation --
 `organiseSelectedOnly` (`F12Conformance.lean:59`) is one, whatever `Policy` and
 `P` are.  This arm's type does not: at `Score := Empty` it is EMPTY, because a
 total function at this signature has to produce two `Score` values on inputs that
@@ -295,7 +295,7 @@ theorem cascadeDiffArmIsEmptyAtAnEmptyScore :
   exact (f trivialPolicyCascade d1Selected d1Repo).scoreBefore.elim
 
 /-- F12 slice 13 REVIEW ADDITION, the comparand that makes the previous theorem a
-cost rather than a curiosity: the declared `organise` signature
+cost rather than a curiosity: the historical `OrganiseType` signature
 (`F12Conformance.lean:19`) is inhabited at the same argument types. -/
 theorem organiseTypeIsInhabitedAtTheSameArguments :
     Nonempty (OrganiseType Unit Nat) :=

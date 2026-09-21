@@ -3,7 +3,7 @@ import DarkTower.WarMachine.F12Conformance
 /-! # F12 organise discharge arm
 
 This module measures inhabitance, conformance, swappability, temperament use,
-and opacity at the exact `organise` signature without selecting an implementation.
+and opacity at the historical `OrganiseType` implementation signature without selecting an implementation.
 -/
 
 open Set
@@ -24,7 +24,7 @@ def organiseEmptyCascade {P : Type*} : Cascade P where
 def organiseEmpty {Policy P : Type*} : OrganiseType Policy P :=
   fun _ _ _ => organiseEmptyCascade
 
-/-- F12 slice 14 R0.3: the exact `organise` type at `Holes.lean:861` is inhabited without assumptions. -/
+/-- F12 slice 14 R0.3: the historical implementation type `OrganiseType` is inhabited without assumptions. -/
 theorem organiseTypeNonempty {Policy P : Type*} : Nonempty (OrganiseType Policy P) :=
   ⟨organiseEmpty⟩
 
@@ -257,7 +257,7 @@ opaque organiseOpaqueZaif : OrganiseType Unit Nat := organiseEmpty
 
 /-- F12 slice 14 R5.25 review addition: the inhabitance `organiseTypeNonempty`
 proves is the whole of what `opaque` needs.  Declared `local` so that importing
-this module does not put a `Nonempty` instance for `organise`'s own type into
+this module does not put a `Nonempty` instance for `OrganiseType` into
 anyone else's scope. -/
 local instance organiseTypeNonemptyInstance : Nonempty (OrganiseType Unit Nat) :=
   organiseTypeNonempty

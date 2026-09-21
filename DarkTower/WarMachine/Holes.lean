@@ -997,8 +997,67 @@ structure CascadeDiff (P Score : Type*) where
   scoreBefore : Score
   scoreAfter : Score
 
-/-- DELIBERATE IMPLEMENTATION REFUSAL · contract kind HOLE intentionally · owner: P-validated-R5 §3e organise · holder: by-record · evidence: REFUSED — this is an implementation, not a law · falsifier: REFUSED for the same reason · Organise turns selected patterns and authored relations into a cascade, under a temperament — a cascade at policy grain. Its recorded O1–O4 instance does not select one canonical implementation. TYPE AMENDMENT 2026-09-02 (worklist `:L6`, taking the foresight of `futon3:holes/labs/library-contract/LA1c-restatement.md` §10): the temperament is now an argument. Under `Set P → Repository P → Cascade P` there was nowhere to put the policy-grain cascade that decides which patterns enter and in what precedence, and the two organise policies this file already records were therefore indistinguishable in the type: `checks/playout_snatch.clj` takes the up-closure under `standsOn`, while `wmCascadeDiffFixture` below keeps `nodes = selected` and fast-forwards through the unselected bridge. O1's narrowed form admits both, so the choice between them is data, and the temperament is where that datum lives. The STATUS does not move with the type: whether the refusal weakens to definable is LA2's to decide from a running policy-grain rule, not this amendment's. Clojure mirror: `futon3:checks/find_organise.clj` `organise`, which reads the temperament's closure policy and precedence and fires nothing. -/
-def organise {Policy P : Type*} : Cascade Policy → Set P → Repository P → Cascade P := sorry
+/-- The policy-grain declaration against which an organise result is checked.
+These values and evidence relations must be fixed independently of the candidate.
+`nodeEvidence` attests an interpretation receipt and established guards under a
+named policy rule; `wireEvidence` attests the dependency, not merely its presence.
+Binding those relations to production observations is a separate obligation. -/
+structure OrganiseDeclaration (Policy P Receipt : Type*) where
+  temperament : Cascade Policy
+  nodes : Set P
+  edges : P → P → Prop
+  precedence : List P
+  nodeEvidence : Policy → P → Receipt → Prop
+  wireEvidence : P → P → Receipt → Prop
+
+/-- Candidate output with the receipts it actually carries. Missing receipts
+remain representable so that the contract can reject them. -/
+structure OrganiseWitness (Policy P Receipt : Type*) where
+  cascade : Cascade P
+  nodeReceipt : P → Option (Policy × Receipt)
+  wireReceipt : P → P → Option Receipt
+
+/-- Obligations of an organise implementation at the selected inputs. Exact
+agreement with the independently declared temperament prevents ignoring it.
+Authored reachability permits fast-forwarding through unselected patterns.
+Every output element and edge must carry evidence; a receipt must validate
+against the named rule/dependency, rather than merely be present. -/
+structure OrganiseContract {Policy P Receipt : Type*}
+    (declared : OrganiseDeclaration Policy P Receipt)
+    (selected : Set P) (repo : Repository P)
+    (result : OrganiseWitness Policy P Receipt) : Prop where
+  selectedRecorded : selected ⊆ repo.patterns
+  nodesRecorded : result.cascade.nodes ⊆ repo.patterns
+  nodesDeclared : result.cascade.nodes = declared.nodes
+  edgesDeclared : result.cascade.edges = declared.edges
+  precedenceDeclared : result.cascade.precedence = declared.precedence
+  precedenceCovers : ∀ p, p ∈ result.cascade.precedence ↔ p ∈ result.cascade.nodes
+  precedenceUnique : result.cascade.precedence.Nodup
+  origins : result.cascade.nodes = selected ∪ result.cascade.addedByOrganise
+  authored : ∀ a b, result.cascade.edges a b → Reach repo.standsOn a b
+  endpoints : ∀ a b, result.cascade.edges a b →
+    a ∈ result.cascade.nodes ∧ b ∈ result.cascade.nodes
+  nodeReceipted : ∀ p ∈ result.cascade.nodes, ∃ rule receipt,
+    result.nodeReceipt p = some (rule, receipt) ∧
+    rule ∈ declared.temperament.nodes ∧ declared.nodeEvidence rule p receipt
+  wireReceipted : ∀ a b, result.cascade.edges a b → ∃ receipt,
+    result.wireReceipt a b = some receipt ∧ declared.wireEvidence a b receipt
+
+/-- STATED CONTRACT · owner: P-validated-R5 §3e organise · 2026-09-21.
+An implementation is code whose outputs must satisfy this proposition; being
+code is no reason to refuse its specification. The informing production instance
+is futon2 `28a90c73`, `futon2.aif.fold-cascade/realize`: boxes require established
+guards and interpretation receipts; wires require evidenced dependencies. That
+instance informs this interface and is NOT a proof of correspondence. This
+contract describes a complete cascaded result; production remainders/holes do
+not discharge it. Policy-rule interpretation, receipt fidelity, implementation
+correspondence and coverage of calls remain separate production obligations.
+The registry remains open until those obligations are discharged. -/
+def organise {Policy P Receipt : Type*}
+    (declared : OrganiseDeclaration Policy P Receipt)
+    (selected : Set P) (repo : Repository P)
+    (result : OrganiseWitness Policy P Receipt) : Prop :=
+  OrganiseContract declared selected repo result
 
 private def cascadeFixtureSelected : Set Nat
   | 0 | 2 => True
@@ -8022,8 +8081,43 @@ def enactedActionEqualsSelected :
 /-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: wm-organization · TN-edge-review worklist H1b · holder: by-record · evidence: a run record in which the rank-1 selection passes its own act gate, paired with the action that was then enacted · falsifier: a run in which the rank-1 selection passes its gate and a different action is enacted · A BOUND TO BE TESTED, NOT A CLAIM BELIEVED TRUE — read the counterexample above first. `enactedActionEqualsSelected` is refuted on record: over `futon2/data/wm-trace/wm-trace-2026-07-04.edn` and `futon2/data/wm-trace/wm-trace-2026-07-05.edn`, the only two files joining a selection to an enactment, the paths disagree in 50 of 50 comparable records and agree in none. So this is not a weaker form of something observed to hold; it is the untested remainder after the strong claim fell. THE ANTECEDENT HAS NEVER OCCURRED ON RECORD: in all 50 records the act gates run over exactly two missions (`M-canon-fingerprint-store`, `M-bayesian-structure-learning`) and the rank-1 selection `M-first-flights` is not among them, so the rank-1 selection passes its gate in ZERO of 50 — the bound is vacuously unfalsified rather than supported, and a reader must not take its openness for evidence. The two paths can coincide only when the selected entry is also the first to pass its gate: `full_loop_runner`'s `selected-entry` enacts the recorded selection (`futon2/src/futon2/aif/full_loop_runner.clj:870-873`), `close-loop!` takes the first passing gate in ranking order (`futon2/src/futon2/aif/enact.clj:287-316`), and nothing enforces that they meet. Deciding this needs a run that produces the antecedent at all. -/
 def enactedEqualsSelectedWhenRankOneGated : Prop := sorry
 
-/-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove the absence of a code path · evidence is the executable witness · contract kind HOLE intentionally · owner: wm-organization · TN-edge-review worklist H2 · holder: by-record · evidence: a provenance walk from `DirichletConcentrations` back to its producer — name the feeder, grep the store, find the writer · falsifier: a code path from the tick model's o or μ into R17's concentrations · THE THEORY AND THE MACHINE ACCUMULATE FROM DIFFERENT SOURCES. Da Costa eq. 21 accumulates Dirichlet concentrations from the tick model's (o, s). A4a instead builds a capability × mission model: `a4a_substrate/read-corpus` reads `hyperedges-by-type :capability/*` and hands the corpus to `a4a/corpus->concentration` (`futon2/src/futon2/aif/a4a_substrate.clj:46-60`), and those hyperedges are written by the A3 actuator (`futon2/src/futon2/aif/actuator_a3.clj:31, 68`, discharge records at `:486-487`). The A4a namespace says so itself: it is pure, and its concepts are "demo-validated until real :capability/* production writes flow" (`futon2/src/futon2/aif/a4a.clj:2-6`). So R2→R17 and R1→R17 are not realised, and this is why: not a missing wire between two boxes that otherwise agree, but two accumulations over different data. The claim held open is the ABSENCE — no path carries the tick model's o or μ into R17's concentrations. Finding one falsifies it, and would also close the two edges. -/
-def dirichletAccumulationImportAbsent : Prop := sorry
+/-- A recorded accumulation and the concentrations passed to the consumer.
+Coordinates are stable `Channel` and state indices, not corpus-list positions.
+Each outcome carries a receipt together with the observed and inferred values. -/
+structure DirichletAccumulationWitness (State Receipt : Type*) where
+  prior : Channel → State → ℝ
+  outcomes : List (Receipt × ((Channel → ℝ) × (State → ℝ)))
+  updated : Channel → State → ℝ
+  consumerInput : Channel → State → ℝ
+
+/-- POSITIVE, RUN-GATED REQUIREMENT · owner: wm-organization · H2 · 2026-09-21.
+Realised outcomes feed the accumulated concentrations and the consumer receives
+those concentrations. `realised` is the independently recorded receipt authority,
+not a predicate chosen by the candidate. A qualifying run must supply this
+witness and its proof. Mapping production receipts, stable coordinates and the
+consumer to this interface, and covering the production path, remain open.
+
+HISTORICAL AUDIT NOTE (H2, preserved 2026-09-21): the provenance audit reported no path
+from the tick model's o/mu into R17; A4a recounted capability/mission records from
+A3 instead. That was a missing theory-expected edge, not a requirement to keep
+it absent. The former `dirichletAccumulationImportAbsent` is retired; no standing
+absence proposition is certified. `MachineDirichletAccumulation` records the
+arithmetic and coordinate divergence and the positive implementation obligation. -/
+structure dirichletAccumulationFeedsConcentrations {State Receipt : Type*}
+    (realised : Receipt → (Channel → ℝ) → (State → ℝ) → Prop)
+    (record : DirichletAccumulationWitness State Receipt) : Prop where
+  nonempty : record.outcomes ≠ []
+  uniqueReceipts : (record.outcomes.map Prod.fst).Nodup
+  outcomesRealised : ∀ tick ∈ record.outcomes, realised tick.1 tick.2.1 tick.2.2
+  observationsNonnegative : ∀ tick ∈ record.outcomes, ∀ c, 0 ≤ tick.2.1 c
+  statesNonnegative : ∀ tick ∈ record.outcomes, ∀ s, 0 ≤ tick.2.2 s
+  priorPositive : ∀ c s, 0 < record.prior c s
+  accumulation : ∀ c s, record.updated c s = record.prior c s +
+    (record.outcomes.map fun tick => tick.2.1 c * tick.2.2 s).sum
+  contribution : ∃ c s, 0 <
+    (record.outcomes.map fun tick => tick.2.1 c * tick.2.2 s).sum
+  updatedPositive : ∀ c s, 0 < record.updated c s
+  consumed : record.consumerInput = record.updated
 
 /-- PERMANENT EXTERNAL ATTESTATION · Lean cannot prove an event · evidence is the executable witness · contract kind HOLE intentionally · owner: wm-organization · TN-edge-review worklist H3, from Joe's J1 ruling · holder: by-record · evidence: a run record carrying τ together with the β it was derived from · falsifier: no run record carries τ together with the β it was derived from — every persisted tick's τ produced by an engineering calibration law and none by carry-β · THE MACHINE'S DIAL IS NOT THE FORMALISM'S. Friston 2017 eq. 2.7 and Da Costa 2020 A.2 give policy precision as γ = 1/β with β ← β + (π − π₀)·G — the precision learns from the policy posterior's departure from its prior, weighted by expected free energy. What the machine uses instead is τ from the score spread and an engineering selection gain (`futon2/src/futon2/aif/policy.clj:77-145`, `effective-temperature`; the DEFAULT `:spread` mode computes τ_eff = τ_spread / g at `:133`), and `selection_gain.clj` says in its own words that this "is not Friston's variational policy precision". Live, the gain does not even move: the fold returns the state unchanged unless a realised outcome is well-formed and new, and the field "is ABSENT today, sim-only", so τ holds at its prior (`futon2/src/futon2/aif/selection_gain.clj:187-193`). No β appears anywhere in the policy path. J1 ruled the drawn R7→R14 was a conflation and that the theory-aligned precision is to be pursued; this is the claim held open: policy precision is γ = 1/β updated by eq. 2.7. · OWNER CORRECTION 2026-09-03 (Joe's J10 ruling, executed by worklist :U47). THE FALSIFIER FIELD: it read "a run record in which τ is set by the β update from G and π", which is the CONFIRMING observation — word for word what the evidence field asks for — and not a refutation. Twelve of the fifteen holes use the field as a genuine refutation (`wmRunsOnce`: "no invocation of the tick entry point completes end-to-end with a TickRunRecord"; `dirichletAccumulationImportAbsent` says outright "the claim held open is the ABSENCE"), so H3/H4 were the anomaly and both are corrected to that absence form. THE POINTER: `policy.clj:242-245` was re-resolved at source and now holds `gap-report`, an unrelated helper; the τ law is `effective-temperature`, cited above at its current lines. DISPOSITION :run-gated, and no persisted record exists: `futon2/data/wm-trace/wm-trace-2026-09-01.edn` carries 18 `:tau-source` values and every one is `:selection-gain-only`, and S3's one live τ = β tick ran under a write-suppressing preflight (`futon2/holes/labs/wm-contract/run8_s3_preflight.clj:28-54`), so nothing was persisted. NOT REPAIRED AND STATED RATHER THAN SMOOTHED: the sentence "No β appears anywhere in the policy path" above is false of the current tree — `effective-temperature`'s `:variational-beta-gamma` mode sets τ = β (`futon2/src/futon2/aif/policy.clj:101-105`, `:135-144`) and `carry-beta` supplies it with its provenance (`futon2/src/futon2/aif/policy_precision.clj:544-560`), both landed by RUN8/I1 after this docstring was written; it is true of the DEFAULT `:spread` path. That is H4's F4 defect occurring in H3, and J10 did not enumerate it, so it is reported here rather than repaired. -/
 def policyPrecisionIsGammaFromBeta : Prop := sorry
@@ -8245,7 +8339,7 @@ private def holeDeclarations : List Declaration :=
    mkClosedUnderCriterion "findF2Receipted" "P-validated-R5 §3e F2" "FindReceiptTable" "selected pattern lacks receipt",
    mkClosedUnderCriterion "findF3NonSelfCertifying" "P-validated-R5 §3e F3" "FindReceiptTable" "receipt uses score alone",
    mkClosedUnderCriterion "findF4Falsifiable" "P-validated-R5 §3e F4" "FindReceiptTable" "a recorded zero-mass pattern is absent from the repository or selected",
-   mkRefused "organise" "P-validated-R5 §3e organise" "implementation, not a law",
+   mkHole "organise" "P-validated-R5 §3e organise" "OrganiseWitness" "off-repository pattern, unreceipted element, unevidenced wire, or declared temperament not applied; implementation correspondence and coverage remain open",
    mkWitnessedClosed "r9VerdictConsultsChecker" "P-R9 §solved 3" "proof term" "decision ignores checker",
    mkWitnessedClosed "wmVerdictsLedgerAlone" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
    mkWitnessedClosed "wmVerdictsDeclared" "P-R9 §solved 2" "VerdictTable" "a fixture row or verdict is absent",
@@ -8262,7 +8356,7 @@ private def holeDeclarations : List Declaration :=
    mkHole "wmRunConformsToWiring" "record: futon2:holes/problems/BUILD-packets/WM-RUN2.md · Joe 2026-08-31 · organisation evidence" "TickRunRecord" "empty route or any hop absent from both original and measured Figure 4 layers",
    mkRefutedByRecord "enactedActionEqualsSelected" "wm-organization · TN-edge-review worklist H1 (refuted), H1b" "C460 over wm-trace-2026-07-04.edn and wm-trace-2026-07-05.edn: 50 comparable records, 50 differ, 0 agree" "a comparable record whose selection and enactment name the same mission",
    mkHole "enactedEqualsSelectedWhenRankOneGated" "wm-organization · TN-edge-review worklist H1b" "TickRunRecord" "a run in which the rank-1 selection passes its gate and a different action is enacted",
-   mkHole "dirichletAccumulationImportAbsent" "wm-organization · TN-edge-review worklist H2" "DirichletConcentrations" "a code path from the tick model's o or mu into R17's concentrations",
+   mkHole "dirichletAccumulationFeedsConcentrations" "wm-organization · TN-edge-review worklist H2" "DirichletAccumulationWitness" "no qualifying default-path run proves realised outcomes accumulate into the consumed concentrations",
    mkHole "policyPrecisionIsGammaFromBeta" "wm-organization · TN-edge-review worklist H3 (Joe's J1 ruling)" "TickRunRecord" "no run record carries tau together with the beta it was derived from — every persisted tick's tau produced by an engineering calibration law and none by carry-beta; corrected 2026-09-03 (Joe's J10 ruling, worklist :U47): the original field named the CONFIRMING observation, word for word what the evidence field asks for",
    mkHole "policyPosteriorImportsPolicyF" "wm-organization · TN-edge-review worklist H4 (Joe's J2 ruling)" "TickRunRecord" "no default-path run record's Q(pi) carries a per-policy F term — F_pi reaching the posterior only under FUTON_WM_FPI_POSTERIOR=1; corrected 2026-09-03 (Joe's J10 ruling, worklist :U47): the original field named the CONFIRMING observation, and the S4 record already satisfies it under the flag"]
 

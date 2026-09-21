@@ -40,10 +40,11 @@ proposition about the two functions rather than as a name.
    (`declaredAccumulationRealisesItself`) and not trivially satisfiable
    (`recountShapedDoesNotRealise`).
 
-NOT CLAIMED HERE: that no code path carries the tick model's `o` or `mu` into
-R17's concentrations.  Lean cannot prove the absence of a code path; that claim
-is held by-record at `Holes.dirichletAccumulationImportAbsent`
-(`Holes.lean:7679`), whose falsifier this module's predicate makes checkable.
+The historical missing-import finding is preserved in the 2026-09-21 historical audit note
+at `Holes.dirichletAccumulationFeedsConcentrations`. The standing requirement
+is positive: realised outcomes accumulate and the consumer receives the updated
+concentrations. This module connects its arithmetic to that witness contract;
+production correspondence, provenance and coverage remain run-gated.
 -/
 namespace DarkTower.WarMachine.MachineDirichletAccumulation
 
@@ -188,9 +189,9 @@ theorem declaredCoordinatesAreFixedAndMachineCoordinatesAreNot :
 /-- THE REPAIR PATH.  An implementation realises the declared accumulation when,
 on the machine's own fixed `Channel`/`Status` coordinates, it agrees with
 da Costa eq. 21 for every previous concentration and every tick list.  This is
-the obligation the falsifier of `Holes.dirichletAccumulationImportAbsent`
-(`Holes.lean:7679`) would have to discharge; the hole itself stays open and
-untouched. -/
+the implementation obligation accompanying
+`Holes.dirichletAccumulationFeedsConcentrations`; a qualifying run must also
+provide realised-outcome provenance and consumption evidence. -/
 def RealisesDeclaredAccumulation
     (acc : (Channel → Status → ℝ) → List ((Channel → ℝ) × (Status → ℝ)) →
       Channel → Status → ℝ) : Prop :=
@@ -219,6 +220,27 @@ theorem recountShapedDoesNotRealise : ¬ RealisesDeclaredAccumulation recountSha
   intro h
   have := congrFun (congrFun (h (fun _ _ => 1) []) Channel.loopHealth) Status.spawned
   simp [recountShaped, declaredAccumulation] at this
+
+/-- The positive run contract uses exactly the declared accumulation arithmetic. -/
+theorem witnessedAccumulationAgreesWithDeclared {Receipt : Type*}
+    {realised : Receipt → (Channel → ℝ) → (Status → ℝ) → Prop}
+    {record : DirichletAccumulationWitness Status Receipt}
+    (h : dirichletAccumulationFeedsConcentrations realised record) :
+    record.updated = declaredAccumulation record.prior (record.outcomes.map Prod.snd) := by
+  funext c s
+  simpa [declaredAccumulation, List.map_map, Function.comp_def] using h.accumulation c s
+
+/-- The same recorded concentrations reach the consumer, not only a diagnostic. -/
+theorem witnessedConsumerAgreesWithDeclared {Receipt : Type*}
+    {realised : Receipt → (Channel → ℝ) → (Status → ℝ) → Prop}
+    {record : DirichletAccumulationWitness Status Receipt}
+    (h : dirichletAccumulationFeedsConcentrations realised record) :
+    record.consumerInput =
+      declaredAccumulation record.prior (record.outcomes.map Prod.snd) :=
+  h.consumed.trans (witnessedAccumulationAgreesWithDeclared h)
+
+#print axioms witnessedAccumulationAgreesWithDeclared
+#print axioms witnessedConsumerAgreesWithDeclared
 
 #print axioms a4aPrior
 #print axioms a4aIncrement
