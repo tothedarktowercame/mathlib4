@@ -7435,8 +7435,10 @@ structure RouteHop where
   at_ : String
   deriving DecidableEq
 
-/-- OPEN, RUN-GATED · the close path is a Lean certificate per accepted run · contract kind HOLE, until a certificate is accepted · owner: record: futon2:holes/problems/BUILD-packets/WM-RUN2.md · Joe 2026-08-31 · holder: by-record · evidence: `checks/wm_route_conformance.clj` over `holes/labs/wm-contract/tick-run-record-2026-08-30.edn` and the live Figure 4 edge layers; and, since 2026-09-04, `wmS5RunConformsToDrawnWiring` over the pinned 2026-09-01-s5 run · falsifier: an empty route or any hop absent from both the original and measured figure layers · A completed tick's reassembled route is non-empty and every hop is an edge of the wiring specification. CLOSE PATH (Joe's RUN4 ruling, 2026-09-03, futon2 worklist.edn `:run4-lean-ruling`; executed by `:U49`). The PERMANENT EXTERNAL ATTESTATION reading this annotation used to carry is REFUSED BY ITS OWNER, verbatim: "I'm not sure I believe that wmRunConformsToWiring cannot be attested to... all that's really needed here is to run the machine and see if it conforms to the wiring that we drew. And that should be something we can validate in Lean. So I don't see this as a permanent hole at all... It might be the last one we fill. But it's not permanent." C114's decline of the pinned transcription is SUPERSEDED by that ruling: a Lean certificate over a pinned run -- the reassembled route against the drawn Figure 4 layers, proved by `decide`, the `wmTraceR2`/`wmTraceR8` pattern applied per run -- is exactly the wanted validation, and it is leg (3) of the J9 criterion. So this is RUN-GATED, not permanent: the machinery exists and is exercised (`wmS5RunConformsToDrawnWiring`, with `wmS5RouteCensus` deciding its numbers), and the hole closes when Joe ACCEPTS a certificate over a qualifying run -- which run qualifies is his call at certificate time, and the flip-era run may be what he means. Nothing here is closed by the s5 certificate alone; `mkHole` stays until that acceptance. -/
-def wmRunConformsToWiring : Prop := sorry
+/- The run-conformance obligation is defined below, after the route checker.
+Its proposition is fully specified; selecting a qualifying production population
+and supplying its certificates remain outstanding. See `wmRunConformsToWiring`.
+-/
 
 /-! ### The 2026-09-01-s5 run's route against the drawn wiring (worklist `:U49`)
 
@@ -7616,6 +7618,55 @@ conjunction, and instance synthesis does not unfold an irreducible `def`. -/
     (∀ h ∈ routes.flatMap routeHops, classifyHop h ≠ HopClass.unmapped) ∧
     (∀ h ∈ routes.flatMap routeHops, classifyHop h ≠ HopClass.refutation)
 
+/-- Every run in the supplied accepted population satisfies the pinned Figure 4
+checker. A run is represented by its recorded routes. This specifies the
+universal obligation without assuming it and without replacing it by one good
+run. Binding the population to the actual accepted production runs, including
+record fidelity and completeness, is an external evidence obligation.
+
+The registry remains open for that production obligation. Joe's RUN4 ruling
+reserves acceptance of a qualifying run; this definition performs no acceptance.
+The checker retains its existing measured-layer and retirement semantics. -/
+def wmRunConformsToWiring
+    (acceptedRuns : Set (List (List RouteNode))) : Prop :=
+  ∀ routes ∈ acceptedRuns, runConformsToDrawnWiring routes
+
+/-- Per-run certificates discharge the obligation for the specified population. -/
+theorem wmRunConformsToWiring_of_certificates
+    (acceptedRuns : Set (List (List RouteNode)))
+    (certificates : ∀ routes ∈ acceptedRuns, runConformsToDrawnWiring routes) :
+    wmRunConformsToWiring acceptedRuns := certificates
+
+/-- Restricting attention to one named run requires exactly its certificate. -/
+theorem wmRunConformsToWiring_singleton (routes : List (List RouteNode)) :
+    wmRunConformsToWiring {routes} ↔ runConformsToDrawnWiring routes := by
+  simp [wmRunConformsToWiring]
+
+/-- An accepted run with no recorded routes cannot satisfy the obligation. -/
+theorem wmRunConformsToWiring_rejects_empty_run
+    (acceptedRuns : Set (List (List RouteNode))) (h : [] ∈ acceptedRuns) :
+    ¬ wmRunConformsToWiring acceptedRuns := by
+  intro conforms
+  exact (conforms [] h).1 rfl
+
+/-- An empty route is rejected by the actual pinned checker. -/
+theorem wmRunConformsToWiring_rejects_empty_route :
+    ¬ wmRunConformsToWiring {([[]] : List (List RouteNode))} := by
+  rw [wmRunConformsToWiring_singleton]
+  decide
+
+/-- A hop absent from the drawn and measured layers is rejected. -/
+theorem wmRunConformsToWiring_rejects_unmapped_hop :
+    ¬ wmRunConformsToWiring {[[.R20, .TRACE]]} := by
+  rw [wmRunConformsToWiring_singleton]
+  decide
+
+/-- A code-retired hop that the checker classifies as a refutation is rejected. -/
+theorem wmRunConformsToWiring_rejects_refuted_hop :
+    ¬ wmRunConformsToWiring {[[.R13, .R14]]} := by
+  rw [wmRunConformsToWiring_singleton]
+  decide
+
 /-- The 4 routes the run recorded, in the order `:run/id` selection
 returns them out of the shared trace:
 `4e35e740-8c9f-42c1-b8a9-0cdfc024e9c8`,
@@ -7656,6 +7707,11 @@ fired at all. The certificate says this run stayed inside the union of the two
 layers. It does not say the drawn figure predicted the run. -/
 theorem wmS5RunConformsToDrawnWiring : runConformsToDrawnWiring s5Routes := by
   decide
+
+/-- The existing s5 certificate discharges the singleton population's formal
+obligation. This proves neither production coverage nor operator acceptance. -/
+theorem wmS5RunConformsToWiring : wmRunConformsToWiring {s5Routes} :=
+  (wmRunConformsToWiring_singleton s5Routes).mpr wmS5RunConformsToDrawnWiring
 
 /-- The census the certificate is stated over, so the numbers a reader checks
 against `runs/2026-09-01-s5/conformance.edn` are themselves decided rather than
