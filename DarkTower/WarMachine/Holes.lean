@@ -8091,6 +8091,18 @@ structure DirichletAccumulationWitness (State Receipt : Type*) where
   consumerInput : Channel → State → ℝ
 
 /-- POSITIVE, RUN-GATED REQUIREMENT · owner: wm-organization · H2 · 2026-09-21.
+GOVERNING PRINCIPLE — Joe, 2026-09-21: "the fake-out
+... is bad (but at least it was left as a sorry)... the Lean code
+[is] supposed to include a specification of what is to be built, not
+a certification of whatever degenerate state happens to exist at any
+given point in time."
+
+The standing proposition specifies the forward requirement: accumulation feeds
+the concentrations from realised outcomes. The observed absence belongs only
+in a dated audit/registry finding, never as the requirement itself. Proving that
+absence as the standing requirement would have been worse than leaving it
+`sorry`: it would have enshrined the deficient present as the intended system.
+
 Realised outcomes feed the accumulated concentrations and the consumer receives
 those concentrations. `realised` is the independently recorded receipt authority,
 not a predicate chosen by the candidate. A qualifying run must supply this
