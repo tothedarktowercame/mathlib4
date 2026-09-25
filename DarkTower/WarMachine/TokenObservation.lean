@@ -5,9 +5,16 @@ import DarkTower.WarMachine.PolicyRollout
 # WM-04 (design P5): observation model `A` over token states
 
 One observation follows each application. `A` reports the established-token
-state: checkable tokens (artefacts: a file exists, a test passes) are observed
-exactly, while tokens needing judgement carry an adjudication error rate
-(`falseNeg`/`falsePos`). With all rates zero the kernel is the identity on
+state: checkable tokens whose class token is an artefact fact (a file exists,
+a commit exists) are observed exactly; for tests, what is observed exactly is
+only the C8 record-shaped token — the test registry holds a warrant for the
+named namespace whose pinned code-path and test-path shas equal current
+content, postcheck matched, zero failures and zero errors (observation
+contract `resources/wm/observation-contract.edn` `:C8`; H-A-CONSUMER-D, futon2
+`6059ecbc`) — not the bare proposition "the tests pass", which the contract's
+`:stated-conditions-rule` assigns to class J. Tokens needing judgement carry
+an adjudication error rate (`falseNeg`/`falsePos`). With all rates zero the
+kernel is the identity on
 `Finset V`, so the predicted observation distribution coincides with the
 predicted state distribution of `PolicyRollout.ForwardModel`.
 
