@@ -5,12 +5,12 @@
       "build",
       "DarkTower.WarMachine.MachineContracts"
     ],
-    "entry-id": "test-registry-246a7c21e8f1d353d50922dce97e44ac9227943907fbb6a25e68c6449edd4248",
+    "entry-id": "test-registry-5f3fc8b0b43d860782ea9de9dd784cb5c04169ba66065e5b671543bb68b36115",
     "registry": "futon3c.test-registry"
   },
   "bundle": {
     "file": "machine-contracts.json",
-    "sha256": "997f227a613ee52e75f40e417b7af9295146afe786cb04f55c25f703ea4d87fd"
+    "sha256": "3fef4fb17ba208b7a4b3c642374e9a6dd4c218893b85aebb7a2f287f59e58373"
   },
   "expected-modules": [
     "DarkTower.WarMachine.ActionMarginal",
@@ -33,15 +33,15 @@
   ],
   "holes-component": {
     "path": "DarkTower/WarMachine/holes-contract.json",
-    "sha256": "46d73de9b80bb397b6c79982093249c4d56652e9ffa3a3aa406639ba5234377b"
+    "sha256": "d8de47fb2239f99ea43df0602b7d14e8e168cac013d000865d361f4664e2da96"
   },
   "schema": "wm-machine-contract-manifest-v2",
   "scope": "per-entry-holder",
   "sources": [
     {
-      "commit": "b52d417523fbea7358cc8e576cf681f49366bb64",
+      "commit": "22470e731b6b5570840570323db4432643953525",
       "path": "DarkTower/WarMachine/MachineContracts.lean",
-      "sha256": "7cf48b5b39c7cce2d33be8ce04fe7ec651f44557fcccf65af49280a2063a1ed4"
+      "sha256": "a6b3d64d6b43c00aaa6332fb4872413ca45f187b6f347eb4ff5984e886ab61ad"
     },
     {
       "commit": "926d10607e90c4df144e709c48c5b249f9450295",
@@ -64,9 +64,9 @@
       "sha256": "33cbab0d3ba76bdf58d9f3638748f12cb9e3befb1336b223ddbd3567589a09e8"
     },
     {
-      "commit": "480a666ad27c18477b4b9df86e11862be3930d50",
+      "commit": "b3d8afa6a002dbe3ce4fe3f384b770b92ea5b1e3",
       "path": "DarkTower/WarMachine/Holes.lean",
-      "sha256": "7f137e4f85b2aae18b699942bdc505faa3f311752a096718704fb2ca7b7a07d3"
+      "sha256": "7591fa968efce642a78ae2f600d9a79711df41f2761d791b1c0700a098e813cd"
     },
     {
       "commit": "4da0bb794937a44e133402867ea9601a55ec929f",
@@ -134,9 +134,9 @@
       "sha256": "79bb6e490e4d08d6db53d1422310a73c3d758c9348e43a0d15d5e414f038bfeb"
     },
     {
-      "commit": "889429e6bf6f239ae4ca7bdc5668ffd7dee5b4f1",
+      "commit": "5fe0371169993c45d18c11050274d8e78c81d7be",
       "path": "DarkTower/WarMachine/TokenObservation.lean",
-      "sha256": "e84a75a7b8bb1d0129aade4f9a821e3a29a9780331192c0d8c8cbdc9123e05d7"
+      "sha256": "1a3258433259cf77a7d0556697f3fef2a1031d4ed758e73ad83fb3219c7842a3"
     },
     {
       "commit": "678c797666bd60e8f498ca7dddd6d63a4b52ebb5",

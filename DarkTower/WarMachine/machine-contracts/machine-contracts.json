@@ -200,7 +200,7 @@
       "contract-id": "wm-token-state",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:115",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:131",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenState.lean:45",
           "falsifier": "The runtime row is not a point mass summing to 1 on the observed token set.",
@@ -217,7 +217,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:125",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:141",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenState.lean:136",
           "falsifier": "(independent-belief {\"t0\" 3/2 \"t1\" 1/2} #{\"t0\" \"t1\"}) does not refuse with :invalid-token-probability; or all-0/1 probabilities do not reduce to observed-belief (independentBelief_eq_observedBelief, TokenState.lean:153).",
@@ -234,7 +234,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:146",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:162",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenState.lean:56",
           "falsifier": "(coverage #{} state) does not refuse with :empty-want-signature; or coverage leaves [0,1], is 1 without want ⊆ s, or decreases as s grows (coverage_le_one :60, coverage_eq_one_iff :65, coverage_mono :83).",
@@ -262,7 +262,7 @@
       "contract-id": "wm-cascade-transition",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:243",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:293",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:57",
           "falsifier": "(pattern-kernel p s) with theta = 3/2 does not refuse with :invalid-pattern-interpretation; or a row does not sum to 1 (patternKernel_rowsum :50), or an achieved pattern moves the state (patternKernel_of_achieved :57).",
@@ -279,7 +279,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:263",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:327",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:82",
           "falsifier": "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A pattern whose forbids set meets s is selected (firstEnabled_skips_forbidden :82).",
@@ -296,7 +296,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:278",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:427",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:116",
           "falsifier": "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A cascade row does not sum to 1 (cascadeKernel_rowsum :116), or a blocked state is not held fixed (cascadeKernel_of_noEnabled :126; fixture_p3_identity_when_blocked :241).",
@@ -313,7 +313,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:270",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:334",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:156",
           "falsifier": "A precedence containing an uninterpreted pattern does not yield :missing-pattern-interpretation (interpret_eq_none_iff :156).",
@@ -330,7 +330,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:106",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:122",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:95",
           "falsifier": "An achieved pattern first in precedence is not skipped (firstEnabled_skips_achieved :95); empty produces treated as not achieved; a forbidden token present does not disable the guard.",
@@ -347,7 +347,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:263",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:327",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:368",
           "falsifier": "An achieved pattern first in precedence is selected, so the chain stalls at its first completed step.",
@@ -364,7 +364,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:278",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:427",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:507",
           "falsifier": "Any of the five situations gives a different transition row from the Lean fixtures fixture_situation_i :453, _ii :459, _iii :473, _iv :481, _v_disabled :488, _v_renewal :507.",
@@ -409,7 +409,7 @@
       "contract-id": "wm-policy-rollout",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:299",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:486",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/CascadeTransition.lean:286",
           "falsifier": "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: The two-step rollout does not reach the full state with probability theta1*theta2 (fixture_rollout_two :286), or reversing the one-step order changes nothing where it should (fixture_one_step_reversed :514).",
@@ -426,9 +426,9 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:218",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:268",
           "decided": "2026-09-16",
-          "evidence": "mathlib4/DarkTower/WarMachine/TokenObservation.lean:157",
+          "evidence": "mathlib4/DarkTower/WarMachine/TokenObservation.lean:164",
           "falsifier": "With zero rates the predicted observation distribution differs from the state distribution q (predictedOutcome_eq_rolloutState :157); or a rate refusal does not propagate.",
           "fixture": "futon2/test/futon2/aif/cascade_model_manifest_test.clj:199",
           "holder": "runtime-correspondence-not-live-path",
@@ -454,9 +454,9 @@
       "contract-id": "wm-token-observation",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:175",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:191",
           "decided": "2026-09-16",
-          "evidence": "mathlib4/DarkTower/WarMachine/TokenObservation.lean:109",
+          "evidence": "mathlib4/DarkTower/WarMachine/TokenObservation.lean:116",
           "falsifier": "(token-likelihood rates s o) with false-neg 3/2 does not refuse with :invalid-adjudication-rate; or a state token with no rate entry does not refuse; or zero rates do not give the identity kernel (tokenLikelihood_checkable :109).",
           "fixture": "futon2/test/futon2/aif/cascade_model_manifest_test.clj:181",
           "holder": "runtime-correspondence-not-live-path",
@@ -465,15 +465,15 @@
           "owner": "WM-04 (P5): per-token adjudication likelihood A(o|s)",
           "signature": "checked-reference:DarkTower.WarMachine.TokenObservation.tokenLikelihood",
           "source": {
-            "git-sha": "889429e6bf6f239ae4ca7bdc5668ffd7dee5b4f1",
+            "git-sha": "5fe0371169993c45d18c11050274d8e78c81d7be",
             "module": "DarkTower.WarMachine.TokenObservation",
-            "sha256": "e84a75a7b8bb1d0129aade4f9a821e3a29a9780331192c0d8c8cbdc9123e05d7"
+            "sha256": "1a3258433259cf77a7d0556697f3fef2a1031d4ed758e73ad83fb3219c7842a3"
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:201",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:217",
           "decided": "2026-09-16",
-          "evidence": "mathlib4/DarkTower/WarMachine/TokenObservation.lean:84",
+          "evidence": "mathlib4/DarkTower/WarMachine/TokenObservation.lean:91",
           "falsifier": "An observation row has a negative entry or does not sum to exactly 1 (tokenLikelihood_nonneg :43, tokenLikelihood_colsum :84).",
           "fixture": "futon2/test/futon2/aif/cascade_model_manifest_test.clj:199",
           "holder": "runtime-correspondence-not-live-path",
@@ -482,24 +482,24 @@
           "owner": "WM-04 (P5): the observation row over every subset is a distribution (the ForwardModel A obligations)",
           "signature": "checked-reference:DarkTower.WarMachine.TokenObservation.observationKernelOK",
           "source": {
-            "git-sha": "889429e6bf6f239ae4ca7bdc5668ffd7dee5b4f1",
+            "git-sha": "5fe0371169993c45d18c11050274d8e78c81d7be",
             "module": "DarkTower.WarMachine.TokenObservation",
-            "sha256": "e84a75a7b8bb1d0129aade4f9a821e3a29a9780331192c0d8c8cbdc9123e05d7"
+            "sha256": "1a3258433259cf77a7d0556697f3fef2a1031d4ed758e73ad83fb3219c7842a3"
           }
         }
       ],
       "schema-version": 1,
       "source": {
-        "git-sha": "889429e6bf6f239ae4ca7bdc5668ffd7dee5b4f1",
+        "git-sha": "5fe0371169993c45d18c11050274d8e78c81d7be",
         "module": "DarkTower.WarMachine.TokenObservation",
-        "sha256": "e84a75a7b8bb1d0129aade4f9a821e3a29a9780331192c0d8c8cbdc9123e05d7"
+        "sha256": "1a3258433259cf77a7d0556697f3fef2a1031d4ed758e73ad83fb3219c7842a3"
       }
     },
     {
       "contract-id": "wm-token-preference",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:360",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:541",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenPreference.lean:59",
           "falsifier": "lam = 0 or an empty want does not refuse with :invalid-preference-spec (the Lean structure requires lam_pos and want_nonempty; Z_pos :59 depends on them).",
@@ -516,7 +516,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:389",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:570",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenPreference.lean:122",
           "falsifier": "Utility is not strictly increasing in want coverage at equal evidence count (preference_lt_of_want_lt :122), or depends on token content beyond membership (preference_congr).",
@@ -533,7 +533,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:400",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:581",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76",
           "falsifier": "The distribution does not sum to 1 within 1e-12 (preference_sum :76), is nonzero on a zeroed outcome, or zero off it (preference_eq_zero_iff :105, preference_pos_iff :98).",
@@ -550,7 +550,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:556",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:737",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenPreference.lean:76",
           "falsifier": "Any 2-4 token case where preference-fn differs from preference-distribution; a universe that disagrees with the enumerating one (preference-fn-universe-matches-enumerating :528).",
@@ -567,7 +567,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:506",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:687",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/TokenPreference.lean:105",
           "falsifier": "A zeroed outcome gets finite log-preference, or a non-zeroed one gets -inf (preference_eq_zero_iff :105); overflow or wrap at scale.",
@@ -595,7 +595,7 @@
       "contract-id": "wm-policy-horizon",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:419",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:600",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:86",
           "falsifier": "A smoothed risk returns a finite value where some outcome has positive predicted mass and zero preference (the :infinite assertion); or risk is negative for a distribution C (stepRisk_nonneg :80).",
@@ -612,7 +612,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:431",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:612",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:81",
           "falsifier": "Ambiguity is negative, or is read at a different step from risk.",
@@ -629,7 +629,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:451",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:632",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:173",
           "falsifier": "A constant-C runtime fails the ranking reversal (fixture_stepIndexed_preference :300); G is finite although some step has infinite risk (horizonEFE_eq_top_iff :167); extending the horizon does not add exactly the new step (horizonEFE_succ :114).",
@@ -646,7 +646,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:451",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:632",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/PolicyHorizon.lean:173",
           "falsifier": "Any 2-4 token case where sparse and enumerating G differ (sparse-g-equals-enumerating-g :440); a universe offset other than T*k*ln 2 (horizon-g-sparse-universe-offset :559); a non-zero judgement rate accepted at scale.",
@@ -691,7 +691,7 @@
       "contract-id": "wm-exact-belief",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:944",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:1226",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:128",
           "falsifier": "A mean-field-style update refuses the fixture input that exact-update accepts at 9/10 (fixture_exact_accepts :263; exact-belief-falsifiers :637); a P(o) = 0 observation does not give :zero-predictive-probability, or a P(o) > 0 one does (exactUpdate_eq_none_iff :90).",
@@ -708,7 +708,7 @@
           }
         },
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:972",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_model_manifest.clj:1266",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/ExactBeliefTrajectory.lean:238",
           "falsifier": "P10 aligned at futon2 8222c700 (guard-holds? now requires ¬(produces ⊆ s); reviewed, DAG rev 73): an achieved pattern first in precedence is not skipped. Other falsifiers: A stored belief is not a distribution (tokenBeliefAt_dist :238); a refusal is not carried forward; the first stored belief differs from the mean-field update from the observed token set (tokenBeliefAt_one_eq_meanField).",
@@ -736,11 +736,11 @@
       "contract-id": "wm-policy-selection",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_selection.clj:51",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_selection.clj:54",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/PolicySelection.lean:63",
           "falsifier": "An infinite-G candidate receives nonzero mass (selectionPosterior_eq_zero_of_risk_top :40; selection-infinite-excluded); p2/p1 != exp((G1-G2)/beta) at equal habit and F; p2/p1 != exp(F1-F2) at equal G and habit (the +F sign bug; selection-posterior-f-and-habit-enter-with-lean-signs).",
-          "fixture": "futon2/test/futon2/aif/cascade_selection_test.clj:36",
+          "fixture": "futon2/test/futon2/aif/cascade_selection_test.clj:37",
           "holder": "runtime-correspondence-not-live-path",
           "kind": "closed",
           "name": "DarkTower.WarMachine.PolicySelection.selectionPosterior",
@@ -764,11 +764,11 @@
       "contract-id": "wm-action-marginal",
       "declarations": [
         {
-          "clojure-locus": "futon2/src/futon2/aif/cascade_selection.clj:124",
+          "clojure-locus": "futon2/src/futon2/aif/cascade_selection.clj:131",
           "decided": "2026-09-16",
           "evidence": "mathlib4/DarkTower/WarMachine/ActionMarginal.lean:161",
           "falsifier": "Masses 1:1:1:e with three policies on :a and one on :b: a per-policy argmax chooses :b, eq. 11 chooses :a (fixture_bayes_a :161).",
-          "fixture": "futon2/test/futon2/aif/cascade_selection_test.clj:88",
+          "fixture": "futon2/test/futon2/aif/cascade_selection_test.clj:89",
           "holder": "runtime-correspondence-not-live-path",
           "kind": "closed",
           "name": "DarkTower.WarMachine.ActionMarginal.IsBayesAction",
