@@ -4,6 +4,7 @@ import DarkTower.WarMachine.Proof2.EnactmentHabit
 import DarkTower.WarMachine.Proof2.AdjudicationCounts
 import DarkTower.WarMachine.Proof2.TokenLikelihoodRestrict
 import DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
+import DarkTower.WarMachine.Proof2.ObservationAtMachine
 
 /-!
 # F over the machine's own executed prefix (W7, registry `:policy-free-energy`, R8)
@@ -70,6 +71,8 @@ open DarkTower.WarMachine.PolicyVariationalFreeEnergy
 open DarkTower.WarMachine.Proof2.EnactmentHabit (PolicyKey)
 open DarkTower.WarMachine.Proof2.AdjudicationCounts (Supply)
 open DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
+open DarkTower.WarMachine.Proof2.ObservationAtMachine
+open DarkTower.WarMachine.PolicyRollout (ForwardModel)
 
 noncomputable section
 
@@ -319,6 +322,47 @@ theorem prefixF_two (π : PolicyKey M P) (s₁ s₂ : Step M P S O)
     prefixF π [s₁, s₂] = .ok (stepF s₁ + stepF s₂) := by
   simp [prefixF, admittedPrefix, admitFrom, h₁, h₂, sumF]
 
+/-! ## A contradiction step is an observation the process cannot yield (R2)
+
+`o` is a realised observation, and the machine's observation law (R2,
+`machineObservationLaw`) is what it is drawn from. When the step's `sPrev` is the known world
+state (a point mass, P4) and the model's `A`, `B u` are the process's (the stack assumption
+`ObservationProcess` declares, not proved), the step's `P(o)` IS the process's probability of
+`o`: so a contradiction step (`P(o) = 0`) is exactly an observation the process gives
+probability zero after the action. -/
+
+section Process
+
+variable {S' O' U PolicyIndex : Type*} [Fintype S'] [DecidableEq S'] [Fintype O'] [DecidableEq O']
+  [LinearOrder U]
+
+/-- **The process's law at a known world state is the step's evidence.** -/
+theorem processLaw_eq_evidence (M : ForwardModel S' O' U) (I : PolicyInputs PolicyIndex U)
+    (world : S') (u : U) (law : O' → ℝ)
+    (h : machineObservationLaw M I world = .ok (u, law)) (o : O') :
+    law o = observationProbability M.A (M.B u) o (fun s => if s = world then 1 else 0) := by
+  unfold machineObservationLaw at h
+  cases ha : actionAt I with
+  | error a => simp [ha] at h
+  | ok v =>
+    simp only [ha, Except.ok.injEq, Prod.mk.injEq] at h
+    obtain ⟨rfl, rfl⟩ := h
+    have hpred : ∀ x, predictedState (M.B v) (fun s => if s = world then (1 : ℝ) else 0) x
+        = M.B v world x := fun x => by simp [predictedState]
+    simp only [observationProbability, hpred, ObservationProcess.observationAfter]
+    exact Finset.sum_congr rfl fun x _ => mul_comm _ _
+
+/-- **`contradiction ⇔ the process cannot yield it`.** From a known world state, the exact
+update refuses (`P(o) = 0`, the step's `contradiction`) exactly when the machine's observation
+law gives `o` probability zero. -/
+theorem contradiction_iff_processImpossible (M : ForwardModel S' O' U)
+    (I : PolicyInputs PolicyIndex U) (world : S') (u : U) (law : O' → ℝ)
+    (h : machineObservationLaw M I world = .ok (u, law)) (o : O') :
+    exactUpdate M.A (M.B u) o (fun s => if s = world then 1 else 0) = none ↔ law o = 0 := by
+  rw [exactUpdate_eq_none_iff, processLaw_eq_evidence M I world u law h o]
+
+end Process
+
 /-! ## Tokens: the kernel as C5 states it -/
 
 section Tokens
@@ -428,6 +472,8 @@ end
 #print axioms brokenChainStopsThePrefix
 #print axioms two_step_total_ne_last
 #print axioms prefixF_two
+#print axioms processLaw_eq_evidence
+#print axioms contradiction_iff_processImpossible
 #print axioms tokenA
 #print axioms machineWeightsAtPrefixF
 #print axioms machineWeightsAtPrefixF_eq
