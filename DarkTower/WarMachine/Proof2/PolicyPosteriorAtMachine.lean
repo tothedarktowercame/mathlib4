@@ -2,6 +2,7 @@ import DarkTower.WarMachine.PolicyPosterior
 import DarkTower.WarMachine.MachineTemperature
 import DarkTower.WarMachine.PolicyVariationalFreeEnergy
 import DarkTower.WarMachine.Proof2.EnactmentHabit
+import DarkTower.WarMachine.PolicySelection
 
 /-!
 # The policy posterior at the machine's own τ and F(π) (W1, registry `:policy-posterior`)
@@ -687,5 +688,269 @@ end HabitApplied
 #print axioms unenactedPolicyIsScored
 
 end
+
+/-! ## W1c: BOTH terms extended
+
+`machinePosterior` above takes `G` as a REAL (`(grade π).value`) and `F` as
+`EReal`, so it states the infinite-F clause and not the infinite-G one.
+`PolicySelection.selectionPosterior` does the reverse — extended `G`, real `F`
+(`selectionWeight_top`, `selectionPosterior_finite`). The CODE does both:
+`futon2:src/futon2/aif/cascade_selection.clj` `selection-posterior` gives an
+infinite `G` (`:infinite`, or a numeric `##Inf`) probability exactly `0.0` AND a
+`:zero-support` `F` `0`, normalising over the candidates that survive both. By
+Parr B.9 the weight `exp(ln E − G/τ − F)` is zero when EITHER term is `+∞`, and
+the distribution exists whenever some candidate has both finite. The registry
+row's `:formal` states both clauses. This section is that construction.
+
+**Added beside rather than substituted into `machineWeights`.** Six modules
+import this one and W2's `ActionAtMachine` uses `machinePosterior` in six
+places, all at a real grade; W10's `machineWeightsAtHabit` likewise. Changing
+the existing signature would have edited two other lanes' modules for no gain,
+so the extended form is its own definition and
+`machineWeights_eq_machineWeightsE` PROVES the existing one is its finite-`G`
+case. `machinePosterior_eq_softmax` and the whole τ half are untouched.
+-/
+
+section BothExtended
+
+noncomputable section
+
+variable {PolicyIndex : Type*}
+
+/-- Both terms finite at `π`. `FiniteF` is the finiteness predicate for an
+extended term, applied here to each of them. `⊥` is refused as before: a free
+energy or a risk of `−∞` is not one, and `variationalFreeEnergyNeverBot` shows
+the machine cannot produce it. -/
+def FiniteTerms (F G : PolicyIndex → EReal) (π : PolicyIndex) : Prop :=
+  FiniteF F π ∧ FiniteF G π
+
+instance (F G : PolicyIndex → EReal) (π : PolicyIndex) : Decidable (FiniteTerms F G π) := by
+  unfold FiniteTerms; infer_instance
+
+/-- The policies the extended posterior normalises over: both terms finite. -/
+def finiteTermPolicies (F G : PolicyIndex → EReal) (policies : List PolicyIndex) :
+    List PolicyIndex :=
+  policies.filter fun π => decide (FiniteTerms F G π)
+
+/-- The first policy at which either term is `⊥`. -/
+def firstBotE (F G : PolicyIndex → EReal) : List PolicyIndex → Option PolicyIndex
+  | [] => none
+  | π :: rest => if F π = ⊥ ∨ G π = ⊥ then some π else firstBotE F G rest
+
+/-- One policy's unnormalised weight with both terms extended. -/
+def weightE (habit : PolicyIndex → ℝ) (G F : PolicyIndex → EReal) (tau : ℝ)
+    (π : PolicyIndex) : ℝ :=
+  Real.exp (Real.log (habit π) - (G π).toReal / tau - (F π).toReal)
+
+/-- The normaliser: the doubly-finite policies only. -/
+def normaliserE (habit : PolicyIndex → ℝ) (G F : PolicyIndex → EReal) (tau : ℝ)
+    (policies : List PolicyIndex) : ℝ :=
+  ((finiteTermPolicies F G policies).map (weightE habit G F tau)).foldl (· + ·) 0
+
+/-- **The machine's weights with both terms extended**: `exp(−∞) = 0` at an
+infinite `G` OR an infinite `F`, the normalised weight otherwise. -/
+def machineWeightsE (habit : PolicyIndex → ℝ) (G F : PolicyIndex → EReal) (tau : ℝ)
+    (policies : List PolicyIndex) : List ℝ :=
+  policies.map fun π =>
+    if FiniteTerms F G π then weightE habit G F tau π / normaliserE habit G F tau policies
+    else 0
+
+/-! ### The arithmetic, over an arbitrary finiteness predicate -/
+
+theorem sum_map_ite_div' (p : PolicyIndex → Prop) [DecidablePred p] (w : PolicyIndex → ℝ)
+    (c : ℝ) (l : List PolicyIndex) :
+    (l.map fun π => if p π then w π / c else 0).sum
+      = ((l.filter fun π => decide (p π)).map w).sum / c := by
+  induction l with
+  | nil => simp
+  | cons a as ih =>
+    by_cases h : p a
+    · simp only [List.map_cons, List.sum_cons, if_pos h, List.filter_cons,
+        decide_eq_true_eq, ih]
+      rw [add_div]
+    · simp only [List.map_cons, List.sum_cons, if_neg h, List.filter_cons,
+        decide_eq_true_eq, ih, zero_add]
+
+theorem zip_map_ite_zero' (p : PolicyIndex → Prop) [DecidablePred p] (w : PolicyIndex → ℝ)
+    (c : ℝ) (l : List PolicyIndex) :
+    ∀ q ∈ l.zip (l.map fun π => if p π then w π / c else 0), ¬ p q.1 → q.2 = 0 := by
+  induction l with
+  | nil => simp
+  | cons a as ih =>
+    intro q hq hfin
+    simp only [List.map_cons, List.zip_cons_cons, List.mem_cons] at hq
+    rcases hq with rfl | hq
+    · exact if_neg hfin
+    · exact ih q hq hfin
+
+theorem normaliserE_pos (habit : PolicyIndex → ℝ) (G F : PolicyIndex → EReal) (tau : ℝ)
+    (policies : List PolicyIndex) (hfin : finiteTermPolicies F G policies ≠ []) :
+    0 < normaliserE habit G F tau policies := by
+  unfold normaliserE
+  cases hl : finiteTermPolicies F G policies with
+  | nil => exact absurd hl hfin
+  | cons a as =>
+    simp only [List.map_cons, List.foldl_cons]
+    refine PolicyPosterior.foldl_add_pos_of_pos (by unfold weightE; positivity) ?_
+    intro x hx
+    obtain ⟨π, _, hπ⟩ := List.mem_map.mp hx
+    subst hπ
+    unfold weightE
+    exact Real.exp_pos _
+
+/-! ### What the extended weights say -/
+
+/-- **`infiniteGHasZeroWeight`**, at its own position, as `infiniteFHasZeroWeight`
+is: paired with the policy list, an entry whose `G` is infinite is exactly `0`. -/
+theorem infiniteGHasZeroWeight (habit : PolicyIndex → ℝ) (G F : PolicyIndex → EReal)
+    (tau : ℝ) (policies : List PolicyIndex) :
+    ∀ q ∈ policies.zip (machineWeightsE habit G F tau policies),
+      ¬ FiniteTerms F G q.1 → q.2 = 0 :=
+  zip_map_ite_zero' (FiniteTerms F G) (weightE habit G F tau)
+    (normaliserE habit G F tau policies) policies
+
+/-- And the rest still sum to one, whenever some policy has both terms finite. -/
+theorem machineWeightsE_isDistribution (habit : PolicyIndex → ℝ) (G F : PolicyIndex → EReal)
+    (tau : ℝ) (policies : List PolicyIndex)
+    (hfin : finiteTermPolicies F G policies ≠ []) :
+    (∀ x ∈ machineWeightsE habit G F tau policies, 0 ≤ x) ∧
+    (machineWeightsE habit G F tau policies).sum = 1 := by
+  have hpos := normaliserE_pos habit G F tau policies hfin
+  constructor
+  · intro x hx
+    obtain ⟨π, _, rfl⟩ := List.mem_map.mp hx
+    by_cases h : FiniteTerms F G π
+    · rw [if_pos h]
+      exact div_nonneg (by unfold weightE; positivity) hpos.le
+    · rw [if_neg h]
+  · unfold machineWeightsE
+    rw [sum_map_ite_div' (FiniteTerms F G) (weightE habit G F tau) _ policies]
+    have : ((policies.filter fun π => decide (FiniteTerms F G π)).map
+        (weightE habit G F tau)).sum = normaliserE habit G F tau policies := by
+      unfold normaliserE finiteTermPolicies
+      rw [PolicyPosterior.foldl_add_eq, zero_add]
+    rw [this]
+    exact div_self hpos.ne'
+
+/-- **The existing real-grade weights are the finite-`G` case of these.** Nothing
+above this section changes meaning; it is the restriction. -/
+theorem machineWeights_eq_machineWeightsE (habit : PolicyIndex → ℝ)
+    (grade : PolicyIndex → Holes.ExpectedFreeEnergyValue) (F : PolicyIndex → EReal)
+    (tau : ℝ) (policies : List PolicyIndex) :
+    machineWeights habit grade F tau policies
+      = machineWeightsE habit (fun π => ((grade π).value : EReal)) F tau policies := by
+  have hG : ∀ π : PolicyIndex, FiniteTerms F (fun π => ((grade π).value : EReal)) π ↔ FiniteF F π := by
+    intro π
+    constructor
+    · exact fun h => h.1
+    · exact fun h => ⟨h, by constructor <;> simp⟩
+  have hw : ∀ π : PolicyIndex,
+      weightE habit (fun π => ((grade π).value : EReal)) F tau π = weight habit grade F tau π := by
+    intro π; unfold weightE weight; simp
+  have hfilter : finiteTermPolicies F (fun π => ((grade π).value : EReal)) policies
+      = finitePolicies F policies := by
+    unfold finiteTermPolicies finitePolicies
+    exact List.filter_congr fun π _ => by simp [hG π]
+  have hnorm : normaliserE habit (fun π => ((grade π).value : EReal)) F tau policies
+      = normaliser habit grade F tau policies := by
+    unfold normaliserE normaliser
+    rw [hfilter]
+    exact congrArg _ (List.map_congr_left fun π _ => hw π)
+  unfold machineWeights machineWeightsE
+  refine List.map_congr_left fun π _ => ?_
+  rw [hnorm, hw π]
+  by_cases h : FiniteF F π
+  · rw [if_pos h, if_pos ((hG π).mpr h)]
+  · rw [if_neg h, if_neg (fun hc => h ((hG π).mp hc))]
+
+/-! ### The instantiation, and the refusal that survives -/
+
+/-- The machine's posterior with both terms extended. -/
+def machinePosteriorE (habit : PolicyIndex → ℝ) (G F : PolicyIndex → EReal)
+    (opts : MachineTemperature.TemperatureOpts) (policies : List PolicyIndex) :
+    Except (Absence PolicyIndex) (List ℝ) :=
+  match machineTau opts with
+  | .error a => .error (.tau a)
+  | .ok t =>
+    match firstBotE F G policies with
+    | some π => .error (.freeEnergyBot π)
+    | none =>
+      if finiteTermPolicies F G policies = [] then .error .allFreeEnergiesInfinite
+      else .ok (machineWeightsE habit G F t.val policies)
+
+/-- **`allInfiniteIsRefused`, widened: no candidate with BOTH terms finite.**
+One infinite term no longer refuses anything; no surviving candidate still
+does, because there is then no normaliser. Reachable. -/
+theorem allTermsInfiniteIsRefused (habit : PolicyIndex → ℝ) (π₀ : PolicyIndex)
+    (tauMin spread gain beta : ℝ) (hbeta : 0 < beta) :
+    machinePosteriorE habit (fun _ => ⊤) (fun _ => 0)
+        ⟨.variationalBetaGamma, tauMin, spread, gain, some (.finite beta)⟩ [π₀]
+      = .error .allFreeEnergiesInfinite := by
+  simp [machinePosteriorE, machineTau, MachineTemperature.machineTemperature, hbeta,
+    firstBotE, finiteTermPolicies, FiniteTerms, FiniteF]
+
+/-! ### The fixture, extended
+
+Two policies: `true` has `G = ⊤` with a finite `F`, `false` has both finite.
+The impossible-risk policy takes probability exactly zero and the other takes
+all of it — no refusal, and a distribution. This is what `selection-posterior`
+computes for an `:infinite` G beside a scored candidate. -/
+
+theorem fixtureWeightsE :
+    machineWeightsE fixtureHabit (fun b => if b then ⊤ else 0) (fun _ => 0) 1 [true, false]
+      = [0, 1] := by
+  norm_num [machineWeightsE, normaliserE, finiteTermPolicies, FiniteTerms, FiniteF,
+    weightE, fixtureHabit]
+
+/-! ### Agreement with `PolicySelection` -/
+
+/-- **The machine's per-policy weight IS `PolicySelection.selectionWeight`**, at a
+real `F` and a finite `G`, with `τ = 1/γ`. So the two modules provably describe
+one construction where both apply.
+
+Stated at the WEIGHT and not at the normalised distribution: `selectionPosterior`
+normalises over `Finset.univ` of a `Fintype`, `machineWeightsE` over a `List`,
+and equating those would need a carrier bridge that adds nothing to the claim —
+the content is that the summands agree, and that each gives zero at `⊤`
+(`PolicySelection.selectionWeight_top` beside `infiniteGHasZeroWeight`). -/
+theorem weightE_eq_selectionWeight {ι : Type*} [Fintype ι]
+    (t : PolicyPrecision.PolicyTemperature) (habit F g : ι → ℝ)
+    (hhabit : ∀ π, 0 < habit π) (G : ι → EReal) (π : ι) (hG : G π = (g π : EReal)) :
+    ENNReal.ofReal
+        (weightE habit G (fun π => (F π : EReal))
+          (1 / PolicyPrecision.policyPrecision t) π)
+      = PolicySelection.selectionWeight t habit F G π := by
+  rw [PolicySelection.selectionWeight_coe t habit F hhabit G g π hG]
+  congr 1
+  unfold weightE
+  rw [hG]
+  simp only [EReal.toReal_coe]
+  congr 1
+  have hpos : 0 < PolicyPrecision.policyPrecision t :=
+    PolicyPrecision.policyPrecision_pos t
+  field_simp
+  ring
+
+end
+
+end BothExtended
+
+#print axioms FiniteTerms
+#print axioms finiteTermPolicies
+#print axioms firstBotE
+#print axioms weightE
+#print axioms normaliserE
+#print axioms machineWeightsE
+#print axioms sum_map_ite_div'
+#print axioms zip_map_ite_zero'
+#print axioms normaliserE_pos
+#print axioms infiniteGHasZeroWeight
+#print axioms machineWeightsE_isDistribution
+#print axioms machineWeights_eq_machineWeightsE
+#print axioms machinePosteriorE
+#print axioms allTermsInfiniteIsRefused
+#print axioms fixtureWeightsE
+#print axioms weightE_eq_selectionWeight
+
 
 end DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
