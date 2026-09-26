@@ -2,6 +2,7 @@ import DarkTower.WarMachine.ExactBeliefTrajectory
 import DarkTower.WarMachine.ObservationProcess
 import DarkTower.WarMachine.BeliefTrajectory
 import DarkTower.WarMachine.Proof2.ActionAtMachine
+import DarkTower.WarMachine.Proof2.ObservationAtMachine
 
 /-!
 # The closed-loop belief trajectory at the machine's own action (W3)
@@ -15,6 +16,10 @@ against what the process yields after it, so the registry edges R16→R1 (`u` in
 belief), R2→R1 and R2→R3 (`o` into the belief and its update) and R16→R2 (`u` and the
 world into the observation) had the term in the consumer's signature and no import
 behind it. This module is that application.
+
+`machineObservationLaw` (the machine's action and the process's law for it, R16→R2)
+lives in `Proof2/ObservationAtMachine.lean`, which this module imports, so the
+observation's edges into the belief cross a module boundary.
 
 ## What is supplied and what is not
 
@@ -55,40 +60,17 @@ open DarkTower.WarMachine.ExactBeliefTrajectory
 open DarkTower.WarMachine.ObservationProcess
 open DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
 open DarkTower.WarMachine.Proof2.ActionAtMachine
+open DarkTower.WarMachine.Proof2.ObservationAtMachine
 
 noncomputable section
 
 variable {S O U PolicyIndex : Type*} [Fintype S] [DecidableEq S] [Fintype O] [DecidableEq O]
-
-/-- Everything `machineAction` reads, at one moment. -/
-structure PolicyInputs (PolicyIndex U : Type*) where
-  habit : PolicyIndex → ℝ
-  grade : PolicyIndex → Holes.ExpectedFreeEnergyValue
-  F : PolicyIndex → EReal
-  opts : MachineTemperature.TemperatureOpts
-  policies : List PolicyIndex
-  head : PolicyIndex → U
 
 /-- Why a step of the loop produced no belief. Each arm names what is missing. -/
 inductive StepAbsence (PolicyIndex : Type*) where
   | noAction (a : Absence PolicyIndex)
   | processImpossible
   | updateRefused
-
-/-- The machine's action at these inputs: W2's `machineAction`. -/
-def actionAt [LinearOrder U] (I : PolicyInputs PolicyIndex U) :
-    Except (Absence PolicyIndex) U :=
-  machineAction I.habit I.grade I.F I.opts I.policies I.head
-
-/-- **The observation law after the machine's action.** The machine's action `u` and
-the process's distribution `o ↦ P(o | world, u)` for it: `u` and the world into
-`observationAfter` (R16→R2). An absent action gives no law. -/
-def machineObservationLaw [LinearOrder U] (M : ForwardModel S O U)
-    (I : PolicyInputs PolicyIndex U) (world : S) :
-    Except (Absence PolicyIndex) (U × (O → ℝ)) :=
-  match actionAt I with
-  | .error a => .error a
-  | .ok u => .ok (u, observationAfter M world u)
 
 /-- **One step of the closed loop** from belief `μ` at time `t`: the machine's action,
 the process's law for the realised observation `obs (t+1)` from the realised world
@@ -322,10 +304,7 @@ theorem fixtureImpossibleRefused :
 
 end
 
-#print axioms PolicyInputs
 #print axioms StepAbsence
-#print axioms actionAt
-#print axioms machineObservationLaw
 #print axioms machineStep
 #print axioms machineTrajectory
 #print axioms machineStep_ok
