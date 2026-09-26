@@ -50,6 +50,7 @@ open DarkTower.WarMachine.PolicyRollout
 open DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
 open DarkTower.WarMachine.Proof2.ObservationAtMachine
 open DarkTower.WarMachine.Proof2.BeliefAtMachine
+open DarkTower.WarMachine.Proof2.BeliefStepAtMachine
 
 noncomputable section
 
