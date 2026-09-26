@@ -3,6 +3,7 @@ import DarkTower.WarMachine.ObservationProcess
 import DarkTower.WarMachine.BeliefTrajectory
 import DarkTower.WarMachine.Proof2.ActionAtMachine
 import DarkTower.WarMachine.Proof2.ObservationAtMachine
+import DarkTower.WarMachine.Proof2.KernelAtCounts
 
 /-!
 # One step of the machine's closed loop (W3b, registry `:state-belief-update`, R3)
@@ -183,6 +184,86 @@ theorem fixtureImpossibleRefused :
   simp [observationProbability, predictedState, BeliefTrajectory.fxB]
 
 end
+
+/-! ## The step at the counted rates (W8, R7→R3)
+
+`machineStep` takes the model's `A` as it stands. `machineStepAtCounts` is `machineStep` with
+`A := tokenLikelihood` of the COUNTED rates (`KernelAtCounts.machineKernel`, C2's
+`kernelSupply` arms): the belief update over token states, at the kernel the adjudication
+counter measured. A refused kernel (`unsupported`) gives no step, carrying the kernel's own
+absence; the assumed-zero default is recorded on the kernel value, not hidden.
+
+The Lean map's [R7 R3] entry names the term `Pi`, whose importer is `:belief-update`, the
+Laplace update `mu <- mu + alpha Pi eps`; `machineStep` is the exact update and takes no
+precision, so what this supplies at R3 is the counted `A`, and the edge imports through
+`AdjudicationCounts` (the counter) at node grain, not through `Pi`. -/
+
+section AtCounts
+
+open DarkTower.WarMachine.Proof2.KernelAtCounts
+
+noncomputable section
+
+variable {κ V U PolicyIndex : Type*} [DecidableEq κ] [Fintype V] [DecidableEq V] [LinearOrder U]
+
+/-- Why there is no step at the counted rates. -/
+inductive StepAtCountsAbsence (V PolicyIndex : Type*) where
+  | kernel (a : KernelAbsence V)
+  | step (a : StepAbsence PolicyIndex)
+
+/-- **`machineStep` at the counted kernel.** -/
+def machineStepAtCounts (records : List (AdjudicationCounts.Record κ V)) (classOf : V → κ)
+    (kindOf : κ → AdjudicationCounts.ClassKind)
+    (M : ForwardModel (Finset V) (Finset V) U)
+    (inputsAt : ℕ → (Finset V → ℝ) → PolicyInputs PolicyIndex U)
+    (world : ℕ → Finset V) (obs : ℕ → Finset V) (t : ℕ) (μ : Finset V → ℝ) :
+    Except (StepAtCountsAbsence V PolicyIndex) (Finset V → ℝ) :=
+  match machineKernel records classOf kindOf with
+  | .error a => .error (.kernel a)
+  | .ok k =>
+    match machineStep (withKernel M k) inputsAt world obs t μ with
+    | .error a => .error (.step a)
+    | .ok μ' => .ok μ'
+
+/-- **The instantiation.** On the ok arm the step IS `machineStep` at the model whose
+likelihood is the counted kernel. -/
+theorem machineStepAtCounts_eq (records : List (AdjudicationCounts.Record κ V)) (classOf : V → κ)
+    (kindOf : κ → AdjudicationCounts.ClassKind)
+    (M : ForwardModel (Finset V) (Finset V) U)
+    (inputsAt : ℕ → (Finset V → ℝ) → PolicyInputs PolicyIndex U)
+    (world : ℕ → Finset V) (obs : ℕ → Finset V) (t : ℕ) (μ μ' : Finset V → ℝ)
+    (h : machineStepAtCounts records classOf kindOf M inputsAt world obs t μ = .ok μ') :
+    ∃ k, machineKernel records classOf kindOf = .ok k ∧
+      machineStep (withKernel M k) inputsAt world obs t μ = .ok μ' := by
+  unfold machineStepAtCounts at h
+  cases hk : machineKernel records classOf kindOf with
+  | error a => simp only [hk] at h; cases h
+  | ok k =>
+    simp only [hk] at h
+    cases hs : machineStep (withKernel M k) inputsAt world obs t μ with
+    | error a => simp only [hs] at h; cases h
+    | ok x =>
+      simp only [hs] at h
+      exact ⟨k, rfl, by rw [hs, Except.ok.inj h]⟩
+
+/-- **A refused kernel gives no step**, carrying the kernel's absence. -/
+theorem machineStepAtCounts_absentKernel (records : List (AdjudicationCounts.Record κ V))
+    (classOf : V → κ) (kindOf : κ → AdjudicationCounts.ClassKind)
+    (M : ForwardModel (Finset V) (Finset V) U)
+    (inputsAt : ℕ → (Finset V → ℝ) → PolicyInputs PolicyIndex U)
+    (world : ℕ → Finset V) (obs : ℕ → Finset V) (t : ℕ) (μ : Finset V → ℝ)
+    (a : KernelAbsence V) (h : machineKernel records classOf kindOf = .error a) :
+    machineStepAtCounts records classOf kindOf M inputsAt world obs t μ = .error (.kernel a) := by
+  simp [machineStepAtCounts, h]
+
+end
+
+end AtCounts
+
+#print axioms StepAtCountsAbsence
+#print axioms machineStepAtCounts
+#print axioms machineStepAtCounts_eq
+#print axioms machineStepAtCounts_absentKernel
 
 #print axioms StepAbsence
 #print axioms machineStep
