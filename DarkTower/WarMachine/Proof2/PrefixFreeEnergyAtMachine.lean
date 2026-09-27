@@ -3,7 +3,6 @@ import DarkTower.WarMachine.ExactBeliefTrajectory
 import DarkTower.WarMachine.Proof2.EnactmentHabit
 import DarkTower.WarMachine.Proof2.AdjudicationCounts
 import DarkTower.WarMachine.Proof2.TokenLikelihoodRestrict
-import DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
 import DarkTower.WarMachine.Proof2.ObservationAtMachine
 
 /-!
@@ -54,7 +53,8 @@ only for a contradiction step, never a per-step absence inside a computed total)
 
 ## F into the posterior
 
-`machineWeightsAtPrefixF` is `machineWeights` with `F π := prefixF π`, `⊤` at a
+The sibling module `Proof2.PrefixFreeEnergyPosterior` supplies
+`machineWeightsAtPrefixF`: `machineWeights` with `F π := prefixF π`, `⊤` at a
 contradiction (weight `0`, W1b). A policy with no admitted history has NO `F`, and
 `machineWeights`' carrier has no arm for an absent `F`; the code's fallback (omit the term
 and record the law that ran, `law-receipt`) is not something that carrier expresses, so the
@@ -378,81 +378,6 @@ def tokenA {V : Type*} [Fintype V] [DecidableEq V] (r : AdjudicationRates V) (C 
 
 end Tokens
 
-/-! ## F into the posterior -/
-
-section FPosterior
-
-open Classical
-
-/-- Why there are no posterior weights at the prefix F. -/
-inductive PrefixWeightsAbsence (M P : Type*) where
-  | notSupplied (π : PolicyKey M P)
-
-/-- **The machine's posterior weights with `F` the observed-prefix free energy.**
-`machineWeights` (W1/W1b) with `F π := prefixF π (steps π)`, `⊤` at a contradiction (weight
-`0`). A policy on the menu with NO admitted history has no `F` and the weights are absent,
-naming it: no `0` is stood in. -/
-def machineWeightsAtPrefixF (habit : PolicyKey M P → ℝ)
-    (grade : PolicyKey M P → Holes.ExpectedFreeEnergyValue)
-    (steps : PolicyKey M P → List (Step M P S O)) (tau : ℝ)
-    (policies : List (PolicyKey M P)) : Except (PrefixWeightsAbsence M P) (List ℝ) :=
-  match policies.find? (fun π => decide (prefixF π (steps π) = .error .noAdmittedSteps)) with
-  | some π => .error (.notSupplied π)
-  | none =>
-    .ok (machineWeights habit grade
-      (fun π => match prefixF π (steps π) with | .ok f => f | .error _ => ⊤) tau policies)
-
-/-- **The composition.** On the ok arm every menu policy has an admitted history or a
-contradiction, and the weights are `machineWeights` at that `F`. -/
-theorem machineWeightsAtPrefixF_eq (habit : PolicyKey M P → ℝ)
-    (grade : PolicyKey M P → Holes.ExpectedFreeEnergyValue)
-    (steps : PolicyKey M P → List (Step M P S O)) (tau : ℝ)
-    (policies : List (PolicyKey M P)) (ws : List ℝ)
-    (h : machineWeightsAtPrefixF habit grade steps tau policies = .ok ws) :
-    (∀ π ∈ policies, prefixF π (steps π) ≠ .error .noAdmittedSteps) ∧
-    ws = machineWeights habit grade
-      (fun π => match prefixF π (steps π) with | .ok f => f | .error _ => ⊤) tau policies := by
-  unfold machineWeightsAtPrefixF at h
-  cases hf : policies.find? (fun π => decide (prefixF π (steps π) = .error .noAdmittedSteps)) with
-  | some π => rw [hf] at h; cases h
-  | none =>
-    rw [hf] at h
-    refine ⟨fun π hπ hπ' => ?_, (Except.ok.inj h).symm⟩
-    have := List.find?_eq_none.mp hf π hπ
-    simp [hπ'] at this
-
-/-- **A policy with no admitted history makes the weights absent**, naming a policy: reachable,
-and no `F = 0` is stood in. -/
-theorem notSuppliedIsAbsence (habit : PolicyKey M P → ℝ)
-    (grade : PolicyKey M P → Holes.ExpectedFreeEnergyValue)
-    (steps : PolicyKey M P → List (Step M P S O)) (tau : ℝ)
-    (policies : List (PolicyKey M P)) (π : PolicyKey M P) (hπ : π ∈ policies)
-    (hn : prefixF π (steps π) = .error .noAdmittedSteps) :
-    ∃ π', machineWeightsAtPrefixF habit grade steps tau policies = .error (.notSupplied π') := by
-  unfold machineWeightsAtPrefixF
-  cases hf : policies.find? (fun π => decide (prefixF π (steps π) = .error .noAdmittedSteps)) with
-  | some π' => exact ⟨π', rfl⟩
-  | none =>
-    exfalso
-    have := List.find?_eq_none.mp hf π hπ
-    simp [hn] at this
-
-/-- **A policy whose prefix ended in a contradiction has weight zero.** `F = ⊤`, so W1b's
-`infiniteFHasZeroWeight` applies: the code's `:zero-support`. -/
-theorem contradictionHasZeroWeight (habit : PolicyKey M P → ℝ)
-    (grade : PolicyKey M P → Holes.ExpectedFreeEnergyValue)
-    (steps : PolicyKey M P → List (Step M P S O)) (tau : ℝ)
-    (policies : List (PolicyKey M P)) (ws : List ℝ)
-    (h : machineWeightsAtPrefixF habit grade steps tau policies = .ok ws) :
-    ∀ p ∈ policies.zip ws, prefixF p.1 (steps p.1) = .error .contradiction → p.2 = 0 := by
-  obtain ⟨_, rfl⟩ := machineWeightsAtPrefixF_eq habit grade steps tau policies ws h
-  intro p hp hc
-  refine infiniteFHasZeroWeight habit grade _ tau policies p hp ?_
-  intro hfin
-  simp [FiniteF, hc] at hfin
-
-end FPosterior
-
 end
 
 #print axioms Step
@@ -475,9 +400,5 @@ end
 #print axioms processLaw_eq_evidence
 #print axioms contradiction_iff_processImpossible
 #print axioms tokenA
-#print axioms machineWeightsAtPrefixF
-#print axioms machineWeightsAtPrefixF_eq
-#print axioms notSuppliedIsAbsence
-#print axioms contradictionHasZeroWeight
 
 end DarkTower.WarMachine.Proof2.PrefixFreeEnergyAtMachine
