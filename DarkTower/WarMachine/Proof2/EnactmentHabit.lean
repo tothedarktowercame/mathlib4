@@ -1,4 +1,4 @@
-import DarkTower.WarMachine.Holes
+import DarkTower.WarMachine.Proof2.CascadePolicySet
 
 /-!
 # The habit prior E, counted from enactment records (C4, registry `:enactment-habit`)
@@ -13,11 +13,10 @@ was a typed absence. The row's `:formal` is a counting rule, and
 
 The row's key is the cascade-grain triple `[mission, ordered pattern ids,
 semilattice]` (`cascade_prior.clj` `policy-key`). `MachinePolicySet`'s index is
-`Candidate`, the FLAT action grain today's production selection ranges over —
-the divergence `:policy-set`'s own row already records ("flat `Candidate` grain;
-diverges from the approved `CascadePolicy` carrier"). They are different grains,
-so `PolicyKey` is stated here rather than reused, and the gap is the one already
-on the record, not a new one.
+`Candidate`, the historical flat action grain retired from production on
+2026-09-17. The shared key now lives in `CascadePolicySet`, whose menu set binds
+`:policy-set` after Joe's 2026-09-27 rebind ruling. E and the prefix F therefore
+use the same cascade-key type as that set.
 
 ## The three standing absences of the key (A1, A2, A3)
 
@@ -80,40 +79,9 @@ input data.
 namespace DarkTower.WarMachine.Proof2.EnactmentHabit
 
 open DarkTower.WarMachine.Holes
+open DarkTower.WarMachine.Proof2.CascadePolicySet
 
 variable {M P : Type*} [DecidableEq M] [DecidableEq P]
-
-/-- The cascade-grain policy key: `[mission, ordered pattern ids, semilattice]`
-(`cascade_prior.clj` `policy-key`). Pattern ORDER in `shown` is kept; semilattice
-edge order is not. -/
-structure PolicyKey (M P : Type*) where
-  mission : M
-  shown : List P
-  semilattice : List (P × P)
-  deriving DecidableEq
-
-/-- What `policy-key-for` records ABOUT the key it built: the three standing
-absences, carried rather than silently defaulted. -/
-structure KeyProvenance where
-  /-- A1: the mission slot was filled from a target that may be an INSTANCE
-  below the mission. -/
-  missionMayBeInstance : Bool
-  /-- A2: `shown` came from the constructor replay, because the click carries no
-  precedence. -/
-  shownFromReplay : Bool
-  /-- A3: no reader maps containment and co-application edges, so the
-  semilattice is empty. -/
-  semilatticeUnmapped : Bool
-
-/-- `policy-key-for`'s five typed refusals (`:34-65`). None of them is a zero
-count: a record with no key is EXCLUDED and reported. -/
-inductive KeyAbsence where
-  | enactmentNamesNoCandidate
-  | candidateNotInClick
-  | targetAbsent
-  | precedenceAbsent (distinctPrecedences : ℕ)
-  | noPolicyIdentity
-  deriving DecidableEq
 
 /-- The W_c verdict as `increment` reads it: `check-c`'s vector of failure
 strings, empty meaning pass. -/

@@ -552,7 +552,8 @@ EMPTY menu is `habitPrior`'s hypothesis failing, so it is an absence
 
 section HabitApplied
 
-open EnactmentHabit (PolicyKey Record Concentration habitCounts habitPrior habitPrior_pos
+open CascadePolicySet (PolicyKey)
+open EnactmentHabit (Record Concentration habitCounts habitPrior habitPrior_pos
   weightOf)
 
 variable {M P : Type*} [DecidableEq M] [DecidableEq P]

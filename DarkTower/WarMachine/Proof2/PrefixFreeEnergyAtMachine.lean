@@ -1,6 +1,6 @@
 import DarkTower.WarMachine.PolicyVariationalFreeEnergy
 import DarkTower.WarMachine.ExactBeliefTrajectory
-import DarkTower.WarMachine.Proof2.EnactmentHabit
+import DarkTower.WarMachine.Proof2.CascadePolicySet
 import DarkTower.WarMachine.Proof2.AdjudicationCounts
 import DarkTower.WarMachine.Proof2.TokenLikelihoodRestrict
 import DarkTower.WarMachine.Proof2.ObservationAtMachine
@@ -21,7 +21,7 @@ live path stamps `:not-supplied` for every entry (`production-ranked`).
 
 ## The policy grain the Step carries
 
-The step carries the CASCADE-GRAIN policy key `EnactmentHabit.PolicyKey`
+The step carries the CASCADE-GRAIN policy key `CascadePolicySet.PolicyKey`
 (`[mission, ordered pattern ids, semilattice]`), because that is the `:policy-key` the
 flight's `:increment` receipt carries and the key `policy-key-for` builds (F1c-D §1, §4;
 C4). It does NOT carry `MachinePolicySet`'s policy type: that module's own header marks it
@@ -68,7 +68,7 @@ namespace DarkTower.WarMachine.Proof2.PrefixFreeEnergyAtMachine
 open DarkTower.WarMachine
 open DarkTower.WarMachine.ExactBeliefTrajectory
 open DarkTower.WarMachine.PolicyVariationalFreeEnergy
-open DarkTower.WarMachine.Proof2.EnactmentHabit (PolicyKey)
+open DarkTower.WarMachine.Proof2.CascadePolicySet (PolicyKey)
 open DarkTower.WarMachine.Proof2.AdjudicationCounts (Supply)
 open DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
 open DarkTower.WarMachine.Proof2.ObservationAtMachine

@@ -16,7 +16,7 @@ set_option linter.unusedSectionVars false
 namespace DarkTower.WarMachine.Proof2.PrefixFreeEnergyPosterior
 
 open DarkTower.WarMachine
-open DarkTower.WarMachine.Proof2.EnactmentHabit (PolicyKey)
+open DarkTower.WarMachine.Proof2.CascadePolicySet (PolicyKey)
 open DarkTower.WarMachine.Proof2.PrefixFreeEnergyAtMachine
 open DarkTower.WarMachine.Proof2.PolicyPosteriorAtMachine
 
