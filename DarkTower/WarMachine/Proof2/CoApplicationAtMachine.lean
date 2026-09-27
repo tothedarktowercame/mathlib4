@@ -1,4 +1,5 @@
 import DarkTower.WarMachine.Proof2.ContainmentOrder
+import DarkTower.WarMachine.Proof2.ContainmentOrderAtMachine
 import DarkTower.WarMachine.Proof2.CoApplicationKernel
 
 /-!
@@ -51,6 +52,19 @@ noncomputable def machineCoApplyKernel (pat : ι → InterpretedPattern V)
 /-- The machine kernel IS `coApplyKernel` at `containmentOrder pat`. -/
 theorem machineCoApplyKernel_eq (pat : ι → InterpretedPattern V) (s s' : Finset V) :
     machineCoApplyKernel pat s s' = coApplyKernel pat (containmentOrder pat) s s' := rfl
+
+/-- W9-2: apply the kernel at the received supply and its machine order.
+The legacy pat-parameter API above remains unchanged; no attestation is
+invented for it. This adapter records the exact composition at observed input. -/
+noncomputable def machineCoApplyKernelAtObservedInterpretation
+    (ob : ObservedInterpretation ι V)
+    (s s' : Finset V) : ℝ :=
+  coApplyKernel ob.pat (ContainmentOrderAtMachine.machineContainmentOrder ob) s s'
+
+theorem machineCoApplyKernelAtObservedInterpretation_eq
+    (ob : ObservedInterpretation ι V) (s s' : Finset V) :
+    machineCoApplyKernelAtObservedInterpretation ob s s' =
+      machineCoApplyKernel ob.pat s s' := rfl
 
 /-- Row sums at the machine's order, by composition with
 `coApplyKernel_rowsum`. -/
@@ -211,6 +225,8 @@ theorem machineKernel_differs_at_other_order :
 
 end BadCase
 
+#print axioms machineCoApplyKernelAtObservedInterpretation
+#print axioms machineCoApplyKernelAtObservedInterpretation_eq
 #print axioms machineCoApplyKernel
 #print axioms machineCoApplyKernel_eq
 #print axioms machineCoApplyKernel_rowsum
