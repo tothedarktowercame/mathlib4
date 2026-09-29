@@ -9,6 +9,12 @@ These typed adapters bind the admitted pure arms of `scan-learn/step`,
 `scan-bmr/score`, and `scan-shadow/shadow-row`. EDN decoding, duplicate run
 ids, absent/malformed channels, non-finite JVM doubles, receipts, and trace
 recording are machine-only boundaries and are not modeled here.
+
+Every theorem below is definitional (`rfl`): each machine carrier is the theory
+declaration under a machine-facing name, so these theorems add no mathematical
+content. What ties the Clojure to the theory is a reading of the cited
+futon2 lines against the theory declarations; nothing here executes or checks
+the Clojure.
 -/
 
 namespace DarkTower.WarMachine.Proof2.ScanLearningAtMachine
@@ -33,7 +39,9 @@ theorem machineStatusLogLikelihoods_eq [Fintype K] [Fintype O] [Nonempty O]
     machineStatusLogLikelihoods used alpha counts =
       fun s => scanStatusLogLikelihood used alpha counts s := by rfl
 
-/-- Admitted `scan-learn/step` carrier: posterior plus each used key's update. -/
+/-- Admitted `scan-learn/step` carrier: the posterior only. The count update of
+each used key is `ScanLearning.scanAccumulate` (see `scanAccumulate_conc`) and
+is not composed here. -/
 def machineScanStep [Fintype S] [DecidableEq S]
     (rho : ℝ) (ll : S → ℝ) (q0 : S → ℝ) := scanPosterior rho ll q0
 
