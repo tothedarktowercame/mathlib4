@@ -154,13 +154,18 @@ theorem scanAccumulate_conc (prior : DirichletParams O S) (counts : O → ℕ)
     (scanAccumulate prior counts q hq).conc o s = prior.conc o s + counts o * q s := by
   rfl
 
-/-- Concrete outcome-first fixture: `conc outcome status`, not its transpose.
-The asymmetric matrix corresponds to the access at `scan_learn.clj:195-197`. -/
+/-- Concrete outcome-first fixture for `scanStatusLogLikelihood` itself. At
+status `true`, outcome `false` has concentration 3 and the row total is 10,
+so the one-hot likelihood is `log (3/10)`, not the transposed row's value.
+This is the access performed at `scan_learn.clj:195-197`. -/
 example :
-    let a : DirichletParams Bool Bool :=
+    let a : Bool → DirichletParams Bool Bool := fun _ =>
       ⟨fun outcome status => if outcome then (if status then 7 else 5)
                              else (if status then 3 else 2), by norm_num⟩
-    a.conc false true = 3 := by
+    scanStatusLogLikelihood ({false} : Finset Bool) a
+      (fun _ => oneHot false) true = Real.log (3 / 10 : ℝ) := by
+  simp only [scanStatusLogLikelihood, Finset.sum_singleton]
+  rw [dirichletCategoricalLogPredictive_eq]
   norm_num
 
 #print axioms dirichletCategoricalLogPredictive_eq
