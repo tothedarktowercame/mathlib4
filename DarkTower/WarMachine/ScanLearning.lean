@@ -1,4 +1,6 @@
 import DarkTower.WarMachine.Holes
+import DarkTower.WarMachine.DirichletLearning
+import DarkTower.WarMachine.ExactBeliefTrajectory
 
 /-!
 # Integrated predictive for the learned scan observation model
@@ -14,6 +16,8 @@ namespace DarkTower.WarMachine.ScanLearning
 
 open scoped BigOperators
 open DarkTower.WarMachine.Holes
+open DarkTower.WarMachine.DirichletLearning
+open DarkTower.WarMachine.ExactBeliefTrajectory
 
 noncomputable section
 
@@ -93,35 +97,76 @@ theorem dirichletCategoricalLogPredictive_eq [Fintype O] [Nonempty O] [Decidable
     intro
     simp
 
-/-- `scan_learn.clj:158-169`: the two-outcome instance is definitionally the
-Beta-Binomial specialization of the Dirichlet-multinomial formula. -/
-theorem betaBinomialLogPredictive_eq (alpha : Bool → ℝ) (hα : ∀ o, 0 < alpha o)
-    (n : Bool → ℕ) :
-    dirichletMultinomialLogPredictive alpha hα n =
-      logMultinomialCoefficient n +
-        logMultivariateBeta (parameters (fun o => alpha o + n o)
-          (fun o => add_pos_of_pos_of_nonneg (hα o) (Nat.cast_nonneg _))) -
-        logMultivariateBeta (parameters alpha hα) := by
+/-- `scan_learn.clj:175-199`, `status-log-likelihoods`: for one status, sum
+the integrated predictive over exactly the used keys, reading the existing
+`DirichletParams` in its declared outcome-first order `conc o s`. Unobserved
+keys are absent from `used` and contribute nothing. This common-`O` version
+models a family of keys sharing one outcome carrier. -/
+def scanStatusLogLikelihood [Fintype K] [Fintype O] [Nonempty O]
+    (used : Finset K) (alpha : K → DirichletParams O S) (counts : K → O → ℕ)
+    (status : S) : ℝ :=
+  ∑ key ∈ used, dirichletMultinomialLogPredictive
+    (fun o => (alpha key).conc o status) (fun o => (alpha key).pos o status) (counts key)
+
+/-- `scan_learn.clj:201-206`, `predicted-q`: the status transition
+`B_rho = (1-rho)I + rho*Uniform`, oriented as `B previous next`. -/
+def scanTransition [Fintype S] [DecidableEq S] (rho : ℝ) (previous next : S) : ℝ :=
+  (1 - rho) * (if previous = next then 1 else 0) + rho / Fintype.card S
+
+/-- Every row of `scanTransition` sums to one (`scan_learn.clj:201-206`). -/
+theorem scanTransition_row_sum [Fintype S] [Nonempty S] [DecidableEq S]
+    (rho : ℝ) (hr0 : 0 ≤ rho) (hr1 : rho ≤ 1) (previous : S) :
+    ∑ next, scanTransition rho previous next = 1 := by
+  have hc : (Fintype.card S : ℝ) ≠ 0 := by exact_mod_cast Fintype.card_ne_zero
+  simp [scanTransition, Finset.sum_add_distrib, Finset.mul_sum, Finset.sum_mul, hc]
+  field_simp
+  ring
+
+/-- `scan_learn.clj:230-263`, `step`: exact categorical filtering using
+`scanTransition` and the exponentiated integrated status log-likelihood. -/
+def scanPosterior [Fintype S] [DecidableEq S] (rho : ℝ) (ll : S → ℝ)
+    (qPrevious : S → ℝ) : Option (S → ℝ) :=
+  exactUpdate (fun s (_ : Unit) => Real.exp (ll s)) (scanTransition rho) () qPrevious
+
+/-- A successful `scanPosterior` has exactly the normalized
+`exp(log-likelihood) * predicted-q` form computed at `scan_learn.clj:248-263`. -/
+theorem scanPosterior_some [Fintype S] [DecidableEq S] (rho : ℝ) (ll : S → ℝ)
+    (qPrevious q : S → ℝ) (h : scanPosterior rho ll qPrevious = some q) (x : S) :
+    q x = Real.exp (ll x) * predictedState (scanTransition rho) qPrevious x /
+      ∑ y, Real.exp (ll y) * predictedState (scanTransition rho) qPrevious y := by
+  unfold scanPosterior exactUpdate at h
+  split at h
+  · contradiction
+  · simp only [Option.some.injEq] at h
+    subst q
+    rfl
+
+/-- `scan_learn.clj:265-272`, `step`: one key's q-weighted count update,
+specialized directly from `DirichletLearning.step`. -/
+def scanAccumulate (prior : DirichletParams O S) (counts : O → ℕ) (q : S → ℝ)
+    (hq : ∀ s, 0 ≤ q s) : DirichletParams O S :=
+  step prior (fun o => counts o, q) (fun o => Nat.cast_nonneg _) hq
+
+/-- The concentration selected by `scanAccumulate` is prior plus count times
+posterior mass, the update at `scan_learn.clj:265-272`. -/
+theorem scanAccumulate_conc (prior : DirichletParams O S) (counts : O → ℕ)
+    (q : S → ℝ) (hq : ∀ s, 0 ≤ q s) (o : O) (s : S) :
+    (scanAccumulate prior counts q hq).conc o s = prior.conc o s + counts o * q s := by
   rfl
 
-/-- `scan_learn.clj:175-199`, `status-log-likelihoods`: for one status, sum
-the integrated predictive over exactly the used keys. Unobserved keys are not
-members of `used` and therefore contribute nothing. -/
-def scanLogLikelihood [Fintype K] (used : Finset K)
-    (predictive : K → S → ℝ) (status : S) : ℝ :=
-  ∑ key ∈ used, predictive key status
-
-/-- A typed fixture guarding the `key → status` argument order of
-`scanLogLikelihood`; transposing outcome/status-indexed data cannot inhabit
-the `predictive` argument used here. -/
+/-- Concrete outcome-first fixture: `conc outcome status`, not its transpose.
+The asymmetric matrix corresponds to the access at `scan_learn.clj:195-197`. -/
 example :
-    scanLogLikelihood ({false} : Finset Bool)
-      (fun key status : Bool => if key then (if status then 40 else 30)
-                               else (if status then 20 else 10)) true = 20 := by
-  norm_num [scanLogLikelihood]
+    let a : DirichletParams Bool Bool :=
+      ⟨fun outcome status => if outcome then (if status then 7 else 5)
+                             else (if status then 3 else 2), by norm_num⟩
+    a.conc false true = 3 := by
+  norm_num
 
 #print axioms dirichletCategoricalLogPredictive_eq
-#print axioms betaBinomialLogPredictive_eq
+#print axioms scanTransition_row_sum
+#print axioms scanPosterior_some
+#print axioms scanAccumulate_conc
 
 end
 
