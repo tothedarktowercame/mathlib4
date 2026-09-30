@@ -98,6 +98,70 @@ def Cascade.structuralIdentity {L : Library} (c : Cascade L) : StructuralIdentit
   precedes := c.precedes.image fun e => (e.1.id, e.2.id)
   overlap := c.overlap.image fun e => (e.left.id, e.right.id)
 
+/-- First-seen structural deduplication, matching
+`target-policy-family/deduplicate`. -/
+def structurallyDifferent {L : Library} (c d : Cascade L) : Bool :=
+  c.structuralIdentity != d.structuralIdentity
+
+def structuralDedup {L : Library} : List (Cascade L) → List (Cascade L)
+  | [] => []
+  | c :: cs => c :: structuralDedup (cs.filter (structurallyDifferent c))
+termination_by xs => xs.length
+decreasing_by
+  simp_wf
+  exact Nat.lt_succ_of_le (List.length_filter_le _ _)
+
+theorem mem_structuralDedup {L : Library} {c : Cascade L} :
+    ∀ {xs : List (Cascade L)}, c ∈ structuralDedup xs → c ∈ xs := by
+  intro xs
+  induction xs using structuralDedup.induct with
+  | case1 => simp [structuralDedup]
+  | case2 x rest ih =>
+      intro h
+      simp only [structuralDedup, List.mem_cons] at h ⊢
+      rcases h with rfl | h
+      · exact Or.inl rfl
+      · right
+        have ih' : c ∈ structuralDedup (rest.filter (structurallyDifferent x)) →
+            c ∈ rest.filter (structurallyDifferent x) := by simpa using ih
+        exact List.mem_of_mem_filter (ih' h)
+
+theorem length_structuralDedup_le {L : Library} :
+    ∀ xs : List (Cascade L), (structuralDedup xs).length ≤ xs.length := by
+  intro xs
+  induction xs using structuralDedup.induct with
+  | case1 => simp [structuralDedup]
+  | case2 x rest ih =>
+      simp only [structuralDedup, List.length_cons, Nat.succ_le_succ_iff]
+      exact le_trans
+        (by simpa using ih)
+        (List.length_filter_le _ _)
+
+theorem structuralDedup_pairwise {L : Library} :
+    ∀ xs : List (Cascade L),
+      (structuralDedup xs).Pairwise
+        (fun a b => a.structuralIdentity ≠ b.structuralIdentity) := by
+  intro xs
+  induction xs using structuralDedup.induct with
+  | case1 => simp [structuralDedup]
+  | case2 x rest ih =>
+      rw [structuralDedup]
+      apply List.pairwise_cons.2
+      constructor
+      · intro y hy heq
+        have hyr : y ∈ rest.filter (structurallyDifferent x) :=
+          mem_structuralDedup hy
+        have hb := (List.mem_filter.mp hyr).2
+        simp [structurallyDifferent, heq] at hb
+      · simpa using ih
+
+theorem structuralDedup_same_identity {L : Library} (a b : Cascade L)
+    (h : a.structuralIdentity = b.structuralIdentity) :
+    structuralDedup [a, b] = [a] := by
+  rw [structuralDedup]
+  simp [structurallyDifferent, h]
+  rw [structuralDedup]
+
 structure Reading (L : Library) where
   fragments : List (Fragment L)
   deriving DecidableEq
@@ -285,11 +349,11 @@ def source {L : Library} (r : Reading L) (g : PatternGraph L) (p : Params)
   allReadingCascades r ++ ret.retractions g (r.usableSeeds g) p
 
 def construct {L : Library} (r : Reading L) (g : PatternGraph L) (p : Params)
-    (ret : RetractionSpec L) : PolicySet L := .mk (source r g p ret).dedup
+    (ret : RetractionSpec L) : PolicySet L := .mk (structuralDedup (source r g p ret))
 
 theorem members_construct {L : Library} (r : Reading L) (g : PatternGraph L)
     (p : Params) (ret : RetractionSpec L) :
-    (construct r g p ret).members = (source r g p ret).dedup := rfl
+    (construct r g p ret).members = structuralDedup (source r g p ret) := rfl
 
 theorem member_is_valid {L : Library} (r : Reading L) (g : PatternGraph L)
     (p : Params) (ret : RetractionSpec L) (c : Cascade L)
@@ -299,7 +363,9 @@ theorem member_is_valid {L : Library} (r : Reading L) (g : PatternGraph L)
 
 theorem members_structurally_distinct {L : Library} (r : Reading L)
     (g : PatternGraph L) (p : Params) (ret : RetractionSpec L) :
-    (construct r g p ret).members.Pairwise (· ≠ ·) := List.nodup_dedup _
+    (construct r g p ret).members.Pairwise
+      (fun a b => a.structuralIdentity ≠ b.structuralIdentity) :=
+  structuralDedup_pairwise _
 
 theorem readingCascade_cites {L : Library} (mode : ReadingMode) (r : Reading L)
     (c : Cascade L) (h : c ∈ readingCascades mode r) :
@@ -324,7 +390,7 @@ theorem member_cites_reading {L : Library} (r : Reading L) (g : PatternGraph L)
     (h : c ∈ (construct r g p ret).members) :
     ∃ q ∈ r.citedPatterns, c.containsPattern q := by
   rw [members_construct] at h
-  have hs := List.mem_dedup.mp h
+  have hs := mem_structuralDedup h
   rcases List.mem_append.mp hs with hr | hx
   · rcases List.mem_append.mp hr with ha | ho
     · exact readingCascade_cites .alternatives r c ha
@@ -345,6 +411,7 @@ theorem empty_reading_empty_policy_set {L : Library} (r : Reading L)
   rw [source, hs, ret.emptySeeds]
   simp [allReadingCascades, readingCascades, rawReadingCascades, supportedUnits,
     fragmentUnitsAux, h, alternatives, cascadeOfUnits?]
+  rw [structuralDedup]
 
 theorem policy_count_le_reading_plus_k {L : Library} (r : Reading L)
     (g : PatternGraph L) (p : Params) (ret : RetractionSpec L) :
@@ -353,8 +420,8 @@ theorem policy_count_le_reading_plus_k {L : Library} (r : Reading L)
         (readingCascades .overlap r).length + p.k := by
   rw [members_construct]
   calc
-    (source r g p ret).dedup.length ≤ (source r g p ret).length :=
-      (List.dedup_sublist _).length_le
+    (structuralDedup (source r g p ret)).length ≤ (source r g p ret).length :=
+      length_structuralDedup_le _
     _ ≤ (readingCascades .alternatives r).length +
         (readingCascades .overlap r).length + p.k := by
       simpa only [source, List.length_append, allReadingCascades] using
@@ -365,7 +432,7 @@ theorem policy_count_le_reading_plus_k {L : Library} (r : Reading L)
 deduplication of both reading modes. -/
 theorem construct_k_zero {L : Library} (r : Reading L) (g : PatternGraph L)
     (p : Params) (ret : RetractionSpec L) (hk : p.k = 0) :
-    (construct r g p ret).members = (allReadingCascades r).dedup := by
+    (construct r g p ret).members = structuralDedup (allReadingCascades r) := by
   rw [members_construct, source]
   have hz : ret.retractions g (r.usableSeeds g) p = [] := by
     apply List.eq_nil_of_length_eq_zero
@@ -429,6 +496,7 @@ example (badGraph : PatternGraph ({0, 1} : Library))
 #print axioms construct_k_zero
 #print axioms fixture_alternatives
 #print axioms fixture_overlap
+#print axioms structuralDedup_same_identity
 
 end
 end DarkTower.WarMachine.CascadeSpec
