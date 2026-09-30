@@ -85,8 +85,16 @@ structure RunFacts where
   horizonLength : Nat
   /-- Zero-based horizon steps whose C-tau row states a real preference. -/
   preferenceSteps : Finset Nat
+  /-- Horizon steps whose C-tau is graded by completed-progress count. -/
+  gradedPreferenceSteps : Finset Nat
   /-- Terms that contributed to every reported policy G. -/
   gTerms : GTerms
+  /-- Compared policies carrying a separately recorded risk term. -/
+  policiesWithRiskTerm : Nat
+  /-- Compared policies carrying a separately recorded ambiguity term. -/
+  policiesWithAmbiguityTerm : Nat
+  /-- Compared policies carrying a separately recorded expected-information term. -/
+  policiesWithInformationTerm : Nat
   /-- Temporal order recorded for selection and target-specific interpretation. -/
   interpretationOrder : InterpretationOrder
   /-- Count of all `absent`, `not-supplied`, `status missing`, and typed-refusal
@@ -110,6 +118,10 @@ structure RunFacts where
   completionPreferencePairs : Nat
   /-- Number of those pairs on which C strictly prefers the criterion-closing outcome. -/
   completionPairsStrictlyPreferred : Nat
+  /-- Trace pairs with equal terminal belief and pointwise earlier progress. -/
+  earlierProgressPairs : Nat
+  /-- Those pairs whose earlier trace has no greater cumulative normalized risk. -/
+  earlierProgressNoGreaterRisk : Nat
   /-- Number of compared cascade pairs with the same pattern set and different arrangements. -/
   differentArrangementPairs : Nat
   /-- Number of those pairs represented as distinct policies, each with its own numeric G. -/
@@ -147,7 +159,11 @@ step of the horizon. -/
 def Q4 (r : RunFacts) : Bool := decide (
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
   r.gTerms.informationGain = true ∧ 0 < r.horizonLength ∧
-  r.preferenceSteps = Finset.range r.horizonLength)
+  r.preferenceSteps = Finset.range r.horizonLength ∧
+  r.gradedPreferenceSteps = Finset.range r.horizonLength ∧
+  r.policiesWithRiskTerm = r.comparedPolicies.card ∧
+  r.policiesWithAmbiguityTerm = r.comparedPolicies.card ∧
+  r.policiesWithInformationTerm = r.comparedPolicies.card)
 
 /-! Joe: "Go ahead and interpret a pattern, after you select it." -/
 def Q5 (r : RunFacts) : Bool :=
@@ -190,7 +206,9 @@ def Q8 (r : RunFacts) : Bool := decide (
 not. Every reachable comparison is strict, and at least one is represented. -/
 def Q9 (r : RunFacts) : Bool := decide (
   0 < r.completionPreferencePairs ∧
-  r.completionPairsStrictlyPreferred = r.completionPreferencePairs)
+  r.completionPairsStrictlyPreferred = r.completionPreferencePairs ∧
+  0 < r.earlierProgressPairs ∧
+  r.earlierProgressNoGreaterRisk = r.earlierProgressPairs)
 
 /-! Joe: policies are cascades in a specific geometric arrangement. Whenever
 the same patterns occur in two compared arrangements, both arrangements are
@@ -238,7 +256,11 @@ def click20 : RunFacts where
   cascadesWithoutG := ∅
   horizonLength := 4
   preferenceSteps := {3}
+  gradedPreferenceSteps := ∅
   gTerms := ⟨true, false, false⟩
+  policiesWithRiskTerm := 1
+  policiesWithAmbiguityTerm := 0
+  policiesWithInformationTerm := 0
   interpretationOrder := .interpretationBeforeSelection
   pathAbsenceCount := 62
   previousChoice := ⟨0, 20⟩
@@ -250,6 +272,8 @@ def click20 : RunFacts where
   seatsUsed := {1, 2, 3}
   completionPreferencePairs := 1
   completionPairsStrictlyPreferred := 0
+  earlierProgressPairs := 1
+  earlierProgressNoGreaterRisk := 0
   differentArrangementPairs := 1
   arrangementPairsDistinguishedByG := 0
 
@@ -278,7 +302,11 @@ def good : RunFacts where
   cascadesWithoutG := ∅
   horizonLength := 4
   preferenceSteps := Finset.range 4
+  gradedPreferenceSteps := Finset.range 4
   gTerms := ⟨true, true, true⟩
+  policiesWithRiskTerm := 1911
+  policiesWithAmbiguityTerm := 1911
+  policiesWithInformationTerm := 1911
   interpretationOrder := .selectionBeforeInterpretation
   pathAbsenceCount := 0
   previousChoice := ⟨0, 50000⟩
@@ -290,6 +318,8 @@ def good : RunFacts where
   seatsUsed := ids 0 10
   completionPreferencePairs := 12
   completionPairsStrictlyPreferred := 12
+  earlierProgressPairs := 20
+  earlierProgressNoGreaterRisk := 20
   differentArrangementPairs := 20
   arrangementPairsDistinguishedByG := 20
 
