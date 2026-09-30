@@ -2,107 +2,170 @@ import DarkTower.WarMachine.CascadeOrder
 import Mathlib.Data.Rat.Defs
 import Mathlib.Data.List.Dedup
 import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Finset.Prod
 
-/-!
-# Reading-derived cascade policy sets
+/-! Reading-derived cascades and graph-derived policy sets.
 
-This module specifies the finite objects built by `analysis_cascade.clj`,
-`pattern_retraction.clj`, `target_policy_family.clj`, and
-`cascade_shape_g.clj`.  In particular, a policy set is the result of
-`construct`; it is not a caller-supplied menu.  This supersedes the free
-`menu` boundary of `Proof2.CascadePolicySet.cascadePolicySet` for new work,
-without deleting that historical model.
+`readingCascades` mirrors `analysis_cascade.clj`: unsupported fragments are
+skipped; alternatives select one citation per supported fragment; overlap
+keeps all citations, overlaps citations in one fragment, and joins every unit
+in consecutive supported fragments. Direction in graph retractions is data,
+never inferred from pattern names.
 
-The names correspond to countable runtime objects as follows:
-
-| Lean | Clojure | counted object |
+| Lean | Clojure | countable thing |
 |---|---|---|
-| `PatternId`, `Library` | pattern library | library pattern ids (1,431 in the 2026-09-30 census) |
-| `Citation` | validated `:pattern-refs` | one library-pattern occurrence at a fragment index |
-| `Unit` | `:nodes` / occurrence | one pattern occurrence in a cascade |
-| `Cascade` | analysis cascade or graph retraction | one nonempty acyclic arranged cascade |
-| `PatternGraph` | pattern relation graph | weighted graph edges, including authored direction when present |
-| `Params.k` | `:k` | maximum number of retractions returned for one target |
-| `PolicySet.members` | `policy-family` | structurally deduplicated policies for one target |
+| `Library` | pattern library | pattern ids (1,431 in the census) |
+| `Citation` | validated `:pattern_refs` | cited patterns |
+| `Unit` | `:nodes` | citation occurrences |
+| `readingCascades` | `analysis->cascades` | reading-supported cascades |
+| `PatternGraph` | relation graph | weighted edges and authored directions |
+| `Params.k` | `:k` | maximum retractions |
+| `PolicySet.members` | `policy-family` | deduplicated policies per target |
 
-An “accepted seed” below means a seed actually passed to `retractions`.
-The runtime first removes unknown and isolated reading citations; consequently
-it would be false to require every raw citation to occur in every retraction.
--/
+This construction supersedes the free `menu` boundary in
+`Proof2.CascadePolicySet.cascadePolicySet` for new work. -/
 
 namespace DarkTower.WarMachine.CascadeSpec
-
 noncomputable section
 open Classical
 
 abbrev PatternId := Nat
-abbrev FragmentIndex := Nat
-abbrev UnitId := Nat
 abbrev Library := Finset PatternId
 
 structure Citation (L : Library) where
   pattern : PatternId
-  fragment : FragmentIndex
   inLibrary : pattern ∈ L
   deriving DecidableEq
 
 structure Fragment (L : Library) where
-  index : FragmentIndex
   citations : List (Citation L)
   deriving DecidableEq
 
-structure Unit where
-  id : UnitId
+structure Unit (L : Library) where
+  fragment : Nat
+  slot : Nat
   pattern : PatternId
+  inLibrary : pattern ∈ L
   deriving DecidableEq
 
-abbrev DirectedEdge := Unit × Unit
+abbrev DirectedEdge (L : Library) := Unit L × Unit L
 
-/-- An overlap is represented canonically by its two endpoints in increasing
-unit-id order.  This makes an undirected pair finite and decidable. -/
-structure Overlap where
-  left : Unit
-  right : Unit
-  canonical : left.id < right.id
+structure Overlap (L : Library) where
+  left : Unit L
+  right : Unit L
+  canonical : left.fragment = right.fragment ∧ left.slot < right.slot
   deriving DecidableEq
 
 structure Cascade (L : Library) where
-  units : Finset Unit
+  units : Finset (Unit L)
   nonempty : units.Nonempty
-  precedes : Finset DirectedEdge
-  overlap : Finset Overlap
+  precedes : Finset (DirectedEdge L)
+  overlap : Finset (Overlap L)
   labelsInLibrary : ∀ u ∈ units, u.pattern ∈ L
   precedesEndpoints : ∀ e ∈ precedes, e.1 ∈ units ∧ e.2 ∈ units
   overlapEndpoints : ∀ e ∈ overlap, e.left ∈ units ∧ e.right ∈ units
-  acyclic : acyclicDescent (fun a b => (a, b) ∈ precedes)
+  precedesForward : ∀ e ∈ precedes, e.1.fragment < e.2.fragment
   deriving DecidableEq
 
-def Cascade.roots {L : Library} (c : Cascade L) : Finset Unit :=
+def Cascade.precedesRel {L : Library} (c : Cascade L) (a b : Unit L) : Prop :=
+  (a, b) ∈ c.precedes
+
+theorem Cascade.acyclic {L : Library} (c : Cascade L) : acyclicDescent c.precedesRel := by
+  apply acyclic_of_increasing_rank c.precedesRel (·.fragment)
+  intro a b h
+  exact c.precedesForward (a, b) h
+
+def Cascade.roots {L : Library} (c : Cascade L) : Finset (Unit L) :=
   c.units.filter fun u => ¬ ∃ v ∈ c.units, (v, u) ∈ c.precedes
 
 def Cascade.containsPattern {L : Library} (c : Cascade L) (p : PatternId) : Prop :=
   ∃ u ∈ c.units, u.pattern = p
 
-/-- A reading is the validated finite fragment analysis plus the cascades
-actually constructed from that analysis.  Keeping these together records the
-`analysis->cascades` boundary rather than inventing a second translation. -/
 structure Reading (L : Library) where
   fragments : List (Fragment L)
-  readingCascades : List (Cascade L)
-  cascadeCites : ∀ c ∈ readingCascades,
-    ∃ f ∈ fragments, ∃ q ∈ f.citations, c.containsPattern q.pattern
-  noFragmentsNoCascades : fragments = [] → readingCascades = []
+  deriving DecidableEq
+
+inductive ReadingMode | alternatives | overlap deriving DecidableEq
+
+def unitsAtAux {L : Library} (fi : Nat) : Nat → List (Citation L) → List (Unit L)
+  | _, [] => []
+  | si, q :: qs => ⟨fi, si, q.pattern, q.inLibrary⟩ :: unitsAtAux fi (si + 1) qs
+
+def unitsAt {L : Library} (fi : Nat) (f : Fragment L) : List (Unit L) :=
+  unitsAtAux fi 0 f.citations
+
+def fragmentUnitsAux {L : Library} : Nat → List (Fragment L) → List (List (Unit L))
+  | _, [] => []
+  | fi, f :: fs => unitsAt fi f :: fragmentUnitsAux (fi + 1) fs
+
+def supportedUnits {L : Library} (r : Reading L) : List (List (Unit L)) :=
+  (fragmentUnitsAux 0 r.fragments).filter (· ≠ [])
+
+def alternatives : List (List α) → List (List α)
+  | [] => [[]]
+  | choices :: rest => choices.flatMap fun x => (alternatives rest).map (x :: ·)
+
+def adjacentFragments {L : Library} (us : Finset (Unit L)) (i j : Nat) : Bool :=
+  decide (i < j) && !(us.toList.any fun u => decide (i < u.fragment ∧ u.fragment < j))
+
+def directedEdges {L : Library} (us : Finset (Unit L)) : Finset (DirectedEdge L) :=
+  (us.product us).filter fun e => adjacentFragments us e.1.fragment e.2.fragment
+
+def overlapPairs {L : Library} (us : Finset (Unit L)) : Finset (Overlap L) :=
+  ((us.product us).filter fun e =>
+    e.1.fragment = e.2.fragment ∧ e.1.slot < e.2.slot).attach.map
+    ⟨fun e => ⟨e.1.1, e.1.2, by
+        exact (Finset.mem_filter.mp e.property).2⟩,
+      by
+        intro a b h
+        apply Subtype.ext
+        exact Prod.ext (congrArg Overlap.left h) (congrArg Overlap.right h)⟩
+
+def cascadeOfUnits? {L : Library} (row : List (Unit L)) : Option (Cascade L) :=
+  let us := row.toFinset
+  if h : us.Nonempty then
+    some {
+      units := us
+      nonempty := h
+      precedes := directedEdges us
+      overlap := overlapPairs us
+      labelsInLibrary := by intro u hu; exact u.inLibrary
+      precedesEndpoints := by
+        intro e he
+        simp [directedEdges] at he
+        exact ⟨he.1.1, he.1.2⟩
+      overlapEndpoints := by
+        intro e he
+        rcases Finset.mem_map.mp he with ⟨x, hx, rfl⟩
+        exact Finset.mem_product.mp (Finset.mem_filter.mp x.property).1
+      precedesForward := by
+        intro e he
+        simp [directedEdges, adjacentFragments] at he
+        exact he.2.1 }
+  else none
+
+def rawReadingCascades {L : Library} (mode : ReadingMode) (r : Reading L) : List (Cascade L) :=
+  match mode with
+  | .alternatives => (alternatives (supportedUnits r)).filterMap cascadeOfUnits?
+  | .overlap =>
+      match cascadeOfUnits? (supportedUnits r).flatten with
+      | some c => [c]
+      | none => []
 
 def Reading.citedPatterns {L : Library} (r : Reading L) : Finset PatternId :=
   (r.fragments.flatMap fun f => f.citations.map (·.pattern)).toFinset
+
+/-- The final check is redundant for correctly generated rows, but makes the
+target-provenance invariant part of the executable constructor boundary. -/
+def readingCascades {L : Library} (mode : ReadingMode) (r : Reading L) : List (Cascade L) :=
+  (rawReadingCascades mode r).filter fun c =>
+    c.units.toList.any fun u => u.pattern ∈ r.citedPatterns
 
 structure GraphEdge where
   left : PatternId
   right : PatternId
   distinct : left ≠ right
   weight : ℚ
-  /-- Direction authored in the evidence. `none` means overlap.  Direction is
-  data; it is never derived from alphabetical or numeric ordering. -/
   authoredDirection : Option (PatternId × PatternId)
   directionEndpoints : ∀ d ∈ authoredDirection, d = (left, right) ∨ d = (right, left)
   deriving DecidableEq
@@ -115,33 +178,46 @@ def PatternGraph.incident {L : Library} (g : PatternGraph L) (p : PatternId) : P
   ∃ e ∈ g.edges, e.left = p ∨ e.right = p
 
 def Reading.usableSeeds {L : Library} (r : Reading L) (g : PatternGraph L) : Finset PatternId :=
-  r.citedPatterns.filter fun p => g.incident p
+  r.citedPatterns.filter g.incident
 
 inductive WeightKind | authored | overlap deriving DecidableEq
-
 structure Params where
+  mode : ReadingMode
   k : Nat
   weights : WeightKind → ℚ
 
-def graphJoins {L : Library} (g : PatternGraph L) (a b : PatternId) : Prop :=
-  ∃ e ∈ g.edges, (e.left = a ∧ e.right = b) ∨ (e.left = b ∧ e.right = a)
+def authoredGraphEdge {L : Library} (g : PatternGraph L) (a b : PatternId) : Prop :=
+  ∃ e ∈ g.edges, e.authoredDirection = some (a, b)
 
-/-- The explicit contract of the graph-retraction implementation.  It says
-only what construction relies on: supplied seeds survive, labels and edges
-come from the graph/library, no seeds yields no result, and `k` bounds output. -/
+def overlapGraphEdge {L : Library} (g : PatternGraph L) (a b : PatternId) : Prop :=
+  ∃ e ∈ g.edges, e.authoredDirection = none ∧
+    ((e.left = a ∧ e.right = b) ∨ (e.left = b ∧ e.right = a))
+
+/-- The rejected implementation strategy: turn every graph edge into a
+directed pair by numeric id, ignoring `authoredDirection`. -/
+def alphabeticalRetractionEdges {L : Library} (g : PatternGraph L) :
+    List (PatternId × PatternId) :=
+  g.edges.toList.map fun e => if e.left < e.right then (e.left, e.right) else (e.right, e.left)
+
 structure RetractionSpec (L : Library) where
   retractions : PatternGraph L → Finset PatternId → Params → List (Cascade L)
   containsSeeds : ∀ g seeds p c, c ∈ retractions g seeds p →
     ∀ seed ∈ seeds, c.containsPattern seed
   labelsFromLibrary : ∀ g seeds p c, c ∈ retractions g seeds p →
     ∀ u ∈ c.units, u.pattern ∈ L
-  edgesFromGraph : ∀ g seeds p c, c ∈ retractions g seeds p →
-    ∀ e ∈ c.precedes, graphJoins g e.1.pattern e.2.pattern
+  precedesAuthored : ∀ g seeds p c, c ∈ retractions g seeds p →
+    ∀ e ∈ c.precedes, authoredGraphEdge g e.1.pattern e.2.pattern
+  overlapUnauthored : ∀ g seeds p c, c ∈ retractions g seeds p →
+    ∀ e ∈ c.overlap, overlapGraphEdge g e.left.pattern e.right.pattern
+  usesEveryUnauthored : ∀ g seeds p c, c ∈ retractions g seeds p →
+    ∀ ge ∈ g.edges, ge.authoredDirection = none →
+      c.containsPattern ge.left → c.containsPattern ge.right →
+      ∃ e ∈ c.overlap,
+        (e.left.pattern = ge.left ∧ e.right.pattern = ge.right) ∨
+        (e.left.pattern = ge.right ∧ e.right.pattern = ge.left)
   emptySeeds : ∀ g p, retractions g ∅ p = []
   bounded : ∀ g seeds p, (retractions g seeds p).length ≤ p.k
 
-/-- Closed result type.  Its constructor is private: outside this module a
-handwritten menu cannot be promoted to a `PolicySet`. -/
 structure PolicySet (L : Library) where
   private mk ::
   data : List (Cascade L)
@@ -151,14 +227,10 @@ def PolicySet.members {L : Library} : PolicySet L → List (Cascade L)
 
 def source {L : Library} (r : Reading L) (g : PatternGraph L) (p : Params)
     (ret : RetractionSpec L) : List (Cascade L) :=
-  r.readingCascades ++ ret.retractions g (r.usableSeeds g) p
+  readingCascades p.mode r ++ ret.retractions g (r.usableSeeds g) p
 
-/-- The policy family is exactly structural deduplication of reading cascades
-and at most `k` graph retractions.  Equality of `Cascade` is equality of all
-structural data; proof fields are propositionally irrelevant. -/
 def construct {L : Library} (r : Reading L) (g : PatternGraph L) (p : Params)
-    (ret : RetractionSpec L) : PolicySet L :=
-  .mk (source r g p ret).dedup
+    (ret : RetractionSpec L) : PolicySet L := .mk (source r g p ret).dedup
 
 theorem members_construct {L : Library} (r : Reading L) (g : PatternGraph L)
     (p : Params) (ret : RetractionSpec L) :
@@ -167,113 +239,113 @@ theorem members_construct {L : Library} (r : Reading L) (g : PatternGraph L)
 theorem member_is_valid {L : Library} (r : Reading L) (g : PatternGraph L)
     (p : Params) (ret : RetractionSpec L) (c : Cascade L)
     (_h : c ∈ (construct r g p ret).members) :
-    c.units.Nonempty ∧ (∀ u ∈ c.units, u.pattern ∈ L) ∧
-      acyclicDescent (fun a b => (a, b) ∈ c.precedes) :=
+    c.units.Nonempty ∧ (∀ u ∈ c.units, u.pattern ∈ L) ∧ acyclicDescent c.precedesRel :=
   ⟨c.nonempty, c.labelsInLibrary, c.acyclic⟩
 
 theorem members_structurally_distinct {L : Library} (r : Reading L)
     (g : PatternGraph L) (p : Params) (ret : RetractionSpec L) :
-    (construct r g p ret).members.Pairwise (· ≠ ·) := by
-  exact List.nodup_dedup _
+    (construct r g p ret).members.Pairwise (· ≠ ·) := List.nodup_dedup _
+
+theorem readingCascade_cites {L : Library} (mode : ReadingMode) (r : Reading L)
+    (c : Cascade L) (h : c ∈ readingCascades mode r) :
+    ∃ p ∈ r.citedPatterns, c.containsPattern p := by
+  have ha := (List.mem_filter.mp h).2
+  rw [List.any_eq_true] at ha
+  obtain ⟨u, hu, hp⟩ := ha
+  exact ⟨u.pattern, of_decide_eq_true hp, u, Finset.mem_toList.mp hu, rfl⟩
 
 theorem member_cites_reading {L : Library} (r : Reading L) (g : PatternGraph L)
     (p : Params) (ret : RetractionSpec L) (c : Cascade L)
     (h : c ∈ (construct r g p ret).members) :
-    ∃ f ∈ r.fragments, ∃ q ∈ f.citations, c.containsPattern q.pattern := by
+    ∃ q ∈ r.citedPatterns, c.containsPattern q := by
   rw [members_construct] at h
-  have hs : c ∈ source r g p ret := (List.mem_dedup.mp h)
+  have hs := List.mem_dedup.mp h
   rcases List.mem_append.mp hs with hr | hx
-  · exact r.cascadeCites c hr
-  · have husable : (r.usableSeeds g).Nonempty := by
+  · exact readingCascade_cites p.mode r c hr
+  · have hn : (r.usableSeeds g).Nonempty := by
       by_contra hempty
-      have heq : r.usableSeeds g = ∅ := Finset.not_nonempty_iff_eq_empty.mp hempty
-      rw [heq, ret.emptySeeds] at hx
+      rw [Finset.not_nonempty_iff_eq_empty.mp hempty, ret.emptySeeds] at hx
       simp at hx
-    obtain ⟨seed, hseed⟩ := husable
-    have hc := ret.containsSeeds g (r.usableSeeds g) p c hx seed hseed
-    have hcited : seed ∈ r.citedPatterns := (Finset.mem_filter.mp hseed).1
-    rw [Reading.citedPatterns, List.mem_toFinset] at hcited
-    rcases List.mem_flatMap.mp hcited with ⟨f, hf, hfm⟩
-    rcases List.mem_map.mp hfm with ⟨q, hq, rfl⟩
-    exact ⟨f, hf, q, hq, hc⟩
+    obtain ⟨seed, hseed⟩ := hn
+    exact ⟨seed, (Finset.mem_filter.mp hseed).1,
+      ret.containsSeeds g (r.usableSeeds g) p c hx seed hseed⟩
 
 theorem empty_reading_empty_policy_set {L : Library} (r : Reading L)
     (g : PatternGraph L) (p : Params) (ret : RetractionSpec L)
     (h : r.fragments = []) : (construct r g p ret).members = [] := by
-  rw [members_construct, source, r.noFragmentsNoCascades h]
-  have hs : r.usableSeeds g = ∅ := by
-    ext seed
-    simp [Reading.usableSeeds, Reading.citedPatterns, h]
-  rw [hs, ret.emptySeeds]
-  rfl
+  rw [members_construct]
+  have hs : r.usableSeeds g = ∅ := by ext seed; simp [Reading.usableSeeds, Reading.citedPatterns, h]
+  rw [source, hs, ret.emptySeeds]
+  cases p.mode <;>
+    simp [readingCascades, rawReadingCascades, supportedUnits, fragmentUnitsAux,
+      h, alternatives, cascadeOfUnits?]
 
 theorem policy_count_le_reading_plus_k {L : Library} (r : Reading L)
     (g : PatternGraph L) (p : Params) (ret : RetractionSpec L) :
-    (construct r g p ret).members.length ≤ r.readingCascades.length + p.k := by
+    (construct r g p ret).members.length ≤ (readingCascades p.mode r).length + p.k := by
   rw [members_construct]
   calc
     (source r g p ret).dedup.length ≤ (source r g p ret).length :=
       (List.dedup_sublist _).length_le
-    _ ≤ r.readingCascades.length + p.k := by
+    _ ≤ (readingCascades p.mode r).length + p.k := by
       simpa [source] using Nat.add_le_add_left (ret.bounded g (r.usableSeeds g) p)
-        r.readingCascades.length
+        (readingCascades p.mode r).length
 
--- A list is not a policy set: callers must use `construct`.
+def fixtureLibrary : Library := {0, 1, 2}
+
+def fixtureReading : Reading fixtureLibrary :=
+  ⟨[⟨[⟨0, by simp [fixtureLibrary]⟩, ⟨1, by simp [fixtureLibrary]⟩]⟩,
+    ⟨[⟨2, by simp [fixtureLibrary]⟩]⟩]⟩
+
+def cascadeCounts {L : Library} (c : Cascade L) : Nat × Nat × Nat :=
+  (c.units.card, c.precedes.card, c.overlap.card)
+
+/-- Two alternatives, each a two-unit chain. -/
+theorem fixture_alternatives :
+    (readingCascades .alternatives fixtureReading).map cascadeCounts =
+      [(2, 1, 0), (2, 1, 0)] := by
+  simp +decide [readingCascades, rawReadingCascades, fixtureReading, fixtureLibrary,
+    supportedUnits, fragmentUnitsAux, unitsAt, unitsAtAux, alternatives, cascadeOfUnits?,
+    cascadeCounts, directedEdges, adjacentFragments, overlapPairs]
+
+/-- One three-unit overlap cascade: the first fragment contributes one
+overlap pair and both of its units precede the second fragment's unit. -/
+theorem fixture_overlap :
+    (readingCascades .overlap fixtureReading).map cascadeCounts = [(3, 2, 1)] := by
+  simp +decide [readingCascades, rawReadingCascades, fixtureReading, fixtureLibrary,
+    supportedUnits, fragmentUnitsAux, unitsAt, unitsAtAux, cascadeOfUnits?, cascadeCounts,
+    directedEdges, adjacentFragments, overlapPairs]
+
+-- An unoriented edge cannot justify alphabetical precedence.
 /--
-error: Type mismatch
-  []
-has type
-  List ?m.1
-but is expected to have type
-  PolicySet L
+error: Tactic `assumption` failed
+
+badGraph : PatternGraph {0, 1}
+e : GraphEdge
+he : e ∈ badGraph.edges
+hl : e.left = 0
+hr : e.right = 1
+hn : e.authoredDirection = none
+⊢ none = some (0, 1)
 -/
 #guard_msgs in
-example {L : Library} : PolicySet L := []
+example (badGraph : PatternGraph ({0, 1} : Library))
+    (h : ∃ e ∈ badGraph.edges, e.left = 0 ∧ e.right = 1 ∧ e.authoredDirection = none) :
+    authoredGraphEdge badGraph 0 1 := by
+  rcases h with ⟨e, he, hl, hr, hn⟩
+  refine ⟨e, he, ?_⟩
+  rw [hn]
+  assumption
 
--- Cyclic and out-of-library examples are rejected at the proof fields of
--- `Cascade`; unlike a free menu, malformed data cannot enter `construct`.
-/--
-error: unsolved goals
-⊢ ∀ (a b : Unit),
-    (a, b) ∈
-        {({ id := 0, pattern := 0 }, { id := 1, pattern := 1 }),
-          ({ id := 1, pattern := 1 }, { id := 0, pattern := 0 })} →
-      a.id < b.id
--/
-#guard_msgs in
-example : Cascade ({0, 1} : Library) where
-  units := {⟨0, 0⟩, ⟨1, 1⟩}
-  nonempty := by simp
-  precedes := {(⟨0, 0⟩, ⟨1, 1⟩), (⟨1, 1⟩, ⟨0, 0⟩)}
-  overlap := ∅
-  labelsInLibrary := by simp
-  precedesEndpoints := by simp
-  overlapEndpoints := by simp
-  acyclic := by
-    apply acyclic_of_increasing_rank _ (fun u => u.id)
-
-/--
-error: unsolved goals
-⊢ False
--/
-#guard_msgs in
-example : Cascade ({0} : Library) where
-  units := {⟨0, 1⟩}
-  nonempty := by simp
-  precedes := ∅
-  overlap := ∅
-  labelsInLibrary := by simp
-  precedesEndpoints := by simp
-  overlapEndpoints := by simp
-  acyclic := by
-    apply acyclic_of_increasing_rank _ (fun _ => 0)
-    simp
-
+#print axioms Cascade.acyclic
 #print axioms member_is_valid
 #print axioms members_structurally_distinct
+#print axioms readingCascade_cites
 #print axioms member_cites_reading
 #print axioms empty_reading_empty_policy_set
 #print axioms policy_count_le_reading_plus_k
+#print axioms fixture_alternatives
+#print axioms fixture_overlap
 
 end
 end DarkTower.WarMachine.CascadeSpec
