@@ -182,7 +182,6 @@ def Reading.usableSeeds {L : Library} (r : Reading L) (g : PatternGraph L) : Fin
 
 inductive WeightKind | authored | overlap deriving DecidableEq
 structure Params where
-  mode : ReadingMode
   k : Nat
   weights : WeightKind → ℚ
 
@@ -201,6 +200,8 @@ def alphabeticalRetractionEdges {L : Library} (g : PatternGraph L) :
 
 structure RetractionSpec (L : Library) where
   retractions : PatternGraph L → Finset PatternId → Params → List (Cascade L)
+  /-- `pattern_retraction.clj` returns no retractions for disconnected seeds,
+  so seed containment is deliberately vacuous in that case. -/
   containsSeeds : ∀ g seeds p c, c ∈ retractions g seeds p →
     ∀ seed ∈ seeds, c.containsPattern seed
   labelsFromLibrary : ∀ g seeds p c, c ∈ retractions g seeds p →
@@ -209,12 +210,8 @@ structure RetractionSpec (L : Library) where
     ∀ e ∈ c.precedes, authoredGraphEdge g e.1.pattern e.2.pattern
   overlapUnauthored : ∀ g seeds p c, c ∈ retractions g seeds p →
     ∀ e ∈ c.overlap, overlapGraphEdge g e.left.pattern e.right.pattern
-  usesEveryUnauthored : ∀ g seeds p c, c ∈ retractions g seeds p →
-    ∀ ge ∈ g.edges, ge.authoredDirection = none →
-      c.containsPattern ge.left → c.containsPattern ge.right →
-      ∃ e ∈ c.overlap,
-        (e.left.pattern = ge.left ∧ e.right.pattern = ge.right) ∨
-        (e.left.pattern = ge.right ∧ e.right.pattern = ge.left)
+  /- There is intentionally no converse: `render-tree` emits only edges in
+  the chosen Steiner tree, not every graph edge induced by its nodes. -/
   emptySeeds : ∀ g p, retractions g ∅ p = []
   bounded : ∀ g seeds p, (retractions g seeds p).length ≤ p.k
 
@@ -225,9 +222,13 @@ structure PolicySet (L : Library) where
 def PolicySet.members {L : Library} : PolicySet L → List (Cascade L)
   | .mk members => members
 
+/-- `reading-policies` emits alternatives first and overlap second. -/
+def allReadingCascades {L : Library} (r : Reading L) : List (Cascade L) :=
+  readingCascades .alternatives r ++ readingCascades .overlap r
+
 def source {L : Library} (r : Reading L) (g : PatternGraph L) (p : Params)
     (ret : RetractionSpec L) : List (Cascade L) :=
-  readingCascades p.mode r ++ ret.retractions g (r.usableSeeds g) p
+  allReadingCascades r ++ ret.retractions g (r.usableSeeds g) p
 
 def construct {L : Library} (r : Reading L) (g : PatternGraph L) (p : Params)
     (ret : RetractionSpec L) : PolicySet L := .mk (source r g p ret).dedup
@@ -261,7 +262,9 @@ theorem member_cites_reading {L : Library} (r : Reading L) (g : PatternGraph L)
   rw [members_construct] at h
   have hs := List.mem_dedup.mp h
   rcases List.mem_append.mp hs with hr | hx
-  · exact readingCascade_cites p.mode r c hr
+  · rcases List.mem_append.mp hr with ha | ho
+    · exact readingCascade_cites .alternatives r c ha
+    · exact readingCascade_cites .overlap r c ho
   · have hn : (r.usableSeeds g).Nonempty := by
       by_contra hempty
       rw [Finset.not_nonempty_iff_eq_empty.mp hempty, ret.emptySeeds] at hx
@@ -276,20 +279,34 @@ theorem empty_reading_empty_policy_set {L : Library} (r : Reading L)
   rw [members_construct]
   have hs : r.usableSeeds g = ∅ := by ext seed; simp [Reading.usableSeeds, Reading.citedPatterns, h]
   rw [source, hs, ret.emptySeeds]
-  cases p.mode <;>
-    simp [readingCascades, rawReadingCascades, supportedUnits, fragmentUnitsAux,
-      h, alternatives, cascadeOfUnits?]
+  simp [allReadingCascades, readingCascades, rawReadingCascades, supportedUnits,
+    fragmentUnitsAux, h, alternatives, cascadeOfUnits?]
 
 theorem policy_count_le_reading_plus_k {L : Library} (r : Reading L)
     (g : PatternGraph L) (p : Params) (ret : RetractionSpec L) :
-    (construct r g p ret).members.length ≤ (readingCascades p.mode r).length + p.k := by
+    (construct r g p ret).members.length ≤
+      (readingCascades .alternatives r).length +
+        (readingCascades .overlap r).length + p.k := by
   rw [members_construct]
   calc
     (source r g p ret).dedup.length ≤ (source r g p ret).length :=
       (List.dedup_sublist _).length_le
-    _ ≤ (readingCascades p.mode r).length + p.k := by
-      simpa [source] using Nat.add_le_add_left (ret.bounded g (r.usableSeeds g) p)
-        (readingCascades p.mode r).length
+    _ ≤ (readingCascades .alternatives r).length +
+        (readingCascades .overlap r).length + p.k := by
+      simpa only [source, List.length_append, allReadingCascades] using
+        Nat.add_le_add_left (ret.bounded g (r.usableSeeds g) p)
+        (allReadingCascades r).length
+
+/-- With no retraction allowance, construction is exactly structural
+deduplication of both reading modes. -/
+theorem construct_k_zero {L : Library} (r : Reading L) (g : PatternGraph L)
+    (p : Params) (ret : RetractionSpec L) (hk : p.k = 0) :
+    (construct r g p ret).members = (allReadingCascades r).dedup := by
+  rw [members_construct, source]
+  have hz : ret.retractions g (r.usableSeeds g) p = [] := by
+    apply List.eq_nil_of_length_eq_zero
+    exact Nat.le_zero.mp (hk ▸ ret.bounded g (r.usableSeeds g) p)
+  rw [hz, List.append_nil]
 
 def fixtureLibrary : Library := {0, 1, 2}
 
@@ -344,6 +361,7 @@ example (badGraph : PatternGraph ({0, 1} : Library))
 #print axioms member_cites_reading
 #print axioms empty_reading_empty_policy_set
 #print axioms policy_count_le_reading_plus_k
+#print axioms construct_k_zero
 #print axioms fixture_alternatives
 #print axioms fixture_overlap
 
