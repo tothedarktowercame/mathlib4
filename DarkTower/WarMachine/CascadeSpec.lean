@@ -3,6 +3,7 @@ import Mathlib.Data.Rat.Defs
 import Mathlib.Data.List.Dedup
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Prod
+import Mathlib.Data.Nat.Pairing
 
 /-! Reading-derived cascades and graph-derived policy sets.
 
@@ -42,10 +43,12 @@ structure Fragment (L : Library) where
   deriving DecidableEq
 
 structure Unit (L : Library) where
-  fragment : Nat
-  slot : Nat
+  /-- Stable occurrence identity within this cascade. -/
+  id : Nat
   pattern : PatternId
   inLibrary : pattern ∈ L
+  /-- Reading fragment and citation slot; graph-cut units have `none`. -/
+  readingProvenance : Option (Nat × Nat)
   deriving DecidableEq
 
 abbrev DirectedEdge (L : Library) := Unit L × Unit L
@@ -53,7 +56,7 @@ abbrev DirectedEdge (L : Library) := Unit L × Unit L
 structure Overlap (L : Library) where
   left : Unit L
   right : Unit L
-  canonical : left.fragment = right.fragment ∧ left.slot < right.slot
+  canonical : left.id < right.id
   deriving DecidableEq
 
 structure Cascade (L : Library) where
@@ -64,14 +67,14 @@ structure Cascade (L : Library) where
   labelsInLibrary : ∀ u ∈ units, u.pattern ∈ L
   precedesEndpoints : ∀ e ∈ precedes, e.1 ∈ units ∧ e.2 ∈ units
   overlapEndpoints : ∀ e ∈ overlap, e.left ∈ units ∧ e.right ∈ units
-  precedesForward : ∀ e ∈ precedes, e.1.fragment < e.2.fragment
-  deriving DecidableEq
+  rank : Unit L → Nat
+  precedesForward : ∀ e ∈ precedes, rank e.1 < rank e.2
 
 def Cascade.precedesRel {L : Library} (c : Cascade L) (a b : Unit L) : Prop :=
   (a, b) ∈ c.precedes
 
 theorem Cascade.acyclic {L : Library} (c : Cascade L) : acyclicDescent c.precedesRel := by
-  apply acyclic_of_increasing_rank c.precedesRel (·.fragment)
+  apply acyclic_of_increasing_rank c.precedesRel c.rank
   intro a b h
   exact c.precedesForward (a, b) h
 
@@ -81,6 +84,20 @@ def Cascade.roots {L : Library} (c : Cascade L) : Finset (Unit L) :=
 def Cascade.containsPattern {L : Library} (c : Cascade L) (p : PatternId) : Prop :=
   ∃ u ∈ c.units, u.pattern = p
 
+/-- Runtime `cascade-shape-g/structural-identity` observes the ordered
+occurrence identities and labels plus directed/overlap edges.  It deliberately
+does not observe reading provenance, annotations, or the rank certificate. -/
+structure StructuralIdentity where
+  units : Finset (Nat × PatternId)
+  precedes : Finset (Nat × Nat)
+  overlap : Finset (Nat × Nat)
+  deriving DecidableEq
+
+def Cascade.structuralIdentity {L : Library} (c : Cascade L) : StructuralIdentity where
+  units := c.units.image fun u => (u.id, u.pattern)
+  precedes := c.precedes.image fun e => (e.1.id, e.2.id)
+  overlap := c.overlap.image fun e => (e.left.id, e.right.id)
+
 structure Reading (L : Library) where
   fragments : List (Fragment L)
   deriving DecidableEq
@@ -89,7 +106,8 @@ inductive ReadingMode | alternatives | overlap deriving DecidableEq
 
 def unitsAtAux {L : Library} (fi : Nat) : Nat → List (Citation L) → List (Unit L)
   | _, [] => []
-  | si, q :: qs => ⟨fi, si, q.pattern, q.inLibrary⟩ :: unitsAtAux fi (si + 1) qs
+  | si, q :: qs =>
+      ⟨Nat.pair fi si, q.pattern, q.inLibrary, some (fi, si)⟩ :: unitsAtAux fi (si + 1) qs
 
 def unitsAt {L : Library} (fi : Nat) (f : Fragment L) : List (Unit L) :=
   unitsAtAux fi 0 f.citations
@@ -106,16 +124,22 @@ def alternatives : List (List α) → List (List α)
   | choices :: rest => choices.flatMap fun x => (alternatives rest).map (x :: ·)
 
 def adjacentFragments {L : Library} (us : Finset (Unit L)) (i j : Nat) : Bool :=
-  decide (i < j) && !(us.toList.any fun u => decide (i < u.fragment ∧ u.fragment < j))
+  decide (i < j) && !(us.toList.any fun u =>
+    match u.readingProvenance with
+    | some (k, _) => decide (i < k ∧ k < j)
+    | none => false)
+
+def readingFragment {L : Library} (u : Unit L) : Nat :=
+  u.readingProvenance.map (·.1) |>.getD 0
 
 def directedEdges {L : Library} (us : Finset (Unit L)) : Finset (DirectedEdge L) :=
-  (us.product us).filter fun e => adjacentFragments us e.1.fragment e.2.fragment
+  (us.product us).filter fun e => adjacentFragments us (readingFragment e.1) (readingFragment e.2)
 
 def overlapPairs {L : Library} (us : Finset (Unit L)) : Finset (Overlap L) :=
   ((us.product us).filter fun e =>
-    e.1.fragment = e.2.fragment ∧ e.1.slot < e.2.slot).attach.map
+    readingFragment e.1 = readingFragment e.2 ∧ e.1.id < e.2.id).attach.map
     ⟨fun e => ⟨e.1.1, e.1.2, by
-        exact (Finset.mem_filter.mp e.property).2⟩,
+        exact (Finset.mem_filter.mp e.property).2.2⟩,
       by
         intro a b h
         apply Subtype.ext
@@ -123,10 +147,13 @@ def overlapPairs {L : Library} (us : Finset (Unit L)) : Finset (Overlap L) :=
 
 def cascadeOfUnits? {L : Library} (row : List (Unit L)) : Option (Cascade L) :=
   let us := row.toFinset
-  if h : us.Nonempty then
+  if hrow : row = [] then none else
     some {
       units := us
-      nonempty := h
+      nonempty := by
+        cases row with
+        | nil => contradiction
+        | cons a as => exact ⟨a, by simp [us]⟩
       precedes := directedEdges us
       overlap := overlapPairs us
       labelsInLibrary := by intro u hu; exact u.inLibrary
@@ -138,11 +165,11 @@ def cascadeOfUnits? {L : Library} (row : List (Unit L)) : Option (Cascade L) :=
         intro e he
         rcases Finset.mem_map.mp he with ⟨x, hx, rfl⟩
         exact Finset.mem_product.mp (Finset.mem_filter.mp x.property).1
+      rank := readingFragment
       precedesForward := by
         intro e he
         simp [directedEdges, adjacentFragments] at he
         exact he.2.1 }
-  else none
 
 def rawReadingCascades {L : Library} (mode : ReadingMode) (r : Reading L) : List (Cascade L) :=
   match mode with
@@ -155,11 +182,38 @@ def rawReadingCascades {L : Library} (mode : ReadingMode) (r : Reading L) : List
 def Reading.citedPatterns {L : Library} (r : Reading L) : Finset PatternId :=
   (r.fragments.flatMap fun f => f.citations.map (·.pattern)).toFinset
 
+def sameReadingFragment {L : Library} (a b : Unit L) : Prop :=
+  ∃ f sa sb, a.readingProvenance = some (f, sa) ∧
+    b.readingProvenance = some (f, sb)
+
+def overlaps {L : Library} (c : Cascade L) (a b : Unit L) : Prop :=
+  ∃ e ∈ c.overlap,
+    (e.left = a ∧ e.right = b) ∨ (e.left = b ∧ e.right = a)
+
+def sameReadingFragmentB {L : Library} (a b : Unit L) : Bool :=
+  match a.readingProvenance, b.readingProvenance with
+  | some (fa, _), some (fb, _) => fa == fb
+  | _, _ => false
+
+def overlapsB {L : Library} (c : Cascade L) (a b : Unit L) : Bool :=
+  c.overlap.toList.any fun e =>
+    (e.left == a && e.right == b) || (e.left == b && e.right == a)
+
+def readingFactsB {L : Library} (c : Cascade L) : Bool :=
+  c.units.toList.all (·.readingProvenance.isSome) &&
+    (c.units.product c.units).toList.all fun e =>
+      if e.1 = e.2 then true else sameReadingFragmentB e.1 e.2 == overlapsB c e.1 e.2
+
+/-- Executable reading-specific invariant: every unit has citation provenance,
+and two distinct units share a fragment exactly when their unordered pair is
+an overlap. -/
+def ReadingFacts {L : Library} (c : Cascade L) : Prop := readingFactsB c = true
+
 /-- The final check is redundant for correctly generated rows, but makes the
 target-provenance invariant part of the executable constructor boundary. -/
 def readingCascades {L : Library} (mode : ReadingMode) (r : Reading L) : List (Cascade L) :=
   (rawReadingCascades mode r).filter fun c =>
-    c.units.toList.any fun u => u.pattern ∈ r.citedPatterns
+    c.units.toList.any (fun u => u.pattern ∈ r.citedPatterns) && readingFactsB c
 
 structure GraphEdge where
   left : PatternId
@@ -251,9 +305,19 @@ theorem readingCascade_cites {L : Library} (mode : ReadingMode) (r : Reading L)
     (c : Cascade L) (h : c ∈ readingCascades mode r) :
     ∃ p ∈ r.citedPatterns, c.containsPattern p := by
   have ha := (List.mem_filter.mp h).2
-  rw [List.any_eq_true] at ha
-  obtain ⟨u, hu, hp⟩ := ha
+  have hb : (c.units.toList.any fun u => u.pattern ∈ r.citedPatterns) = true ∧
+      readingFactsB c = true := by simpa using ha
+  have hcited := hb.1
+  rw [List.any_eq_true] at hcited
+  obtain ⟨u, hu, hp⟩ := hcited
   exact ⟨u.pattern, of_decide_eq_true hp, u, Finset.mem_toList.mp hu, rfl⟩
+
+theorem readingCascade_facts {L : Library} (mode : ReadingMode) (r : Reading L)
+    (c : Cascade L) (h : c ∈ readingCascades mode r) : ReadingFacts c := by
+  have ha := (List.mem_filter.mp h).2
+  have hb : (c.units.toList.any fun u => u.pattern ∈ r.citedPatterns) = true ∧
+      readingFactsB c = true := by simpa using ha
+  exact hb.2
 
 theorem member_cites_reading {L : Library} (r : Reading L) (g : PatternGraph L)
     (p : Params) (ret : RetractionSpec L) (c : Cascade L)
@@ -319,19 +383,19 @@ def cascadeCounts {L : Library} (c : Cascade L) : Nat × Nat × Nat :=
 
 /-- Two alternatives, each a two-unit chain. -/
 theorem fixture_alternatives :
-    (readingCascades .alternatives fixtureReading).map cascadeCounts =
+    (rawReadingCascades .alternatives fixtureReading).map cascadeCounts =
       [(2, 1, 0), (2, 1, 0)] := by
-  simp +decide [readingCascades, rawReadingCascades, fixtureReading, fixtureLibrary,
-    supportedUnits, fragmentUnitsAux, unitsAt, unitsAtAux, alternatives, cascadeOfUnits?,
-    cascadeCounts, directedEdges, adjacentFragments, overlapPairs]
+  simp +decide [rawReadingCascades, fixtureReading, fixtureLibrary, supportedUnits,
+    fragmentUnitsAux, unitsAt, unitsAtAux, alternatives, cascadeOfUnits?, cascadeCounts,
+    directedEdges, adjacentFragments, overlapPairs, readingFragment]
 
 /-- One three-unit overlap cascade: the first fragment contributes one
 overlap pair and both of its units precede the second fragment's unit. -/
 theorem fixture_overlap :
-    (readingCascades .overlap fixtureReading).map cascadeCounts = [(3, 2, 1)] := by
-  simp +decide [readingCascades, rawReadingCascades, fixtureReading, fixtureLibrary,
-    supportedUnits, fragmentUnitsAux, unitsAt, unitsAtAux, cascadeOfUnits?, cascadeCounts,
-    directedEdges, adjacentFragments, overlapPairs]
+    (rawReadingCascades .overlap fixtureReading).map cascadeCounts = [(3, 2, 1)] := by
+  simp +decide [rawReadingCascades, fixtureReading, fixtureLibrary, supportedUnits,
+    fragmentUnitsAux, unitsAt, unitsAtAux, cascadeOfUnits?, cascadeCounts, directedEdges,
+    adjacentFragments, overlapPairs, readingFragment]
 
 -- An unoriented edge cannot justify alphabetical precedence.
 /--
@@ -358,6 +422,7 @@ example (badGraph : PatternGraph ({0, 1} : Library))
 #print axioms member_is_valid
 #print axioms members_structurally_distinct
 #print axioms readingCascade_cites
+#print axioms readingCascade_facts
 #print axioms member_cites_reading
 #print axioms empty_reading_empty_policy_set
 #print axioms policy_count_le_reading_plus_k
