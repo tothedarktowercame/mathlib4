@@ -1,0 +1,342 @@
+import Mathlib.Data.Finset.Basic
+import Mathlib.Data.List.Defs
+import Mathlib.Tactic
+
+/-!
+# Countable requirements for one War Machine run
+
+Every field below denotes a finite population in the world or in one run
+record.  This file states requirements over those facts; it does not claim
+that today's runner exports them faithfully.
+-/
+
+namespace DarkTower.WarMachine.Requirements
+
+set_option maxRecDepth 100000
+set_option maxHeartbeats 5000000
+
+abbrev Id := Nat
+
+structure TargetConstruction where
+  /-- Stable target ids sharing this exact slice/pool construction fact. The
+  exporter may group targets only when all remaining fields are identical. -/
+  targets : Finset Id
+  /-- Pattern ids returned by query-time retrieval from the pinned library. -/
+  slice : Finset Id
+  /-- Pattern ids the constructor was actually permitted to use. -/
+  pool : Finset Id
+  /-- True exactly when the recorded slice was queried over the whole pinned library. -/
+  sliceFromWholeLibrary : Bool
+  /-- Number of extensionally distinct policies constructed for this target. -/
+  policyCount : Nat
+  deriving DecidableEq
+
+structure Choice where
+  /-- Stable id of the chosen open task. -/
+  target : Id
+  /-- Stable id/hash of the chosen arranged cascade. -/
+  cascade : Id
+  deriving DecidableEq
+
+inductive RunOutcome where
+  | changed | alreadySatisfied | question | refused | invalid | timedOut
+  deriving DecidableEq, Repr
+
+inductive InterpretationOrder where
+  | selectionBeforeInterpretation
+  | interpretationBeforeSelection
+  deriving DecidableEq, Repr
+
+structure GTerms where
+  /-- Whether outcome risk contributed to every reported G. -/
+  risk : Bool
+  /-- Whether expected ambiguity contributed to every reported G. -/
+  ambiguity : Bool
+  /-- Whether expected information gain contributed to every reported G. -/
+  informationGain : Bool
+  deriving DecidableEq, Repr
+
+structure RunFacts where
+  /-- Canonical ids of open missions; counted from the pinned mission registry. -/
+  openMissions : Finset Id
+  /-- Canonical ids of open excursions; counted from the pinned excursion registry. -/
+  openExcursions : Finset Id
+  /-- Canonical ids of open tickets; counted from the pinned ticket registry. -/
+  openTickets : Finset Id
+  /-- Task ids emitted by the decision enumerator in the selection certificate. -/
+  enumeratedTasks : Finset Id
+  /-- Enumerated target ids admitted to the scoring boundary. -/
+  targetsReachingScoring : Finset Id
+  /-- Target ids for which the run record carries a numeric G. -/
+  targetsWithG : Finset Id
+  /-- Number of pattern files in the pinned pattern-library manifest. -/
+  libraryPatternCount : Nat
+  /-- Per-target retrieval slice, constructor pool and policy coverage. -/
+  targetConstruction : List TargetConstruction
+  /-- Number of distinct patterns across pools the constructor could draw on. -/
+  constructorPatternCount : Nat
+  /-- Stable ids/hashes of all arranged cascades the constructor emitted. -/
+  constructedCascades : Finset Id
+  /-- Stable ids/hashes of the policies actually compared by the posterior. -/
+  comparedPolicies : Finset Id
+  /-- Constructed cascade ids for which the record has no numeric G. -/
+  cascadesWithoutG : Finset Id
+  /-- Number of future steps scored, read from the observation-model horizon. -/
+  horizonLength : Nat
+  /-- Zero-based horizon steps whose C-tau row states a real preference. -/
+  preferenceSteps : Finset Nat
+  /-- Terms that contributed to every reported policy G. -/
+  gTerms : GTerms
+  /-- Temporal order recorded for selection and target-specific interpretation. -/
+  interpretationOrder : InterpretationOrder
+  /-- Count of all `absent`, `not-supplied`, `status missing`, and typed-refusal
+  values on the selection-to-terminal-receipt path. -/
+  pathAbsenceCount : Nat
+  /-- Previous run's selected target and arranged cascade. -/
+  previousChoice : Choice
+  /-- Previous run's typed terminal outcome. -/
+  previousOutcome : RunOutcome
+  /-- Digest of all inputs on which the previous choice depended. -/
+  previousInputDigest : Id
+  /-- Current run's selected target and arranged cascade. -/
+  currentChoice : Choice
+  /-- Digest of all inputs on which the current choice depended. -/
+  currentInputDigest : Id
+  /-- Stable ids of seats registered when selection ran. -/
+  seatsAvailable : Finset Id
+  /-- Stable ids of seats included in dispatch or behavior counts for the run. -/
+  seatsUsed : Finset Id
+  deriving DecidableEq
+
+def RunFacts.openTasks (r : RunFacts) : Finset Id :=
+  r.openMissions ∪ r.openExcursions ∪ r.openTickets
+
+def RunFacts.totalPolicies (r : RunFacts) : Nat :=
+  (r.targetConstruction.map (fun tc => tc.targets.card * tc.policyCount)).sum
+
+def RunFacts.maxSliceSize (r : RunFacts) : Nat :=
+  (r.targetConstruction.map (·.slice.card)).foldl max 0
+
+/-! Joe: "Every open mission, excursion or ticket is wanted." -/
+def Q1 (r : RunFacts) : Bool := decide (r.enumeratedTasks = r.openTasks)
+
+/-! Joe: cascades are derived per problem from the pattern library; the pool is
+the query-time slice, and every open target has an action from the start. -/
+def Q2 (r : RunFacts) : Bool := decide (
+  (∀ tc ∈ r.targetConstruction,
+    tc.targets ⊆ r.openTasks ∧ tc.pool = tc.slice ∧ tc.sliceFromWholeLibrary = true ∧
+      tc.slice.card ≤ r.libraryPatternCount ∧ 0 < tc.policyCount) ∧
+  (r.targetConstruction.map (fun tc : TargetConstruction => tc.targets)).foldl (· ∪ ·) ∅ =
+    r.openTasks ∧
+  r.constructorPatternCount =
+    ((r.targetConstruction.map (fun tc : TargetConstruction => tc.pool)).foldl (· ∪ ·) ∅).card)
+
+/-! Joe: "G is defined over policies, and policies are cascades ... full stop." -/
+def Q3 (r : RunFacts) : Bool := decide (r.cascadesWithoutG = ∅)
+
+/-! Joe: G must not be risk-only, and C-tau states a preference at every
+step of the horizon. -/
+def Q4 (r : RunFacts) : Bool := decide (
+  r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
+  r.gTerms.informationGain = true ∧ 0 < r.horizonLength ∧
+  r.preferenceSteps = Finset.range r.horizonLength)
+
+/-! Joe: "Go ahead and interpret a pattern, after you select it." -/
+def Q5 (r : RunFacts) : Bool :=
+  decide (r.interpretationOrder = .selectionBeforeInterpretation)
+
+/-! Joe: a failure is a critical incident, never a non-event to be repeated.
+An unchanged refusal may not choose the same target/cascade pair again. -/
+def Q6 (r : RunFacts) : Bool := decide (
+  r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest →
+    r.previousChoice ≠ r.currentChoice)
+
+/-! Joe: an absence, refusal, or "not supplied" on the path is a failure;
+the working path contains none. -/
+def Q7 (r : RunFacts) : Bool := decide (r.pathAbsenceCount = 0)
+
+/-! Joe: no carrier is supplied at one, or at a hand-picked handful, while
+the real population has tens or hundreds. Explicit alert thresholds:
+
+* at least 90% of open tasks are enumerated;
+* at least 50% of enumerated tasks reach scoring and receive G;
+* if the library has at least 100 patterns, a problem slice/pool contains at
+  least 10 patterns;
+* at least two distinct cascades and policies are compared;
+* at least two policies per open task are constructed ("several" comparison);
+* if at least 10 seats are available, at least 10% are represented in use or
+  learned behavior counts.
+
+The ratios use multiplication, so there is no truncating division. -/
+def Q8 (r : RunFacts) : Bool := decide (
+  10 * r.enumeratedTasks.card ≥ 9 * r.openTasks.card ∧
+  2 * r.targetsReachingScoring.card ≥ r.enumeratedTasks.card ∧
+  2 * r.targetsWithG.card ≥ r.enumeratedTasks.card ∧
+  (r.libraryPatternCount < 100 ∨ 10 ≤ r.maxSliceSize) ∧
+  2 ≤ r.constructedCascades.card ∧
+  2 ≤ r.comparedPolicies.card ∧
+  2 * r.openTasks.card ≤ r.totalPolicies ∧
+  (r.seatsAvailable.card < 10 ∨ r.seatsAvailable.card ≤ 10 * r.seatsUsed.card))
+
+inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q8
+  deriving DecidableEq, Repr
+
+def violations (r : RunFacts) : List Requirement :=
+  [(.q1, Q1 r), (.q2, Q2 r), (.q3, Q3 r),
+   (.q4, Q4 r), (.q5, Q5 r), (.q6, Q6 r),
+   (.q7, Q7 r), (.q8, Q8 r)].filterMap
+    (fun (q, ok) => if ok then none else some q)
+
+def conforms (r : RunFacts) : Bool := violations r = []
+
+private def ids (start count : Nat) : Finset Id :=
+  Finset.Ico start (start + count)
+
+def click20 : RunFacts where
+  openMissions := ids 0 221
+  openExcursions := ids 221 373
+  openTickets := ids 594 43
+  enumeratedTasks := ids 0 195
+  targetsReachingScoring := {0, 1, 2}
+  targetsWithG := {0}
+  libraryPatternCount := 1431
+  targetConstruction :=
+    [{ targets := {0}, slice := {10, 11}, pool := {10, 11},
+       sliceFromWholeLibrary := false, policyCount := 1 }]
+  constructorPatternCount := 2
+  constructedCascades := {20}
+  comparedPolicies := {30}
+  cascadesWithoutG := ∅
+  horizonLength := 4
+  preferenceSteps := {3}
+  gTerms := ⟨true, false, false⟩
+  interpretationOrder := .interpretationBeforeSelection
+  pathAbsenceCount := 155
+  previousChoice := ⟨0, 20⟩
+  previousOutcome := .refused
+  previousInputDigest := 99
+  currentChoice := ⟨0, 20⟩
+  currentInputDigest := 99
+  seatsAvailable := ids 0 56
+  seatsUsed := {1, 2, 3}
+
+def missingG : RunFacts :=
+  { click20 with
+    enumeratedTasks := click20.openTasks
+    targetsReachingScoring := click20.openTasks
+    targetsWithG := click20.openTasks
+    cascadesWithoutG := {21} }
+
+def good : RunFacts where
+  openMissions := ids 0 221
+  openExcursions := ids 221 373
+  openTickets := ids 594 43
+  enumeratedTasks := ids 0 637
+  targetsReachingScoring := ids 0 637
+  targetsWithG := ids 0 637
+  libraryPatternCount := 1431
+  targetConstruction :=
+    [{ targets := ids 0 637, slice := ids 3000 30,
+       pool := ids 3000 30, sliceFromWholeLibrary := true,
+       policyCount := 3 }]
+  constructorPatternCount := 30
+  constructedCascades := ids 50000 (3 * 637)
+  comparedPolicies := ids 60000 (3 * 637)
+  cascadesWithoutG := ∅
+  horizonLength := 4
+  preferenceSteps := Finset.range 4
+  gTerms := ⟨true, true, true⟩
+  interpretationOrder := .selectionBeforeInterpretation
+  pathAbsenceCount := 0
+  previousChoice := ⟨0, 50000⟩
+  previousOutcome := .refused
+  previousInputDigest := 7
+  currentChoice := ⟨1, 50001⟩
+  currentInputDigest := 7
+  seatsAvailable := ids 0 56
+  seatsUsed := ids 0 10
+
+theorem click20_not_Q1 : Q1 click20 = false := by decide
+theorem click20_not_Q2 : Q2 click20 = false := by decide
+theorem click20_not_Q4 : Q4 click20 = false := by decide
+theorem click20_not_Q5 : Q5 click20 = false := by decide
+theorem click20_not_Q6 : Q6 click20 = false := by decide
+theorem click20_not_Q7 : Q7 click20 = false := by decide
+theorem click20_not_Q8 : Q8 click20 = false := by decide
+theorem click20_violations :
+    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q8] := by decide
+theorem click20_not_conformant : conforms click20 = false := by decide
+theorem missingG_not_Q3 : Q3 missingG = false := by decide
+theorem good_conforms : conforms good = true := by decide
+theorem good_has_no_violations : violations good = [] := by decide
+
+/--
+error: Tactic `decide` proved that the proposition
+  Q1 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q1 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q2 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q2 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q3 missingG = true
+is false
+-/
+#guard_msgs in
+example : Q3 missingG = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q4 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q4 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q5 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q5 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q6 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q6 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q7 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q7 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q8 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q8 click20 = true := by decide
+
+#print axioms click20_not_Q1
+#print axioms click20_not_Q2
+#print axioms click20_not_Q4
+#print axioms click20_not_Q5
+#print axioms click20_not_Q6
+#print axioms click20_not_Q7
+#print axioms click20_not_Q8
+#print axioms click20_violations
+#print axioms click20_not_conformant
+#print axioms missingG_not_Q3
+#print axioms good_conforms
+
+end DarkTower.WarMachine.Requirements
