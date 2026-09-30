@@ -106,6 +106,14 @@ structure RunFacts where
   seatsAvailable : Finset Id
   /-- Stable ids of seats included in dispatch or behavior counts for the run. -/
   seatsUsed : Finset Id
+  /-- Number of reachable pairs `(closed criterion, non-closing outcome)` in C. -/
+  completionPreferencePairs : Nat
+  /-- Number of those pairs on which C strictly prefers the criterion-closing outcome. -/
+  completionPairsStrictlyPreferred : Nat
+  /-- Number of compared cascade pairs with the same pattern set and different arrangements. -/
+  differentArrangementPairs : Nat
+  /-- Number of those pairs represented as distinct policies, each with its own numeric G. -/
+  arrangementPairsDistinguishedByG : Nat
   deriving DecidableEq
 
 def RunFacts.openTasks (r : RunFacts) : Finset Id :=
@@ -178,13 +186,26 @@ def Q8 (r : RunFacts) : Bool := decide (
   2 * r.openTasks.card ≤ r.totalPolicies ∧
   (r.seatsAvailable.card < 10 ∨ r.seatsAvailable.card ≤ 10 * r.seatsUsed.card))
 
-inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q8
+/-! Joe: C must prefer an outcome that closes a criterion to one that does
+not. Every reachable comparison is strict, and at least one is represented. -/
+def Q9 (r : RunFacts) : Bool := decide (
+  0 < r.completionPreferencePairs ∧
+  r.completionPairsStrictlyPreferred = r.completionPreferencePairs)
+
+/-! Joe: policies are cascades in a specific geometric arrangement. Whenever
+the same patterns occur in two compared arrangements, both arrangements are
+distinct policies with their own G, and at least one such control is present. -/
+def Q10 (r : RunFacts) : Bool := decide (
+  0 < r.differentArrangementPairs ∧
+  r.arrangementPairsDistinguishedByG = r.differentArrangementPairs)
+
+inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q8 | q9 | q10
   deriving DecidableEq, Repr
 
 def violations (r : RunFacts) : List Requirement :=
   [(.q1, Q1 r), (.q2, Q2 r), (.q3, Q3 r),
    (.q4, Q4 r), (.q5, Q5 r), (.q6, Q6 r),
-   (.q7, Q7 r), (.q8, Q8 r)].filterMap
+   (.q7, Q7 r), (.q8, Q8 r), (.q9, Q9 r), (.q10, Q10 r)].filterMap
     (fun (q, ok) => if ok then none else some q)
 
 def conforms (r : RunFacts) : Bool := violations r = []
@@ -192,6 +213,14 @@ def conforms (r : RunFacts) : Bool := violations r = []
 private def ids (start count : Nat) : Finset Id :=
   Finset.Ico start (start + count)
 
+/-! Click 20 provenance. The selection certificate/exporter supplies reaching
+scoring, with-G, constructed/compared singleton counts, horizon/preference
+rows, risk-only terms, and 62 path-scoped absences. The 221/373/43 historical
+task census, two-pattern incident reconstruction, interpretation ordering,
+repeat-refusal identity/digest, and 56/3 seat census come from the incident;
+the record cannot recompute them and the reader therefore marks the
+corresponding real-run requirements `unverifiable`. This closed witness keeps
+them only to exhibit the incident described by the combined sources. -/
 def click20 : RunFacts where
   openMissions := ids 0 221
   openExcursions := ids 221 373
@@ -211,7 +240,7 @@ def click20 : RunFacts where
   preferenceSteps := {3}
   gTerms := ⟨true, false, false⟩
   interpretationOrder := .interpretationBeforeSelection
-  pathAbsenceCount := 155
+  pathAbsenceCount := 62
   previousChoice := ⟨0, 20⟩
   previousOutcome := .refused
   previousInputDigest := 99
@@ -219,6 +248,10 @@ def click20 : RunFacts where
   currentInputDigest := 99
   seatsAvailable := ids 0 56
   seatsUsed := {1, 2, 3}
+  completionPreferencePairs := 1
+  completionPairsStrictlyPreferred := 0
+  differentArrangementPairs := 1
+  arrangementPairsDistinguishedByG := 0
 
 def missingG : RunFacts :=
   { click20 with
@@ -255,6 +288,10 @@ def good : RunFacts where
   currentInputDigest := 7
   seatsAvailable := ids 0 56
   seatsUsed := ids 0 10
+  completionPreferencePairs := 12
+  completionPairsStrictlyPreferred := 12
+  differentArrangementPairs := 20
+  arrangementPairsDistinguishedByG := 20
 
 theorem click20_not_Q1 : Q1 click20 = false := by decide
 theorem click20_not_Q2 : Q2 click20 = false := by decide
@@ -263,8 +300,10 @@ theorem click20_not_Q5 : Q5 click20 = false := by decide
 theorem click20_not_Q6 : Q6 click20 = false := by decide
 theorem click20_not_Q7 : Q7 click20 = false := by decide
 theorem click20_not_Q8 : Q8 click20 = false := by decide
+theorem click20_not_Q9 : Q9 click20 = false := by decide
+theorem click20_not_Q10 : Q10 click20 = false := by decide
 theorem click20_violations :
-    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q8] := by decide
+    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q8, .q9, .q10] := by decide
 theorem click20_not_conformant : conforms click20 = false := by decide
 theorem missingG_not_Q3 : Q3 missingG = false := by decide
 theorem good_conforms : conforms good = true := by decide
@@ -326,6 +365,20 @@ is false
 -/
 #guard_msgs in
 example : Q8 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q9 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q9 click20 = true := by decide
+/--
+error: Tactic `decide` proved that the proposition
+  Q10 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q10 click20 = true := by decide
 
 #print axioms click20_not_Q1
 #print axioms click20_not_Q2
@@ -334,6 +387,8 @@ example : Q8 click20 = true := by decide
 #print axioms click20_not_Q6
 #print axioms click20_not_Q7
 #print axioms click20_not_Q8
+#print axioms click20_not_Q9
+#print axioms click20_not_Q10
 #print axioms click20_violations
 #print axioms click20_not_conformant
 #print axioms missingG_not_Q3
