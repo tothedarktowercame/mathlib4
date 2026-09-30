@@ -1,4 +1,6 @@
 import DarkTower.WarMachine.CascadeEFEPolicies
+import DarkTower.WarMachine.Proof2.CoApplicationKernel
+import DarkTower.WarMachine.CascadeCoapplication
 
 /-! Finite arithmetic requirements for G over reading-derived arranged cascades.
 This does not assert runtime conformance; `Requirements.lean` states the
@@ -274,12 +276,169 @@ theorem no_enabling_only_separation_three_nodes (e₁ e₂ : ForwardEdges)
       transition, firstEnabled, findEnabled, enabled, buildModel, forwardArrangement,
       halfTheta, canonicalFiring, doneProjection, doneToken, edgeToken]
 
+/-! The preceding `projection_erases_fixture_shape` and
+`no_enabling_only_separation_three_nodes` deliberately remain as negative
+results for the retired first-enabled scorer.  They explain why structural
+edge-count observations were needed there; the live scorer now uses the
+co-application kernel below and no longer emits edge tokens. -/
+
+abbrev CoToken := Node ⊕ (Node × Node)
+def coDone (n : Node) : CoToken := Sum.inl n
+def coShared (a b : Node) : CoToken := Sum.inr (a, b)
+
+open DarkTower.WarMachine.CascadeTransition
+open DarkTower.WarMachine.Proof2.CoApplicationKernel
+open DarkTower.WarMachine.CascadeCoapplication
+
+def coRequires (c : ArrangedCascade) (n : Node) : Finset CoToken :=
+  c.operators.foldl (fun acc op => match op with
+    | .edge source destination => if destination = n then insert (coDone source) acc else acc
+    | .overlap _ _ => acc) ∅
+
+def coProduces (c : ArrangedCascade) (n : Node) : Finset CoToken :=
+  insert (coDone n) <| c.operators.foldl (fun acc op => match op with
+    | .edge _ _ => acc
+    | .overlap left right =>
+        if left = n ∨ right = n then insert (coShared left right) acc else acc) ∅
+
+def coPattern (c : ArrangedCascade) (theta : Node → ℝ)
+    (h0 : ∀ n, 0 ≤ theta n) (h1 : ∀ n, theta n ≤ 1) (n : Node) :
+    InterpretedPattern CoToken where
+  consumes := coRequires c n
+  produces := coProduces c n
+  forbids := ∅
+  theta := theta n
+  theta_nonneg := h0 n
+  theta_le_one := h1 n
+
+def coDescent (c : ArrangedCascade) (source destination : Node) : Prop :=
+  .edge source destination ∈ c.operators
+
+def nodeRank : Node → Nat | .a => 0 | .b => 1 | .c => 2
+
+structure CoModel where
+  pattern : Node → InterpretedPattern CoToken
+  descent : Node → Node → Prop
+
+def buildCoModel (c : ArrangedCascade) (theta : Node → ℝ)
+    (h0 : ∀ n, 0 ≤ theta n) (h1 : ∀ n, theta n ≤ 1) : CoModel :=
+  ⟨coPattern c theta h0 h1, coDescent c⟩
+
+def halfThetaReal (_ : Node) : ℝ := 1 / 2
+theorem halfThetaReal_nonneg : ∀ n, 0 ≤ halfThetaReal n := by intro; norm_num [halfThetaReal]
+theorem halfThetaReal_le_one : ∀ n, halfThetaReal n ≤ 1 := by intro; norm_num [halfThetaReal]
+
+def noEdgeFixture : ArrangedCascade := ⟨{.a, .b, .c}, []⟩
+def noEdgeCoModel : CoModel :=
+  buildCoModel noEdgeFixture halfThetaReal halfThetaReal_nonneg halfThetaReal_le_one
+def chainCoModel : CoModel :=
+  buildCoModel chainFixture halfThetaReal halfThetaReal_nonneg halfThetaReal_le_one
+
+theorem chainCoDescent_acyclic : acyclicDescent chainCoModel.descent := by
+  apply acyclic_of_increasing_rank _ nodeRank
+  intro source destination h
+  cases source <;> cases destination <;>
+    simp [chainCoModel, buildCoModel, coDescent, chainFixture, nodeRank] at h ⊢
+
+def coState (s : Finset Node) : Finset CoToken := s.image coDone
+
+theorem noEdge_frontier_empty :
+    enabledFrontier noEdgeCoModel.pattern noEdgeCoModel.descent ∅ = Finset.univ := by
+  ext n
+  simp [enabledFrontier, noEdgeCoModel, buildCoModel, coPattern, coRequires,
+    coProduces, noEdgeFixture, coDescent, CascadeTransition.guard,
+    not_reach_of_empty]
+
+theorem chain_frontier_empty :
+    enabledFrontier chainCoModel.pattern chainCoModel.descent ∅ = {.a} := by
+  ext n
+  rw [mem_enabledFrontier_iff]
+  cases n
+  · simp only [Finset.mem_singleton]
+    constructor
+    · intro _; trivial
+    · intro _
+      constructor
+      · simp [chainCoModel, buildCoModel, coPattern, coRequires, coProduces,
+        chainFixture, CascadeTransition.guard]
+      · intro q hq
+        cases q
+        · exact chainCoDescent_acyclic .a
+        · simp [chainCoModel, buildCoModel, coPattern, coRequires,
+            coProduces, chainFixture, CascadeTransition.guard] at hq
+        · simp [chainCoModel, buildCoModel, coPattern, coRequires,
+            coProduces, chainFixture, CascadeTransition.guard] at hq
+  · simp [chainCoModel, buildCoModel, coPattern, coRequires, coProduces,
+      chainFixture, CascadeTransition.guard]
+  · simp [chainCoModel, buildCoModel, coPattern, coRequires, coProduces,
+      chainFixture, CascadeTransition.guard]
+
+theorem nodePowerset :
+    (Finset.univ : Finset Node).powerset =
+      {∅, {.a}, {.b}, {.c}, {.a, .b}, {.a, .c}, {.b, .c}, {.a, .b, .c}} := by decide
+
+theorem nodeUniv : (Finset.univ : Finset Node) = {.a, .b, .c} := by decide
+
+theorem node_compl_card (s : Finset Node) :
+    ((Finset.univ : Finset Node) \ s).card = 3 - s.card := by
+  rw [Finset.card_sdiff]
+  have h : Fintype.card Node = 3 := by decide
+  simp [h]
+
+theorem noEdge_all_done_one_round :
+    coApplyKernel noEdgeCoModel.pattern noEdgeCoModel.descent ∅
+      (coState {.a, .b, .c}) = 1 / 8 := by
+  rw [coApplyKernel, noEdge_frontier_empty]
+  rw [nodePowerset]
+  norm_num +decide [coState, noEdgeCoModel, buildCoModel, coPattern, coProduces,
+    noEdgeFixture, halfThetaReal, node_compl_card]
+
+theorem noEdge_each_done_subset_one_round (s : Finset Node) :
+    coApplyKernel noEdgeCoModel.pattern noEdgeCoModel.descent ∅ (coState s) = 1 / 8 := by
+  rw [coApplyKernel, noEdge_frontier_empty]
+  rw [nodePowerset]
+  fin_cases s <;>
+    norm_num +decide [coState, noEdgeCoModel, buildCoModel, coPattern, coProduces,
+      noEdgeFixture, halfThetaReal, node_compl_card]
+
+theorem chain_empty_one_round :
+    coApplyKernel chainCoModel.pattern chainCoModel.descent ∅ ∅ = 1 / 2 := by
+  rw [coApplyKernel, chain_frontier_empty]
+  have hp : ({.a} : Finset Node).powerset = {∅, {.a}} := by decide
+  rw [hp]
+  norm_num +decide [chainCoModel, buildCoModel, coPattern, coProduces, chainFixture,
+    halfThetaReal]
+
+theorem chain_a_one_round :
+    coApplyKernel chainCoModel.pattern chainCoModel.descent ∅ (coState {.a}) = 1 / 2 := by
+  rw [coApplyKernel, chain_frontier_empty]
+  have hp : ({.a} : Finset Node).powerset = {∅, {.a}} := by decide
+  rw [hp]
+  norm_num +decide [coState, chainCoModel, buildCoModel, coPattern, coProduces, chainFixture,
+    halfThetaReal]
+
+theorem chain_all_done_zero_one_round :
+    coApplyKernel chainCoModel.pattern chainCoModel.descent ∅
+      (coState {.a, .b, .c}) = 0 := by
+  rw [coApplyKernel, chain_frontier_empty]
+  have hp : ({.a} : Finset Node).powerset = {∅, {.a}} := by decide
+  rw [hp]
+  norm_num +decide [coState, chainCoModel, buildCoModel, coPattern, coProduces, chainFixture,
+    halfThetaReal]
+
+theorem coapplication_separates_arrangements_on_nodes :
+    coApplyKernel noEdgeCoModel.pattern noEdgeCoModel.descent ∅ (coState {.a, .b, .c}) ≠
+      coApplyKernel chainCoModel.pattern chainCoModel.descent ∅ (coState {.a, .b, .c}) := by
+  rw [noEdge_all_done_one_round, chain_all_done_zero_one_round]
+  norm_num
+
 theorem fixture_same_firing_nodes : chainFixture.nodes = shortcutFixture.nodes := rfl
 
-/-- What Q10 requires of the scorer. It cannot be discharged from a recorded
-decimal pair: the transition and observation semantics must imply it. -/
+/-- Q10 at the live policy grain: the score distinguishes co-application
+rollouts whose node-token transition kernels differ.  The no-edge/chain pair
+is separated by `coapplication_separates_arrangements_on_nodes` before G. -/
 def ShapeSensitive (score : ArrangedCascade → ℝ) : Prop :=
-  score chainFixture ≠ score shortcutFixture
+  score noEdgeFixture ≠ score chainFixture
 
 
 /--
@@ -321,6 +480,13 @@ example : ShapeSensitive (fun _ => 0) := by simp [ShapeSensitive]
 #print axioms fixture_distributions_differ_at_two
 #print axioms projection_erases_fixture_shape
 #print axioms no_enabling_only_separation_three_nodes
+#print axioms noEdge_frontier_empty
+#print axioms chain_frontier_empty
+#print axioms noEdge_each_done_subset_one_round
+#print axioms chain_empty_one_round
+#print axioms chain_a_one_round
+#print axioms chain_all_done_zero_one_round
+#print axioms coapplication_separates_arrangements_on_nodes
 
 end
 
