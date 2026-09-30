@@ -264,9 +264,8 @@ def overlapsB {L : Library} (c : Cascade L) (a b : Unit L) : Bool :=
     (e.left == a && e.right == b) || (e.left == b && e.right == a)
 
 def readingFactsB {L : Library} (c : Cascade L) : Bool :=
-  c.units.toList.all (·.readingProvenance.isSome) &&
-    (c.units.product c.units).toList.all fun e =>
-      if e.1 = e.2 then true else sameReadingFragmentB e.1 e.2 == overlapsB c e.1 e.2
+  decide ((c.units.filter fun u => u.readingProvenance.isNone).card = 0) &&
+    decide (c.overlap = overlapPairs c.units)
 
 /-- Executable reading-specific invariant: every unit has citation provenance,
 and two distinct units share a fragment exactly when their unordered pair is
@@ -277,7 +276,7 @@ def ReadingFacts {L : Library} (c : Cascade L) : Prop := readingFactsB c = true
 target-provenance invariant part of the executable constructor boundary. -/
 def readingCascades {L : Library} (mode : ReadingMode) (r : Reading L) : List (Cascade L) :=
   (rawReadingCascades mode r).filter fun c =>
-    c.units.toList.any (fun u => u.pattern ∈ r.citedPatterns) && readingFactsB c
+    decide (0 < (c.units.filter fun u => u.pattern ∈ r.citedPatterns).card) && readingFactsB c
 
 structure GraphEdge where
   left : PatternId
@@ -371,17 +370,17 @@ theorem readingCascade_cites {L : Library} (mode : ReadingMode) (r : Reading L)
     (c : Cascade L) (h : c ∈ readingCascades mode r) :
     ∃ p ∈ r.citedPatterns, c.containsPattern p := by
   have ha := (List.mem_filter.mp h).2
-  have hb : (c.units.toList.any fun u => u.pattern ∈ r.citedPatterns) = true ∧
+  have hb : decide (0 < (c.units.filter fun u => u.pattern ∈ r.citedPatterns).card) = true ∧
       readingFactsB c = true := by simpa using ha
-  have hcited := hb.1
-  rw [List.any_eq_true] at hcited
-  obtain ⟨u, hu, hp⟩ := hcited
-  exact ⟨u.pattern, of_decide_eq_true hp, u, Finset.mem_toList.mp hu, rfl⟩
+  have hcited := of_decide_eq_true hb.1
+  obtain ⟨u, hu⟩ := Finset.card_pos.mp hcited
+  have hup := Finset.mem_filter.mp hu
+  exact ⟨u.pattern, hup.2, u, hup.1, rfl⟩
 
 theorem readingCascade_facts {L : Library} (mode : ReadingMode) (r : Reading L)
     (c : Cascade L) (h : c ∈ readingCascades mode r) : ReadingFacts c := by
   have ha := (List.mem_filter.mp h).2
-  have hb : (c.units.toList.any fun u => u.pattern ∈ r.citedPatterns) = true ∧
+  have hb : decide (0 < (c.units.filter fun u => u.pattern ∈ r.citedPatterns).card) = true ∧
       readingFactsB c = true := by simpa using ha
   exact hb.2
 
@@ -450,19 +449,24 @@ def cascadeCounts {L : Library} (c : Cascade L) : Nat × Nat × Nat :=
 
 /-- Two alternatives, each a two-unit chain. -/
 theorem fixture_alternatives :
-    (rawReadingCascades .alternatives fixtureReading).map cascadeCounts =
+    (readingCascades .alternatives fixtureReading).map cascadeCounts =
       [(2, 1, 0), (2, 1, 0)] := by
-  simp +decide [rawReadingCascades, fixtureReading, fixtureLibrary, supportedUnits,
+  simp +decide [readingCascades, readingFactsB, rawReadingCascades, fixtureReading, fixtureLibrary, supportedUnits,
     fragmentUnitsAux, unitsAt, unitsAtAux, alternatives, cascadeOfUnits?, cascadeCounts,
     directedEdges, adjacentFragments, overlapPairs, readingFragment]
 
 /-- One three-unit overlap cascade: the first fragment contributes one
 overlap pair and both of its units precede the second fragment's unit. -/
 theorem fixture_overlap :
-    (rawReadingCascades .overlap fixtureReading).map cascadeCounts = [(3, 2, 1)] := by
-  simp +decide [rawReadingCascades, fixtureReading, fixtureLibrary, supportedUnits,
+    (readingCascades .overlap fixtureReading).map cascadeCounts = [(3, 2, 1)] := by
+  simp +decide [readingCascades, readingFactsB, rawReadingCascades, fixtureReading, fixtureLibrary, supportedUnits,
     fragmentUnitsAux, unitsAt, unitsAtAux, cascadeOfUnits?, cascadeCounts, directedEdges,
     adjacentFragments, overlapPairs, readingFragment]
+
+theorem fixture_reported_reading_count : (allReadingCascades fixtureReading).length = 3 := by
+  have ha := congrArg List.length fixture_alternatives
+  have ho := congrArg List.length fixture_overlap
+  simpa [allReadingCascades] using congrArg₂ (· + ·) ha ho
 
 -- An unoriented edge cannot justify alphabetical precedence.
 /--
@@ -496,6 +500,7 @@ example (badGraph : PatternGraph ({0, 1} : Library))
 #print axioms construct_k_zero
 #print axioms fixture_alternatives
 #print axioms fixture_overlap
+#print axioms fixture_reported_reading_count
 #print axioms structuralDedup_same_identity
 
 end
