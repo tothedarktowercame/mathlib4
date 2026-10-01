@@ -17,6 +17,17 @@ Both complete the repair while preserving state and typed auditability.  The
 second has higher time and token cost in this pinned fixture.  A
 restart-through-untyped-pipe graph remains a negative control: it is
 structurally well formed but fails the warranted peripheral-policy predicate.
+
+This is strictly a hand-constructed exemplar.  It proves properties of a
+supplied construction; it does not prove that the War Machine can retrieve
+patterns, infer these relations, or build interpretations for a new problem.
+
+NEXT (not discharged here): generate candidate cascades and their construction
+receipts per problem from a pinned snapshot of the whole `futon3/library`,
+including evidenced support/meet/precedence relations, excluded candidates,
+and graph-derived outcome semantics; then prove the generated Lean term equals
+the runtime policy.  Interactive authorship of this fixture is not evidence
+for that capability.
 -/
 
 namespace DarkTower.WarMachine.PeripheralCascadePolicies
