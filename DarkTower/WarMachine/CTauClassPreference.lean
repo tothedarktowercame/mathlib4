@@ -1,4 +1,5 @@
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Data.EReal.Basic
 import Mathlib.Tactic
 
 /-!
@@ -15,7 +16,14 @@ This module states the class preference schedule built by
 The four terminal weights are Joe's fixed ruling of 2026-09-22: focused 55/100,
 related 35/100, unrelated 5/100, and stop-the-line 5/100. Before the horizon,
 all preference mass is on `:ending/not-yet-evaluated`. Exact rationals model
-the Clojure ratios; `classRisk` states the runtime Gibbs/KL formula over reals.
+the Clojure ratios; `classRisk` states the runtime Gibbs/KL formula in the
+extended reals, with `⊤` where the runtime returns `:infinite`.
+
+`classRisk` has the shape of `OutcomeRiskKL.outcomeRisk`, which the runtime
+function's docstring names as its Lean counterpart, but it is a separate
+definition over this module's five-class distributions. It is not proved equal
+to `outcomeRisk`: that needs the class distributions presented as the `Holes`
+predictive-kernel and preference carriers, which is not done here.
 
 An unresolved target relation maps to unknown, not to one of the five scored
 classes. At runtime `observation_model.clj` refuses it as
@@ -138,21 +146,57 @@ theorem scorerClass_other_unknown (code : Nat) :
     scorerClass (.other code) = none := by
   simp [scorerClass]
 
-/-- Runtime `outcome-risk`: `D_KL(predicted || preference)`. As in the runtime,
-zero predicted masses contribute zero. The runtime separately returns
-`:infinite` if a positive predicted mass has zero preferred mass; the theorem
-below concerns the strictly supported pre-horizon case. -/
-noncomputable def classRisk (predicted preferred : Distribution) : ℝ :=
+/-- The finite branch of runtime `outcome-risk`: the Gibbs sum
+`Σ q(o) · ln(q(o)/c(o))` over classes with predicted mass. The runtime sums
+over `(pos? p)`; for the non-negative masses of a distribution that is the
+same as leaving out `p = 0`. -/
+noncomputable def finiteClassRisk (predicted preferred : Distribution) : ℝ :=
   ∑ ending : EndingClass,
     if predicted ending = 0 then 0
     else (predicted ending : ℝ) *
       Real.log ((predicted ending : ℝ) / (preferred ending : ℝ))
 
+/-- The runtime's `:infinite` condition: some class has positive predicted
+mass and zero preferred mass. -/
+def Unsupported (predicted preferred : Distribution) : Prop :=
+  ∃ ending, 0 < predicted ending ∧ preferred ending = 0
+
+open Classical in
+/-- Runtime `outcome-risk`: `D_KL(predicted || preference)` in the extended
+reals. `⊤` stands for the runtime's `:infinite`, returned exactly when the
+prediction is `Unsupported` by the preference; otherwise the Gibbs sum. A
+real-valued definition would return a finite number in that case, because
+`Real.log 0 = 0`. -/
+noncomputable def classRisk (predicted preferred : Distribution) : EReal :=
+  if Unsupported predicted preferred then ⊤
+  else ((finiteClassRisk predicted preferred : ℝ) : EReal)
+
+theorem classRisk_eq_top_iff (predicted preferred : Distribution) :
+    classRisk predicted preferred = ⊤ ↔ Unsupported predicted preferred := by
+  unfold classRisk
+  split_ifs with unsupported
+  · simp [unsupported]
+  · simp [unsupported]
+
+theorem waiting_is_supported : ¬ Unsupported waitingPreference waitingPreference := by
+  rintro ⟨ending, positive, zero⟩
+  cases ending <;> simp_all [waitingPreference]
+
 /-- The runtime's exact pre-horizon claim: deterministic not-yet-evaluated
 prediction against unit preference has zero risk. -/
 theorem waiting_point_mass_risk_zero :
     classRisk waitingPreference waitingPreference = 0 := by
-  simp [classRisk, waitingPreference]
+  have finite : finiteClassRisk waitingPreference waitingPreference = 0 := by
+    simp [finiteClassRisk, waitingPreference]
+  simp [classRisk, waiting_is_supported, finite]
+
+/-- The case a real-valued risk would hide: a run-ending prediction scored
+against the pre-horizon preference puts mass where the preference has none,
+and its risk is `⊤`, not a number. -/
+theorem terminal_against_waiting_risk_top :
+    classRisk terminalPreference waitingPreference = ⊤ := by
+  rw [classRisk_eq_top_iff]
+  exact ⟨.focused, by norm_num [terminalPreference], by simp [waitingPreference]⟩
 
 theorem pre_horizon_risk_zero (horizon tau : Nat) (before : tau < horizon) :
     classRisk waitingPreference (classPreference horizon tau) = 0 := by
