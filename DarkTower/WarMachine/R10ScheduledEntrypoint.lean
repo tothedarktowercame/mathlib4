@@ -1,4 +1,5 @@
 import Mathlib.Data.List.GetD
+import Mathlib.Data.List.Nodup
 
 /-!
 # R10 scheduled-entrypoint route records
@@ -68,38 +69,63 @@ def expectedTickEntries (launchId : Nat) (plan : List Nat) : List TickEntry :=
 
 /-- Executable R10 predicate, clause-for-clause at the retained structural
 boundary: one matching launch, unique plan entries, exact ordered tick rows,
-and exact ordered R8 coverage. `eraseDups` changes a plan exactly when that
-plan repeats a tick identity. -/
+and exact ordered R8 coverage. -/
 def checkRoute (record : RouteRecord) : Bool :=
   (record.launch.commissionId == record.commissionId) &&
   (record.launch.dispatchId == record.dispatchId) &&
   (record.launchHistory.filter
       (fun launch => (launch.commissionId == record.commissionId) &&
                      (launch.dispatchId == record.dispatchId)) == [record.launch]) &&
-  (record.tickPlan.eraseDups == record.tickPlan) &&
+  decide record.tickPlan.Nodup &&
   (record.tickEntries == expectedTickEntries record.launch.launchId record.tickPlan) &&
   (record.r8TickIds == record.tickPlan)
 
-/-- Propositional reading of the executable R10 route checker. -/
+/-- R10's record-level role, stated as propositions and independently of the
+checker. In the order of `verify-route!`: the launch joins the commission and
+dispatch; the launch history holds exactly one launch for that commission and
+dispatch, and it is this launch; no tick identity repeats in the plan; the
+tick entries are the ones the launch and plan force; the R8 rows cover the plan
+in order. -/
 def ScheduledRoute (record : RouteRecord) : Prop :=
-  checkRoute record = true
+  record.launch.commissionId = record.commissionId ∧
+  record.launch.dispatchId = record.dispatchId ∧
+  record.launchHistory.filter
+      (fun launch => (launch.commissionId == record.commissionId) &&
+                     (launch.dispatchId == record.dispatchId)) = [record.launch] ∧
+  record.tickPlan.Nodup ∧
+  record.tickEntries = expectedTickEntries record.launch.launchId record.tickPlan ∧
+  record.r8TickIds = record.tickPlan
 
+/-- The executable checker decides the stated role: it accepts exactly the
+records that satisfy every clause of `ScheduledRoute`. A checker that dropped
+or weakened a clause would not satisfy this. -/
 theorem checkRoute_eq_true_iff (record : RouteRecord) :
     checkRoute record = true ↔ ScheduledRoute record := by
-  rfl
+  simp [checkRoute, ScheduledRoute, and_assoc]
 
-/-- Combining launch-history uniqueness with the tick-plan clause: an accepted
-record's complete tick sequence is tied to the sole launch retained for this
-commission and dispatch. -/
+/-- A consequence that needs the launch-history clause and the tick-entry
+clause together: in an accepted record, every tick entry carries the identity
+of every launch the history holds for this commission and dispatch. There is
+no tick launched by anything else, and no second launch a tick could belong
+to. -/
 theorem accepted_ticks_use_unique_joined_launch (record : RouteRecord)
-    (accepted : ScheduledRoute record) :
-    record.launchHistory.filter
+    (accepted : ScheduledRoute record)
+    (launch : Launch) (retained : launch ∈ record.launchHistory)
+    (joinsCommission : launch.commissionId = record.commissionId)
+    (joinsDispatch : launch.dispatchId = record.dispatchId)
+    (tick : TickEntry) (tickRetained : tick ∈ record.tickEntries) :
+    tick.launchId = launch.launchId := by
+  obtain ⟨_, _, unique, _, entries, _⟩ := accepted
+  have isTheLaunch : launch = record.launch := by
+    have member : launch ∈ record.launchHistory.filter
         (fun launch => (launch.commissionId == record.commissionId) &&
-                       (launch.dispatchId == record.dispatchId)) = [record.launch] ∧
-    record.tickEntries = expectedTickEntries record.launch.launchId record.tickPlan := by
-  have clauses := accepted
-  simp [ScheduledRoute, checkRoute] at clauses
-  exact ⟨clauses.1.1.1.2, clauses.1.2⟩
+                       (launch.dispatchId == record.dispatchId)) := by
+      simp [List.mem_filter, retained, joinsCommission, joinsDispatch]
+    rw [unique] at member
+    simpa using member
+  rw [entries] at tickRetained
+  obtain ⟨index, _, rfl⟩ := List.mem_mapIdx.mp tickRetained
+  simp [isTheLaunch]
 
 def goodLaunch : Launch :=
   { launchId := 7, commissionId := 20, dispatchId := 30 }
@@ -114,9 +140,8 @@ def positiveRecord : RouteRecord :=
     tickEntries := expectedTickEntries 7 [10, 11]
     r8TickIds := [10, 11] }
 
-theorem positiveRecord_is_scheduled : ScheduledRoute positiveRecord := by
-  show checkRoute positiveRecord = true
-  decide
+theorem positiveRecord_is_scheduled : ScheduledRoute positiveRecord :=
+  (checkRoute_eq_true_iff positiveRecord).mp (by decide)
 
 /-- Control 1: two launches match the same commission and dispatch. -/
 def duplicateLaunchRecord : RouteRecord :=
@@ -125,7 +150,8 @@ def duplicateLaunchRecord : RouteRecord :=
       { launchId := 8, commissionId := 20, dispatchId := 30 }] }
 
 theorem duplicateLaunchRecord_is_rejected :
-    checkRoute duplicateLaunchRecord = false := by
+    ¬ ScheduledRoute duplicateLaunchRecord := by
+  rw [← checkRoute_eq_true_iff]
   decide
 
 /-- Control 2: the tick row names a launch other than the uniquely retained
@@ -139,7 +165,8 @@ def wrongTickLaunchRecord : RouteRecord :=
          predecessorTickId := some 10 }] }
 
 theorem wrongTickLaunchRecord_is_rejected :
-    checkRoute wrongTickLaunchRecord = false := by
+    ¬ ScheduledRoute wrongTickLaunchRecord := by
+  rw [← checkRoute_eq_true_iff]
   decide
 
 /-- Control 3: the second tick predicts from a tick other than the immediately
@@ -153,7 +180,8 @@ def stalePredecessorRecord : RouteRecord :=
          predecessorTickId := some 99 }] }
 
 theorem stalePredecessorRecord_is_rejected :
-    checkRoute stalePredecessorRecord = false := by
+    ¬ ScheduledRoute stalePredecessorRecord := by
+  rw [← checkRoute_eq_true_iff]
   decide
 
 end DarkTower.WarMachine.R10ScheduledEntrypoint
