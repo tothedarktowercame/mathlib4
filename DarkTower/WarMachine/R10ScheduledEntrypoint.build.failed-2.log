@@ -1,0 +1,41 @@
+✖ [93/93] Building DarkTower.WarMachine.R10ScheduledEntrypoint (1.0s)
+trace: .> LEAN_PATH=/home/joe/code/mathlib4/.lake/packages/Cli/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/batteries/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/Qq/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/aesop/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/proofwidgets/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/importGraph/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/plausible/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/build/lib/lean /home/joe/.elan/toolchains/leanprover--lean4---v4.31.0-rc1/bin/lean /home/joe/code/mathlib4/DarkTower/WarMachine/R10ScheduledEntrypoint.lean -o /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R10ScheduledEntrypoint.olean -i /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R10ScheduledEntrypoint.ilean -c /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R10ScheduledEntrypoint.c --setup /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R10ScheduledEntrypoint.setup.json --json
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:61:2: failed to synthesize instance of type class
+  Decidable (ScheduledRoute record)
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:67:67: unsolved goals
+LaunchId : Type u_1
+TickId : Type u_2
+inst✝¹ : DecidableEq LaunchId
+inst✝ : DecidableEq TickId
+record : RouteRecord LaunchId TickId
+⊢ sorry () = true ↔ ScheduledRoute record
+warning: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:68:8: declaration uses `sorry`
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:80:21: Invalid projection: Projections extract constructor fields for one-constructor inductive types. The expression
+  accepted
+has type
+  match record.scheduledLaunch with
+  | none => False
+  | some launchId =>
+    List.map TickRoute.tickId record.ticks = record.tickPlan ∧
+      ∀ (tick : TickRoute LaunchId TickId),
+        tick ∈ record.ticks →
+          tick.launchedBy = launchId ∧ record.scheduledLaunchAt < tick.tickAt ∧ tick.tickAt < tick.r8At
+which is not a one-constructor inductive type.
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:108:2: Tactic `decide` failed for proposition
+  scheduledRouteChecker missingLaunchRecord = false
+because its `Decidable` instance
+  instDecidableEqBool (scheduledRouteChecker missingLaunchRecord) false
+did not reduce to `isTrue` or `isFalse`.
+
+After unfolding the instances `instDecidableEqBool` and `Bool.decEq`, reduction got stuck at the `Decidable` instance
+  match scheduledRouteChecker missingLaunchRecord, false with
+  | false, false => isTrue ⋯
+  | false, true => isFalse ⋯
+  | true, false => isFalse ⋯
+  | true, true => isTrue ⋯
+error: Lean exited with code 1
+Some required targets logged failures:
+- DarkTower.WarMachine.R10ScheduledEntrypoint
+error: build failed

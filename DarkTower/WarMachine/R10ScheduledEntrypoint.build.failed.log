@@ -1,0 +1,44 @@
+✖ [93/93] Building DarkTower.WarMachine.R10ScheduledEntrypoint (931ms)
+trace: .> LEAN_PATH=/home/joe/code/mathlib4/.lake/packages/Cli/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/batteries/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/Qq/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/aesop/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/proofwidgets/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/importGraph/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/plausible/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/build/lib/lean /home/joe/.elan/toolchains/leanprover--lean4---v4.31.0-rc1/bin/lean /home/joe/code/mathlib4/DarkTower/WarMachine/R10ScheduledEntrypoint.lean -o /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R10ScheduledEntrypoint.olean -i /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R10ScheduledEntrypoint.ilean -c /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R10ScheduledEntrypoint.c --setup /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R10ScheduledEntrypoint.setup.json --json
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:60:2: failed to synthesize instance of type class
+  Decidable (ScheduledRoute record)
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:66:67: unsolved goals
+LaunchId : Type u_1
+TickId : Type u_2
+inst✝¹ : DecidableEq LaunchId
+inst✝ : DecidableEq TickId
+record : RouteRecord LaunchId TickId
+⊢ sorry () = true ↔ ScheduledRoute record
+warning: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:67:8: declaration uses `sorry`
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:92:29: Tactic `subst` failed: invalid equality proof, it is not of the form (x = t) or (t = x)
+  tick = { tickId := 11, launchedBy := 7, tickAt := 6, r8At := 8 } ∨ tick ∈ []
+
+case inr
+tick : TickRoute ℕ ℕ
+h✝ : tick = { tickId := 11, launchedBy := 7, tickAt := 6, r8At := 8 } ∨ tick ∈ []
+⊢ tick.launchedBy = 7 ∧ positiveRecord.scheduledLaunchAt < tick.tickAt ∧ tick.tickAt < tick.r8At
+warning: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:91:44: This simp argument is unused:
+  List.mem_singleton
+
+Hint: Omit it from the simp argument list.
+  simp only [positiveRecord, List.mem_cons,̵ ̵L̵i̵s̵t̵.̵m̵e̵m̵_̵s̵i̵n̵g̵l̵e̵t̵o̵n̵] at retained
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:104:2: Tactic `decide` failed for proposition
+  scheduledRouteChecker missingLaunchRecord = false
+because its `Decidable` instance
+  instDecidableEqBool (scheduledRouteChecker missingLaunchRecord) false
+did not reduce to `isTrue` or `isFalse`.
+
+After unfolding the instances `instDecidableEqBool` and `Bool.decEq`, reduction got stuck at the `Decidable` instance
+  match scheduledRouteChecker missingLaunchRecord, false with
+  | false, false => isTrue ⋯
+  | false, true => isFalse ⋯
+  | true, false => isFalse ⋯
+  | true, true => isTrue ⋯
+error: Lean exited with code 1
+Some required targets logged failures:
+- DarkTower.WarMachine.R10ScheduledEntrypoint
+error: build failed
