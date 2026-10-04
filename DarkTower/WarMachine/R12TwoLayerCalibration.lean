@@ -166,6 +166,21 @@ theorem no_independent_admitted_layer2_not_valueEvidence
 theorem valueEvidence_implies_admitted (record : CalibrationRecord) :
     ValueEvidence record → Admitted record := fun evidence => evidence.1
 
+/-- The same record with its Layer-1 content replaced. -/
+def withLayer1 (record : CalibrationRecord) (layer1 : Layer1Record) : CalibrationRecord :=
+  { record with
+    returned := { record.returned with
+      artifact := { record.returned.artifact with layer1 := layer1 } } }
+
+/-- Layer 1 cannot promote or demote: replacing the Layer-1 content of any
+record, by anything, changes neither whether it is admitted nor whether it is
+value evidence. -/
+theorem admitted_ignores_layer1 (record : CalibrationRecord) (layer1 : Layer1Record) :
+    Admitted (withLayer1 record layer1) ↔ Admitted record := Iff.rfl
+
+theorem valueEvidence_ignores_layer1 (record : CalibrationRecord) (layer1 : Layer1Record) :
+    ValueEvidence (withLayer1 record layer1) ↔ ValueEvidence record := Iff.rfl
+
 def perfectLayer1 : Layer1Record := { perfect := true, diagnostic := 100 }
 def ordinaryArtifact : Artifact := { layer1 := perfectLayer1, layer2 := none }
 
