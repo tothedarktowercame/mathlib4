@@ -28,6 +28,15 @@ source completeness, review/observer independence, application-ledger joins,
 and the prospective-versus-production authority restrictions enforced by the
 evidence verifiers. It proves correspondence of a supplied two-tick record;
 it does not prove that the runtime event or its witness occurred.
+
+A slow state is a list of entries here and a map in the runtime, and the
+clauses of `TwoTickFeedback` compare lists. Two lists holding the same entries
+in a different order, or one listing a class at its fresh Beta(1,1) value and
+one omitting it, are the same runtime map and different lists. A retained
+record is therefore comparable with this predicate only once its three states
+are listed in the order `advance` produces (existing classes in place, a new
+class appended). Restating the clauses through `countsFor`, class by class,
+would remove that condition; it is not done here.
 -/
 
 namespace DarkTower.WarMachine.R15TemporalHierarchy
