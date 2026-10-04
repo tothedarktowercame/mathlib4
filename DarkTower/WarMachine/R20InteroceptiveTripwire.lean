@@ -20,6 +20,12 @@ persistence, `*halt-on-witness?*`, deferral, `repair-covered-witness?`,
 cross-run observation assembly, disabled-ID option parsing, and the runtime
 catch around a throwing evaluator. It neither proves that an evaluator states
 the right invariant nor that an observation is complete.
+
+"Registry order" here is whatever order the runtime iterates `wire-registry`
+in. That registry is a thirteen-entry Clojure map, which is a hash map: at the
+commit above its iteration order is T13, T12, T5, T1, T9, T4, T2, T7, T3, T11,
+T10, T8, T6, not T1 to T13 as written. The theorems hold for any order; which
+wire reports when two are violated is fixed by that iteration order.
 -/
 
 namespace DarkTower.WarMachine.R20InteroceptiveTripwire
