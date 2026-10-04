@@ -20,6 +20,11 @@ that portfolio, validate runtime schemas or numeric finiteness, enforce leaf
 minimum-cost then lexical-proposal-id tie-break among equal-utility portfolios
 is also left out: it chooses one maximizer but does not change feasibility or
 maximum utility.
+
+Because `:selection-limit` is left out, `Optimal` ranges over every portfolio
+within the budgets. It is the runtime's claim only for a hierarchy in which no
+leaf carries a `:selection-limit`: with a limit of 1 the runtime chooses among
+fewer portfolios, and its choice need not be `Optimal` in this sense.
 -/
 
 namespace DarkTower.WarMachine.R11HierarchicalBudget
@@ -105,9 +110,16 @@ theorem checkFeasible_eq_false_iff (record : ArbitrationRecord) :
 def candidatePortfolios (record : ArbitrationRecord) : List (List Nat) :=
   (record.proposals.map Proposal.proposalId).sublists
 
-/-- R11 optimality: no feasible portfolio over this proposal field has greater
-utility than the retained selected portfolio. -/
+/-- R11 optimality, stated without the enumeration the checker uses: the
+retained portfolio is feasible, and no selection of identities that is feasible
+for the same hierarchy and proposal field has greater utility. -/
 def Optimal (record : ArbitrationRecord) : Prop :=
+  Feasible record ∧
+  ∀ ids : List Nat, Feasible (withSelection record ids) →
+    totalUtility (withSelection record ids) ≤ totalUtility record
+
+/-- The same statement restricted to the checker's finite enumeration. -/
+def OptimalAmongCandidates (record : ArbitrationRecord) : Prop :=
   Feasible record ∧
   (candidatePortfolios record).Forall (fun ids =>
     Feasible (withSelection record ids) →
@@ -119,10 +131,10 @@ def checkOptimal (record : ArbitrationRecord) : Bool :=
     !checkFeasible (withSelection record ids) ||
       decide (totalUtility (withSelection record ids) ≤ totalUtility record))
 
-theorem checkOptimal_eq_true_iff (record : ArbitrationRecord) :
-    checkOptimal record = true ↔ Optimal record := by
-  simp [checkOptimal, Optimal, List.forall_iff_forall_mem, checkFeasible_eq_true_iff,
-    checkFeasible_eq_false_iff]
+theorem checkOptimal_eq_true_iff_amongCandidates (record : ArbitrationRecord) :
+    checkOptimal record = true ↔ OptimalAmongCandidates record := by
+  simp [checkOptimal, OptimalAmongCandidates, List.forall_iff_forall_mem,
+    checkFeasible_eq_true_iff, checkFeasible_eq_false_iff]
   intro _
   constructor
   · intro checked ids retained selected
@@ -133,6 +145,76 @@ theorem checkOptimal_eq_true_iff (record : ArbitrationRecord) :
     by_cases selected : Feasible (withSelection record ids)
     · exact Or.inr (bounded ids retained selected)
     · exact Or.inl selected
+
+/-- The portfolio with the same members as `ids`, listed in the order of the
+proposal field. Every feasible selection has one, and it is among the
+checker's candidates. -/
+def inFieldOrder (record : ArbitrationRecord) (ids : List Nat) : List Nat :=
+  (record.proposals.map Proposal.proposalId).filter (fun id => id ∈ ids)
+
+theorem inFieldOrder_mem_candidates (record : ArbitrationRecord) (ids : List Nat) :
+    inFieldOrder record ids ∈ candidatePortfolios record :=
+  List.mem_sublists.mpr (List.filter_sublist ..)
+
+theorem selectedProposals_inFieldOrder (record : ArbitrationRecord) (ids : List Nat) :
+    selectedProposals (withSelection record (inFieldOrder record ids)) =
+      selectedProposals (withSelection record ids) := by
+  simp only [selectedProposals, withSelection, inFieldOrder]
+  apply List.filter_congr
+  intro proposal retained
+  have inField : proposal.proposalId ∈ record.proposals.map Proposal.proposalId :=
+    List.mem_map.mpr ⟨proposal, retained, rfl⟩
+  simp [List.mem_filter, inField]
+
+theorem usageAt_inFieldOrder (record : ArbitrationRecord) (ids : List Nat) (nodeId : Nat) :
+    usageAt (withSelection record (inFieldOrder record ids)) nodeId =
+      usageAt (withSelection record ids) nodeId := by
+  unfold usageAt
+  rw [selectedProposals_inFieldOrder]
+
+theorem totalUtility_inFieldOrder (record : ArbitrationRecord) (ids : List Nat) :
+    totalUtility (withSelection record (inFieldOrder record ids)) =
+      totalUtility (withSelection record ids) := by
+  unfold totalUtility
+  rw [selectedProposals_inFieldOrder]
+
+theorem feasible_inFieldOrder (record : ArbitrationRecord) (ids : List Nat)
+    (feasible : Feasible (withSelection record ids)) :
+    Feasible (withSelection record (inFieldOrder record ids)) := by
+  obtain ⟨nodesNodup, proposalsNodup, _, rootRetained, _, within⟩ := feasible
+  refine ⟨nodesNodup, proposalsNodup, ?_, rootRetained, ?_, ?_⟩
+  · exact List.Nodup.filter _ proposalsNodup
+  · simp [withSelection, inFieldOrder, List.forall_iff_forall_mem, List.mem_filter]
+    intro proposal retained _
+    exact ⟨proposal, retained, rfl⟩
+  · rw [List.forall_iff_forall_mem] at within ⊢
+    intro node retained
+    rw [usageAt_inFieldOrder]
+    exact within node retained
+
+/-- The enumeration loses nothing: a selection in any order, feasible for the
+record, has the same proposals, usage and utility as a candidate. -/
+theorem optimal_iff_optimalAmongCandidates (record : ArbitrationRecord) :
+    Optimal record ↔ OptimalAmongCandidates record := by
+  constructor
+  · rintro ⟨feasible, best⟩
+    refine ⟨feasible, ?_⟩
+    rw [List.forall_iff_forall_mem]
+    intro ids _ selected
+    exact best ids selected
+  · rintro ⟨feasible, best⟩
+    refine ⟨feasible, ?_⟩
+    rw [List.forall_iff_forall_mem] at best
+    intro ids selected
+    have bounded := best (inFieldOrder record ids) (inFieldOrder_mem_candidates record ids)
+      (feasible_inFieldOrder record ids selected)
+    rwa [totalUtility_inFieldOrder] at bounded
+
+/-- The executable checker decides `Optimal`. -/
+theorem checkOptimal_eq_true_iff (record : ArbitrationRecord) :
+    checkOptimal record = true ↔ Optimal record :=
+  (checkOptimal_eq_true_iff_amongCandidates record).trans
+    (optimal_iff_optimalAmongCandidates record).symm
 
 /-- Hierarchical consequence: feasibility bounds root usage as well as leaf
 usage; satisfying children alone is not enough. -/
@@ -167,7 +249,7 @@ theorem positiveRecord_is_feasible : Feasible positiveRecord :=
 
 theorem positiveRecord_is_optimal : Optimal positiveRecord := by
   rw [← checkOptimal_eq_true_iff]
-  native_decide
+  decide
 
 /-- Control A: both leaves respect budget 6, but their combined cost 12 exceeds
 the shared parent budget 8. -/
@@ -203,8 +285,8 @@ theorem betterPortfolio_has_greater_utility :
     totalUtility nonoptimalRecord < totalUtility (withSelection nonoptimalRecord [10, 30]) := by
   decide
 
-theorem nonoptimalRecord_is_rejected : ¬ Optimal nonoptimalRecord := by
-  rw [← checkOptimal_eq_true_iff]
-  native_decide
+theorem nonoptimalRecord_is_rejected : ¬ Optimal nonoptimalRecord :=
+  fun optimal => absurd (optimal.2 [10, 30] betterPortfolio_is_feasible)
+    (Nat.not_le.mpr betterPortfolio_has_greater_utility)
 
 end DarkTower.WarMachine.R11HierarchicalBudget
