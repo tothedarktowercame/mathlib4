@@ -1,0 +1,54 @@
+✖ [93/93] Building DarkTower.WarMachine.R10ScheduledEntrypoint (900ms)
+trace: .> LEAN_PATH=/home/joe/code/mathlib4/.lake/packages/Cli/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/batteries/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/Qq/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/aesop/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/proofwidgets/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/importGraph/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/plausible/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/build/lib/lean /home/joe/.elan/toolchains/leanprover--lean4---v4.31.0-rc1/bin/lean /home/joe/code/mathlib4/DarkTower/WarMachine/R10ScheduledEntrypoint.lean -o /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R10ScheduledEntrypoint.olean -i /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R10ScheduledEntrypoint.ilean -c /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R10ScheduledEntrypoint.c --setup /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R10ScheduledEntrypoint.setup.json --json
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:85:2: failed to synthesize instance of type class
+  Decidable (ScheduledRoute record)
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:88:56: unsolved goals
+record : RouteRecord
+⊢ sorry () = true ↔ ScheduledRoute record
+warning: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:89:8: declaration uses `sorry`
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:116:2: failed to synthesize
+  Decidable (ScheduledRoute positiveRecord)
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:126:2: Tactic `decide` failed for proposition
+  checkRoute duplicateLaunchRecord = false
+because its `Decidable` instance
+  instDecidableEqBool (checkRoute duplicateLaunchRecord) false
+did not reduce to `isTrue` or `isFalse`.
+
+After unfolding the instances `instDecidableEqBool` and `Bool.decEq`, reduction got stuck at the `Decidable` instance
+  match checkRoute duplicateLaunchRecord, false with
+  | false, false => isTrue ⋯
+  | false, true => isFalse ⋯
+  | true, false => isFalse ⋯
+  | true, true => isTrue ⋯
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:140:2: Tactic `decide` failed for proposition
+  checkRoute wrongTickLaunchRecord = false
+because its `Decidable` instance
+  instDecidableEqBool (checkRoute wrongTickLaunchRecord) false
+did not reduce to `isTrue` or `isFalse`.
+
+After unfolding the instances `instDecidableEqBool` and `Bool.decEq`, reduction got stuck at the `Decidable` instance
+  match checkRoute wrongTickLaunchRecord, false with
+  | false, false => isTrue ⋯
+  | false, true => isFalse ⋯
+  | true, false => isFalse ⋯
+  | true, true => isTrue ⋯
+error: DarkTower/WarMachine/R10ScheduledEntrypoint.lean:154:2: Tactic `decide` failed for proposition
+  checkRoute stalePredecessorRecord = false
+because its `Decidable` instance
+  instDecidableEqBool (checkRoute stalePredecessorRecord) false
+did not reduce to `isTrue` or `isFalse`.
+
+After unfolding the instances `instDecidableEqBool` and `Bool.decEq`, reduction got stuck at the `Decidable` instance
+  match checkRoute stalePredecessorRecord, false with
+  | false, false => isTrue ⋯
+  | false, true => isFalse ⋯
+  | true, false => isFalse ⋯
+  | true, true => isTrue ⋯
+error: Lean exited with code 1
+Some required targets logged failures:
+- DarkTower.WarMachine.R10ScheduledEntrypoint
+error: build failed
