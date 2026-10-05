@@ -35,6 +35,16 @@ whether the click was active inference.
 | liveness | `R10ScheduledEntrypoint` | `HonestLiveness` | green no-op |
 | independence | R9 adapter | author is not reviewer | same author and reviewer |
 | joint action | `R11JointAction.SharedState` | `OneWriter` | two writers |
+| cost | this module | `CostConforms` | total that is not the sum of its jobs |
+
+The cost row says how many tokens and how much time the click spent up to and
+including its choice, and how many after it, and checks that the total is the
+sum of what its jobs report.  Parr, Pezzulo and Friston (2022), section 10.8,
+`refs/parr2022.txt:10854-10892`: "a bounded rational agent has to balance the
+costs, effort, and timeliness of computation", and "What is costly during
+deliberation is decreasing the entropy (or complexity) of one's beliefs before
+a choice".  The row sets no limit on cost; it requires that the cost is fully
+accounted for and prints on which side of the choice it fell.
 
 The evidence module supplies the posterior but no before/after receipt, so
 `EvidenceRow` is the minimal carrier for those existing quantities.  R9's
@@ -51,7 +61,7 @@ attribute [local instance] Classical.propDecidable
 
 inductive Node
   | precision | evidence | habit | classPreference
-  | strategicFocus | liveness | independence | jointAction
+  | strategicFocus | liveness | independence | jointAction | cost
   deriving DecidableEq, Repr, Fintype
 
 inductive PrecisionCase | unchanged | moreDecisive | lessDecisive deriving DecidableEq, Repr
@@ -64,12 +74,14 @@ inductive StrategicFocusCase | focusKept | focusChanged deriving DecidableEq, Re
 inductive LivenessCase | live | notLive deriving DecidableEq, Repr
 inductive IndependenceCase | authorIsNotReviewer | sameAgent deriving DecidableEq, Repr
 inductive JointActionCase | eachTookItsPart | takenTwice | dropped deriving DecidableEq, Repr
+inductive CostCase | mostlyChoosing | mostlyActing | even deriving DecidableEq, Repr
 
 inductive Case
   | precision (v : PrecisionCase) | evidence (v : EvidenceCase)
   | habit (v : HabitCase) | classPreference (v : ClassPreferenceCase)
   | strategicFocus (v : StrategicFocusCase) | liveness (v : LivenessCase)
   | independence (v : IndependenceCase) | jointAction (v : JointActionCase)
+  | cost (v : CostCase)
   deriving DecidableEq, Repr
 
 abbrev Policy := PrecisionFromObservation.TwoPolicy
@@ -122,6 +134,47 @@ def IndependenceConforms (r : IndependenceRow) : Prop :=
 
 abbrev JointRow := Fin 2 → R11JointAction.Ownership Unit (Fin 2)
 
+/-- What one dispatched job reports: its tokens, and whether it ran up to and
+including the click's choice (`true`) or after it. -/
+structure JobCost where
+  throughSelection : Bool
+  inputTokens : Nat
+  outputTokens : Nat
+  totalTokens : Nat
+
+/-- The click's cost as it reports it. Every job here has a usage record; a
+click with a job whose usage is missing has no `CostRow`, and its row is
+`notRecorded`. Times are in milliseconds. -/
+structure CostRow where
+  jobs : List JobCost
+  msThroughSelection : Nat
+  msAfterSelection : Nat
+  reportedTotalTokens : Nat
+  reportedTokensThroughSelection : Nat
+  reportedTokensAfterSelection : Nat
+
+/-- Tokens of the jobs on one side of the choice. -/
+def tokensWhere (side : Bool) (jobs : List JobCost) : Nat :=
+  (jobs.map fun j => if j.throughSelection = side then j.totalTokens else 0).sum
+
+def totalTokens (jobs : List JobCost) : Nat := (jobs.map (·.totalTokens)).sum
+
+/-- Each job's total is its input plus its output, and the reported total and
+the two reported sides are the sums over the jobs. -/
+def CostConforms (r : CostRow) : Prop :=
+  (∀ j ∈ r.jobs, j.totalTokens = j.inputTokens + j.outputTokens) ∧
+  r.reportedTotalTokens = totalTokens r.jobs ∧
+  r.reportedTokensThroughSelection = tokensWhere true r.jobs ∧
+  r.reportedTokensAfterSelection = tokensWhere false r.jobs
+
+/-- Where the cost fell: by tokens, and by time when the tokens are equal. -/
+def costCase (r : CostRow) : CostCase :=
+  if r.reportedTokensAfterSelection < r.reportedTokensThroughSelection then .mostlyChoosing
+  else if r.reportedTokensThroughSelection < r.reportedTokensAfterSelection then .mostlyActing
+  else if r.msAfterSelection < r.msThroughSelection then .mostlyChoosing
+  else if r.msThroughSelection < r.msAfterSelection then .mostlyActing
+  else .even
+
 def NodeRecord : Node → Type
   | .precision => PrecisionFromObservation.TickRecord Policy
   | .evidence => EvidenceRow
@@ -131,6 +184,7 @@ def NodeRecord : Node → Type
   | .liveness => LiveRow
   | .independence => IndependenceRow
   | .jointAction => JointRow
+  | .cost => CostRow
 
 def conforms : (n : Node) → NodeRecord n → Prop
   | .precision, r => PrecisionFromObservation.Conforms r
@@ -141,6 +195,7 @@ def conforms : (n : Node) → NodeRecord n → Prop
   | .liveness, r => LivenessConforms r
   | .independence, r => IndependenceConforms r
   | .jointAction, r => R11JointAction.OneWriter r
+  | .cost, r => CostConforms r
 
 def caseOf : (n : Node) → NodeRecord n → Case
   | .precision, r => .precision <| if r.betaPosterior = r.betaPrior then .unchanged
@@ -156,6 +211,7 @@ def caseOf : (n : Node) → NodeRecord n → Case
       if r.author = r.reviewer then .sameAgent else .authorIsNotReviewer
   | .jointAction, r => .jointAction <| match (R11JointAction.writers r ()).card with
       | 0 => .dropped | 1 => .eachTookItsPart | _ => .takenTwice
+  | .cost, r => .cost (costCase r)
 
 /-- The precision row prints the fixed-point's qualitative direction. -/
 theorem precision_constant_F_is_unchanged
@@ -216,6 +272,49 @@ theorem failed_habit_is_unchanged (r : R15TemporalHierarchy.TwoTickRecord)
 theorem liveness_case_is_live_iff (r : LiveRow) :
     caseOf .liveness r = .liveness .live ↔ R10ScheduledEntrypoint.LiveTick r := by
   simp [caseOf]
+
+/-! ## The cost row -/
+
+theorem totalTokens_split (jobs : List JobCost) :
+    totalTokens jobs = tokensWhere true jobs + tokensWhere false jobs := by
+  induction jobs with
+  | nil => simp [totalTokens, tokensWhere]
+  | cons j rest ih =>
+    simp only [totalTokens, tokensWhere, List.map_cons, List.sum_cons] at ih ⊢
+    cases h : j.throughSelection <;> simp <;> omega
+
+/-- In a conforming row the total is the tokens through the choice plus the
+tokens after it. -/
+theorem cost_total_is_sum_of_sides (r : CostRow) (h : CostConforms r) :
+    r.reportedTotalTokens =
+      r.reportedTokensThroughSelection + r.reportedTokensAfterSelection := by
+  obtain ⟨_, total, through, after⟩ := h
+  rw [total, through, after, totalTokens_split]
+
+/-- More tokens after the choice than up to it: the row prints `mostlyActing`. -/
+theorem cost_mostlyActing (r : CostRow) (h : CostConforms r)
+    (more : tokensWhere true r.jobs < tokensWhere false r.jobs) :
+    caseOf .cost r = .cost .mostlyActing := by
+  obtain ⟨_, _, through, after⟩ := h
+  have lt : r.reportedTokensThroughSelection < r.reportedTokensAfterSelection := by
+    rw [through, after]; exact more
+  simp [caseOf, costCase, lt, Nat.lt_asymm lt]
+
+/-- More tokens up to the choice than after it: the row prints `mostlyChoosing`. -/
+theorem cost_mostlyChoosing (r : CostRow) (h : CostConforms r)
+    (more : tokensWhere false r.jobs < tokensWhere true r.jobs) :
+    caseOf .cost r = .cost .mostlyChoosing := by
+  obtain ⟨_, _, through, after⟩ := h
+  have lt : r.reportedTokensAfterSelection < r.reportedTokensThroughSelection := by
+    rw [through, after]; exact more
+  simp [caseOf, costCase, lt]
+
+/-- Equal tokens and equal time on the two sides: the row prints `even`. -/
+theorem cost_even (r : CostRow)
+    (tokens : r.reportedTokensThroughSelection = r.reportedTokensAfterSelection)
+    (time : r.msThroughSelection = r.msAfterSelection) :
+    caseOf .cost r = .cost .even := by
+  simp [caseOf, costCase, tokens, time]
 
 inductive RowVerdict | notRecorded | agrees (case : Case) | disagrees (case : Case)
   deriving DecidableEq, Repr
@@ -353,10 +452,37 @@ theorem joint_control_disagrees (records : Records)
       .disagrees (caseOf .jointAction R11JointAction.bothClaim) :=
   refused_row_disagrees records .jointAction _ present R11JointAction.both_claim_refused
 
+/-- One job of 12 tokens, reported as a total of 13. -/
+def badCost : CostRow :=
+  { jobs := [⟨false, 10, 2, 12⟩], msThroughSelection := 0, msAfterSelection := 5,
+    reportedTotalTokens := 13, reportedTokensThroughSelection := 0,
+    reportedTokensAfterSelection := 12 }
+
+theorem badCost_refused : ¬ CostConforms badCost := by
+  intro h
+  have total := h.2.1
+  simp [badCost, totalTokens] at total
+
+/-- A job whose total is not its input plus its output. -/
+def badJobCost : CostRow :=
+  { jobs := [⟨false, 10, 2, 13⟩], msThroughSelection := 0, msAfterSelection := 5,
+    reportedTotalTokens := 13, reportedTokensThroughSelection := 0,
+    reportedTokensAfterSelection := 13 }
+
+theorem badJobCost_refused : ¬ CostConforms badJobCost := by
+  intro h
+  have job := h.1 ⟨false, 10, 2, 13⟩ (by simp [badJobCost])
+  simp at job
+
+theorem cost_control_disagrees (records : Records)
+    (present : records .cost = some badCost) :
+    certify records .cost = .disagrees (caseOf .cost badCost) :=
+  refused_row_disagrees records .cost badCost present badCost_refused
+
 /-- Fixed print order for the run's succinct certificate. -/
 def nodeOrder : List Node :=
   [.precision, .evidence, .habit, .classPreference, .strategicFocus,
-   .liveness, .independence, .jointAction]
+   .liveness, .independence, .jointAction, .cost]
 
 def summary (certificate : Certificate) : List (Node × RowVerdict) :=
   nodeOrder.map fun node => (node, certificate node)
