@@ -9,12 +9,17 @@ something that can be observed. A tick that fires and changes nothing must not
 be reported as live, and a loop that has stopped changing anything should have
 its schedule switched off, not left to report success.
 
-Source status. This rule is stated here as a design requirement. Its grounding
-in the active-inference literature has not been done: the obvious candidate is
-that a step which yields no new observation leaves every belief where it was,
-so nothing is inferred and nothing is learned, but no passage has been read
-and cited for it yet. Until that is done this module should be read as a
-candidate specification.
+Sources. The requirement is R10 of the completeness contract
+(`ukrn-services-simulation/docs/aif-completeness.md`): "The AIF loop runs on a
+recurring schedule without operator intervention". What makes a scheduled step
+count is settled by the theory: observations come from the generative process
+(Parr, Pezzulo and Friston 2022, pp. 22-23), and
+`EvidenceFromTheProcess.uninformative_tick_changes_nothing` proves that a step
+whose observation does not discriminate leaves belief, policy temperature and
+the counts of what worked exactly where they were;
+`uninformative_tick_is_not_live` concludes that such a step is not a
+`LiveTick`, whatever it was labelled. The rule that an inert schedule be
+switched off is a requirement of this system and has no passage behind it.
 
 `LiveTick` is state change. `HonestLiveness` says no tick is labelled live
 without one; a changed tick labelled not-live is allowed. `R10Conformant k`

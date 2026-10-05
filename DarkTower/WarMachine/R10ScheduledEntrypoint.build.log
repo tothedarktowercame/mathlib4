@@ -1,2 +1,3 @@
-Command: lake build DarkTower.WarMachine.R10ScheduledEntrypoint DarkTower.WarMachine.R15TemporalHierarchy DarkTower.WarMachine.R15HabitPrior DarkTower.WarMachine.R15StrategicTarget
-Build completed successfully (3358 jobs).
+Command: lake build DarkTower.WarMachine.EvidenceFromTheProcess
+✔ [3359/3360] Built DarkTower.WarMachine.R10ScheduledEntrypoint (1.0s)
+Build completed successfully (3360 jobs).

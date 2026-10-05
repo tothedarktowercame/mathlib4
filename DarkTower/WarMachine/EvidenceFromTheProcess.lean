@@ -79,16 +79,36 @@ theorem changed_posterior_requires_differential_likelihood
     rw [← Finset.sum_mul, normal, one_mul]
   exact changed (no_evidence_no_change prior A o normal _ (he ▸ positive) constant)
 
-/-- An "observation" obtained solely by applying functions to the current
-belief has a state-independent likelihood and cannot update that belief. -/
+/-- The likelihood of something the agent produced from its own belief. The
+agent's output may be random, with distribution `produce belief` over what it
+reports; that distribution depends on the belief and not on the hidden state,
+so the likelihood is the same function of the report for every state. -/
+def selfLikelihood {SelfObservation : Type*}
+    (produce : Belief State → SelfObservation → ℝ) (belief : Belief State) :
+    Likelihood State SelfObservation :=
+  fun _ report => produce belief report
+
+/-- Conditioning on something the agent produced from its own belief changes
+nothing, whatever the rule that produced it and whichever report came out.
+This is why a verdict resting on the maker's own output, or a forecast checked
+against the model's own later score, cannot move a belief about the world. -/
 theorem self_produced_evidence_changes_nothing
-    {Output SelfObservation : Type*} (prior : Belief State)
-    (normal : ∑ s, prior s = 1) (make : Belief State → Output)
-    (observe : Output → SelfObservation) :
-    posterior prior (fun _ _ => 1) (observe (make prior)) = prior := by
-  apply no_evidence_no_change prior _ _ normal 1 (by norm_num)
-  intro s
-  rfl
+    {SelfObservation : Type*} (prior : Belief State) (normal : ∑ s, prior s = 1)
+    (produce : Belief State → SelfObservation → ℝ) (report : SelfObservation)
+    (possible : 0 < produce prior report) :
+    posterior prior (selfLikelihood produce prior) report = prior :=
+  no_evidence_no_change prior _ report normal (produce prior report) possible
+    (fun _ => rfl)
+
+/-- The deterministic case: the report is a function of the belief alone. -/
+theorem self_computed_report_changes_nothing
+    {SelfObservation : Type*} [DecidableEq SelfObservation]
+    (prior : Belief State) (normal : ∑ s, prior s = 1)
+    (compute : Belief State → SelfObservation) :
+    posterior prior
+      (selfLikelihood (fun belief report => if report = compute belief then 1 else 0) prior)
+      (compute prior) = prior :=
+  self_produced_evidence_changes_nothing prior normal _ (compute prior) (by simp)
 
 theorem posterior_rises_iff_likelihood_above_evidence
     (prior : Belief State) (A : Likelihood State Observation) (o : Observation)
@@ -121,37 +141,64 @@ theorem process_evidence_can_move_belief :
 
 /-! ## One observation-free step changes nothing -/
 
+/-- What a tick can change: the belief over hidden states, the policy
+temperature, and the counts of what worked. -/
 structure EpistemicState (State Class : Type*) where
   belief : Belief State
-  precision : ℝ
+  temperature : ℝ
   counts : Class → R15TemporalHierarchy.BetaCounts
 
-/-- The three explicit no-update claims: a state-independent observation
-leaves the state belief fixed; constant F leaves policy precision fixed; and
-an unwitnessed outcome cannot be admitted as slow learning. -/
-theorem nothing_inferred_or_learned
-    {Policy : Type*} [Fintype Policy] [Nonempty Policy]
-    (prior : Belief State) (A : Likelihood State Observation) (o : Observation)
-    (normal : ∑ s, prior s = 1) (c : ℝ) (hc : 0 < c)
-    (constantA : ∀ s, A s o = c)
-    (beta : ℝ) (G : Policy → ℝ) (f : ℝ)
+/-- The state after one tick that conditions the belief on `o`, applies the
+precision update with per-policy free energy `F`, and admits no outcome into
+the counts. -/
+def afterTick {Class Policy : Type*} [Fintype Policy] [Nonempty Policy]
+    (before : EpistemicState State Class) (A : Likelihood State Observation)
+    (o : Observation) (G F : Policy → ℝ) : EpistemicState State Class :=
+  { belief := posterior before.belief A o
+    temperature := PrecisionFromObservation.updatedTemperature before.temperature G F
+    counts := before.counts }
+
+/-- Nothing inferred, nothing learned: if the observation's likelihood is the
+same in every state and the per-policy free energy is the same for every
+policy, the tick leaves the whole state exactly where it was. -/
+theorem uninformative_tick_changes_nothing
+    {Class Policy : Type*} [Fintype Policy] [Nonempty Policy]
+    (before : EpistemicState State Class) (A : Likelihood State Observation)
+    (o : Observation) (normal : ∑ s, before.belief s = 1)
+    (c : ℝ) (hc : 0 < c) (constantA : ∀ s, A s o = c)
+    (G : Policy → ℝ) (f : ℝ) :
+    afterTick before A o G (fun _ => f) = before := by
+  have belief := no_evidence_no_change before.belief A o normal c hc constantA
+  have temperature :=
+    (PrecisionFromObservation.constant_F_no_update before.temperature G f).2.1
+  cases before
+  simp_all [afterTick]
+
+/-- An outcome that was not witnessed is never admitted into the counts. -/
+theorem unwitnessed_outcome_teaches_nothing
     (slow : R15TemporalHierarchy.TwoTickRecord)
     (unwitnessed : slow.outcome.witnessed = false) :
-    posterior prior A o = prior ∧
-      PrecisionFromObservation.updatedPrecision beta G (fun _ => f) = 1 / beta ∧
-      ¬ R15TemporalHierarchy.TwoTickFeedback slow := by
-  exact ⟨no_evidence_no_change prior A o normal c hc constantA,
-    (PrecisionFromObservation.constant_F_no_update beta G f).2.2,
-    R15TemporalHierarchy.unwitnessed_never_accepted slow unwitnessed⟩
+    ¬ R15TemporalHierarchy.TwoTickFeedback slow :=
+  R15TemporalHierarchy.unwitnessed_never_accepted slow unwitnessed
 
-/-- If the observable state is the triple of belief, precision, and learned
-counts, the no-update result makes the tick a no-op, hence not `LiveTick`. -/
-theorem no_update_is_not_live {Observable : Type} [DecidableEq Observable]
-    (state : Observable) :
+open Classical in
+/-- Such a tick is not live in the sense of `R10ScheduledEntrypoint`, whatever
+label it was given: its state after is its state before. -/
+theorem uninformative_tick_is_not_live
+    {Class Policy : Type} {State : Type} [Fintype State] [Nonempty State]
+    {Observation : Type} [Fintype Policy] [Nonempty Policy]
+    (before : EpistemicState State Class) (A : Likelihood State Observation)
+    (o : Observation) (normal : ∑ s, before.belief s = 1)
+    (c : ℝ) (hc : 0 < c) (constantA : ∀ s, A s o = c)
+    (G : Policy → ℝ) (f : ℝ) (label : Bool) :
     ¬ R10ScheduledEntrypoint.LiveTick
-      ({ beforeState := state, afterState := state, reportedLive := false } :
-        R10ScheduledEntrypoint.TickOutcome Observable) := by
-  simp [R10ScheduledEntrypoint.LiveTick, R10ScheduledEntrypoint.ChangedState]
+      ({ beforeState := before
+         afterState := afterTick before A o G (fun _ => f)
+         reportedLive := label } :
+        R10ScheduledEntrypoint.TickOutcome (EpistemicState State Class)) := by
+  simp only [R10ScheduledEntrypoint.LiveTick, R10ScheduledEntrypoint.ChangedState,
+    uninformative_tick_changes_nothing before A o normal c hc constantA G f]
+  simp
 
 /-! ## Small retained-record boundaries -/
 
