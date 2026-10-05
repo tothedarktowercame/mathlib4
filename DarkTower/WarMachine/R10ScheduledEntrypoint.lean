@@ -2,34 +2,49 @@ import Mathlib.Data.List.GetD
 import Mathlib.Data.List.Nodup
 
 /-!
-# R10 scheduled-entrypoint route records
+# R10 scheduled observer entrypoint
 
-This module transcribes the record-level role checked by
+## The role
+
+`p4ng/sec-catalog.tex`, "Scheduled Observer Entrypoint (R10, the No-Op
+Trap)", gives R10 its role: "liveness is a property of state change, not of
+the scheduler firing". A scheduler whose ticks cache or no-op writes a green
+"it ran" row at every firing while nothing changes. The paper's move is to
+"gate 'live' on evidence that a tick changed observable state ... not merely
+that it fired", and "when the loop can only no-op, disable the schedule rather
+than let it paint green".
+
+The second half of this module states that role (`LiveTick`,
+`HonestLiveness`, `MustDisable`) and what a run record must satisfy to conform
+to it (`R10Conformant`). The statements come from the paper's paragraph, not
+from the implementation.
+
+## What the implementation checks instead
+
+The first half (`ScheduledRoute`) transcribes the route check made by
 `futon2/src/futon2/aif/scheduled_route_evidence.clj/verify-route!` and projected
 by `futon2/src/futon2/aif/wm/apparatus_certificates.clj/r10-certificate`, read at
-Futon2 commit `0f9587532031beb50a21091cc41cd10f4a16ff63`.
+Futon2 commit `0f9587532031beb50a21091cc41cd10f4a16ff63`: exactly one retained
+launch joins the commission and dispatch, and its ordered tick entries and R8
+rows cover the declared plan with the required launch, index and predecessor
+identities. That says the ticks belong to the schedule. It is not the role:
+`scheduledRoute_does_not_imply_live_tick` exhibits an accepted route whose
+ticks are all no-ops.
 
-An accepted record says that exactly one retained launch joins the commission
-and dispatch, and that its ordered tick entries and R8 rows cover the declared
-plan with the required launch, index and predecessor identities. It does not
-prove that a scheduler fired in the world, that the record is complete or
-independently owned, or that R8 arithmetic is correct. The runtime verifier
-itself refuses `:independently-retained-production` authority, so this module
-does not close `Holes.wmRunsOnce` or certify production scheduling.
+At that commit neither `verify-route!` nor `r10-certificate` checks state
+change, liveness labels or the disable rule, and the retained R10 records have
+no field for observable state before or after a tick, for a per-tick liveness
+label, or for whether the schedule is enabled. So no run record can yet be
+tested for `R10Conformant`; supplying those fields is what conformance of the
+implementation requires.
 
-The transcription leaves out runtime schema tags, SHA/source pins,
+`ScheduledRoute` does not prove that a scheduler fired in the world, that the
+record is complete or independently owned, or that R8 arithmetic is correct.
+The runtime verifier itself refuses `:independently-retained-production`
+authority, so this module does not close `Holes.wmRunsOnce`. The route
+transcription leaves out runtime schema tags, SHA/source pins,
 run/model/revision joins, observation payload validation, candidate-support
 coverage, and detailed prediction/occurrence input agreement.
-
-The second half of this module states the role assigned to R10 by
-`p4ng/sec-catalog.tex`, "Scheduled Observer Entrypoint (R10, the No-Op
-Trap)": a scheduled tick is live only when it changes observable state, and a
-run may not label a no-op live. At Futon2 commit
-`0f9587532031beb50a21091cc41cd10f4a16ff63`, neither `verify-route!` nor
-`r10-certificate` checks that role. Their retained R10 records have no field
-for observable state before or after a tick. Thus `ScheduledRoute` remains a
-necessary route/provenance precondition, while `HonestLiveness` below is the
-paper's distinct satisfaction criterion.
 -/
 
 namespace DarkTower.WarMachine.R10ScheduledEntrypoint
@@ -337,5 +352,75 @@ theorem no_change_requires_disable_for_every_available_window
   apply unchanged tick
   have inReverse : tick ∈ ticks.reverse := List.mem_of_mem_take retained
   simpa using inReverse
+
+/-! ## Conformance of a run record to the role -/
+
+instance honestLivenessDecidable {State : Type} [DecidableEq State]
+    (ticks : List (TickOutcome State)) : Decidable (HonestLiveness ticks) := by
+  unfold HonestLiveness ChangedState
+  infer_instance
+
+instance mustDisableDecidable {State : Type} [DecidableEq State]
+    (k : Nat) (ticks : List (TickOutcome State)) : Decidable (MustDisable k ticks) := by
+  unfold MustDisable ChangedState
+  infer_instance
+
+/-- What a scheduled run must retain to be judged against the role: the
+outcome of each fired tick, oldest first, and whether the schedule is still
+enabled after the last of them. No such record exists at Futon2
+`0f9587532031beb50a21091cc41cd10f4a16ff63`. -/
+structure RunRecord (State : Type) where
+  ticks : List (TickOutcome State)
+  scheduleEnabled : Bool
+
+/-- A run record conforms to R10, for a disable window `k`, when no tick is
+labelled live without a state change, and the schedule is not left enabled
+after `k` consecutive ticks that changed nothing. The paper fixes no `k`. -/
+def R10Conformant {State : Type} [DecidableEq State]
+    (k : Nat) (run : RunRecord State) : Prop :=
+  HonestLiveness run.ticks ∧
+  (MustDisable k run.ticks → run.scheduleEnabled = false)
+
+instance r10ConformantDecidable {State : Type} [DecidableEq State]
+    (k : Nat) (run : RunRecord State) : Decidable (R10Conformant k run) := by
+  unfold R10Conformant
+  infer_instance
+
+/-- A conforming run in which nothing changed, long enough to fill the window,
+has its schedule disabled, whatever the number of firings. -/
+theorem conformant_inert_run_is_disabled {State : Type} [DecidableEq State]
+    (k : Nat) (run : RunRecord State) (conformant : R10Conformant k run)
+    (unchanged : ∀ tick ∈ run.ticks, ¬ ChangedState tick)
+    (positive : 0 < k) (available : k ≤ run.ticks.length) :
+    run.scheduleEnabled = false :=
+  conformant.2
+    (no_change_requires_disable_for_every_available_window run.ticks unchanged
+      k positive available)
+
+/-- Control: three no-op ticks, none labelled live, schedule still enabled.
+The labels are honest, and the run does not conform: the disable rule is a
+requirement of its own, not a consequence of honest labels. -/
+def inertButEnabledRun : RunRecord Nat :=
+  { ticks := [noOpTick 0, noOpTick 0, noOpTick 0], scheduleEnabled := true }
+
+theorem inertButEnabledRun_labels_are_honest :
+    HonestLiveness inertButEnabledRun.ticks := by
+  decide
+
+theorem inertButEnabledRun_does_not_conform :
+    ¬ R10Conformant 3 inertButEnabledRun := by
+  decide
+
+/-- Control: the same ticks with the schedule disabled conform. -/
+theorem inertAndDisabledRun_conforms :
+    R10Conformant 3 { inertButEnabledRun with scheduleEnabled := false } := by
+  decide
+
+/-- Control: a run whose last tick changed state may stay enabled. -/
+theorem liveRun_may_stay_enabled :
+    R10Conformant 3
+      ({ ticks := [noOpTick 0, noOpTick 0, honestGreenTick],
+         scheduleEnabled := true } : RunRecord Nat) := by
+  decide
 
 end DarkTower.WarMachine.R10ScheduledEntrypoint
