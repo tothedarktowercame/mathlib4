@@ -41,8 +41,13 @@ retain an authoritative known-incident corpus with wire assignments, a
 calibration receipt, an explicit blind-spot map, an exact coverage number, or
 one response record whose booleans establish every paper-mandated step. Thus
 the implementation cannot yet be tested for `R20Conformant` from its retained
-records. Moreover, `FUTON_WM_TRIPWIRE_HALT=1` makes a trip stop the run, which
-disagrees with the paper's non-blocking clause and is nonconforming here.
+records.
+
+On blocking, the default path agrees with the paper: since Futon2 `a03ae7b05`
+(2026-09-19) `observe!` records a witness and the run continues, and the
+default action is `:record`, the lowest rung. `FUTON_WM_TRIPWIRE_HALT=1` is an
+opt-in setting under which a trip throws and stops the run; a response made
+under it has `blockedRun = true` and is not a `ConformingResponse`.
 
 This module leaves out the other twelve evaluators, deferral,
 `repair-covered-witness?`, cross-run observation assembly, disabled-ID option
@@ -278,8 +283,12 @@ structure Incident (Observation : Type) where
   observation : Observation
   assignedWireId : Option Nat
 
-/-- A wire's idealized trajectory prior: a trajectory observation on which
-the evaluator finds a violation has mass zero; a clear one has unit mass. -/
+/-- The support of a wire's trajectory prior, as an indicator: 0 on an
+observation where the evaluator finds a violation, 1 on a clear one. It is not
+a normalised distribution, and `tripSurprisal` below is defined beside it, not
+derived from it as a negative logarithm; the derived statement, for any prior
+supported on the wire's clear observations, belongs with the precision
+statement that connects R20 to R7. -/
 def wirePriorMass (wire : Wire Observation Witness) (observation : Observation) : ℚ :=
   if wire.evaluate observation = [] then 1 else 0
 
@@ -443,8 +452,12 @@ structure ResponseRecord where
   blockedRun : Bool
   deriving DecidableEq, Repr
 
-/-- The four rungs permitted by the paper: full response, then dropping
-summon, then park, then stop-line. Durable recording is never dropped. -/
+/-- Four rungs: the full response, then without the summon, then without the
+park, then the record alone. The paper fixes two things about the ladder: it
+"only ever degrades toward recording", and never toward blocking the run. The
+order in which the other steps are dropped is not in the paper; it is the order
+the runtime's `:park-and-summon` action degrades in (to stop-line, then to
+record). `ConformingResponse` below is the paper's part. -/
 inductive ResponseRung where
   | freezeRecordParkSummon
   | recordStopLinePark
