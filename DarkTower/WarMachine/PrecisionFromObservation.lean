@@ -158,11 +158,24 @@ theorem binaryPrior_lt_posterior_iff {wa wb ea eb : ℝ}
   · have := mul_lt_mul_of_pos_left h (mul_pos hwa hwb)
     nlinarith
 
-/- Positive habits affect masses but cancel from the likelihood-ratio direction. -/
-theorem two_policy_direction {beta : ℝ} {E G F : TwoPolicy → ℝ}
-    (hE : ∀ p, 0 < E p) (hG : G .a < G .b) :
-    (F .a < F .b → expectedGChange beta E G F < 0) ∧
-    (F .b < F .a → 0 < expectedGChange beta E G F) := by
+theorem expectedGChange_twoPolicy (beta : ℝ) (E G F : TwoPolicy → ℝ) :
+    expectedGChange beta E G F =
+      (posteriorPolicy beta E G F .a - priorPolicy beta E G .a) * (G .a - G .b) := by
+  have psum : priorPolicy beta E G .a + priorPolicy beta E G .b = 1 := by
+    simp [priorPolicy, softmax, sum_twoPolicy]; field_simp
+  have qsum : posteriorPolicy beta E G F .a + posteriorPolicy beta E G F .b = 1 := by
+    simp [posteriorPolicy, softmax, sum_twoPolicy]; field_simp
+  simp only [expectedGChange, sum_twoPolicy]
+  have hd : posteriorPolicy beta E G F .b - priorPolicy beta E G .b =
+      -(posteriorPolicy beta E G F .a - priorPolicy beta E G .a) := by linarith
+  rw [hd]
+  ring
+
+/-- With two policies, the observation moves belief toward the policy it
+favours. The habit sets the masses but cancels from the direction. -/
+theorem two_policy_posterior_vs_prior {beta : ℝ} {E G F : TwoPolicy → ℝ} :
+    (F .a < F .b → priorPolicy beta E G .a < posteriorPolicy beta E G F .a) ∧
+    (F .b < F .a → posteriorPolicy beta E G F .a < priorPolicy beta E G .a) := by
   let wa := Real.exp (Real.log (E .a) - G .a / beta)
   let wb := Real.exp (Real.log (E .b) - G .b / beta)
   let ea := Real.exp (-F .a)
@@ -182,37 +195,40 @@ theorem two_policy_direction {beta : ℝ} {E G F : TwoPolicy → ℝ}
         Real.exp (Real.log (E .b) - G .b / beta) * Real.exp (-F .b) := by
       rw [← Real.exp_add]; congr 1 <;> ring
     rw [ha, hb]
-  have psum : priorPolicy beta E G .a + priorPolicy beta E G .b = 1 := by
-    simp [priorPolicy, softmax, sum_twoPolicy]; field_simp
-  have qsum : posteriorPolicy beta E G F .a + posteriorPolicy beta E G F .b = 1 := by
-    simp [posteriorPolicy, softmax, sum_twoPolicy]; field_simp
-  have change : expectedGChange beta E G F =
-      (posteriorPolicy beta E G F .a - priorPolicy beta E G .a) * (G .a - G .b) := by
-    simp only [expectedGChange, sum_twoPolicy]
-    have hd : posteriorPolicy beta E G F .b - priorPolicy beta E G .b =
-        -(posteriorPolicy beta E G F .a - priorPolicy beta E G .a) := by linarith
-    rw [hd]
-    ring
-  rw [change, pa, qa]
+  rw [pa, qa]
   constructor
   · intro hf
     have he : eb < ea := Real.exp_lt_exp.mpr (by change -F .b < -F .a; linarith)
-    exact mul_neg_of_pos_of_neg (sub_pos.mpr ((binaryPrior_lt_posterior_iff hwa hwb hea heb).2 he))
-      (sub_neg.mpr hG)
+    exact (binaryPrior_lt_posterior_iff hwa hwb hea heb).2 he
   · intro hf
     have he : ea < eb := Real.exp_lt_exp.mpr (by change -F .a < -F .b; linarith)
-    exact mul_pos_of_neg_of_neg (sub_neg.mpr ((binaryPosterior_lt_prior_iff hwa hwb hea heb).2 he))
+    exact (binaryPosterior_lt_prior_iff hwa hwb hea heb).2 he
+
+/-- Direction of the change in expected G when G favours policy `a`. It holds
+for any habit vector. -/
+theorem two_policy_direction {beta : ℝ} {E G F : TwoPolicy → ℝ} (hG : G .a < G .b) :
+    (F .a < F .b → expectedGChange beta E G F < 0) ∧
+    (F .b < F .a → 0 < expectedGChange beta E G F) := by
+  rw [expectedGChange_twoPolicy]
+  constructor
+  · intro hf
+    exact mul_neg_of_pos_of_neg
+      (sub_pos.mpr ((two_policy_posterior_vs_prior (beta := beta) (E := E) (G := G) (F := F)).1 hf))
+      (sub_neg.mpr hG)
+  · intro hf
+    exact mul_pos_of_neg_of_neg
+      (sub_neg.mpr ((two_policy_posterior_vs_prior (beta := beta) (E := E) (G := G) (F := F)).2 hf))
       (sub_neg.mpr hG)
 
 theorem favoured_observation_raises_precision {betaPrior beta : ℝ} {E G F : TwoPolicy → ℝ}
-    (fixed : IsPosteriorTemperature betaPrior beta E G F) (hE : ∀ p, 0 < E p)
+    (fixed : IsPosteriorTemperature betaPrior beta E G F)
     (hG : G .a < G .b) (hF : F .a < F .b) : beta < betaPrior :=
-  (posterior_temperature_direction_lt fixed).2 ((two_policy_direction hE hG).1 hF)
+  (posterior_temperature_direction_lt fixed).2 ((two_policy_direction hG).1 hF)
 
 theorem against_favoured_lowers_precision {betaPrior beta : ℝ} {E G F : TwoPolicy → ℝ}
-    (fixed : IsPosteriorTemperature betaPrior beta E G F) (hE : ∀ p, 0 < E p)
+    (fixed : IsPosteriorTemperature betaPrior beta E G F)
     (hG : G .a < G .b) (hF : F .b < F .a) : betaPrior < beta :=
-  (posterior_temperature_direction_gt fixed).2 ((two_policy_direction hE hG).2 hF)
+  (posterior_temperature_direction_gt fixed).2 ((two_policy_direction hG).2 hF)
 
 def finiteSurprisal (p : ℝ) : ℝ := -Real.log p
 theorem lower_prediction_has_higher_surprisal {pa pb : ℝ} (ha : 0 < pa) (h : pa < pb) :
@@ -223,9 +239,9 @@ theorem interoceptive_reading_lowers_precision {betaPrior beta : ℝ}
     {E G : TwoPolicy → ℝ} {pa pb : ℝ}
     (fixed : IsPosteriorTemperature betaPrior beta E G
       (fun p => if p = .a then finiteSurprisal pa else finiteSurprisal pb))
-    (hE : ∀ p, 0 < E p) (hG : G .a < G .b) (ha : 0 < pa) (hp : pa < pb) :
+    (hG : G .a < G .b) (ha : 0 < pa) (hp : pa < pb) :
     betaPrior < beta := by
-  apply against_favoured_lowers_precision fixed hE hG
+  apply against_favoured_lowers_precision fixed hG
   simpa using lower_prediction_has_higher_surprisal ha hp
 
 theorem zero_prediction_surprisal_top {Reading : Type*} [Fintype Reading] [DecidableEq Reading]
@@ -262,15 +278,62 @@ theorem conformsWithin_zero_iff (r : TickRecord Policy) : ConformsWithin 0 r ↔
   · rintro ⟨hE, hp, ⟨hb, hz⟩, hprior, hpost⟩
     exact ⟨hE, hp, hb, by simp [hz], hprior, hpost⟩
 
-theorem unchanged_discriminating_refused {E G F : TwoPolicy → ℝ} {beta : ℝ}
-    (hE : ∀ p, 0 < E p) (hG : G .a < G .b) (hF : F .b < F .a) :
-    ¬ IsPosteriorTemperature beta beta E G F := by
-  intro fixed; exact (lt_irrefl beta) (against_favoured_lowers_precision fixed hE hG hF)
+/-- With two policies and unequal habits, the prior that includes the habit is
+not the printed prior that leaves it out. -/
+theorem printedPrior_ne_priorPolicy_of_unequal_habit {E G : TwoPolicy → ℝ} {beta : ℝ}
+    (hE : ∀ p, 0 < E p) (unequal : E .a ≠ E .b) :
+    printedPrior beta G ≠ priorPolicy beta E G := by
+  intro same
+  let va := Real.exp (-G .a / beta)
+  let vb := Real.exp (-G .b / beta)
+  have hva : 0 < va := Real.exp_pos _
+  have hvb : 0 < vb := Real.exp_pos _
+  have printed : printedPrior beta G .a = binaryPrior va vb := by
+    simp [printedPrior, softmax, sum_twoPolicy, binaryPrior, va, vb]
+  have withHabit : priorPolicy beta E G .a = binaryPosterior va vb (E .a) (E .b) := by
+    simp only [priorPolicy, softmax, sum_twoPolicy, binaryPosterior, va, vb]
+    have ha : Real.exp (Real.log (E .a) - G .a / beta) =
+        Real.exp (-G .a / beta) * E .a := by
+      rw [show Real.log (E .a) - G .a / beta = -G .a / beta + Real.log (E .a) by ring,
+        Real.exp_add, Real.exp_log (hE .a)]
+    have hb : Real.exp (Real.log (E .b) - G .b / beta) =
+        Real.exp (-G .b / beta) * E .b := by
+      rw [show Real.log (E .b) - G .b / beta = -G .b / beta + Real.log (E .b) by ring,
+        Real.exp_add, Real.exp_log (hE .b)]
+    rw [ha, hb]
+  have eq : binaryPrior va vb = binaryPosterior va vb (E .a) (E .b) :=
+    printed.symm.trans ((congrFun same .a).trans withHabit)
+  rcases lt_or_gt_of_ne unequal with h | h
+  · exact absurd eq ((binaryPosterior_lt_prior_iff hva hvb (hE .a) (hE .b)).2 h).ne'
+  · exact absurd eq ((binaryPrior_lt_posterior_iff hva hvb (hE .a) (hE .b)).2 h).ne
 
-theorem omitted_habit_prior_refused {E G : TwoPolicy → ℝ} {beta : ℝ}
-    (recorded : TwoPolicy → ℝ) (printed : recorded = printedPrior beta G)
-    (different : printedPrior beta G ≠ priorPolicy beta E G) :
-    recorded ≠ priorPolicy beta E G := fun h => different (printed.symm.trans h)
+/-- Control: the temperature did not move although the observation
+discriminated between two policies that G ranks differently. -/
+theorem unchanged_discriminating_refused (r : TickRecord TwoPolicy)
+    (hG : r.G .a ≠ r.G .b) (hF : r.F .a ≠ r.F .b)
+    (unchanged : r.betaPosterior = r.betaPrior) : ¬ Conforms r := by
+  rintro ⟨_, _, ⟨_, zero⟩, _, _⟩
+  have change : expectedGChange r.betaPosterior r.E r.G r.F = 0 := by
+    unfold precisionError at zero
+    rw [unchanged] at zero ⊢
+    linarith
+  rw [expectedGChange_twoPolicy] at change
+  have same : posteriorPolicy r.betaPosterior r.E r.G r.F .a =
+      priorPolicy r.betaPosterior r.E r.G .a := by
+    rcases mul_eq_zero.mp change with h | h
+    · linarith
+    · exact absurd (sub_eq_zero.mp h) hG
+  rcases lt_or_gt_of_ne hF with h | h
+  · exact absurd same (two_policy_posterior_vs_prior.1 h).ne'
+  · exact absurd same (two_policy_posterior_vs_prior.2 h).ne
+
+/-- Control: the recorded prior is the printed form without the habit although
+the two habits differ. -/
+theorem omitted_habit_prior_refused (r : TickRecord TwoPolicy)
+    (unequal : r.E .a ≠ r.E .b)
+    (printed : r.prior = printedPrior r.betaPosterior r.G) : ¬ Conforms r := by
+  rintro ⟨hE, _, _, hprior, _⟩
+  exact printedPrior_ne_priorPolicy_of_unequal_habit hE unequal (printed.symm.trans hprior)
 
 end
 end DarkTower.WarMachine.PrecisionFromObservation
