@@ -111,4 +111,75 @@ theorem disconnectedPathReceipt_invalid :
     valid exampleSemantics disconnectedPathReceipt = false := by
   native_decide
 
+/-! ## The outer-loop diamond
+
+`futon3/library/meta/meta-outer-policy-cascade.edn` (2026-10-02) is a
+four-unit cascade: observe → {fill, injury} → minimise.  Units and tokens
+are numbered as in `NOTE-outer-cascade-as-pasted-blends-2026-10-05.md` §3:
+
+  units  0 observe, 1 fill, 2 injury, 3 minimise
+  tokens 0 field-observation, 1 injury-observation, 2 filled-candidates,
+         3 typed-exclusions, 4 admitted-support, 5 rearm-slot,
+         6 selected-meta-policy
+
+`fill` and `injury` are incomparable; `minimise` is their meet.  The diamond
+has two linear extensions, and both validate the same support: the order is
+a parse of the formation, not part of it.  A chain adds an edge between
+`fill` and `injury` that no token supports, and `valid` rejects it. -/
+
+def diamondSemantics : Nat → UnitSemantics
+  | 0 => ⟨{0, 1}, ∅⟩
+  | 1 => ⟨{2, 3}, {0}⟩
+  | 2 => ⟨{4, 5}, {0, 1}⟩
+  | 3 => ⟨{6}, {2, 3, 4, 5}⟩
+  | _ => ⟨∅, ∅⟩
+
+def observeFill : EdgeWitness := ⟨0, 1, {0}⟩
+def observeInjury : EdgeWitness := ⟨0, 2, {0, 1}⟩
+def fillMinimise : EdgeWitness := ⟨1, 3, {2, 3}⟩
+def injuryMinimise : EdgeWitness := ⟨2, 3, {4, 5}⟩
+
+def diamondSupport : List EdgeWitness :=
+  [observeFill, observeInjury, fillMinimise, injuryMinimise]
+
+def diamondReceipt : Receipt :=
+  { order := [0, 1, 2, 3]
+    support := diamondSupport
+    meets := [⟨1, 2, 3, [fillMinimise], [injuryMinimise]⟩]
+    precedence := diamondSupport
+    linearExtension := [0, 1, 2, 3]
+    precedenceViolations := [] }
+
+theorem diamondReceipt_valid : valid diamondSemantics diamondReceipt = true := by
+  native_decide
+
+/-- The other linear extension, injury before fill, over the same support. -/
+def diamondReceiptInjuryFirst : Receipt :=
+  { diamondReceipt with order := [0, 2, 1, 3], linearExtension := [0, 2, 1, 3] }
+
+theorem diamondReceiptInjuryFirst_valid :
+    valid diamondSemantics diamondReceiptInjuryFirst = true := by
+  native_decide
+
+/-- The chain O F I M: the recipe's fill → injury step as a precedence edge.
+`produces fill ∩ needs injury = ∅`, so no token carries it. -/
+def chainReceipt : Receipt :=
+  { diamondReceipt with
+    support := [observeFill, ⟨1, 2, ∅⟩, injuryMinimise]
+    precedence := [observeFill, ⟨1, 2, ∅⟩, injuryMinimise] }
+
+theorem chainReceipt_invalid : valid diamondSemantics chainReceipt = false := by
+  native_decide
+
+/-- Forging a token onto that step does not help: the token set must equal
+the intersection. -/
+def chainReceiptForgedToken : Receipt :=
+  { chainReceipt with
+    support := [observeFill, ⟨1, 2, {0}⟩, injuryMinimise]
+    precedence := [observeFill, ⟨1, 2, {0}⟩, injuryMinimise] }
+
+theorem chainReceiptForgedToken_invalid :
+    valid diamondSemantics chainReceiptForgedToken = false := by
+  native_decide
+
 end DarkTower.WarMachine.ConstructionReceipt
