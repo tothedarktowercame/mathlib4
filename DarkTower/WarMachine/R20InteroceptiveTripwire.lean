@@ -3,7 +3,26 @@ import Mathlib.Tactic
 /-!
 # R20 interoceptive tripwires
 
-This module states the record-level role implemented by `check!`,
+## The role
+
+`p4ng/sec-catalog.tex`, "Interoceptive Tripwires (R20)", gives R20 its role:
+an enabled wire is calibrated against known incidents before it is armed; a
+trip receives the fail-safe response "freeze, record, park, summon", which may
+degrade only toward durable recording and never toward blocking the run; and
+every closed incident is covered by a retro-tripping wire or retained on an
+explicit blind-spot map. Because no sensorium is complete, the record reports
+exact coverage rather than claiming completeness. `Calibrated`,
+`IncidentsAccountedFor`, `ConformingResponse`, and `R20Conformant` below state
+the corresponding satisfaction criteria.
+
+The paper also reads a wire as a near-infinite-precision prior over machine
+trajectories. `wirePriorMass` and `tripSurprisal` state its limiting ideal:
+violating trajectories have zero prior mass and therefore infinite surprisal.
+This is a role statement, not an empirical calibration of a wire's precision.
+
+## What the implementation checks
+
+The first section transcribes the record-level mechanics implemented by `check!`,
 `evaluate-wire`, `enabled?`, and `observe!` in
 `futon2/src/futon2/aif/tripwire.clj`, read at Futon2 commit
 `0f9587532031beb50a21091cc41cd10f4a16ff63`. A wire evaluates one observation
@@ -15,11 +34,21 @@ The concrete T11 model covers only `:unknown-job-state`: its seven accepted
 states transcribe `known-job-states`. T11's independent
 `:unparseable-job-time` witness is deliberately omitted.
 
-This module leaves out the other twelve evaluators, report construction and
-persistence, `*halt-on-witness?*`, deferral, `repair-covered-witness?`,
-cross-run observation assembly, disabled-ID option parsing, and the runtime
-catch around a throwing evaluator. It neither proves that an evaluator states
-the right invariant nor that an observation is complete.
+At that commit the runtime retains a trip observation, wire ID, witness, action
+and durable report path; `:park-and-summon` attempts a typed repair finding,
+park and bell, degrading to stop-line and then record on failure. It does not
+retain an authoritative known-incident corpus with wire assignments, a
+calibration receipt, an explicit blind-spot map, an exact coverage number, or
+one response record whose booleans establish every paper-mandated step. Thus
+the implementation cannot yet be tested for `R20Conformant` from its retained
+records. Moreover, `FUTON_WM_TRIPWIRE_HALT=1` makes a trip stop the run, which
+disagrees with the paper's non-blocking clause and is nonconforming here.
+
+This module leaves out the other twelve evaluators, deferral,
+`repair-covered-witness?`, cross-run observation assembly, disabled-ID option
+parsing, and the runtime catch around a throwing evaluator. It neither proves
+that an evaluator states the right invariant nor that an observation is
+complete. The R20-to-R7/R14 precision-update role is a separate statement.
 
 "Registry order" here is whatever order the runtime iterates `wire-registry`
 in. That registry is a thirteen-entry Clojure map, which is a hash map: at the
@@ -236,5 +265,249 @@ theorem registry_order_reports_first :
 theorem registry_order_does_not_report_second :
     observe [firstViolated, secondViolated] 0 ≠ some { wireId := 2, witness := 202 } := by
   decide
+
+/-! ## The paper's prior/surprisal reading -/
+
+/-- A closed or reconstructed incident used to calibrate the sensorium.
+`incidentId` stands for its durable identity; `observation` is the machine
+observation retained for it; `assignedWireId` is the wire the calibration
+corpus says must retro-trip. No authoritative runtime record carrying this
+three-way join exists at Futon2 `0f9587532031beb50a21091cc41cd10f4a16ff63`. -/
+structure Incident (Observation : Type) where
+  incidentId : Nat
+  observation : Observation
+  assignedWireId : Option Nat
+
+/-- A wire's idealized trajectory prior: a trajectory observation on which
+the evaluator finds a violation has mass zero; a clear one has unit mass. -/
+def wirePriorMass (wire : Wire Observation Witness) (observation : Observation) : ℚ :=
+  if wire.evaluate observation = [] then 1 else 0
+
+/-- The limiting surprisal corresponding to `wirePriorMass`: a trip is top in
+the extended reals, while a clear observation has zero surprisal. -/
+noncomputable def tripSurprisal (wire : Wire Observation Witness)
+    (observation : Observation) : EReal :=
+  if wire.evaluate observation = [] then 0 else ⊤
+
+/-- A wire retro-trips when it yields at least one witness for the retained
+observation of a known incident. -/
+def RetroTrips (wire : Wire Observation Witness) (incident : Incident Observation) : Prop :=
+  wire.evaluate incident.observation ≠ []
+
+theorem retroTrip_has_zero_prior_and_infinite_surprisal
+    (wire : Wire Observation Witness) (incident : Incident Observation)
+    (trips : RetroTrips wire incident) :
+    wirePriorMass wire incident.observation = 0 ∧
+    tripSurprisal wire incident.observation = ⊤ := by
+  change wire.evaluate incident.observation ≠ [] at trips
+  simp [wirePriorMass, tripSurprisal, trips]
+
+/-! ## Calibration against known incidents -/
+
+/-- Every enabled wire has at least one assigned incident, and it retro-trips
+on every corpus incident assigned to it. -/
+def Calibrated (registry : Registry Observation Witness)
+    (corpus : List (Incident Observation)) : Prop :=
+  ∀ wire ∈ registry, wire.enabled = true →
+    (∃ incident ∈ corpus, incident.assignedWireId = some wire.wireId) ∧
+    (∀ incident ∈ corpus, incident.assignedWireId = some wire.wireId →
+      RetroTrips wire incident)
+
+/-- An armed wire with an assigned known incident that it fails to detect. -/
+def Dud (wire : Wire Observation Witness) (incident : Incident Observation) : Prop :=
+  wire.enabled = true ∧
+  incident.assignedWireId = some wire.wireId ∧
+  ¬ RetroTrips wire incident
+
+theorem calibrated_has_no_dud (registry : Registry Observation Witness)
+    (corpus : List (Incident Observation)) (calibrated : Calibrated registry corpus)
+    (wire : Wire Observation Witness) (wireIn : wire ∈ registry)
+    (incident : Incident Observation) (incidentIn : incident ∈ corpus) :
+    ¬ Dud wire incident := by
+  intro dud
+  exact dud.2.2 ((calibrated wire wireIn dud.1).2 incident incidentIn dud.2.1)
+
+/-- An always-silent wire. It satisfies the earlier evaluator theorems—`check`
+always passes and `observe` reports nothing—but is a dud when armed against an
+assigned incident. -/
+def alwaysSilentWire : Wire Nat Nat :=
+  { wireId := 20, enabled := true, evaluate := fun _ => [] }
+
+def silentIncident : Incident Nat :=
+  { incidentId := 1, observation := 99, assignedWireId := some 20 }
+
+theorem alwaysSilent_check_passes :
+    check alwaysSilentWire silentIncident.observation = .passed 20 := by
+  decide
+
+theorem alwaysSilent_is_a_dud : Dud alwaysSilentWire silentIncident := by
+  simp [Dud, RetroTrips, alwaysSilentWire, silentIncident]
+
+/-! ## Closed-incident accounting and measured coverage -/
+
+/-- An incident is covered when an enabled registry wire is the incident's
+assigned wire and retro-trips on its observation. -/
+def CoveredByWire : Registry Observation Witness → Incident Observation → Prop
+  | [], _ => False
+  | wire :: rest, incident =>
+      (wire.enabled = true ∧ incident.assignedWireId = some wire.wireId ∧
+        RetroTrips wire incident) ∨ CoveredByWire rest incident
+
+/-- The incident's durable identity occurs on the explicit blind-spot map. -/
+def OnBlindSpotMap (blindSpots : List Nat) (incident : Incident Observation) : Prop :=
+  incident.incidentId ∈ blindSpots
+
+/-- Every closed incident is either detected by an enabled calibrated wire or
+retained explicitly as a blind spot. -/
+def IncidentsAccountedFor (registry : Registry Observation Witness)
+    (blindSpots : List Nat) (closed : List (Incident Observation)) : Prop :=
+  ∀ incident ∈ closed,
+    CoveredByWire registry incident ∨ OnBlindSpotMap blindSpots incident
+
+noncomputable instance coveredByWireDecidable (registry : Registry Observation Witness)
+    (incident : Incident Observation) : Decidable (CoveredByWire registry incident) := by
+  exact Classical.propDecidable _
+
+/-- Exact rational sensor coverage: wire-covered closed incidents divided by
+all closed incidents. The empty corpus reports zero rather than asserting
+vacuous completeness. -/
+noncomputable def coverageNumber (registry : Registry Observation Witness)
+    (closed : List (Incident Observation)) : ℚ :=
+  match closed with
+  | [] => 0
+  | _ => ((closed.filter fun incident => decide (CoveredByWire registry incident)).length : ℚ) /
+         (closed.length : ℚ)
+
+theorem accounted_uncovered_is_on_blind_spot_map
+    (registry : Registry Observation Witness) (blindSpots : List Nat)
+    (closed : List (Incident Observation))
+    (accounted : IncidentsAccountedFor registry blindSpots closed)
+    (incident : Incident Observation) (incidentIn : incident ∈ closed)
+    (uncovered : ¬ CoveredByWire registry incident) :
+    OnBlindSpotMap blindSpots incident := by
+  rcases accounted incident incidentIn with covered | mapped
+  · exact False.elim (uncovered covered)
+  · exact mapped
+
+theorem coverageNumber_eq_one_iff_all_covered
+    (registry : Registry Observation Witness)
+    (closed : List (Incident Observation)) (nonempty : closed ≠ []) :
+    coverageNumber registry closed = 1 ↔
+      ∀ incident ∈ closed, CoveredByWire registry incident := by
+  cases closed with
+  | nil => exact False.elim (nonempty rfl)
+  | cons head tail =>
+      simp only [coverageNumber]
+      rw [div_eq_one_iff_eq]
+      · norm_cast
+        constructor
+        · intro sameLength incident retained
+          have allTrue := List.length_filter_eq_length_iff.mp sameLength
+          have decided := allTrue incident retained
+          simpa using decided
+        · intro allCovered
+          apply List.length_filter_eq_length_iff.mpr
+          intro incident retained
+          simp [allCovered incident retained]
+      · have positiveDenominator : (0 : ℚ) < (tail.length : ℚ) + 1 := by
+          positivity
+        exact ne_of_gt (by simpa using positiveDenominator)
+
+def uncoveredIncident : Incident Nat :=
+  { incidentId := 2, observation := 7, assignedWireId := none }
+
+theorem unaccounted_closed_incident_fails :
+    ¬ IncidentsAccountedFor ([] : Registry Nat Nat) [] [uncoveredIncident] := by
+  simp [IncidentsAccountedFor, CoveredByWire, OnBlindSpotMap, uncoveredIncident]
+
+theorem mapped_incident_is_accounted :
+    IncidentsAccountedFor ([] : Registry Nat Nat) [2] [uncoveredIncident] := by
+  simp [IncidentsAccountedFor, CoveredByWire, OnBlindSpotMap, uncoveredIncident]
+
+theorem mapped_incident_lowers_coverage :
+    coverageNumber ([] : Registry Nat Nat) [uncoveredIncident] < 1 := by
+  norm_num [coverageNumber, CoveredByWire, uncoveredIncident]
+
+/-! ## Fail-safe response and whole-record conformance -/
+
+/-- The retained response to one trip. The fields state whether the frozen
+state was durably recorded, a typed stop-line was opened, an investigation was
+parked, the outer reviewer was summoned, and the run was blocked. The runtime
+currently retains pieces of these actions in separate report, repair, park and
+Agency records, not one authoritative response record. -/
+structure ResponseRecord where
+  recorded : Bool
+  stopLineOpened : Bool
+  parked : Bool
+  summoned : Bool
+  blockedRun : Bool
+  deriving DecidableEq, Repr
+
+/-- The four rungs permitted by the paper: full response, then dropping
+summon, then park, then stop-line. Durable recording is never dropped. -/
+inductive ResponseRung where
+  | freezeRecordParkSummon
+  | recordStopLinePark
+  | recordStopLine
+  | recordOnly
+  deriving DecidableEq, Repr
+
+def responseAtRung : ResponseRung → ResponseRecord
+  | .freezeRecordParkSummon => ⟨true, true, true, true, false⟩
+  | .recordStopLinePark => ⟨true, true, true, false, false⟩
+  | .recordStopLine => ⟨true, true, false, false, false⟩
+  | .recordOnly => ⟨true, false, false, false, false⟩
+
+/-- A response lies on the paper's fail-safe ladder. -/
+def OnResponseLadder (response : ResponseRecord) : Prop :=
+  ∃ rung, response = responseAtRung rung
+
+/-- The paper's minimum response invariant: preserve the durable record and
+never block the run. -/
+def ConformingResponse (response : ResponseRecord) : Prop :=
+  response.recorded = true ∧ response.blockedRun = false
+
+theorem every_response_rung_conforms (rung : ResponseRung) :
+    ConformingResponse (responseAtRung rung) := by
+  cases rung <;> simp [ConformingResponse, responseAtRung]
+
+theorem response_without_record_not_on_ladder (response : ResponseRecord)
+    (missing : response.recorded = false) : ¬ OnResponseLadder response := by
+  rintro ⟨rung, rfl⟩
+  cases rung <;> simp [responseAtRung] at missing
+
+theorem blocking_response_not_on_ladder (response : ResponseRecord)
+    (blocks : response.blockedRun = true) : ¬ OnResponseLadder response := by
+  rintro ⟨rung, rfl⟩
+  cases rung <;> simp [responseAtRung] at blocks
+
+def droppedRecordResponse : ResponseRecord :=
+  ⟨false, true, true, true, false⟩
+
+def blockingResponse : ResponseRecord :=
+  ⟨true, true, true, true, true⟩
+
+theorem dropped_record_response_is_nonconforming :
+    ¬ ConformingResponse droppedRecordResponse := by
+  simp [ConformingResponse, droppedRecordResponse]
+
+theorem blocking_response_is_nonconforming :
+    ¬ ConformingResponse blockingResponse := by
+  simp [ConformingResponse, blockingResponse]
+
+/-- One trip and the response retained for it. -/
+structure RespondedTrip (Observation : Type) where
+  incident : Incident Observation
+  response : ResponseRecord
+
+/-- A complete R20 record conforms to the paper when the enabled registry is
+calibrated, every closed incident is wire-covered or explicitly mapped, and
+every retained trip received a non-blocking, record-preserving response. -/
+def R20Conformant (registry : Registry Observation Witness)
+    (calibrationCorpus closed : List (Incident Observation))
+    (blindSpots : List Nat) (trips : List (RespondedTrip Observation)) : Prop :=
+  Calibrated registry calibrationCorpus ∧
+  IncidentsAccountedFor registry blindSpots closed ∧
+  ∀ trip ∈ trips, ConformingResponse trip.response
 
 end DarkTower.WarMachine.R20InteroceptiveTripwire
