@@ -1,26 +1,3 @@
-ℹ [2701/2799] Replayed DarkTower.WarMachine.CascadeOrder
-info: DarkTower/WarMachine/CascadeOrder.lean:143:0: 'attempt001_2026_07_14_two_cycle_is_refused' depends on axioms: [propext]
-info: DarkTower/WarMachine/CascadeOrder.lean:144:0: 'dropping_reverse_edge_is_acyclic_but_not_a_semilattice' depends on axioms: [propext]
-info: DarkTower/WarMachine/CascadeOrder.lean:145:0: 'attempt008_2026_07_16_descent_is_accepted' depends on axioms: [propext]
-⚠ [2703/2799] Replayed DarkTower.WarMachine.Holes
-warning: DarkTower/WarMachine/Holes.lean:7464:4: declaration uses `sorry`
-warning: DarkTower/WarMachine/Holes.lean:7487:4: declaration uses `sorry`
-warning: DarkTower/WarMachine/Holes.lean:8082:4: declaration uses `sorry`
-warning: DarkTower/WarMachine/Holes.lean:8135:4: declaration uses `sorry`
-warning: DarkTower/WarMachine/Holes.lean:8138:4: declaration uses `sorry`
+Command: lake build DarkTower.WarMachine.R20Interoception
 ⚠ [3353/3353] Built DarkTower.WarMachine.R20Interoception (2.8s)
-warning: DarkTower/WarMachine/R20Interoception.lean:116:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.R20Interoception.zero_mass_surprisal_top`:
-  [Fintype Reading]
-  [DecidableEq Reading]
-consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
-  omit [Fintype Reading] [DecidableEq Reading] in theorem ...
-
-Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
-warning: DarkTower/WarMachine/R20Interoception.lean:125:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.R20Interoception.outside_surprisal_lower_bound`:
-  [Fintype Reading]
-  [DecidableEq Reading]
-consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
-  omit [Fintype Reading] [DecidableEq Reading] in theorem ...
-
-Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
 Build completed successfully (3353 jobs).

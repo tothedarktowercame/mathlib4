@@ -145,19 +145,33 @@ noncomputable def gaugePreference : Distribution GaugeReading
 noncomputable def expectedAlarm : Distribution GaugeReading
   | .inRange => 1 / 10
   | .alarm => 9 / 10
-noncomputable def surprisingRecovery : Distribution GaugeReading
-  | .inRange => 1 / 10
-  | .alarm => 9 / 10
+theorem gaugePreference_prefersViable : PrefersViable gaugePreference viableGauge := by
+  intro v hv n hn
+  have hv' : v = .inRange := by simpa [viableGauge] using hv
+  subst v
+  cases n with
+  | inRange => simp [viableGauge] at hn
+  | alarm => norm_num [gaugePreference]
 
-/-- Alarm can be expected (low surprisal) and still unpreferred, so expectation
-does not remove the ordinary preference pressure to repair it. Conversely an
-in-range reading may be preferred yet surprising. -/
+/-- Expectation and preference are different objects. Under a model that
+expects the alarm, the alarm is the less surprising reading and the in-range
+reading the more surprising one; under the preference, ending in range still
+has the lower risk. An expected alarm therefore still calls for repair. -/
 theorem expectation_and_preference_differ :
-    expectedAlarm .alarm > expectedAlarm .inRange ∧
-    gaugePreference .alarm < gaugePreference .inRange ∧
-    surprisingRecovery .inRange < surprisingRecovery .alarm ∧
-    gaugePreference .inRange > gaugePreference .alarm := by
-  norm_num [expectedAlarm, surprisingRecovery, gaugePreference]
+    surprisal expectedAlarm .alarm < surprisal expectedAlarm .inRange ∧
+    interoceptiveRisk (pointMass GaugeReading.inRange) gaugePreference <
+      interoceptiveRisk (pointMass GaugeReading.alarm) gaugePreference := by
+  constructor
+  · have alarmMass : expectedAlarm .alarm = 9 / 10 := rfl
+    have rangeMass : expectedAlarm .inRange = 1 / 10 := rfl
+    rw [surprisal, surprisal, alarmMass, rangeMass, if_neg (by norm_num), if_neg (by norm_num),
+      EReal.coe_lt_coe_iff]
+    have logs := Real.strictMonoOn_log (by norm_num : (0 : ℝ) < 1 / 10)
+      (by norm_num : (0 : ℝ) < 9 / 10) (by norm_num : (1 : ℝ) / 10 < 9 / 10)
+    linarith
+  · exact viable_point_has_lower_risk gaugePreference_prefersViable
+      (by simp [viableGauge]) (by simp [viableGauge])
+      (by norm_num [gaugePreference]) (by norm_num [gaugePreference])
 
 /-! ## Tick-record conformance -/
 
