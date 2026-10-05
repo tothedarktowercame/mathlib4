@@ -20,6 +20,16 @@ does not close `Holes.wmRunsOnce` or certify production scheduling.
 The transcription leaves out runtime schema tags, SHA/source pins,
 run/model/revision joins, observation payload validation, candidate-support
 coverage, and detailed prediction/occurrence input agreement.
+
+The second half of this module states the role assigned to R10 by
+`p4ng/sec-catalog.tex`, "Scheduled Observer Entrypoint (R10, the No-Op
+Trap)": a scheduled tick is live only when it changes observable state, and a
+run may not label a no-op live. At Futon2 commit
+`0f9587532031beb50a21091cc41cd10f4a16ff63`, neither `verify-route!` nor
+`r10-certificate` checks that role. Their retained R10 records have no field
+for observable state before or after a tick. Thus `ScheduledRoute` remains a
+necessary route/provenance precondition, while `HonestLiveness` below is the
+paper's distinct satisfaction criterion.
 -/
 
 namespace DarkTower.WarMachine.R10ScheduledEntrypoint
@@ -183,5 +193,149 @@ theorem stalePredecessorRecord_is_rejected :
     ¬ ScheduledRoute stalePredecessorRecord := by
   rw [← checkRoute_eq_true_iff]
   decide
+
+/-! ## The paper's state-change account of liveness -/
+
+/-- One fired tick together with the observations needed to judge its
+liveness. `beforeState` and `afterState` stand for the paper's observable
+state before and after the tick; there is no corresponding retained R10 field
+at Futon2 `0f9587532031beb50a21091cc41cd10f4a16ff63`. `reportedLive` stands
+for the green/live label whose honesty the paper requires; there is likewise
+no such per-tick liveness-label field in `verify-route!`'s record. Membership
+in a list of `TickOutcome`s means that the tick fired. -/
+structure TickOutcome (State : Type) where
+  beforeState : State
+  afterState : State
+  reportedLive : Bool
+  deriving Repr
+
+/-- The observable state changed across this tick. -/
+def ChangedState {State : Type} [DecidableEq State]
+    (tick : TickOutcome State) : Prop :=
+  tick.beforeState ≠ tick.afterState
+
+/-- The paper's definition of a live tick: observable state changed, rather
+than merely the scheduler firing. -/
+def LiveTick {State : Type} [DecidableEq State]
+    (tick : TickOutcome State) : Prop :=
+  ChangedState tick
+
+/-- A run's liveness labels are honest exactly when every tick it labels live
+actually changed observable state. The converse is intentionally not
+required: the paper bars a false green row but does not say that every changed
+tick must be labelled live. -/
+def HonestLiveness {State : Type} [DecidableEq State]
+    (ticks : List (TickOutcome State)) : Prop :=
+  ∀ tick ∈ ticks, tick.reportedLive = true → ChangedState tick
+
+/-- A canonical fired no-op tick. -/
+def noOpTick (state : State) : TickOutcome State :=
+  { beforeState := state, afterState := state, reportedLive := false }
+
+/-- Scheduler firing carries no information about liveness: for every number
+of firings there is a run of exactly that length in which no tick is live. -/
+theorem firing_carries_no_liveness_information (State : Type)
+    [DecidableEq State] (state : State) (n : Nat) :
+    ∃ ticks : List (TickOutcome State),
+      ticks.length = n ∧ ∀ tick ∈ ticks, ¬ LiveTick tick := by
+  refine ⟨List.replicate n (noOpTick state), ?_, ?_⟩
+  · simp
+  · intro tick retained
+    have : tick = noOpTick state := List.eq_of_mem_replicate retained
+    subst tick
+    simp [LiveTick, ChangedState, noOpTick]
+
+/-- If no fired tick changed state, then the run contains no live tick,
+regardless of how many ticks fired. -/
+theorem no_changed_state_has_no_live_tick {State : Type} [DecidableEq State]
+    (ticks : List (TickOutcome State))
+    (unchanged : ∀ tick ∈ ticks, ¬ ChangedState tick) :
+    ∀ tick ∈ ticks, ¬ LiveTick tick := by
+  intro tick retained
+  exact unchanged tick retained
+
+/-- On an honestly labelled run with no state change, every label must be
+not-live. This is the no-false-green half of the paper's rule. -/
+theorem honest_no_change_forces_not_live_labels {State : Type}
+    [DecidableEq State] (ticks : List (TickOutcome State))
+    (honest : HonestLiveness ticks)
+    (unchanged : ∀ tick ∈ ticks, ¬ ChangedState tick) :
+    ∀ tick ∈ ticks, tick.reportedLive = false := by
+  intro tick retained
+  cases h : tick.reportedLive with
+  | false => rfl
+  | true => exact False.elim (unchanged tick retained (honest tick retained h))
+
+/-- Two no-op outcomes corresponding to `positiveRecord`'s two scheduled
+ticks. They make the route/liveness gap concrete without adding liveness
+fields to the route carrier. -/
+def positiveRouteNoOps : List (TickOutcome Nat) :=
+  [noOpTick 0, noOpTick 0]
+
+/-- `ScheduledRoute` does not imply a live tick. The accepted two-tick route
+has a same-length outcome record in which every fired tick is a no-op. -/
+theorem scheduledRoute_does_not_imply_live_tick :
+    ScheduledRoute positiveRecord ∧
+    positiveRouteNoOps.length = positiveRecord.tickPlan.length ∧
+    (∀ tick ∈ positiveRouteNoOps, ¬ LiveTick tick) := by
+  refine ⟨positiveRecord_is_scheduled, ?_, ?_⟩
+  · decide
+  · intro tick retained
+    simp [positiveRouteNoOps, noOpTick] at retained
+    subst tick
+    simp [LiveTick, ChangedState]
+
+/-- Control: a green/live label on an unchanged tick is dishonest. -/
+def falseGreenTick : TickOutcome Nat :=
+  { beforeState := 4, afterState := 4, reportedLive := true }
+
+theorem falseGreen_is_rejected : ¬ HonestLiveness [falseGreenTick] := by
+  intro honest
+  have changed := honest falseGreenTick (by simp) rfl
+  exact changed rfl
+
+/-- Positive control: a changed tick labelled live satisfies the criterion. -/
+def honestGreenTick : TickOutcome Nat :=
+  { beforeState := 4, afterState := 5, reportedLive := true }
+
+theorem honestGreen_is_accepted : HonestLiveness [honestGreenTick] := by
+  intro tick retained _
+  simp only [List.mem_singleton] at retained
+  subst tick
+  simp [ChangedState, honestGreenTick]
+
+/-- A changed tick labelled not-live is permitted. The paper forbids false
+green labels; it does not require every real change to receive a green label. -/
+def missedLiveTick : TickOutcome Nat :=
+  { beforeState := 4, afterState := 5, reportedLive := false }
+
+theorem missedLive_is_permitted : HonestLiveness [missedLiveTick] := by
+  intro tick retained labelled
+  simp [missedLiveTick] at retained
+  subst tick
+  simp at labelled
+
+/-- The paper's disable rule with its unspecified window exposed as `k`.
+`MustDisable k ticks` means `k` is a positive, available suffix and every tick
+in that suffix failed to change observable state. The paper fixes no value of
+`k`; this module does not choose one. -/
+def MustDisable {State : Type} [DecidableEq State]
+    (k : Nat) (ticks : List (TickOutcome State)) : Prop :=
+  0 < k ∧ k ≤ ticks.length ∧
+    ∀ tick ∈ ticks.reverse.take k, ¬ ChangedState tick
+
+/-- Any positive window within a wholly unchanged run meets the paper's
+parameterised disable condition. -/
+theorem no_change_requires_disable_for_every_available_window
+    {State : Type} [DecidableEq State]
+    (ticks : List (TickOutcome State))
+    (unchanged : ∀ tick ∈ ticks, ¬ ChangedState tick)
+    (k : Nat) (positive : 0 < k) (available : k ≤ ticks.length) :
+    MustDisable k ticks := by
+  refine ⟨positive, available, ?_⟩
+  intro tick retained
+  apply unchanged tick
+  have inReverse : tick ∈ ticks.reverse := List.mem_of_mem_take retained
+  simpa using inReverse
 
 end DarkTower.WarMachine.R10ScheduledEntrypoint
