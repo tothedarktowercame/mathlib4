@@ -192,6 +192,74 @@ theorem observations_for_favored_lower_temperature {beta Ga Gb Fa Fb : ℝ}
   rw [hd]
   exact mul_neg_of_pos_of_neg (sub_pos.mpr hp) (sub_neg.mpr hG)
 
+/-! The two-policy quantities above are the general ones on a two-policy type. -/
+
+theorem sum_twoPolicy (f : TwoPolicy → ℝ) : ∑ p, f p = f .a + f .b := by
+  have univ : (Finset.univ : Finset TwoPolicy) = {TwoPolicy.a, TwoPolicy.b} := by decide
+  rw [univ, Finset.sum_pair (by decide)]
+
+theorem priorPolicy_a (beta : ℝ) (G : TwoPolicy → ℝ) :
+    priorPolicy beta G .a = priorA beta (G .a) (G .b) := by
+  simp [priorPolicy, softmax, sum_twoPolicy, priorA]
+
+theorem priorPolicy_b (beta : ℝ) (G : TwoPolicy → ℝ) :
+    priorPolicy beta G .b = 1 - priorA beta (G .a) (G .b) := by
+  simp only [priorPolicy, softmax, sum_twoPolicy, priorA]
+  have pos : 0 < Real.exp (-G .a / beta) + Real.exp (-G .b / beta) := by positivity
+  field_simp
+  ring
+
+theorem posteriorPolicy_a (beta : ℝ) (G F : TwoPolicy → ℝ) :
+    posteriorPolicy beta G F .a = posteriorA beta (G .a) (G .b) (F .a) (F .b) := by
+  simp only [posteriorPolicy, softmax, sum_twoPolicy, posteriorA]
+  have ea : Real.exp (-F .a - G .a / beta) = Real.exp (-G .a / beta) * Real.exp (-F .a) := by
+    rw [← Real.exp_add]; congr 1; ring
+  have eb : Real.exp (-F .b - G .b / beta) = Real.exp (-G .b / beta) * Real.exp (-F .b) := by
+    rw [← Real.exp_add]; congr 1; ring
+  rw [ea, eb]
+
+theorem posteriorPolicy_b (beta : ℝ) (G F : TwoPolicy → ℝ) :
+    posteriorPolicy beta G F .b = 1 - posteriorA beta (G .a) (G .b) (F .a) (F .b) := by
+  simp only [posteriorPolicy, softmax, sum_twoPolicy, posteriorA]
+  have ea : Real.exp (-F .a - G .a / beta) = Real.exp (-G .a / beta) * Real.exp (-F .a) := by
+    rw [← Real.exp_add]; congr 1; ring
+  have eb : Real.exp (-F .b - G .b / beta) = Real.exp (-G .b / beta) * Real.exp (-F .b) := by
+    rw [← Real.exp_add]; congr 1; ring
+  rw [ea, eb]
+  have pos : 0 < Real.exp (-G .a / beta) * Real.exp (-F .a) +
+      Real.exp (-G .b / beta) * Real.exp (-F .b) := by positivity
+  field_simp
+  ring
+
+/-- On two policies, the general evidence term is `twoDelta`. -/
+theorem evidenceDelta_twoPolicy (beta : ℝ) (G F : TwoPolicy → ℝ) :
+    evidenceDelta beta G F = twoDelta beta (G .a) (G .b) (F .a) (F .b) := by
+  simp only [evidenceDelta, sum_twoPolicy, priorPolicy_a, priorPolicy_b,
+    posteriorPolicy_a, posteriorPolicy_b, twoDelta]
+
+/-- The general statement on two policies: observations that count against
+the policy expected free energy favours raise the temperature given by the
+paper's update, for every incoming temperature. -/
+theorem against_favoured_raises_updatedTemperature (beta : ℝ) (G F : TwoPolicy → ℝ)
+    (favoured : G .a < G .b) (against : F .b < F .a) :
+    beta < updatedTemperature beta G F := by
+  have positive := observations_against_favored_raise_temperature
+    (beta := beta) favoured against
+  rw [← evidenceDelta_twoPolicy] at positive
+  simp only [updatedTemperature]
+  linarith
+
+/-- Control with nothing assumed about the evidence term: a record that leaves
+the temperature where it was, although the observations count against the
+favoured policy, does not conform. -/
+theorem unchanged_against_favoured_refused (beta : ℝ) (G F : TwoPolicy → ℝ)
+    (favoured : G .a < G .b) (against : F .b < F .a) :
+    ¬ (0 < beta ∧
+      beta = updatedTemperature beta G F) := by
+  rintro ⟨_, unchanged⟩
+  have raised := against_favoured_raises_updatedTemperature beta G F favoured against
+  linarith
+
 /-! ## Interoceptive observations -/
 
 def finiteSurprisal (p : ℝ) : ℝ := -Real.log p
