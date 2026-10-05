@@ -1,0 +1,36 @@
+✖ [2946/2946] Building DarkTower.WarMachine.R15TemporalHierarchy (2.8s)
+trace: .> LEAN_PATH=/home/joe/code/mathlib4/.lake/packages/Cli/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/batteries/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/Qq/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/aesop/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/proofwidgets/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/importGraph/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/plausible/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/build/lib/lean /home/joe/.elan/toolchains/leanprover--lean4---v4.31.0-rc1/bin/lean /home/joe/code/mathlib4/DarkTower/WarMachine/R15TemporalHierarchy.lean -o /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R15TemporalHierarchy.olean -i /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R15TemporalHierarchy.ilean -c /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R15TemporalHierarchy.c --setup /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R15TemporalHierarchy.setup.json --json
+error: DarkTower/WarMachine/R15TemporalHierarchy.lean:340:28: Tactic `rewrite` failed: Did not find an occurrence of the pattern
+  ?m.62 / (a + b) < ?m.64 / ?m.65
+in the target expression
+  1 / 2 < selectionWeight temperature first / (selectionWeight temperature first + selectionWeight temperature second) ↔
+    first < second
+
+temperature first second : ℝ
+positive : 0 < temperature
+a : ℝ := selectionWeight temperature first
+b : ℝ := selectionWeight temperature second
+ha : 0 < a
+hb : 0 < b
+hab : 0 < a + b
+⊢ 1 / 2 < selectionWeight temperature first / (selectionWeight temperature first + selectionWeight temperature second) ↔
+    first < second
+error: DarkTower/WarMachine/R15TemporalHierarchy.lean:408:63: unexpected identifier; expected '}'
+error: DarkTower/WarMachine/R15TemporalHierarchy.lean:414:55: unsolved goals
+⊢ sorry.stepCosts.length = 2 ∧
+    sorry.reportedScore = discountedScore (1 / 2) sorry.stepCosts ∧
+      sorry = selectionProbability 2 5 ↑sorry.reportedScore ∧
+        sorry.reportedProbability = selectionProbability 2 (↑sorry.reportedScore) 5
+warning: DarkTower/WarMachine/R15TemporalHierarchy.lean:415:36: declaration uses `sorry`
+warning: DarkTower/WarMachine/R15TemporalHierarchy.lean:427:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/R15TemporalHierarchy.lean:423:8: declaration uses `sorry`
+error: DarkTower/WarMachine/R15TemporalHierarchy.lean:442:2: 'change' tactic failed, pattern
+  1 / 2 = selectionProbability 2 5 6
+is not definitionally equal to target
+  temperatureIgnoredRecord.first.reportedProbability =
+    selectionProbability temperatureIgnoredRecord.temperature ↑temperatureIgnoredRecord.first.reportedScore
+      ↑temperatureIgnoredRecord.second.reportedScore
+error: Lean exited with code 1
+Some required targets logged failures:
+- DarkTower.WarMachine.R15TemporalHierarchy
+error: build failed
