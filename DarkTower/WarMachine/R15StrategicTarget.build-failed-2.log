@@ -1,0 +1,86 @@
+✖ [2948/2948] Building DarkTower.WarMachine.R15StrategicTarget (1.9s)
+trace: .> LEAN_PATH=/home/joe/code/mathlib4/.lake/packages/Cli/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/batteries/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/Qq/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/aesop/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/proofwidgets/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/importGraph/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/plausible/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/build/lib/lean /home/joe/.elan/toolchains/leanprover--lean4---v4.31.0-rc1/bin/lean /home/joe/code/mathlib4/DarkTower/WarMachine/R15StrategicTarget.lean -o /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R15StrategicTarget.olean -i /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R15StrategicTarget.ilean -c /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R15StrategicTarget.c --setup /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R15StrategicTarget.setup.json --json
+warning: DarkTower/WarMachine/R15StrategicTarget.lean:126:22: This simp argument is unused:
+  sameOutcomes
+
+Hint: Omit it from the simp argument list.
+  simp_all ̵[̵s̵a̵m̵e̵O̵u̵t̵c̵o̵m̵e̵s̵]̵
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+error: DarkTower/WarMachine/R15StrategicTarget.lean:156:49: unsolved goals
+case focus
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+⊢ False
+
+case associated
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+⊢ False
+
+case usefulElsewhere
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+⊢ False
+
+case other
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+code✝ : ℕ
+⊢ False
+warning: DarkTower/WarMachine/R15StrategicTarget.lean:161:75: This simp argument is unused:
+  notWaiting
+
+Hint: Omit it from the simp argument list.
+  simp [tacticalPreference, classified,
+  ̵  ̵ ̵ ̵before_horizon_all_mass_waiting horizon tau before,
+  ̲  ̲ ̲ ̲waitingPreference,̵ ̵n̵o̵t̵W̵a̵i̵t̵i̵n̵g̵]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+warning: DarkTower/WarMachine/R15StrategicTarget.lean:212:8: This simp argument is unused:
+  wrongClassTick
+
+Hint: Omit it from the simp argument list.
+  simp [̵w̵r̵o̵n̵g̵C̵l̵a̵s̵s̵T̵i̵c̵k̵,̵ ̵o̵u̵t̵c̵o̵m̵e̵C̵l̵a̵s̵s̵,̵[̲o̲u̲t̲c̲o̲m̲e̲C̲l̲a̲s̲s̲,̲ scorerClass] at classified
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+error: Lean exited with code 1
+Some required targets logged failures:
+- DarkTower.WarMachine.R15StrategicTarget
+error: build failed

@@ -1,0 +1,97 @@
+✖ [2948/2948] Building DarkTower.WarMachine.R15StrategicTarget (2.1s)
+trace: .> LEAN_PATH=/home/joe/code/mathlib4/.lake/packages/Cli/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/batteries/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/Qq/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/aesop/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/proofwidgets/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/importGraph/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/packages/plausible/.lake/build/lib/lean:/home/joe/code/mathlib4/.lake/build/lib/lean /home/joe/.elan/toolchains/leanprover--lean4---v4.31.0-rc1/bin/lean /home/joe/code/mathlib4/DarkTower/WarMachine/R15StrategicTarget.lean -o /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R15StrategicTarget.olean -i /home/joe/code/mathlib4/.lake/build/lib/lean/DarkTower/WarMachine/R15StrategicTarget.ilean -c /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R15StrategicTarget.c --setup /home/joe/code/mathlib4/.lake/build/ir/DarkTower/WarMachine/R15StrategicTarget.setup.json --json
+error: DarkTower/WarMachine/R15StrategicTarget.lean:124:8: Unknown constant `List.filterMap_congr_left`
+error: DarkTower/WarMachine/R15StrategicTarget.lean:125:8: No goals to be solved
+error: DarkTower/WarMachine/R15StrategicTarget.lean:157:20: unsolved goals
+case notYetEvaluated.focus
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+⊢ tacticalPreference focus relation horizon tau (some target) = some 0
+
+case notYetEvaluated.associated
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+⊢ tacticalPreference focus relation horizon tau (some target) = some 0
+
+case notYetEvaluated.usefulElsewhere
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+⊢ tacticalPreference focus relation horizon tau (some target) = some 0
+
+case notYetEvaluated.other
+focus : Target
+relation : Target → Target → TargetRelation
+horizon tau target : ℕ
+before : tau < horizon
+classified :
+  (match relation focus target with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none) =
+    some EndingClass.notYetEvaluated
+code✝ : ℕ
+⊢ tacticalPreference focus relation horizon tau (some target) = some 0
+error: DarkTower/WarMachine/R15StrategicTarget.lean:209:32: Application type mismatch: The argument
+  wrongClassTick.candidates.head
+has type
+  wrongClassTick.candidates ≠ [] → CandidateClassReceipt
+but is expected to have type
+  CandidateClassReceipt
+in the application
+  conforms.left wrongClassTick.candidates.head
+error: DarkTower/WarMachine/R15StrategicTarget.lean:209:64: unsolved goals
+conforms : StrategicTickConforms wrongClassTick
+⊢ sorry () =
+    { target := 9, recordedRelation := TargetRelation.usefulElsewhere, scoredClass := some EndingClass.focused }
+error: DarkTower/WarMachine/R15StrategicTarget.lean:207:76: unsolved goals
+conforms : StrategicTickConforms wrongClassTick
+classified :
+  (sorry ()).scoredClass =
+    match (sorry ()).recordedRelation with
+    | TargetRelation.focus => some EndingClass.focused
+    | TargetRelation.associated => some EndingClass.related
+    | TargetRelation.usefulElsewhere => some EndingClass.unrelated
+    | TargetRelation.other code => none
+⊢ False
+warning: DarkTower/WarMachine/R15StrategicTarget.lean:210:8: This simp argument is unused:
+  wrongClassTick
+
+Hint: Omit it from the simp argument list.
+  simp [̵w̵r̵o̵n̵g̵C̵l̵a̵s̵s̵T̵i̵c̵k̵,̵ ̵o̵u̵t̵c̵o̵m̵e̵C̵l̵a̵s̵s̵,̵[̲o̲u̲t̲c̲o̲m̲e̲C̲l̲a̲s̲s̲,̲ scorerClass] at classified
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+error: DarkTower/WarMachine/R15StrategicTarget.lean:218:47: unsolved goals
+conforms : StrategicTickConforms earlyTerminalTick
+⊢ 1 ≤ earlyTerminalTick.horizon
+error: Lean exited with code 1
+Some required targets logged failures:
+- DarkTower.WarMachine.R15StrategicTarget
+error: build failed
