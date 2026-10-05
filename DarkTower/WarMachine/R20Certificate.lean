@@ -20,9 +20,10 @@ lines 28--32 and 47--56: each row identifies consumed values, checks the Lean
 proposition on them, and has an independently constructed bad extract that
 fails that same proposition.  Da Costa et al. (2020),
 `refs/dacosta2020.txt:222-227`, call the paired perception/action account
-“self-evidencing”.  Joe's 2026-10-05 ruling identifies R20 as the final
-Proof-2A/Proof-2B certificate and requires the qualitative result (for
-example, whether F discriminated between policies) to be printed.
+“self-evidencing”.  R20 is the last term of the PROOF-2a/PROOF-2b series
+(Joe, 2026-10-05): each row prints the qualitative result in plain terms, for
+example whether F was the same for every policy, and the certificate answers
+whether the click was active inference.
 
 | row | module | proposition | control |
 | --- | --- | --- | --- |
@@ -31,8 +32,8 @@ example, whether F discriminated between policies) to be printed.
 | habit | `R15TemporalHierarchy` | `TwoTickFeedback` | unwitnessed outcome |
 | class preference | `CTauClassPreference` | reported `classRisk` | altered risk |
 | strategic focus | `R15StrategicTarget` | `StrategicTickConforms` | wrong class |
-| liveness | `R10ScheduledEntrypoint` | honest live label | green no-op |
-| independence | R9 adapter | author/reviewer verdict | same author and reviewer |
+| liveness | `R10ScheduledEntrypoint` | `HonestLiveness` | green no-op |
+| independence | R9 adapter | author is not reviewer | same author and reviewer |
 | joint action | `R11JointAction.SharedState` | `OneWriter` | two writers |
 
 The evidence module supplies the posterior but no before/after receipt, so
@@ -103,17 +104,21 @@ def StrategicFocusConforms (r : StrategicFocusRow) : Prop :=
   R15StrategicTarget.StrategicTickConforms r.tick
 
 abbrev LiveRow := R10ScheduledEntrypoint.TickOutcome Nat
-def LivenessConforms (r : LiveRow) : Prop :=
-  r.reportedLive = decide (R10ScheduledEntrypoint.LiveTick r)
 
-inductive IndependenceVerdict | independent | sameAgent deriving DecidableEq, Repr
+/-- The R10 rule as that module states it: a tick labelled live changed
+state. A changed tick labelled not-live is permitted there and here. -/
+def LivenessConforms (r : LiveRow) : Prop :=
+  R10ScheduledEntrypoint.HonestLiveness [r]
+
 structure IndependenceRow where
   author : Fin 2
   reviewer : Fin 2
-  verdict : IndependenceVerdict
 
+/-- No self-certification: the row agrees only when the reviewer is a
+different agent from the author. A record that honestly reports one agent in
+both roles is present and disagrees. -/
 def IndependenceConforms (r : IndependenceRow) : Prop :=
-  r.verdict = if r.author = r.reviewer then .sameAgent else .independent
+  r.author ≠ r.reviewer
 
 abbrev JointRow := Fin 2 → R11JointAction.Ownership Unit (Fin 2)
 
@@ -161,13 +166,48 @@ theorem precision_constant_F_is_unchanged
     h.2.1 r.E r.G c).mp (by simpa [hc] using fixed)
   simp [caseOf, eq]
 
+/-- With two policies that G ranks differently, a conforming record's
+temperature is unchanged exactly when F is the same for both. -/
+theorem precision_unchanged_iff_F_equal
+    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (hG : r.G .a ≠ r.G .b) :
+    caseOf .precision r = .precision .unchanged ↔ r.F .a = r.F .b := by
+  constructor
+  · intro hcase
+    by_contra hF
+    have eq : r.betaPosterior = r.betaPrior := by
+      by_contra ne
+      simp only [caseOf, if_neg ne] at hcase
+      split_ifs at hcase <;> simp at hcase
+    exact PrecisionFromObservation.unchanged_discriminating_refused r hG hF eq h
+  · intro hF
+    apply precision_constant_F_is_unchanged r h (r.F .a)
+    funext p
+    cases p
+    · rfl
+    · exact hF.symm
+
+theorem precision_favoured_is_moreDecisive
+    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (hG : r.G .a < r.G .b) (hF : r.F .a < r.F .b) :
+    caseOf .precision r = .precision .moreDecisive := by
+  have lt := PrecisionFromObservation.favoured_observation_raises_precision h.2.2.1 hG hF
+  simp [caseOf, lt.ne, lt]
+
+theorem precision_against_is_lessDecisive
+    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (hG : r.G .a < r.G .b) (hF : r.F .b < r.F .a) :
+    caseOf .precision r = .precision .lessDecisive := by
+  have gt := PrecisionFromObservation.against_favoured_lowers_precision h.2.2.1 hG hF
+  simp [caseOf, gt.ne', not_lt.mpr gt.le]
+
 theorem evidence_state_independent_is_unchanged (r : EvidenceRow)
     (h : EvidenceConforms r) (normal : ∑ s, r.prior s = 1)
     (c : ℝ) (hc : 0 < c) (constant : ∀ s, r.likelihood s r.observation = c) :
-    r.posterior = r.prior := by
+    caseOf .evidence r = .evidence .beliefUnchanged := by
   have unchanged := EvidenceFromTheProcess.no_evidence_no_change
     r.prior r.likelihood r.observation normal c hc constant
-  exact h.trans unchanged
+  simp [caseOf, h.trans unchanged]
 
 theorem failed_habit_is_unchanged (r : R15TemporalHierarchy.TwoTickRecord)
     (failed : r.outcome.succeeded = false) : caseOf .habit r = .habit .unchanged := by
@@ -248,18 +288,32 @@ theorem badClass_refused : ¬ ClassPreferenceConforms badClass := by
 
 def badLive : LiveRow := ⟨0, 0, true⟩
 theorem badLive_refused : ¬ LivenessConforms badLive := by
-  simp [LivenessConforms, badLive, R10ScheduledEntrypoint.LiveTick,
-    R10ScheduledEntrypoint.ChangedState]
+  intro honest
+  have changed := honest badLive (by simp) rfl
+  simp [R10ScheduledEntrypoint.ChangedState, badLive] at changed
 
-def badIndependence : IndependenceRow := ⟨0, 0, .independent⟩
+def badIndependence : IndependenceRow := ⟨0, 0⟩
 theorem badIndependence_refused : ¬ IndependenceConforms badIndependence := by
   simp [IndependenceConforms, badIndependence]
 
+/-- A certified click had a reviewer who was not its author. -/
+theorem certified_author_is_not_reviewer (records : Records)
+    (certified : Certified (certify records)) :
+    ∃ r : IndependenceRow, records .independence = some r ∧ r.author ≠ r.reviewer :=
+  (certified_iff records).mp certified .independence
+
+/-- The precision control: a record whose temperature did not move although F
+differed between two policies that G ranks differently prints "unchanged" and
+disagrees. -/
 theorem precision_control_disagrees (records : Records)
     (r : PrecisionFromObservation.TickRecord Policy)
-    (present : records .precision = some r) (bad : ¬ PrecisionFromObservation.Conforms r) :
-    certify records .precision = .disagrees (caseOf .precision r) :=
-  refused_row_disagrees records .precision r present bad
+    (present : records .precision = some r)
+    (hG : r.G .a ≠ r.G .b) (hF : r.F .a ≠ r.F .b)
+    (unchanged : r.betaPosterior = r.betaPrior) :
+    certify records .precision = .disagrees (.precision .unchanged) := by
+  have bad := PrecisionFromObservation.unchanged_discriminating_refused r hG hF unchanged
+  rw [refused_row_disagrees records .precision r present bad]
+  simp [caseOf, unchanged]
 
 theorem evidence_control_disagrees (records : Records)
     (present : records .evidence = some badEvidence) :
