@@ -91,6 +91,17 @@ instance (trip : TripDisposition) : Decidable (OpenGenuine trip) := by
   unfold OpenGenuine
   infer_instance
 
+/-- Every genuine trip has a joined repair status. The runtime snapshot
+refuses (`:interoceptive/missing-finding-join`, `:interoceptive/missing-repair-join`)
+when this fails, following the ruling's "Unknown/unreadable trip authority is
+unavailable, never k=0". This module has no "unavailable" outcome: a genuine
+trip with no joined status is not `Discharged`, so it is counted as open
+(`unjoined_genuine_counts_as_open`), which also never reads as zero.
+`SnapshotConforms` is the runtime's criterion only for a `JoinComplete` list;
+for an incomplete one the runtime reports no factor at all. -/
+def JoinComplete (trips : List TripDisposition) : Prop :=
+  ∀ trip ∈ trips, Genuine trip → trip.repairStatus ≠ none
+
 /-- Distinct open genuine identities. Duplicate observations of one `:trip/id`
 contribute only once. -/
 def openGenuineIds (trips : List TripDisposition) : Finset Nat :=
@@ -119,6 +130,17 @@ def confidenceFactor (law : ConfidenceLaw) (trips : List TripDisposition) : ℚ 
 theorem duplicate_identity_counts_once (trip : TripDisposition) (h : OpenGenuine trip) :
     openGenuineCount [trip, trip] = 1 := by
   simp [openGenuineCount, openGenuineIds, h]
+
+/-- A genuine trip whose repair join is missing counts as open: absence of the
+disposition is never read as discharge. -/
+theorem unjoined_genuine_counts_as_open (trip : TripDisposition)
+    (genuine : Genuine trip) (unjoined : trip.repairStatus = none)
+    (rest : List TripDisposition) :
+    0 < openGenuineCount (trip :: rest) := by
+  have isOpen : OpenGenuine trip := ⟨genuine, by simp [Discharged, unjoined]⟩
+  have member : trip.tripId ∈ openGenuineIds (trip :: rest) := by
+    simp [openGenuineIds, isOpen]
+  exact Finset.card_pos.mpr ⟨_, member⟩
 
 theorem no_open_genuine_factor (law : ConfidenceLaw) (trips : List TripDisposition)
     (h : openGenuineCount trips = 0) : confidenceFactor law trips = 1 := by

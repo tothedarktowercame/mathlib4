@@ -1,9 +1,6 @@
 Command: lake build DarkTower.WarMachine.R20MachineConfidence
 Working directory: /home/joe/code/mathlib4
-Result: PASS
+Result: PASS (two linter warnings: unnecessarySeqFocus at lines 265 and 277)
 
-ℹ [8496/8500] Replayed DarkTower.WarMachine.CommitmentTemperature
-ℹ [8498/8500] Replayed DarkTower.WarMachine.MachineTemperature
-ℹ [8499/8500] Replayed DarkTower.WarMachine.InteroceptivePolicyPrecisionProposal
-⚠ [8500/8500] Built DarkTower.WarMachine.R20MachineConfidence (5.0s)
+⚠ [8500/8500] Built DarkTower.WarMachine.R20MachineConfidence (4.5s)
 Build completed successfully (8500 jobs).
