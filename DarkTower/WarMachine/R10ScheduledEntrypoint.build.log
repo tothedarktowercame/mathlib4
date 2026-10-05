@@ -1,2 +1,2 @@
-✔ [463/463] Built DarkTower.WarMachine.R10ScheduledEntrypoint (872ms)
-Build completed successfully (463 jobs).
+Command: lake build DarkTower.WarMachine.R10ScheduledEntrypoint DarkTower.WarMachine.R15TemporalHierarchy DarkTower.WarMachine.R15HabitPrior DarkTower.WarMachine.R15StrategicTarget
+Build completed successfully (3358 jobs).

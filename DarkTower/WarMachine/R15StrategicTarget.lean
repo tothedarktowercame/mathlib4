@@ -5,8 +5,8 @@ import Mathlib.Tactic
 /-!
 # R15 strategic target as a lower-level preference
 
-R15 says that “strategic selection fixes the tactical target.” The active-
-inference reading used here follows Parr et al. (2022), p. 204: higher levels
+In plain terms: the higher level decides what the lower level has to achieve
+and leaves it free to choose how. Source: Parr et al. (2022), p. 204: higher levels
 control lower ones “by setting their reference points or set-points (i.e., what
 they have to achieve) by leaving them free to select the means to achieve them
 rather than by setting or biasing the actions that the lower levels have to
@@ -26,10 +26,9 @@ refuses them rather than inventing a class.
 
 Thus “fixes” is a preference, not a constraint: terminal related and unrelated
 outcomes retain positive mass. This module says neither how the strategic focus
-is inferred nor how its own inference is scored. It also excludes the slow
-Beta state and mode from `tacticalPreference` by construction. Those enter the
-distinct habit-prior/cost shaping path in
-`temporal_hierarchy.clj/apply-slow-prior`, not this C schedule.
+is inferred nor how its own inference is scored. The counts of what worked
+are not an argument of `tacticalPreference`: they enter selection as the habit
+prior E (`R15HabitPrior`), not through this C schedule.
 
 The runtime decision retains `:focus-status` with focus and per-target
 classifications (`cascade_decision.clj` lines 1139–1155), the terminal
