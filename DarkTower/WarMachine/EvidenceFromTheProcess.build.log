@@ -1,3 +1,151 @@
-Command: lake build DarkTower.WarMachine.EvidenceFromTheProcess
-⚠ [3360/3360] Built DarkTower.WarMachine.EvidenceFromTheProcess (2.3s)
+ℹ [2701/2839] Replayed DarkTower.WarMachine.CascadeOrder
+info: DarkTower/WarMachine/CascadeOrder.lean:143:0: 'attempt001_2026_07_14_two_cycle_is_refused' depends on axioms: [propext]
+info: DarkTower/WarMachine/CascadeOrder.lean:144:0: 'dropping_reverse_edge_is_acyclic_but_not_a_semilattice' depends on axioms: [propext]
+info: DarkTower/WarMachine/CascadeOrder.lean:145:0: 'attempt008_2026_07_16_descent_is_accepted' depends on axioms: [propext]
+⚠ [2703/2839] Replayed DarkTower.WarMachine.Holes
+warning: DarkTower/WarMachine/Holes.lean:7464:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:7487:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:8082:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:8135:4: declaration uses `sorry`
+warning: DarkTower/WarMachine/Holes.lean:8138:4: declaration uses `sorry`
+⚠ [2704/2839] Replayed DarkTower.WarMachine.PolicyPosterior
+warning: DarkTower/WarMachine/PolicyPosterior.lean:18:5: Variable name `hhabit` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPosterior.lean:18:33: Variable name `htau` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPosterior.lean:19:5: Variable name `hne` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPosterior.lean:19:27: Variable name `hnodup` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+⚠ [2705/2839] Replayed DarkTower.WarMachine.PolicyPrecision
+warning: DarkTower/WarMachine/PolicyPrecision.lean:43:19: Variable name `hhabit` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPrecision.lean:48:19: Variable name `hhabit` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPrecision.lean:75:51: Variable name `hG` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PolicyPrecision.lean:94:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.PolicyPrecision.sum_map_enum`:
+  [Nonempty ι]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Nonempty ι] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+⚠ [3355/3360] Replayed DarkTower.WarMachine.R20Interoception
+warning: DarkTower/WarMachine/R20Interoception.lean:116:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.R20Interoception.zero_mass_surprisal_top`:
+  [Fintype Reading]
+  [DecidableEq Reading]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Fintype Reading] [DecidableEq Reading] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/R20Interoception.lean:125:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.R20Interoception.outside_surprisal_lower_bound`:
+  [Fintype Reading]
+  [DecidableEq Reading]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Fintype Reading] [DecidableEq Reading] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+⚠ [3356/3360] Replayed DarkTower.WarMachine.PrecisionFromObservation
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:64:42: Variable name `hc` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:72:46: Variable name `hc` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:84:44: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice
+
+Note: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:88:33: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice
+
+Note: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:104:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.PrecisionFromObservation.posterior_temperature_direction_lt`:
+  [Nonempty Policy]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Nonempty Policy] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:111:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.PrecisionFromObservation.posterior_temperature_direction_gt`:
+  [Nonempty Policy]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Nonempty Policy] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:163:5: Variable name `hE` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:199:49: 'change -F .b < -F .a' tactic does nothing
+
+Note: This linter can be disabled with `set_option linter.unusedTactic false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:203:49: 'change -F .a < -F .b' tactic does nothing
+
+Note: This linter can be disabled with `set_option linter.unusedTactic false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:180:35: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice
+
+Note: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:183:35: Used `tac1 <;> tac2` where `(tac1; tac2)` would suffice
+
+Note: This linter can be disabled with `set_option linter.unnecessarySeqFocus false`
+warning: DarkTower/WarMachine/PrecisionFromObservation.lean:256:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.PrecisionFromObservation.conformsWithin_zero_iff`:
+  [Nonempty Policy]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Nonempty Policy] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+⚠ [3360/3360] Built DarkTower.WarMachine.EvidenceFromTheProcess (3.6s)
+warning: DarkTower/WarMachine/EvidenceFromTheProcess.lean:55:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.EvidenceFromTheProcess.no_evidence_no_change`:
+  [Nonempty State]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Nonempty State] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/EvidenceFromTheProcess.lean:74:2: `push_neg` has been deprecated. Prefer using `push Not` instead.
+If you'd rather continue using `push_neg` in your project, you can implement it as follows:
+```
+open Lean.Parser.Tactic in
+macro "push_neg" cfg:optConfig loc:(location)? : tactic =>
+  `(tactic| push $cfg:optConfig Not $[$loc]?)
+```
+warning: DarkTower/WarMachine/EvidenceFromTheProcess.lean:113:0: automatically included section variable(s) unused in theorem `DarkTower.WarMachine.EvidenceFromTheProcess.posterior_rises_iff_likelihood_above_evidence`:
+  [Nonempty State]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [Nonempty State] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`
+warning: DarkTower/WarMachine/EvidenceFromTheProcess.lean:156:34: Variable name `G` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: DarkTower/WarMachine/EvidenceFromTheProcess.lean:156:36: Variable name `F` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
 Build completed successfully (3360 jobs).

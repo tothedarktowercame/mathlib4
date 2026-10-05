@@ -153,9 +153,9 @@ precision update with per-policy free energy `F`, and admits no outcome into
 the counts. -/
 def afterTick {Class Policy : Type*} [Fintype Policy] [Nonempty Policy]
     (before : EpistemicState State Class) (A : Likelihood State Observation)
-    (o : Observation) (G F : Policy → ℝ) : EpistemicState State Class :=
+    (o : Observation) (beta : ℝ) (G F : Policy → ℝ) : EpistemicState State Class :=
   { belief := posterior before.belief A o
-    temperature := PrecisionFromObservation.updatedTemperature before.temperature G F
+    temperature := beta
     counts := before.counts }
 
 /-- Nothing inferred, nothing learned: if the observation's likelihood is the
@@ -166,11 +166,13 @@ theorem uninformative_tick_changes_nothing
     (before : EpistemicState State Class) (A : Likelihood State Observation)
     (o : Observation) (normal : ∑ s, before.belief s = 1)
     (c : ℝ) (hc : 0 < c) (constantA : ∀ s, A s o = c)
-    (G : Policy → ℝ) (f : ℝ) :
-    afterTick before A o G (fun _ => f) = before := by
+    (E G : Policy → ℝ) (f beta : ℝ) (hprior : 0 < before.temperature)
+    (fixed : PrecisionFromObservation.IsPosteriorTemperature
+      before.temperature beta E G (fun _ => f)) :
+    afterTick before A o beta G (fun _ => f) = before := by
   have belief := no_evidence_no_change before.belief A o normal c hc constantA
-  have temperature :=
-    (PrecisionFromObservation.constant_F_no_update before.temperature G f).2.1
+  have temperature := (PrecisionFromObservation.constant_F_posterior_temperature_iff
+    hprior E G f).mp fixed
   cases before
   simp_all [afterTick]
 
@@ -190,14 +192,16 @@ theorem uninformative_tick_is_not_live
     (before : EpistemicState State Class) (A : Likelihood State Observation)
     (o : Observation) (normal : ∑ s, before.belief s = 1)
     (c : ℝ) (hc : 0 < c) (constantA : ∀ s, A s o = c)
-    (G : Policy → ℝ) (f : ℝ) (label : Bool) :
+    (E G : Policy → ℝ) (f beta : ℝ) (hprior : 0 < before.temperature)
+    (fixed : PrecisionFromObservation.IsPosteriorTemperature
+      before.temperature beta E G (fun _ => f)) (label : Bool) :
     ¬ R10ScheduledEntrypoint.LiveTick
       ({ beforeState := before
-         afterState := afterTick before A o G (fun _ => f)
+         afterState := afterTick before A o beta G (fun _ => f)
          reportedLive := label } :
         R10ScheduledEntrypoint.TickOutcome (EpistemicState State Class)) := by
   simp only [R10ScheduledEntrypoint.LiveTick, R10ScheduledEntrypoint.ChangedState,
-    uninformative_tick_changes_nothing before A o normal c hc constantA G f]
+    uninformative_tick_changes_nothing before A o normal c hc constantA E G f beta hprior fixed]
   simp
 
 /-! ## Small retained-record boundaries -/
