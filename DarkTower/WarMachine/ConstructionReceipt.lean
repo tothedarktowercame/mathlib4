@@ -182,4 +182,67 @@ theorem chainReceiptForgedToken_invalid :
     valid diamondSemantics chainReceiptForgedToken = false := by
   native_decide
 
+/-! ## The token relation
+
+Fix the units and their semantics. The pairs `(u, v)` that *could* carry a
+valid edge — some token `u` produces is one `v` needs, and `u` comes first in
+the order — are fixed with them. Every valid support is a sub-relation of
+this set, and its token sets are determined by it. So two valid receipts
+over one unit set are never two cascades: one is the token relation, the
+other has dropped edges. A chain over a non-chain relation needs an edge
+outside it, which `edgeValid` rejects (`chainReceipt_invalid`). This is the
+formal content of E-aif-cascade C2 / NOTE-outer-cascade §5c. -/
+
+def tokenRelated (semantics : Nat → UnitSemantics) (order : List Nat)
+    (u v : Nat) : Bool :=
+  decide ((semantics u).produces ∩ (semantics v).needs ≠ ∅) &&
+  match position? order u, position? order v with
+  | some fromPos, some toPos => fromPos < toPos
+  | _, _ => false
+
+/-- The token relation as a list of pairs, in order of the unit order. -/
+def tokenRelation (semantics : Nat → UnitSemantics) (order : List Nat) :
+    List (Nat × Nat) :=
+  order.flatMap fun u =>
+    order.filterMap fun v =>
+      if tokenRelated semantics order u v then some (u, v) else none
+
+theorem edgeValid_tokenRelated {semantics : Nat → UnitSemantics} {order : List Nat}
+    {edge : EdgeWitness} (h : edgeValid semantics order edge = true) :
+    tokenRelated semantics order edge.source edge.target = true ∧
+      edge.tokens = (semantics edge.source).produces ∩ (semantics edge.target).needs := by
+  unfold edgeValid at h
+  simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
+  obtain ⟨⟨heq, hne⟩, hpos⟩ := h
+  refine ⟨?_, heq⟩
+  unfold tokenRelated
+  simp only [Bool.and_eq_true, decide_eq_true_eq]
+  exact ⟨heq ▸ hne, hpos⟩
+
+/-- Every valid receipt's support lies inside the token relation of its
+units, with each edge's token set equal to the relation's. -/
+theorem valid_support_tokenRelated {semantics : Nat → UnitSemantics}
+    {receipt : Receipt} (h : valid semantics receipt = true) :
+    ∀ edge ∈ receipt.support,
+      tokenRelated semantics receipt.order edge.source edge.target = true ∧
+        edge.tokens =
+          (semantics edge.source).produces ∩ (semantics edge.target).needs := by
+  intro edge hmem
+  unfold valid at h
+  simp only [Bool.and_eq_true, List.all_eq_true] at h
+  exact edgeValid_tokenRelated (h.1.1.1.1.2 edge hmem)
+
+/-- The outer diamond's support *is* its token relation: nothing was dropped. -/
+theorem diamondSupport_is_tokenRelation :
+    diamondSupport.map (fun e => (e.source, e.target)) =
+      tokenRelation diamondSemantics [0, 1, 2, 3] := by
+  native_decide
+
+/-- The chain's fill → injury step is outside the token relation, in either
+order of the two. -/
+theorem chain_step_not_tokenRelated :
+    tokenRelated diamondSemantics [0, 1, 2, 3] 1 2 = false ∧
+      tokenRelated diamondSemantics [0, 2, 1, 3] 2 1 = false := by
+  native_decide
+
 end DarkTower.WarMachine.ConstructionReceipt
