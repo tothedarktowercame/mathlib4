@@ -127,6 +127,24 @@ theorem comp_wellFormed {A B C : Theory} {f g : PMap}
     have ht : wp.2.2 = wq.2.2 := hgfun wp.2 hpg wq.2 hqg hgs
     simpa [← hpv, ← hqv] using ht
 
+theorem wellFormed_of_le {A B : Theory} {f g : PMap}
+    (hfg : f.le g = true) (hg : g.wellFormed A B = true) :
+    f.wellFormed A B = true := by
+  simp only [le, decide_eq_true_eq] at hfg
+  obtain ⟨hgdom, hgfun⟩ := wellFormed_parts hg
+  apply wellFormed_of_parts
+  · intro p hp
+    exact hgdom p (hfg hp)
+  · intro p hp q hq heq
+    exact hgfun p (hfg hp) q (hfg hq) heq
+
+theorem comp_assoc (f g h : PMap) :
+    PMap.comp (PMap.comp f g) h = PMap.comp f (PMap.comp g h) := by
+  apply PMap.ext
+  ext p
+  simp only [comp, Finset.mem_image, Finset.mem_filter, Finset.mem_product]
+  aesop
+
 theorem comp_right_id {A B : Theory} {f : PMap} (hf : f.wellFormed A B = true) :
     comp f (id B) = f := by
   obtain ⟨hdom, _⟩ := wellFormed_parts hf
@@ -650,6 +668,12 @@ structure Square where
 
 def Square.span (q : Square) : Span := ⟨q.G, q.I₁, q.I₂, q.a₁, q.a₂⟩
 def Square.cone (q : Square) : Cone q.span := ⟨q.B, q.b₁, q.b₂, q.aux₁, q.aux₂⟩
+
+/-- On-the-nose equality of the two routes. Auxiliary flags are intentionally
+ignored: Proposition 8 uses this equality, not merely consistency after a
+triangle has been omitted. -/
+def Square.commutes (q : Square) : Bool :=
+  decide (PMap.comp q.a₁ q.b₁ = PMap.comp q.a₂ q.b₂)
 
 def Square.object (q : Square) : Role → Theory
   | .G => q.G
@@ -1207,5 +1231,35 @@ private def endpointBadCone : Cone endpointBadSpan :=
 theorem witness_none_without_wellFormed :
     ∃ (s : Span) (c : Cone s), c.inconsistencyWitness = none ∧ c.consistent = false := by
   exact ⟨endpointBadSpan, endpointBadCone, by native_decide⟩
+
+/-! ## Proposition 8 needs commutation -/
+
+private def prop8G : Theory := tokenTheory {0}
+private def prop8I₁ : Theory := tokenTheory {1}
+private def prop8I₂ : Theory := tokenTheory {2}
+private def prop8B₁ : Theory := tokenTheory {3}
+private def prop8J : Theory := tokenTheory {4}
+private def prop8C : Theory := tokenTheory {5}
+
+private def prop8A₁ : PMap := ⟨{(0, 1)}⟩
+private def prop8B₁Leg : PMap := ⟨{(1, 3)}⟩
+private def prop8C₂ : PMap := ⟨{(3, 5)}⟩
+
+def prop8DiamondOne : Square :=
+  ⟨prop8G, prop8I₁, prop8I₂, prop8B₁, prop8A₁, PMap.empty,
+    prop8B₁Leg, PMap.empty, false, false⟩
+def prop8DiamondTwo : Square :=
+  ⟨prop8I₁, prop8J, prop8B₁, prop8C, PMap.empty, prop8B₁Leg,
+    PMap.empty, prop8C₂, false, false⟩
+def prop8Composite : Square :=
+  ⟨prop8G, prop8J, prop8I₂, prop8C, PMap.empty, PMap.empty,
+    PMap.empty, PMap.empty, false, false⟩
+
+theorem prop8_fails_without_commutation :
+    prop8DiamondOne.cone.isPushout = true ∧
+    prop8DiamondTwo.cone.isPushout = true ∧
+    pastedDiamond prop8DiamondOne prop8DiamondTwo = some prop8Composite ∧
+    prop8Composite.cone.isPushout = false := by
+  native_decide
 
 end DarkTower.WarMachine.ThreeHalvesBlend
