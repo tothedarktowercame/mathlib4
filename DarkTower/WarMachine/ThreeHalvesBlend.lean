@@ -666,8 +666,9 @@ structure Square where
   aux₂ : Bool
   deriving DecidableEq
 
-def Square.span (q : Square) : Span := ⟨q.G, q.I₁, q.I₂, q.a₁, q.a₂⟩
-def Square.cone (q : Square) : Cone q.span := ⟨q.B, q.b₁, q.b₂, q.aux₁, q.aux₂⟩
+@[simp] def Square.span (q : Square) : Span := ⟨q.G, q.I₁, q.I₂, q.a₁, q.a₂⟩
+@[simp] def Square.cone (q : Square) : Cone q.span :=
+  ⟨q.B, q.b₁, q.b₂, q.aux₁, q.aux₂⟩
 
 /-- On-the-nose equality of the two routes. Auxiliary flags are intentionally
 ignored: Proposition 8 uses this equality, not merely consistency after a
@@ -698,6 +699,112 @@ def pastedDiamond (d₁ d₂ : Square) : Option Square :=
         aux₁ := d₁.aux₁ || d₂.aux₁
         aux₂ := d₁.aux₂ || d₂.aux₂ }
   else none
+
+/-- Goguen's Proposition 8 on this carrier: vertically pasted pushouts remain
+pushouts when the second square commutes on the nose and all seven constituent
+maps are hom-set members. Without the last condition the second leg may be
+non-functional away from the part tested by the second square. -/
+theorem prop8 (d₁ d₂ d : Square)
+    (hpaste : pastedDiamond d₁ d₂ = some d)
+    (_hwa₁ : d₁.a₁.wellFormed d₁.G d₁.I₁ = true)
+    (_hwa₂ : d₁.a₂.wellFormed d₁.G d₁.I₂ = true)
+    (_hwb₁ : d₁.b₁.wellFormed d₁.I₁ d₁.B = true)
+    (_hwb₂ : d₁.b₂.wellFormed d₁.I₂ d₁.B = true)
+    (_hwa₃ : d₂.a₁.wellFormed d₂.G d₂.I₁ = true)
+    (_hwc₁ : d₂.b₁.wellFormed d₂.I₁ d₂.B = true)
+    (hwc₂ : d₂.b₂.wellFormed d₂.I₂ d₂.B = true)
+    (h₁ : d₁.cone.isPushout = true) (h₂ : d₂.cone.isPushout = true)
+    (hcomm₂ : d₂.commutes = true) : d.cone.isPushout = true := by
+  unfold pastedDiamond at hpaste
+  split at hpaste
+  · rename_i hmatch
+    simp only [Option.some.injEq] at hpaste
+    subst d
+    rcases hmatch with ⟨hG, hI₂, ha₂⟩
+    simp only [Square.commutes, decide_eq_true_eq] at hcomm₂
+    simp only [Cone.isPushout, Bool.and_eq_true, decide_eq_true_eq] at h₁ h₂ ⊢
+    constructor
+    · let base : PMap := PMap.join d₁.cone.route₁ d₁.cone.route₂
+      let bound : PMap := PMap.comp base d₂.b₂
+      have hbase : base.wellFormed d₁.G d₁.B = true := by
+        simpa [base, Cone.consistent] using h₁.1
+      have hbound : bound.wellFormed d₁.G d₂.B = true := by
+        apply PMap.comp_wellFormed hbase
+        simpa [hI₂] using hwc₂
+      apply PMap.wellFormed_of_le (g := bound) ?_ hbound
+      simp only [PMap.le, decide_eq_true_eq]
+      intro p hp
+      simp only [PMap.join, Finset.mem_union] at hp
+      rcases hp with hp | hp
+      · by_cases haux₁ : d₁.aux₁ = true
+        · have : False := by
+            simp [Cone.route₁, haux₁, PMap.empty] at hp
+          contradiction
+        · by_cases haux₃ : d₂.aux₁ = true
+          · have : False := by
+              simp [Cone.route₁, haux₃, PMap.empty] at hp
+            contradiction
+          · have hd₁a : d₁.aux₁ = false := Bool.eq_false_of_not_eq_true haux₁
+            have hd₂a : d₂.aux₁ = false := Bool.eq_false_of_not_eq_true haux₃
+            have heq : PMap.comp (PMap.comp d₁.a₁ d₂.a₁) d₂.b₁ =
+                PMap.comp (PMap.comp d₁.a₁ d₁.b₁) d₂.b₂ := by
+              rw [PMap.comp_assoc, hcomm₂, ← PMap.comp_assoc, ha₂]
+            have hinner : (PMap.comp d₁.a₁ d₁.b₁).le base = true := by
+              simp only [PMap.le, decide_eq_true_eq]
+              intro x hx
+              exact Finset.mem_union_left _ (by simpa [base, Cone.route₁, hd₁a] using hx)
+            have hout := PMap.comp_monotone hinner (PMap.le_refl d₂.b₂)
+            simp only [PMap.le, decide_eq_true_eq] at hout
+            apply hout
+            rw [← heq]
+            simpa [Cone.route₁, hd₁a, hd₂a] using hp
+      · by_cases haux₂ : d₁.aux₂ = true
+        · have : False := by
+            simp [Cone.route₂, haux₂, PMap.empty] at hp
+          contradiction
+        · by_cases haux₄ : d₂.aux₂ = true
+          · have : False := by
+              simp [Cone.route₂, haux₄, PMap.empty] at hp
+            contradiction
+          · have hd₁a : d₁.aux₂ = false := Bool.eq_false_of_not_eq_true haux₂
+            have hd₂a : d₂.aux₂ = false := Bool.eq_false_of_not_eq_true haux₄
+            have heq : PMap.comp d₁.a₂ (PMap.comp d₁.b₂ d₂.b₂) =
+                PMap.comp (PMap.comp d₁.a₂ d₁.b₂) d₂.b₂ := by
+              rw [← PMap.comp_assoc]
+            have hinner : (PMap.comp d₁.a₂ d₁.b₂).le base = true := by
+              simp only [PMap.le, decide_eq_true_eq]
+              intro x hx
+              exact Finset.mem_union_right _ (by simpa [base, Cone.route₂, hd₁a] using hx)
+            have hout := PMap.comp_monotone hinner (PMap.le_refl d₂.b₂)
+            simp only [PMap.le, decide_eq_true_eq] at hout
+            apply hout
+            rw [← heq]
+            simpa [Cone.route₂, hd₁a, hd₂a] using hp
+    · intro y hy
+      have hy₂ := h₂.2 hy
+      simp only [Finset.mem_union, Finset.mem_image] at hy₂ ⊢
+      rcases hy₂ with ⟨jy, hjy, rfl⟩ | ⟨my, hmy, rfl⟩
+      · exact Or.inl ⟨jy, hjy, rfl⟩
+      · have hmB : my.1 ∈ d₁.B.elems := by
+          have := (PMap.wellFormed_parts (by simpa [hI₂] using hwc₂)).1 my hmy
+          exact this.1
+        have hm := h₁.2 hmB
+        simp only [Finset.mem_union, Finset.mem_image] at hm
+        rcases hm with ⟨im, him, himy⟩ | ⟨km, hkm, hkmy⟩
+        · have hroute : (im.1, my.2) ∈ (PMap.comp d₂.a₂ d₂.b₂).rel := by
+            simp only [PMap.comp, Finset.mem_image, Finset.mem_filter, Finset.mem_product]
+            exact ⟨(im, my), ⟨⟨by simpa [ha₂] using him, hmy⟩, himy⟩, rfl⟩
+          rw [← hcomm₂] at hroute
+          simp only [PMap.comp, Finset.mem_image, Finset.mem_filter, Finset.mem_product] at hroute
+          obtain ⟨w, ⟨⟨hwa, hwb⟩, _⟩, hwy⟩ := hroute
+          have hwy2 : w.2.2 = my.2 := by injection hwy
+          exact Or.inl ⟨w.2, hwb, hwy2⟩
+        · right
+          refine ⟨(km.1, my.2), ?_, rfl⟩
+          apply Finset.mem_image.mpr
+          exact ⟨(km, my), Finset.mem_filter.mpr
+            ⟨Finset.mem_product.mpr ⟨hkm, hmy⟩, hkmy⟩, rfl⟩
+  · simp at hpaste
 
 structure Gluing where
   i : Nat
