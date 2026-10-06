@@ -2,6 +2,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Finset.Image
 import Mathlib.Data.Finset.Prod
+import Mathlib.Data.Finset.Sort
 import Mathlib.Data.List.Basic
 
 /-! # A finite 3/2-blend carrier
@@ -46,6 +47,10 @@ def carries (f : PMap) (A B : Theory) : Finset (Nat × Nat × Nat) :=
     decide (∃ images ∈ f.rel ×ˢ (f.rel ×ˢ f.rel),
       images.1.1 = a.1 ∧ images.2.1.1 = a.2.1 ∧ images.2.2.1 = a.2.2 ∧
         (images.1.2, images.2.1.2, images.2.2.2) ∈ B.axioms)
+
+/-- Number of unordered pairs of distinct sources sent to one target. -/
+def identifications (f : PMap) : Nat :=
+  (f.rel ×ˢ f.rel).filter (fun pq => pq.1.1 < pq.2.1 && pq.1.2 = pq.2.2) |>.card
 
 def le (f g : PMap) : Bool :=
   decide (f.rel ⊆ g.rel)
@@ -197,6 +202,82 @@ theorem both_auxiliary_vacuous (s : Span) (B : Theory) (b₁ b₂ : PMap) :
     (Cone.mk B b₁ b₂ true true : Cone s).consistent = true := by
   simp [Cone.consistent, PMap.empty, PMap.join, PMap.wellFormed]
 
+/-- K1' coverage: the literal Definition 7 on this carrier (discovery note
+§2), not Goguen's optimality distinction (`Cone.quality`). Auxiliary flags
+remove span triangles from consistency; both surviving cone legs cover B. -/
+def Cone.isPushout {s : Span} (c : Cone s) : Bool :=
+  c.consistent && decide (c.B.elems ⊆
+    c.b₁.rel.image Prod.snd ∪ c.b₂.rel.image Prod.snd)
+
+structure ConeQuality where
+  carries₁ : Finset (Nat × Nat × Nat)
+  carries₂ : Finset (Nat × Nat × Nat)
+  dom₁ : Finset Nat
+  dom₂ : Finset Nat
+  ident₁ : Nat
+  ident₂ : Nat
+  deriving DecidableEq
+
+def Cone.quality {s : Span} (c : Cone s) : ConeQuality :=
+  { carries₁ := c.b₁.carries s.I₁ c.B
+    carries₂ := c.b₂.carries s.I₂ c.B
+    dom₁ := c.b₁.rel.image Prod.fst
+    dom₂ := c.b₂.rel.image Prod.fst
+    ident₁ := c.b₁.identifications
+    ident₂ := c.b₂.identifications }
+
+/-- K2': fewer identifications first; at equal identification counts, more
+carried axioms and larger domains. Both legs are compared conjunctively. -/
+def Cone.qualityLE {s : Span} (c d : Cone s) : Bool :=
+  let qc := c.quality
+  let qd := d.quality
+  decide (qd.ident₁ ≤ qc.ident₁ ∧ qd.ident₂ ≤ qc.ident₂ ∧
+    ((qd.ident₁ = qc.ident₁ ∧ qd.ident₂ = qc.ident₂) →
+      qc.carries₁ ⊆ qd.carries₁ ∧ qc.carries₂ ⊆ qd.carries₂ ∧
+      qc.dom₁ ⊆ qd.dom₁ ∧ qc.dom₂ ⊆ qd.dom₂))
+
+theorem Cone.qualityLE_refl {s : Span} (c : Cone s) : c.qualityLE c = true := by
+  simp [Cone.qualityLE]
+
+theorem Cone.qualityLE_trans {s : Span} {c d e : Cone s}
+    (hcd : c.qualityLE d = true) (hde : d.qualityLE e = true) :
+    c.qualityLE e = true := by
+  simp only [Cone.qualityLE, decide_eq_true_eq] at hcd hde ⊢
+  refine ⟨Nat.le_trans hde.1 hcd.1, Nat.le_trans hde.2.1 hcd.2.1, ?_⟩
+  rintro ⟨hec₁, hec₂⟩
+  have hdc₁ : (d.quality).ident₁ = (c.quality).ident₁ :=
+    Nat.le_antisymm hcd.1 (hec₁ ▸ hde.1)
+  have hdc₂ : (d.quality).ident₂ = (c.quality).ident₂ :=
+    Nat.le_antisymm hcd.2.1 (hec₂ ▸ hde.2.1)
+  have hed₁ : (e.quality).ident₁ = (d.quality).ident₁ := hec₁.trans hdc₁.symm
+  have hed₂ : (e.quality).ident₂ = (d.quality).ident₂ := hec₂.trans hdc₂.symm
+  obtain ⟨hcdC₁, hcdC₂, hcdD₁, hcdD₂⟩ := hcd.2.2 ⟨hdc₁, hdc₂⟩
+  obtain ⟨hdeC₁, hdeC₂, hdeD₁, hdeD₂⟩ := hde.2.2 ⟨hed₁, hed₂⟩
+  exact ⟨fun _ h => hdeC₁ (hcdC₁ h), fun _ h => hdeC₂ (hcdC₂ h),
+    fun _ h => hdeD₁ (hcdD₁ h), fun _ h => hdeD₂ (hcdD₂ h)⟩
+
+private def PMap.graphsFrom (sources : List Nat) (targets : Finset Nat) :
+    List (Finset (Nat × Nat)) :=
+  match sources with
+  | [] => [∅]
+  | x :: xs => (PMap.graphsFrom xs targets).flatMap fun rel =>
+      rel :: (targets.sort (· ≤ ·)).map fun y => insert (x, y) rel
+
+/-- The `(n+1)^m` partial functional graphs between two finite element sets. -/
+def PMap.allGraphs (A B : Theory) : List (Finset (Nat × Nat)) :=
+  PMap.graphsFrom (A.elems.sort (· ≤ ·)) B.elems
+
+/-- Cone isomorphism by enumeration of partial functional graphs. The graph
+and transpose are total well-formed maps; legs commute and axioms map both ways. -/
+def Cone.isoCones {s : Span} (c d : Cone s) : Bool :=
+  decide (∃ rel ∈ PMap.allGraphs c.B d.B,
+    let φ : PMap := ⟨rel⟩
+    let ψ : PMap := ⟨rel.image Prod.swap⟩
+    φ.wellFormed c.B d.B = true ∧ ψ.wellFormed d.B c.B = true ∧
+    rel.image Prod.fst = c.B.elems ∧ rel.image Prod.snd = d.B.elems ∧
+    PMap.comp c.b₁ φ = d.b₁ ∧ PMap.comp c.b₂ φ = d.b₂ ∧
+    φ.carries c.B d.B = c.B.axioms ∧ ψ.carries d.B c.B = d.B.axioms)
+
 /-! ## House, boat, houseboat, and boathouse
 
 Element codes:
@@ -259,6 +340,52 @@ def boatToSplitHouseboat : PMap :=
 def splitHouseboatCone : Cone houseBoatSpan :=
   ⟨splitHouseboatTheory, houseToSplitHouseboat, boatToSplitHouseboat, false, false⟩
 
+/- Additional K1'--K3 witnesses. Code 40 is the one-point blend. The renamed
+Houseboat shifts its five element codes by 100. -/
+def amphibiousRVTheory : Theory :=
+  ⟨{30, 31, 12, 22, 33, 4}, {(33, 30, 31), (4, 31, 12), (4, 31, 22)}⟩
+def houseToRV : PMap :=
+  ⟨{(10, 30), (11, 31), (12, 12), (13, 33), (4, 4)}⟩
+def boatToRV : PMap :=
+  ⟨{(20, 30), (21, 31), (22, 22), (23, 33), (4, 4)}⟩
+def rvCone : Cone houseBoatSpan :=
+  ⟨amphibiousRVTheory, houseToRV, boatToRV, true, false⟩
+def rvConeOtherSideAuxiliary : Cone houseBoatSpan :=
+  ⟨amphibiousRVTheory, houseToRV, boatToRV, false, true⟩
+def rvConeNoAuxiliary : Cone houseBoatSpan :=
+  ⟨amphibiousRVTheory, houseToRV, boatToRV, false, false⟩
+
+def onePointTheory : Theory := ⟨{40}, {(40, 40, 40)}⟩
+def houseToOnePoint : PMap :=
+  ⟨{(10, 40), (11, 40), (12, 40), (13, 40), (4, 40)}⟩
+def boatToOnePoint : PMap :=
+  ⟨{(20, 40), (21, 40), (22, 40), (23, 40), (4, 40)}⟩
+def onePointCone : Cone houseBoatSpan :=
+  ⟨onePointTheory, houseToOnePoint, boatToOnePoint, false, false⟩
+
+def waterDroppingTheory : Theory := ⟨houseboatTheory.elems, {(33, 30, 31)}⟩
+def waterDroppingCone : Cone houseBoatSpan :=
+  ⟨waterDroppingTheory, houseToHouseboat, boatToHouseboat, false, false⟩
+
+def landHouseboatTheory : Theory :=
+  ⟨{30, 31, 12, 33, 4}, {(33, 30, 31), (4, 31, 12)}⟩
+def houseToLandHouseboat : PMap :=
+  ⟨{(10, 30), (11, 31), (12, 12), (13, 33), (4, 4)}⟩
+def boatToLandHouseboat : PMap :=
+  ⟨{(20, 30), (21, 31), (23, 33), (4, 4)}⟩
+def landHouseboatCone : Cone houseBoatSpan :=
+  ⟨landHouseboatTheory, houseToLandHouseboat, boatToLandHouseboat, false, false⟩
+
+def renamedHouseboatTheory : Theory :=
+  ⟨{130, 131, 122, 133, 104}, {(133, 130, 131), (104, 131, 122)}⟩
+def houseToRenamedHouseboat : PMap :=
+  ⟨{(10, 130), (11, 131), (13, 133), (4, 104)}⟩
+def boatToRenamedHouseboat : PMap :=
+  ⟨{(20, 130), (21, 131), (22, 122), (23, 133), (4, 104)}⟩
+def renamedHouseboatCone : Cone houseBoatSpan :=
+  ⟨renamedHouseboatTheory, houseToRenamedHouseboat,
+    boatToRenamedHouseboat, false, false⟩
+
 theorem witnessTheories_wellFormed :
     genericTheory.wellFormed = true ∧ houseTheory.wellFormed = true ∧
     boatTheory.wellFormed = true ∧ houseboatTheory.wellFormed = true ∧
@@ -313,6 +440,70 @@ theorem boathouse_no_auxiliary_inconsistent :
   native_decide
 
 theorem split_houseboat_inconsistent : splitHouseboatCone.consistent = false := by
+  native_decide
+
+theorem addedWitnesses_wellFormed :
+    amphibiousRVTheory.wellFormed = true ∧ onePointTheory.wellFormed = true ∧
+    waterDroppingTheory.wellFormed = true ∧ landHouseboatTheory.wellFormed = true ∧
+    renamedHouseboatTheory.wellFormed = true := by
+  native_decide
+
+theorem landHouseboat_consistent : landHouseboatCone.consistent = true := by
+  native_decide
+
+theorem rv_no_auxiliary_inconsistent : rvConeNoAuxiliary.consistent = false := by
+  native_decide
+
+/-- Under K1' Boathouse with its House triangle auxiliary is a pushout: the
+flag removes that triangle from consistency, while both legs cover the blend.
+This was false under the superseded K1, which omitted auxiliary legs from
+coverage as well. -/
+theorem k1PushoutWitnesses :
+    houseboatCone.isPushout = true ∧
+    boathouseCone.isPushout = true ∧
+    boathouseConeNoAuxiliary.isPushout = false ∧
+    onePointCone.isPushout = true ∧
+    waterDroppingCone.isPushout = true ∧
+    rvCone.isPushout = true ∧
+    rvConeOtherSideAuxiliary.isPushout = true ∧
+    rvConeNoAuxiliary.isPushout = false ∧
+    landHouseboatCone.isPushout = true := by
+  native_decide
+
+theorem rv_strictly_better_than_houseboat :
+    houseboatCone.qualityLE rvCone = true ∧ rvCone.qualityLE houseboatCone = false := by
+  native_decide
+
+theorem houseboat_strictly_better_than_waterDropping :
+    waterDroppingCone.qualityLE houseboatCone = true ∧
+      houseboatCone.qualityLE waterDroppingCone = false := by
+  native_decide
+
+theorem onePoint_below_named_witnesses :
+    onePointCone.qualityLE houseboatCone = true ∧
+    houseboatCone.qualityLE onePointCone = false ∧
+    onePointCone.qualityLE rvCone = true ∧ rvCone.qualityLE onePointCone = false ∧
+    onePointCone.qualityLE waterDroppingCone = true ∧
+      waterDroppingCone.qualityLE onePointCone = false := by
+  native_decide
+
+theorem houseboat_landHouseboat_incomparable :
+    houseboatCone.qualityLE landHouseboatCone = false ∧
+      landHouseboatCone.qualityLE houseboatCone = false := by
+  native_decide
+
+theorem houseboat_rv_not_isomorphic : houseboatCone.isoCones rvCone = false := by
+  native_decide
+
+theorem houseboat_self_isomorphic : houseboatCone.isoCones houseboatCone = true := by
+  native_decide
+
+theorem renamed_houseboat_isomorphic :
+    houseboatCone.isoCones renamedHouseboatCone = true := by
+  native_decide
+
+theorem land_houseboat_not_isomorphic :
+    houseboatCone.isoCones landHouseboatCone = false := by
   native_decide
 
 end DarkTower.WarMachine.ThreeHalvesBlend
