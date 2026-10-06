@@ -250,4 +250,121 @@ theorem chain_step_not_tokenRelated :
       tokenRelated diamondSemantics [0, 2, 1, 3] 2 1 = false := by
   native_decide
 
+/-! ## The extended outer diamond
+
+This is the semantic projection of
+`futon2/holes/labs/wm-contract/proposals/meta-outer-policy-cascade-extended-proposal.edn`.
+
+  units  0 observe-the-meta-field, 1 read-the-item-sheet,
+         2 read-revealed-attention, 3 read-library-coupling,
+         4 fill-meta-policy-slots, 5 injury-routes-to-self-heal,
+         6 minimise-g-over-filled-meta-policies
+  tokens 0 field-observation, 1 injury-observation, 2 item-sheet,
+         3 item-attention, 4 item-unblocks, 5 item-coupling,
+         6 filled-candidates, 7 typed-exclusions, 8 admitted-support,
+         9 rearm-slot, 10 selected-meta-policy
+
+The coupling unit produces token 5, which no unit needs. Consequently the
+proposal's coupling precedence has no `EdgeWitness`: it is recorded in the
+proposal but does not enter this valid support. -/
+
+def extendedSemantics : Nat → UnitSemantics
+  | 0 => ⟨{0, 1}, ∅⟩
+  | 1 => ⟨{2}, {0}⟩
+  | 2 => ⟨{3, 4}, {0}⟩
+  | 3 => ⟨{5}, {0}⟩
+  | 4 => ⟨{6, 7}, {0}⟩
+  | 5 => ⟨{8, 9}, {0, 1}⟩
+  | 6 => ⟨{10}, {2, 3, 6, 7, 8, 9}⟩
+  | _ => ⟨∅, ∅⟩
+
+def extendedObserveSheet : EdgeWitness := ⟨0, 1, {0}⟩
+def extendedObserveAttention : EdgeWitness := ⟨0, 2, {0}⟩
+def extendedObserveCoupling : EdgeWitness := ⟨0, 3, {0}⟩
+def extendedObserveFill : EdgeWitness := ⟨0, 4, {0}⟩
+def extendedObserveInjury : EdgeWitness := ⟨0, 5, {0, 1}⟩
+def extendedSheetMinimise : EdgeWitness := ⟨1, 6, {2}⟩
+def extendedAttentionMinimise : EdgeWitness := ⟨2, 6, {3}⟩
+def extendedFillMinimise : EdgeWitness := ⟨4, 6, {6, 7}⟩
+def extendedInjuryMinimise : EdgeWitness := ⟨5, 6, {8, 9}⟩
+
+def extendedSupport : List EdgeWitness :=
+  [extendedObserveSheet, extendedObserveAttention, extendedObserveCoupling,
+   extendedObserveFill, extendedObserveInjury, extendedSheetMinimise,
+   extendedAttentionMinimise, extendedFillMinimise, extendedInjuryMinimise]
+
+def extendedMeets : List MeetWitness :=
+  [⟨1, 2, 0, [extendedObserveSheet], [extendedObserveAttention]⟩,
+   ⟨1, 3, 0, [extendedObserveSheet], [extendedObserveCoupling]⟩,
+   ⟨1, 4, 0, [extendedObserveSheet], [extendedObserveFill]⟩,
+   ⟨1, 5, 0, [extendedObserveSheet], [extendedObserveInjury]⟩,
+   ⟨2, 3, 0, [extendedObserveAttention], [extendedObserveCoupling]⟩,
+   ⟨2, 4, 0, [extendedObserveAttention], [extendedObserveFill]⟩,
+   ⟨2, 5, 0, [extendedObserveAttention], [extendedObserveInjury]⟩,
+   ⟨3, 4, 0, [extendedObserveCoupling], [extendedObserveFill]⟩,
+   ⟨3, 5, 0, [extendedObserveCoupling], [extendedObserveInjury]⟩,
+   ⟨4, 5, 0, [extendedObserveFill], [extendedObserveInjury]⟩]
+
+def extendedReceipt : Receipt :=
+  { order := [0, 1, 2, 3, 4, 5, 6]
+    support := extendedSupport
+    meets := extendedMeets
+    precedence := extendedSupport
+    linearExtension := [0, 1, 2, 3, 4, 5, 6]
+    precedenceViolations := [] }
+
+theorem extendedReceipt_valid :
+    valid extendedSemantics extendedReceipt = true := by
+  native_decide
+
+def extendedReceiptReadingsReversed : Receipt :=
+  { extendedReceipt with
+    order := [0, 5, 4, 3, 2, 1, 6]
+    linearExtension := [0, 5, 4, 3, 2, 1, 6] }
+
+theorem extendedReceiptReadingsReversed_valid :
+    valid extendedSemantics extendedReceiptReadingsReversed = true := by
+  native_decide
+
+def extendedCouplingEdge : EdgeWitness := ⟨3, 6, ∅⟩
+def extendedForgedCouplingEdge : EdgeWitness := ⟨3, 6, {5}⟩
+
+def extendedReceiptWithCoupling : Receipt :=
+  { extendedReceipt with
+    support := extendedSupport ++ [extendedCouplingEdge]
+    precedence := extendedSupport ++ [extendedCouplingEdge] }
+
+theorem extendedReceiptWithCoupling_invalid :
+    valid extendedSemantics extendedReceiptWithCoupling = false := by
+  native_decide
+
+def extendedReceiptWithForgedCoupling : Receipt :=
+  { extendedReceipt with
+    support := extendedSupport ++ [extendedForgedCouplingEdge]
+    precedence := extendedSupport ++ [extendedForgedCouplingEdge] }
+
+theorem extendedReceiptWithForgedCoupling_invalid :
+    valid extendedSemantics extendedReceiptWithForgedCoupling = false := by
+  native_decide
+
+theorem coupling_not_tokenRelated :
+    tokenRelated extendedSemantics [0, 1, 2, 3, 4, 5, 6] 3 6 = false := by
+  native_decide
+
+theorem extendedSupport_is_tokenRelation :
+    extendedSupport.map (fun e => (e.source, e.target)) =
+      tokenRelation extendedSemantics [0, 1, 2, 3, 4, 5, 6] := by
+  native_decide
+
+def extendedChainStep : EdgeWitness := ⟨1, 2, ∅⟩
+
+def extendedChainStepReceipt : Receipt :=
+  { extendedReceipt with
+    support := extendedSupport ++ [extendedChainStep]
+    precedence := extendedSupport ++ [extendedChainStep] }
+
+theorem extendedChainStep_invalid :
+    valid extendedSemantics extendedChainStepReceipt = false := by
+  native_decide
+
 end DarkTower.WarMachine.ConstructionReceipt
