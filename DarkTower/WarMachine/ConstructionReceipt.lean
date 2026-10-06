@@ -23,6 +23,10 @@ structure EdgeWitness where
   tokens : Finset Nat
   deriving DecidableEq
 
+/-- A meet in `CascadeOrder`'s sense: the nearest common *origin* of `left`
+and `right` in descent. The paths run from the meet to each operand
+(ruled 2026-10-06, E-aif-cascade R3: the two Lean modules had disagreed on
+direction; `CascadeOrder.IsMeet` is the reading kept). -/
 structure MeetWitness where
   left : Nat
   right : Nat
@@ -64,8 +68,8 @@ def pathValid (semantics : Nat → UnitSemantics) (order : List Nat)
 
 def meetValid (semantics : Nat → UnitSemantics) (order : List Nat)
     (witness : MeetWitness) : Bool :=
-  pathValid semantics order witness.left witness.meet witness.leftPath &&
-  pathValid semantics order witness.right witness.meet witness.rightPath
+  pathValid semantics order witness.meet witness.left witness.leftPath &&
+  pathValid semantics order witness.meet witness.right witness.rightPath
 
 def valid (semantics : Nat → UnitSemantics) (receipt : Receipt) : Bool :=
   decide receipt.order.Nodup &&
@@ -87,7 +91,7 @@ def exampleEdge : EdgeWitness := ⟨0, 1, {0}⟩
 def exampleReceipt : Receipt :=
   { order := [0, 1]
     support := [exampleEdge]
-    meets := [⟨0, 1, 1, [exampleEdge], []⟩]
+    meets := [⟨0, 1, 0, [], [exampleEdge]⟩]
     precedence := [exampleEdge]
     linearExtension := [0, 1]
     precedenceViolations := [] }
@@ -105,7 +109,7 @@ theorem forgedTokenReceipt_invalid : valid exampleSemantics forgedTokenReceipt =
 
 def disconnectedPathReceipt : Receipt :=
   { exampleReceipt with
-    meets := [⟨0, 1, 1, [⟨0, 0, {0}⟩], []⟩] }
+    meets := [⟨0, 1, 0, [], [⟨0, 0, {0}⟩]⟩] }
 
 theorem disconnectedPathReceipt_invalid :
     valid exampleSemantics disconnectedPathReceipt = false := by
@@ -122,7 +126,8 @@ are numbered as in `NOTE-outer-cascade-as-pasted-blends-2026-10-05.md` §3:
          3 typed-exclusions, 4 admitted-support, 5 rearm-slot,
          6 selected-meta-policy
 
-`fill` and `injury` are incomparable; `minimise` is their meet.  The diamond
+`fill` and `injury` are incomparable; `observe` is their meet (common origin)
+and `minimise` their join.  The diamond
 has two linear extensions, and both validate the same support: the order is
 a parse of the formation, not part of it.  A chain adds an edge between
 `fill` and `injury` that no token supports, and `valid` rejects it. -/
@@ -145,7 +150,7 @@ def diamondSupport : List EdgeWitness :=
 def diamondReceipt : Receipt :=
   { order := [0, 1, 2, 3]
     support := diamondSupport
-    meets := [⟨1, 2, 3, [fillMinimise], [injuryMinimise]⟩]
+    meets := [⟨1, 2, 0, [observeFill], [observeInjury]⟩]
     precedence := diamondSupport
     linearExtension := [0, 1, 2, 3]
     precedenceViolations := [] }
