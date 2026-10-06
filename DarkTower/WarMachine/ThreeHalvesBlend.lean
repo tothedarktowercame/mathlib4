@@ -95,6 +95,38 @@ theorem comp_monotone {f f' g g' : PMap} (hf : f.le f' = true)
   obtain ⟨q, ⟨⟨hqf, hqg⟩, hmatch⟩, rfl⟩ := hp
   exact ⟨q, ⟨⟨hf hqf, hg hqg⟩, hmatch⟩, rfl⟩
 
+theorem wellFormed_of_parts {f : PMap} {A B : Theory}
+    (hdom : ∀ p ∈ f.rel, p.1 ∈ A.elems ∧ p.2 ∈ B.elems)
+    (hfun : ∀ p ∈ f.rel, ∀ q ∈ f.rel, p.1 = q.1 → p.2 = q.2) :
+    f.wellFormed A B = true := by
+  simp only [wellFormed, Bool.and_eq_true, decide_eq_true_eq]
+  constructor
+  · intro p hp
+    exact Finset.mem_product.mpr (hdom p hp)
+  · apply Finset.card_image_iff.mpr
+    intro p hp q hq heq
+    exact Prod.ext heq (hfun p hp q hq heq)
+
+theorem comp_wellFormed {A B C : Theory} {f g : PMap}
+    (hf : f.wellFormed A B = true) (hg : g.wellFormed B C = true) :
+    (PMap.comp f g).wellFormed A C = true := by
+  obtain ⟨hfdom, hffun⟩ := wellFormed_parts hf
+  obtain ⟨hgdom, hgfun⟩ := wellFormed_parts hg
+  apply wellFormed_of_parts
+  · intro p hp
+    simp only [comp, Finset.mem_image, Finset.mem_filter, Finset.mem_product] at hp
+    obtain ⟨q, ⟨⟨hqf, hqg⟩, _⟩, rfl⟩ := hp
+    exact ⟨(hfdom q.1 hqf).1, (hgdom q.2 hqg).2⟩
+  · intro p hp q hq heq
+    simp only [comp, Finset.mem_image, Finset.mem_filter, Finset.mem_product] at hp hq
+    obtain ⟨wp, ⟨⟨hpf, hpg⟩, hpm⟩, hpv⟩ := hp
+    obtain ⟨wq, ⟨⟨hqf, hqg⟩, hqm⟩, hqv⟩ := hq
+    have hs : wp.1.1 = wq.1.1 := by simpa [← hpv, ← hqv] using heq
+    have hm : wp.1.2 = wq.1.2 := hffun wp.1 hpf wq.1 hqf hs
+    have hgs : wp.2.1 = wq.2.1 := hpm ▸ hqm ▸ hm
+    have ht : wp.2.2 = wq.2.2 := hgfun wp.2 hpg wq.2 hqg hgs
+    simpa [← hpv, ← hqv] using ht
+
 theorem comp_right_id {A B : Theory} {f : PMap} (hf : f.wellFormed A B = true) :
     comp f (id B) = f := by
   obtain ⟨hdom, _⟩ := wellFormed_parts hf
@@ -191,16 +223,162 @@ structure Cone (s : Span) where
   aux₂ : Bool
   deriving DecidableEq
 
+def Cone.route₁ (s : Span) (c : Cone s) : PMap :=
+  if c.aux₁ then PMap.empty else PMap.comp s.a₁ c.b₁
+
+def Cone.route₂ (s : Span) (c : Cone s) : PMap :=
+  if c.aux₂ then PMap.empty else PMap.comp s.a₂ c.b₂
+
 /-- The join of the non-auxiliary composites is their least upper bound, so
 its well-formedness is equivalent to existence of a well-formed upper bound.
 An auxiliary triangle contributes the empty map to this join. -/
 def Cone.consistent (s : Span) (c : Cone s) : Bool :=
-  (PMap.join (if c.aux₁ then PMap.empty else PMap.comp s.a₁ c.b₁)
-    (if c.aux₂ then PMap.empty else PMap.comp s.a₂ c.b₂)).wellFormed s.G c.B
+  (PMap.join (c.route₁) (c.route₂)).wellFormed s.G c.B
 
 theorem both_auxiliary_vacuous (s : Span) (B : Theory) (b₁ b₂ : PMap) :
     (Cone.mk B b₁ b₂ true true : Cone s).consistent = true := by
-  simp [Cone.consistent, PMap.empty, PMap.join, PMap.wellFormed]
+  simp [Cone.consistent, Cone.route₁, Cone.route₂, PMap.empty,
+    PMap.join, PMap.wellFormed]
+
+private def firstTarget (rel : Finset (Nat × Nat)) (g : Nat) : Option Nat :=
+  ((rel.filter fun (p : Nat × Nat) => p.1 = g).image Prod.snd).sort (· ≤ ·) |>.head?
+
+private def firstConflict (route₁ route₂ : Finset (Nat × Nat)) :
+    List Nat → Option (Nat × Nat × Nat)
+  | [] => none
+  | g :: gs =>
+    match firstTarget route₁ g, firstTarget route₂ g with
+    | some x, some y => if x = y then firstConflict route₁ route₂ gs else some (g, x, y)
+    | _, _ => firstConflict route₁ route₂ gs
+
+private theorem firstTarget_eq_of_mem {rel : Finset (Nat × Nat)} {g x : Nat}
+    (hmem : (g, x) ∈ rel)
+    (hfun : ∀ p ∈ rel, ∀ q ∈ rel, p.1 = q.1 → p.2 = q.2) :
+    firstTarget rel g = some x := by
+  have himage : (rel.filter fun p => p.1 = g).image Prod.snd = {x} := by
+    ext y
+    constructor
+    · intro hy
+      simp only [Finset.mem_image, Finset.mem_filter] at hy
+      obtain ⟨p, ⟨hp, hpg⟩, hpy⟩ := hy
+      have : p.2 = x := hfun p hp (g, x) hmem hpg
+      simp [← hpy, this]
+    · intro hy
+      simp only [Finset.mem_singleton] at hy
+      subst y
+      exact Finset.mem_image.mpr ⟨(g, x), Finset.mem_filter.mpr ⟨hmem, rfl⟩, rfl⟩
+  simp [firstTarget, himage]
+
+private theorem mem_of_head?_eq_some {α : Type} {l : List α} {x : α}
+    (h : l.head? = some x) : x ∈ l := by
+  cases l with
+  | nil => simp at h
+  | cons a as => simp at h ⊢; exact Or.inl h.symm
+
+private theorem firstTarget_mem {rel : Finset (Nat × Nat)} {g x : Nat}
+    (h : firstTarget rel g = some x) : (g, x) ∈ rel := by
+  unfold firstTarget at h
+  have hx : x ∈ ((rel.filter fun p => p.1 = g).image Prod.snd).sort (· ≤ ·) :=
+    mem_of_head?_eq_some h
+  simp only [Finset.mem_sort, Finset.mem_image, Finset.mem_filter] at hx
+  obtain ⟨p, ⟨hp, hpg⟩, hpx⟩ := hx
+  simpa [← hpg, ← hpx] using hp
+
+private theorem firstConflict_none_of_cross_equal {route₁ route₂ : Finset (Nat × Nat)}
+    (gs : List Nat)
+    (heq : ∀ g x y, g ∈ gs → (g, x) ∈ route₁ → (g, y) ∈ route₂ → x = y) :
+    firstConflict route₁ route₂ gs = none := by
+  induction gs with
+  | nil => rfl
+  | cons g gs ih =>
+    simp only [firstConflict]
+    cases h₁ : firstTarget route₁ g <;> cases h₂ : firstTarget route₂ g
+    · exact ih (fun a x y ha hx hy => heq a x y (by simp [ha]) hx hy)
+    · exact ih (fun a x y ha hx hy => heq a x y (by simp [ha]) hx hy)
+    · exact ih (fun a x y ha hx hy => heq a x y (by simp [ha]) hx hy)
+    · rename_i x y
+      have hxy : x = y := heq g x y (by simp)
+        (firstTarget_mem h₁) (firstTarget_mem h₂)
+      simp [hxy]
+      exact ih (fun a x y ha hx hy => heq a x y (by simp [ha]) hx hy)
+
+private theorem firstConflict_none_imp {route₁ route₂ : Finset (Nat × Nat)}
+    {gs : List Nat} (hnone : firstConflict route₁ route₂ gs = none)
+    {g x y : Nat} (hg : g ∈ gs)
+    (hx : firstTarget route₁ g = some x) (hy : firstTarget route₂ g = some y) : x = y := by
+  induction gs with
+  | nil => simp at hg
+  | cons a as ih =>
+    simp only [List.mem_cons] at hg
+    rcases hg with rfl | hg
+    · by_cases hxy : x = y
+      · exact hxy
+      · simp [firstConflict, hx, hy, hxy] at hnone
+    · apply ih ?_ hg
+      cases h₁ : firstTarget route₁ a <;> cases h₂ : firstTarget route₂ a
+      · simpa [firstConflict, h₁, h₂] using hnone
+      · simpa [firstConflict, h₁, h₂] using hnone
+      · simpa [firstConflict, h₁, h₂] using hnone
+      · rename_i u v
+        by_cases huv : u = v
+        · simpa [firstConflict, h₁, h₂, huv] using hnone
+        · simp [firstConflict, h₁, h₂, huv] at hnone
+
+/-- First source, in Nat order, on which the two non-auxiliary routes disagree.
+The targets are ordered by route, not by their Nat values. Endpoint failures
+are deliberately not encoded by this witness type. -/
+def Cone.inconsistencyWitness (s : Span) (c : Cone s) : Option (Nat × Nat × Nat) :=
+  firstConflict c.route₁.rel c.route₂.rel (s.G.elems.sort (· ≤ ·))
+
+theorem inconsistencyWitness_none_iff (s : Span) (c : Cone s)
+    (ha₁ : s.a₁.wellFormed s.G s.I₁ = true)
+    (ha₂ : s.a₂.wellFormed s.G s.I₂ = true)
+    (hb₁ : c.b₁.wellFormed s.I₁ c.B = true)
+    (hb₂ : c.b₂.wellFormed s.I₂ c.B = true) :
+    c.inconsistencyWitness = none ↔ c.consistent = true := by
+  have hr₁ : c.route₁.wellFormed s.G c.B = true := by
+    unfold Cone.route₁
+    split
+    · simp [PMap.empty, PMap.wellFormed]
+    · exact PMap.comp_wellFormed ha₁ hb₁
+  have hr₂ : c.route₂.wellFormed s.G c.B = true := by
+    unfold Cone.route₂
+    split
+    · simp [PMap.empty, PMap.wellFormed]
+    · exact PMap.comp_wellFormed ha₂ hb₂
+  obtain ⟨hd₁, hf₁⟩ := PMap.wellFormed_parts hr₁
+  obtain ⟨hd₂, hf₂⟩ := PMap.wellFormed_parts hr₂
+  constructor
+  · intro hn
+    apply PMap.wellFormed_of_parts
+    · intro p hp
+      simp only [PMap.join, Finset.mem_union] at hp
+      rcases hp with hp | hp
+      · exact hd₁ p hp
+      · exact hd₂ p hp
+    · intro p hp q hq heq
+      simp only [PMap.join, Finset.mem_union] at hp hq
+      rcases hp with hp | hp <;> rcases hq with hq | hq
+      · exact hf₁ p hp q hq heq
+      · have hg : p.1 ∈ s.G.elems := (hd₁ p hp).1
+        have hgl : p.1 ∈ s.G.elems.sort (· ≤ ·) := by simpa
+        have hq' : (p.1, q.2) ∈ c.route₂.rel := by simpa [heq] using hq
+        have ht := firstConflict_none_imp (by simpa [Cone.inconsistencyWitness] using hn)
+          hgl (firstTarget_eq_of_mem hp hf₁) (firstTarget_eq_of_mem hq' hf₂)
+        exact ht
+      · have hg : q.1 ∈ s.G.elems := (hd₁ q hq).1
+        have hgl : q.1 ∈ s.G.elems.sort (· ≤ ·) := by simpa
+        have hp' : (q.1, p.2) ∈ c.route₂.rel := by rw [← heq]; exact hp
+        have ht := firstConflict_none_imp (by simpa [Cone.inconsistencyWitness] using hn)
+          hgl (firstTarget_eq_of_mem hq hf₁) (firstTarget_eq_of_mem hp' hf₂)
+        exact ht.symm
+      · exact hf₂ p hp q hq heq
+  · intro hc
+    obtain ⟨_, hjfun⟩ := PMap.wellFormed_parts hc
+    apply firstConflict_none_of_cross_equal
+    intro g x y _ hx hy
+    exact hjfun (g, x) (by simp [PMap.join, hx]) (g, y)
+      (by simp [PMap.join, hy]) rfl
 
 /-- K1' coverage: the literal Definition 7 on this carrier (discovery note
 §2), not Goguen's optimality distinction (`Cone.quality`). Auxiliary flags
@@ -304,6 +482,24 @@ def Square.object (q : Square) : Role → Theory
   | .I₁ => q.I₁
   | .I₂ => q.I₂
   | .B => q.B
+
+/-- Vertical pasting. The second square must have the first square's `I₁` as
+ground, its `b₁` as second span leg, and the first square's `B` as that leg's
+codomain. The composite has span `(a₁;a₃, a₂)` and cone `(c₁, b₂;c₂)`. -/
+def pastedDiamond (d₁ d₂ : Square) : Option Square :=
+  if d₂.G = d₁.I₁ ∧ d₂.I₂ = d₁.B ∧ d₂.a₂ = d₁.b₁ then
+    some
+      { G := d₁.G
+        I₁ := d₂.I₁
+        I₂ := d₁.I₂
+        B := d₂.B
+        a₁ := PMap.comp d₁.a₁ d₂.a₁
+        a₂ := d₁.a₂
+        b₁ := d₂.b₁
+        b₂ := PMap.comp d₁.b₂ d₂.b₂
+        aux₁ := d₁.aux₁ || d₂.aux₁
+        aux₂ := d₁.aux₂ || d₂.aux₂ }
+  else none
 
 structure Gluing where
   i : Nat
@@ -772,5 +968,70 @@ theorem diamond_application_order_witness :
     ({diamondPolicy with applicationOrder := [(1, 2, 0)]}).constructionOrder =
       diamondPolicy.constructionOrder := by
   exact applicationOrder_independent diamondPolicy [(1, 2, 0)]
+
+/-! ## Vertical pasting can destroy consistency
+
+This is the partial-map witness for Goguen 1999, p. 33: two consistent
+diamonds whose vertical composite is inconsistent. -/
+
+private def pasteG : Theory := tokenTheory {0}
+private def pasteI₁ : Theory := tokenTheory {1}
+private def pasteI₂ : Theory := tokenTheory {2}
+private def pasteB₁ : Theory := tokenTheory {3}
+private def pasteJ : Theory := tokenTheory {4}
+private def pasteC : Theory := tokenTheory {5, 6}
+
+private def pasteA₁ : PMap := ⟨{(0, 1)}⟩
+private def pasteA₂ : PMap := ⟨{(0, 2)}⟩
+private def pasteB₁Leg : PMap := PMap.empty
+private def pasteB₂ : PMap := ⟨{(2, 3)}⟩
+private def pasteA₃ : PMap := ⟨{(1, 4)}⟩
+private def pasteC₁ : PMap := ⟨{(4, 5)}⟩
+private def pasteC₂ : PMap := ⟨{(3, 6)}⟩
+
+def pasteDiamondOne : Square :=
+  ⟨pasteG, pasteI₁, pasteI₂, pasteB₁, pasteA₁, pasteA₂,
+    pasteB₁Leg, pasteB₂, false, false⟩
+def pasteDiamondTwo : Square :=
+  ⟨pasteI₁, pasteJ, pasteB₁, pasteC, pasteA₃, pasteB₁Leg,
+    pasteC₁, pasteC₂, false, false⟩
+def pasteComposite : Square :=
+  ⟨pasteG, pasteJ, pasteI₂, pasteC, PMap.comp pasteA₁ pasteA₃, pasteA₂,
+    pasteC₁, PMap.comp pasteB₂ pasteC₂, false, false⟩
+
+theorem pastedDiamond_witness :
+    pastedDiamond pasteDiamondOne pasteDiamondTwo = some pasteComposite := by
+  native_decide
+
+theorem diamondOne_consistent : pasteDiamondOne.cone.consistent = true := by
+  native_decide
+
+theorem diamondTwo_consistent : pasteDiamondTwo.cone.consistent = true := by
+  native_decide
+
+theorem composite_inconsistent : pasteComposite.cone.consistent = false := by
+  native_decide
+
+theorem composite_witness :
+    pasteComposite.cone.inconsistencyWitness = some (0, 5, 6) := by
+  native_decide
+
+private def totalPasteB₁ : PMap := ⟨{(1, 3)}⟩
+def totalB₁DiamondTwo : Square :=
+  ⟨pasteI₁, pasteJ, pasteB₁, pasteC, pasteA₃, totalPasteB₁,
+    pasteC₁, pasteC₂, false, false⟩
+
+theorem totalB₁_diamondTwo_inconsistent :
+    totalB₁DiamondTwo.cone.consistent = false := by
+  native_decide
+
+private def endpointBadSpan : Span :=
+  ⟨pasteG, pasteI₁, pasteI₂, ⟨{(9, 1)}⟩, PMap.empty⟩
+private def endpointBadCone : Cone endpointBadSpan :=
+  ⟨tokenTheory {5}, ⟨{(1, 5)}⟩, PMap.empty, false, false⟩
+
+theorem witness_none_without_wellFormed :
+    ∃ (s : Span) (c : Cone s), c.inconsistencyWitness = none ∧ c.consistent = false := by
+  exact ⟨endpointBadSpan, endpointBadCone, by native_decide⟩
 
 end DarkTower.WarMachine.ThreeHalvesBlend
