@@ -278,6 +278,203 @@ def Cone.isoCones {s : Span} (c d : Cone s) : Bool :=
     PMap.comp c.b₁ φ = d.b₁ ∧ PMap.comp c.b₂ φ = d.b₂ ∧
     φ.carries c.B d.B = c.B.axioms ∧ ψ.carries d.B c.B = d.B.axioms)
 
+/-! ## Policies, gluing, and structural verdicts -/
+
+inductive Role | G | I₁ | I₂ | B
+  deriving DecidableEq, Repr
+
+structure Square where
+  G : Theory
+  I₁ : Theory
+  I₂ : Theory
+  B : Theory
+  a₁ : PMap
+  a₂ : PMap
+  b₁ : PMap
+  b₂ : PMap
+  aux₁ : Bool
+  aux₂ : Bool
+  deriving DecidableEq
+
+def Square.span (q : Square) : Span := ⟨q.G, q.I₁, q.I₂, q.a₁, q.a₂⟩
+def Square.cone (q : Square) : Cone q.span := ⟨q.B, q.b₁, q.b₂, q.aux₁, q.aux₂⟩
+
+def Square.object (q : Square) : Role → Theory
+  | .G => q.G
+  | .I₁ => q.I₁
+  | .I₂ => q.I₂
+  | .B => q.B
+
+structure Gluing where
+  i : Nat
+  rᵢ : Role
+  j : Nat
+  rⱼ : Role
+  iso : PMap
+  deriving DecidableEq
+
+structure Policy where
+  squares : List Square
+  gluings : List Gluing
+  applicationOrder : List (Nat × Nat × Nat)
+  deriving DecidableEq
+
+private def Gluing.wellFormed (squares : List Square) (g : Gluing) : Bool :=
+  match squares[g.i]?, squares[g.j]? with
+  | some qi, some qj =>
+    let A := qi.object g.rᵢ
+    let B := qj.object g.rⱼ
+    let inv : PMap := ⟨g.iso.rel.image Prod.swap⟩
+    g.iso.wellFormed A B && inv.wellFormed B A &&
+      decide (g.iso.rel.image Prod.fst = A.elems) &&
+      decide (g.iso.rel.image Prod.snd = B.elems) &&
+      decide (g.iso.carries A B = A.axioms) && decide (inv.carries B A = B.axioms)
+  | _, _ => false
+
+def Policy.wellFormed (p : Policy) : Bool :=
+  p.gluings.all (Gluing.wellFormed p.squares)
+
+private def componentStep (squares : List Square) (gluings : List Gluing)
+    (seen : Finset Nat) : Finset Nat :=
+  gluings.foldl (fun acc g =>
+    if g.i ∈ acc ∧ g.j < squares.length then insert g.j acc
+    else if g.j ∈ acc ∧ g.i < squares.length then insert g.i acc
+    else acc) seen
+
+private def componentClosure (squares : List Square) (gluings : List Gluing) :
+    Nat → Finset Nat → Finset Nat
+  | 0, seen => seen
+  | n + 1, seen => componentClosure squares gluings n
+      (componentStep squares gluings seen)
+
+private def component (squares : List Square) (gluings : List Gluing) (i : Nat) : List Nat :=
+  (componentClosure squares gluings squares.length {i}).sort (· ≤ ·)
+
+private def addComponent (squares : List Square) (gluings : List Gluing)
+    (cs : List (List Nat)) (i : Nat) :
+    List (List Nat) :=
+  if cs.any (fun c => i ∈ c) then cs else cs ++ [component squares gluings i]
+
+/-- Connected components in increasing order of their least square index. -/
+def Policy.components (p : Policy) : List (List Nat) :=
+  (List.range p.squares.length).foldl (addComponent p.squares p.gluings) []
+
+private theorem componentStep_subset (squares : List Square) (gluings : List Gluing)
+    (seen : Finset Nat) : seen ⊆ componentStep squares gluings seen := by
+  unfold componentStep
+  induction gluings generalizing seen with
+  | nil => simp
+  | cons g gs ih =>
+    simp only [List.foldl_cons]
+    apply Finset.Subset.trans (s₂ := if g.i ∈ seen ∧ g.j < squares.length then
+      insert g.j seen else if g.j ∈ seen ∧ g.i < squares.length then insert g.i seen else seen)
+    · by_cases h₁ : g.i ∈ seen ∧ g.j < squares.length
+      · simp [h₁]
+      · by_cases h₂ : g.j ∈ seen ∧ g.i < squares.length <;> simp [h₁, h₂]
+    · apply ih
+
+private theorem componentClosure_subset (squares : List Square) (gluings : List Gluing)
+    (n : Nat) (seen : Finset Nat) :
+    seen ⊆ componentClosure squares gluings n seen := by
+  induction n generalizing seen with
+  | zero => exact Finset.Subset.rfl
+  | succ n ih =>
+    exact Finset.Subset.trans (componentStep_subset squares gluings seen)
+      (ih (componentStep squares gluings seen))
+
+private theorem mem_component_self (squares : List Square) (gluings : List Gluing)
+    (i : Nat) : i ∈ component squares gluings i := by
+  simp only [component, Finset.mem_sort]
+  exact componentClosure_subset squares gluings squares.length {i} (by simp)
+
+private theorem mem_flatten_addComponent (squares : List Square) (gluings : List Gluing)
+    (cs : List (List Nat)) (i : Nat) :
+    i ∈ (addComponent squares gluings cs i).flatten := by
+  unfold addComponent
+  split
+  · rename_i h
+    simp only [List.any_eq_true] at h
+    obtain ⟨c, hc, hic⟩ := h
+    exact List.mem_flatten.mpr ⟨c, hc, of_decide_eq_true hic⟩
+  · simp [mem_component_self]
+
+private theorem mem_flatten_addComponent_of_mem (squares : List Square)
+    (gluings : List Gluing) (cs : List (List Nat)) (i x : Nat)
+    (hx : x ∈ cs.flatten) : x ∈ (addComponent squares gluings cs i).flatten := by
+  unfold addComponent
+  split
+  · exact hx
+  · simp only [List.flatten_append, List.mem_append]
+    exact Or.inl hx
+
+private theorem fold_addComponent_preserves (squares : List Square)
+    (gluings : List Gluing) (xs : List Nat) (cs : List (List Nat)) (x : Nat)
+    (hx : x ∈ cs.flatten) :
+    x ∈ (xs.foldl (addComponent squares gluings) cs).flatten := by
+  induction xs generalizing cs with
+  | nil => exact hx
+  | cons i is ih =>
+    simp only [List.foldl_cons]
+    exact ih _ (mem_flatten_addComponent_of_mem squares gluings cs i x hx)
+
+private theorem fold_addComponent_covers (squares : List Square)
+    (gluings : List Gluing) (xs : List Nat) (cs : List (List Nat))
+    {i : Nat} (hi : i ∈ xs) :
+    i ∈ (xs.foldl (addComponent squares gluings) cs).flatten := by
+  induction xs generalizing cs with
+  | nil => simp at hi
+  | cons x xs ih =>
+    simp only [List.mem_cons] at hi
+    simp only [List.foldl_cons]
+    rcases hi with rfl | hi
+    · exact fold_addComponent_preserves squares gluings xs _ i
+        (mem_flatten_addComponent squares gluings cs i)
+    · exact ih _ hi
+
+/-- Every square index occurs in at least one computed component. Exact-once
+requires the additional disjointness invariant for closure merging. -/
+theorem components_cover (p : Policy) {i : Nat} (hi : i < p.squares.length) :
+    i ∈ p.components.flatten := by
+  apply fold_addComponent_covers p.squares p.gluings (List.range p.squares.length) []
+  exact List.mem_range.mpr hi
+
+inductive Verdict
+  | bag (components : List (List Nat))
+  | cascade
+  deriving DecidableEq, Repr
+
+def Policy.verdict (p : Policy) : Verdict :=
+  if p.wellFormed && p.components.length = 1 && 0 < p.squares.length then
+    .cascade
+  else .bag p.components
+
+private def Gluing.constructionEdge (g : Gluing) : Option (Nat × Nat) :=
+  if g.rᵢ = .B ∧ g.rⱼ ≠ .B then some (g.i, g.j)
+  else if g.rⱼ = .B ∧ g.rᵢ ≠ .B then some (g.j, g.i)
+  else none
+
+/-- Derived construction order. The application order is a separate carrier. -/
+def Policy.constructionOrder (p : Policy) : List (Nat × Nat) :=
+  (p.gluings.filterMap Gluing.constructionEdge).eraseDups
+
+theorem verdict_cascade_iff (p : Policy) :
+    p.verdict = .cascade ↔ p.wellFormed = true ∧ p.components.length = 1 := by
+  simp only [Policy.verdict, Bool.and_eq_true]
+  by_cases hw : p.wellFormed = true <;> simp [hw]
+  by_cases hc : p.components.length = 1 <;> simp [hc]
+  have : 0 < p.squares.length := by
+    by_contra h
+    have hz : p.squares.length = 0 := Nat.eq_zero_of_not_pos h
+    simp [Policy.components, hz] at hc
+  have hne : p.squares ≠ [] := List.ne_nil_of_length_pos this
+  simp [hne]
+
+theorem applicationOrder_independent (p : Policy) (L : List (Nat × Nat × Nat)) :
+    ({p with applicationOrder := L}).verdict = p.verdict ∧
+      ({p with applicationOrder := L}).constructionOrder = p.constructionOrder := by
+  cases p
+  simp [Policy.verdict, Policy.wellFormed, Policy.components, Policy.constructionOrder]
+
 /-! ## House, boat, houseboat, and boathouse
 
 Element codes:
@@ -505,5 +702,75 @@ theorem renamed_houseboat_isomorphic :
 theorem land_houseboat_not_isomorphic :
     houseboatCone.isoCones landHouseboatCone = false := by
   native_decide
+
+/-! ## Policy witnesses
+
+The click witness records the four unconnected occurrences in run
+`tick-run-record-2026-10-05-c9d25d6a-f2bb-42bf-a162-2c4a000e804f.edn`.
+The diamond witness follows `NOTE-outer-cascade-as-pasted-blends` §3 and
+`ConstructionReceipt.diamondSemantics`. Singleton objects not named by a
+gluing are placeholders: the run did not record their G/I₁/I₂/B readings. -/
+
+private def tokenTheory (xs : Finset Nat) : Theory := ⟨xs, ∅⟩
+private def placeholderSquare (code : Nat) : Square :=
+  let T := tokenTheory {code}
+  ⟨T, T, T, T, PMap.empty, PMap.empty, PMap.empty, PMap.empty, false, false⟩
+
+def clickPolicy : Policy :=
+  ⟨[placeholderSquare 1000, placeholderSquare 1001,
+    placeholderSquare 1002, placeholderSquare 1003], [], []⟩
+
+private def observeOut : Theory := tokenTheory {0, 1}
+private def fillOut : Theory := tokenTheory {2, 3}
+private def injuryOut : Theory := tokenTheory {4, 5}
+
+private def observeSquare : Square :=
+  ⟨tokenTheory {100}, tokenTheory {101}, tokenTheory {102}, observeOut,
+    PMap.empty, PMap.empty, PMap.empty, PMap.empty, false, false⟩
+private def fillSquare : Square :=
+  ⟨tokenTheory {110}, observeOut, tokenTheory {111}, fillOut,
+    PMap.empty, PMap.empty, PMap.empty, PMap.empty, false, false⟩
+private def injurySquare : Square :=
+  ⟨tokenTheory {120}, observeOut, tokenTheory {121}, injuryOut,
+    PMap.empty, PMap.empty, PMap.empty, PMap.empty, false, false⟩
+private def minimiseSquare : Square :=
+  ⟨tokenTheory {130}, fillOut, injuryOut, tokenTheory {6},
+    PMap.empty, PMap.empty, PMap.empty, PMap.empty, false, false⟩
+
+private def identityGluing (i : Nat) (rᵢ : Role) (j : Nat) (rⱼ : Role)
+    (T : Theory) : Gluing := ⟨i, rᵢ, j, rⱼ, PMap.id T⟩
+
+private def observeFill : Gluing := identityGluing 0 .B 1 .I₁ observeOut
+private def observeInjury : Gluing := identityGluing 0 .B 2 .I₁ observeOut
+private def fillMinimise : Gluing := identityGluing 1 .B 3 .I₁ fillOut
+private def injuryMinimise : Gluing := identityGluing 2 .B 3 .I₂ injuryOut
+
+def diamondPolicy : Policy :=
+  ⟨[observeSquare, fillSquare, injurySquare, minimiseSquare],
+    [observeFill, observeInjury, fillMinimise, injuryMinimise], []⟩
+
+def diamondPolicyDisconnectedMinimise : Policy :=
+  ⟨diamondPolicy.squares, [observeFill, observeInjury], []⟩
+
+theorem clickPolicy_is_bag : clickPolicy.verdict = .bag [[0], [1], [2], [3]] := by
+  native_decide
+
+theorem diamondPolicy_is_cascade : diamondPolicy.verdict = .cascade := by
+  native_decide
+
+theorem diamondPolicy_constructionOrder :
+    diamondPolicy.constructionOrder = [(0, 1), (0, 2), (1, 3), (2, 3)] := by
+  native_decide
+
+theorem disconnectedMinimise_is_bag :
+    diamondPolicyDisconnectedMinimise.verdict = .bag [[0, 1, 2], [3]] := by
+  native_decide
+
+theorem diamond_application_order_witness :
+    ({diamondPolicy with applicationOrder := [(1, 2, 0)]}).verdict =
+      diamondPolicy.verdict ∧
+    ({diamondPolicy with applicationOrder := [(1, 2, 0)]}).constructionOrder =
+      diamondPolicy.constructionOrder := by
+  exact applicationOrder_independent diamondPolicy [(1, 2, 0)]
 
 end DarkTower.WarMachine.ThreeHalvesBlend
