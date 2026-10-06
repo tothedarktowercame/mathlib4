@@ -387,6 +387,180 @@ def Cone.isPushout {s : Span} (c : Cone s) : Bool :=
   c.consistent && decide (c.B.elems ⊆
     c.b₁.rel.image Prod.snd ∪ c.b₂.rel.image Prod.snd)
 
+def Mediator {s : Span} (c : Cone s) (C : Theory) (c₁ c₂ h : PMap) : Prop :=
+  h.wellFormed c.B C = true ∧
+    (PMap.comp c.b₁ h).le c₁ = true ∧ (PMap.comp c.b₂ h).le c₂ = true
+
+def IsThreeHalvesPushout (s : Span) (c : Cone s) : Prop :=
+  c.consistent = true ∧
+    ∀ (C : Theory) (c₁ c₂ : PMap),
+      c₁.wellFormed s.I₁ C = true → c₂.wellFormed s.I₂ C = true →
+      (Cone.mk C c₁ c₂ c.aux₁ c.aux₂ : Cone s).consistent = true →
+      ∃ h, Mediator c C c₁ c₂ h ∧
+        ∀ h', Mediator c C c₁ c₂ h' → h'.le h = true
+
+private def maximumMediator {s : Span} (c : Cone s) (C : Theory)
+    (c₁ c₂ : PMap) : PMap :=
+  ⟨(c.B.elems ×ˢ C.elems).filter fun uv => decide
+    ((∀ iu ∈ c.b₁.rel, iu.2 = uv.1 → (iu.1, uv.2) ∈ c₁.rel) ∧
+      (∀ ju ∈ c.b₂.rel, ju.2 = uv.1 → (ju.1, uv.2) ∈ c₂.rel))⟩
+
+theorem pushout_iff_coverage (s : Span) (c : Cone s)
+    (_ha₁ : s.a₁.wellFormed s.G s.I₁ = true)
+    (_ha₂ : s.a₂.wellFormed s.G s.I₂ = true)
+    (_hb₁ : c.b₁.wellFormed s.I₁ c.B = true)
+    (_hb₂ : c.b₂.wellFormed s.I₂ c.B = true) :
+    IsThreeHalvesPushout s c ↔ c.isPushout = true := by
+  constructor
+  · rintro ⟨hconsistent, hmax⟩
+    simp only [Cone.isPushout, Bool.and_eq_true, decide_eq_true_eq]
+    refine ⟨hconsistent, ?_⟩
+    intro u huB
+    by_contra hu
+    simp only [Finset.mem_union, Finset.mem_image, not_or, not_exists,
+      not_and] at hu
+    let C : Theory := ⟨{0, 1}, ∅⟩
+    let emptyMap : PMap := PMap.empty
+    have hempty₁ : emptyMap.wellFormed s.I₁ C = true := by
+      simp [emptyMap, PMap.empty, PMap.wellFormed]
+    have hempty₂ : emptyMap.wellFormed s.I₂ C = true := by
+      simp [emptyMap, PMap.empty, PMap.wellFormed]
+    have hcomparison :
+        (Cone.mk C emptyMap emptyMap c.aux₁ c.aux₂ : Cone s).consistent = true := by
+      simp [Cone.consistent, Cone.route₁, Cone.route₂, emptyMap,
+        PMap.empty, PMap.comp, PMap.join, PMap.wellFormed]
+    obtain ⟨h, hh, hgreatest⟩ := hmax C emptyMap emptyMap hempty₁ hempty₂ hcomparison
+    let h₀ : PMap := ⟨{(u, 0)}⟩
+    let h₁ : PMap := ⟨{(u, 1)}⟩
+    have hcomp₀ (b : PMap) (hno : ∀ x ∈ b.rel, x.2 ≠ u) :
+        PMap.comp b h₀ = PMap.empty := by
+      apply PMap.ext
+      ext p
+      constructor
+      · intro hp
+        simp only [PMap.comp, h₀, Finset.mem_image, Finset.mem_filter,
+          Finset.mem_product] at hp
+        obtain ⟨q, ⟨⟨hqb, hqh⟩, hmatch⟩, _⟩ := hp
+        simp only [Finset.mem_singleton] at hqh
+        exact (hno q.1 hqb (by rw [hmatch, hqh])).elim
+      · simp [PMap.empty]
+    have hcomp₁ (b : PMap) (hno : ∀ x ∈ b.rel, x.2 ≠ u) :
+        PMap.comp b h₁ = PMap.empty := by
+      apply PMap.ext
+      ext p
+      constructor
+      · intro hp
+        simp only [PMap.comp, h₁, Finset.mem_image, Finset.mem_filter,
+          Finset.mem_product] at hp
+        obtain ⟨q, ⟨⟨hqb, hqh⟩, hmatch⟩, _⟩ := hp
+        simp only [Finset.mem_singleton] at hqh
+        exact (hno q.1 hqb (by rw [hmatch, hqh])).elim
+      · simp [PMap.empty]
+    have hno₁ : ∀ x ∈ c.b₁.rel, x.2 ≠ u := by
+      intro x hx heq
+      exact hu.1 x hx heq
+    have hno₂ : ∀ x ∈ c.b₂.rel, x.2 ≠ u := by
+      intro x hx heq
+      exact hu.2 x hx heq
+    have hm₀ : Mediator c C emptyMap emptyMap h₀ := by
+      refine ⟨?_, ?_, ?_⟩
+      · apply PMap.wellFormed_of_parts
+        · intro p hp
+          simp only [h₀, Finset.mem_singleton] at hp
+          rcases hp with ⟨rfl, rfl⟩
+          exact ⟨huB, by simp [C]⟩
+        · intro p hp q hq _
+          simp only [h₀, Finset.mem_singleton] at hp hq
+          simp [hp, hq]
+      · simp [hcomp₀ c.b₁ hno₁, PMap.le, PMap.empty]
+      · simp [hcomp₀ c.b₂ hno₂, PMap.le, PMap.empty]
+    have hm₁ : Mediator c C emptyMap emptyMap h₁ := by
+      refine ⟨?_, ?_, ?_⟩
+      · apply PMap.wellFormed_of_parts
+        · intro p hp
+          simp only [h₁, Finset.mem_singleton] at hp
+          rcases hp with ⟨rfl, rfl⟩
+          exact ⟨huB, by simp [C]⟩
+        · intro p hp q hq _
+          simp only [h₁, Finset.mem_singleton] at hp hq
+          simp [hp, hq]
+      · simp [hcomp₁ c.b₁ hno₁, PMap.le, PMap.empty]
+      · simp [hcomp₁ c.b₂ hno₂, PMap.le, PMap.empty]
+    have hle₀ := hgreatest h₀ hm₀
+    have hle₁ := hgreatest h₁ hm₁
+    obtain ⟨_, hhfun⟩ := PMap.wellFormed_parts hh.1
+    simp only [PMap.le, decide_eq_true_eq] at hle₀ hle₁
+    have hp₀ : (u, 0) ∈ h.rel := hle₀ (by simp [h₀])
+    have hp₁ : (u, 1) ∈ h.rel := hle₁ (by simp [h₁])
+    have : (0 : Nat) = 1 := hhfun (u, 0) hp₀ (u, 1) hp₁ rfl
+    omega
+  · intro hp
+    simp only [Cone.isPushout, Bool.and_eq_true, decide_eq_true_eq] at hp
+    refine ⟨hp.1, ?_⟩
+    intro C c₁ c₂ hc₁ hc₂ _hcomparison
+    let H := maximumMediator c C c₁ c₂
+    obtain ⟨hc₁dom, hc₁fun⟩ := PMap.wellFormed_parts hc₁
+    obtain ⟨hc₂dom, hc₂fun⟩ := PMap.wellFormed_parts hc₂
+    have hHwf : H.wellFormed c.B C = true := by
+      apply PMap.wellFormed_of_parts
+      · intro p hpH
+        have hpH' : p ∈ (maximumMediator c C c₁ c₂).rel := by simpa [H] using hpH
+        simpa [maximumMediator] using (Finset.mem_filter.mp hpH').1
+      · intro p hpH q hqH heq
+        have hpH' : p ∈ (maximumMediator c C c₁ c₂).rel := by simpa [H] using hpH
+        have hqH' : q ∈ (maximumMediator c C c₁ c₂).rel := by simpa [H] using hqH
+        have pp := (Finset.mem_filter.mp hpH').2
+        have qq := (Finset.mem_filter.mp hqH').2
+        simp only [decide_eq_true_eq] at pp qq
+        have hcov := hp.2 (Finset.mem_product.mp (Finset.mem_filter.mp hpH').1).1
+        simp only [Finset.mem_union, Finset.mem_image] at hcov
+        rcases hcov with ⟨i, hi, hiu⟩ | ⟨j, hj, hju⟩
+        · have hip : (i.1, p.2) ∈ c₁.rel := pp.1 i hi hiu
+          have hiq : (i.1, q.2) ∈ c₁.rel := qq.1 i hi (hiu.trans heq)
+          exact hc₁fun (i.1, p.2) hip (i.1, q.2) hiq rfl
+        · have hjp : (j.1, p.2) ∈ c₂.rel := pp.2 j hj hju
+          have hjq : (j.1, q.2) ∈ c₂.rel := qq.2 j hj (hju.trans heq)
+          exact hc₂fun (j.1, p.2) hjp (j.1, q.2) hjq rfl
+    refine ⟨H, ⟨hHwf, ?_, ?_⟩, ?_⟩
+    · simp only [PMap.le, decide_eq_true_eq]
+      intro p hpcomp
+      simp only [PMap.comp, Finset.mem_image, Finset.mem_filter,
+        Finset.mem_product] at hpcomp
+      obtain ⟨q, ⟨⟨hqb, hqH⟩, hmatch⟩, rfl⟩ := hpcomp
+      have hqH' : q.2 ∈ (maximumMediator c C c₁ c₂).rel := by simpa [H] using hqH
+      have hpred := (Finset.mem_filter.mp hqH').2
+      simp only [decide_eq_true_eq] at hpred
+      exact hpred.1 q.1 hqb hmatch
+    · simp only [PMap.le, decide_eq_true_eq]
+      intro p hpcomp
+      simp only [PMap.comp, Finset.mem_image, Finset.mem_filter,
+        Finset.mem_product] at hpcomp
+      obtain ⟨q, ⟨⟨hqb, hqH⟩, hmatch⟩, rfl⟩ := hpcomp
+      have hqH' : q.2 ∈ (maximumMediator c C c₁ c₂).rel := by simpa [H] using hqH
+      have hpred := (Finset.mem_filter.mp hqH').2
+      simp only [decide_eq_true_eq] at hpred
+      exact hpred.2 q.1 hqb hmatch
+    · intro h' hh'
+      simp only [PMap.le, decide_eq_true_eq]
+      intro uv huv
+      obtain ⟨h'dom, _⟩ := PMap.wellFormed_parts hh'.1
+      have hle₁ := hh'.2.1
+      have hle₂ := hh'.2.2
+      simp only [PMap.le, decide_eq_true_eq] at hle₁ hle₂
+      change uv ∈ (maximumMediator c C c₁ c₂).rel
+      apply Finset.mem_filter.mpr
+      refine ⟨Finset.mem_product.mpr (h'dom uv huv), ?_⟩
+      simp only [decide_eq_true_eq]
+      constructor
+      · intro iu hi heq
+        apply hle₁
+        simp only [PMap.comp, Finset.mem_image, Finset.mem_filter, Finset.mem_product]
+        exact ⟨(iu, uv), ⟨⟨hi, huv⟩, heq⟩, rfl⟩
+      · intro ju hj heq
+        apply hle₂
+        simp only [PMap.comp, Finset.mem_image, Finset.mem_filter, Finset.mem_product]
+        exact ⟨(ju, uv), ⟨⟨hj, huv⟩, heq⟩, rfl⟩
+
 structure ConeQuality where
   carries₁ : Finset (Nat × Nat × Nat)
   carries₂ : Finset (Nat × Nat × Nat)
