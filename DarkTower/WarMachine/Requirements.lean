@@ -56,6 +56,13 @@ structure GTerms where
   informationGain : Bool
   deriving DecidableEq, Repr
 
+/-- Explicitly declared policy-family preference semantics. There is no
+`undeclared` constructor: absent or unknown runtime declarations are not
+recomputable `RunFacts`. -/
+inductive PreferenceSemantics where
+  | terminalOnly | constant | progressive
+  deriving DecidableEq, Repr
+
 structure RunFacts where
   /-- Canonical ids of open missions; counted from the pinned mission registry. -/
   openMissions : Finset Id
@@ -89,7 +96,7 @@ structure RunFacts where
   gradedPreferenceSteps : Finset Nat
   /-- Whether this policy family declares progressive, rather than constant or
   terminal-only, preference semantics. -/
-  progressivePreferenceRequired : Bool
+  preferenceSemantics : PreferenceSemantics
   /-- Terms that contributed to every reported policy G. -/
   gTerms : GTerms
   /-- Compared policies carrying a separately recorded risk term. -/
@@ -165,7 +172,7 @@ def Q4 (r : RunFacts) : Bool := decide (
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
   r.gTerms.informationGain = true ∧ 0 < r.horizonLength ∧
   r.preferenceSteps = Finset.range r.horizonLength ∧
-  (r.progressivePreferenceRequired = true →
+  (r.preferenceSemantics = .progressive →
     r.gradedPreferenceSteps = Finset.range r.horizonLength) ∧
   r.policiesWithRiskTerm = r.comparedPolicies.card ∧
   r.policiesWithAmbiguityTerm = r.comparedPolicies.card ∧
@@ -263,7 +270,7 @@ def click20 : RunFacts where
   horizonLength := 4
   preferenceSteps := {3}
   gradedPreferenceSteps := ∅
-  progressivePreferenceRequired := false
+  preferenceSemantics := .terminalOnly
   gTerms := ⟨true, false, false⟩
   policiesWithRiskTerm := 1
   policiesWithAmbiguityTerm := 0
@@ -310,7 +317,7 @@ def good : RunFacts where
   horizonLength := 4
   preferenceSteps := Finset.range 4
   gradedPreferenceSteps := Finset.range 4
-  progressivePreferenceRequired := true
+  preferenceSemantics := .progressive
   gTerms := ⟨true, true, true⟩
   policiesWithRiskTerm := 1911
   policiesWithAmbiguityTerm := 1911
@@ -334,11 +341,11 @@ def good : RunFacts where
 /-- Deterministic likelihoods and terminal-only preferences may yield numeric
 zero epistemic terms while still carrying every term and total C-tau. -/
 def deterministicTerminal : RunFacts :=
-  { good with progressivePreferenceRequired := false, gradedPreferenceSteps := ∅ }
+  { good with preferenceSemantics := .terminalOnly, gradedPreferenceSteps := ∅ }
 
 /-- An asserted progressive schedule does not receive that exemption. -/
 def progressiveRowsMissing : RunFacts :=
-  { good with progressivePreferenceRequired := true, gradedPreferenceSteps := ∅ }
+  { good with preferenceSemantics := .progressive, gradedPreferenceSteps := ∅ }
 
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
