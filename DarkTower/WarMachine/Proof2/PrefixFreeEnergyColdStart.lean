@@ -25,6 +25,7 @@ structure BootstrapPrior (M P Θ D Authority Evidence Ledger UpdateRule : Type*)
   policy : PolicyKey M P
   model : String
   version : String
+  calibrationLawId : String
   parameters : Θ
   distribution : D
   rationale : String
@@ -35,24 +36,31 @@ structure BootstrapPrior (M P Θ D Authority Evidence Ledger UpdateRule : Type*)
   authority : Authority
 
 /-- The pinned calibration law is the only source of bootstrap F. -/
-structure CalibrationLaw (Θ D Evidence : Type*) where
+structure CalibrationLaw (Θ D Evidence Authority : Type*) where
+  identity : String
   model : String
   version : String
   evaluate : Θ → D → Evidence → Option EReal
+  authority : Authority
 
 /-- Validity is parameterized by independent judgments.  In particular, this
 file supplies neither a numeric parameter vector nor a distribution family. -/
 structure ValidBootstrap
     (scorerAuthority : Authority) (policy : PolicyKey M P)
-    (law : CalibrationLaw Θ D Evidence)
+    (law : CalibrationLaw Θ D Evidence Authority)
+    (lawAuthorized : String → String →
+      (Θ → D → Evidence → Option EReal) → Authority → Prop)
     (validParameters : Θ → Prop) (validDistribution : D → Prop)
     (ledgerAuthorizes : Ledger → Evidence → Prop)
     (updateDeclared : UpdateRule → Prop)
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule) : Prop where
   exactPolicy : b.policy = policy
+  exactLawIdentity : b.calibrationLawId = law.identity
   exactModel : b.model = law.model
   exactVersion : b.version = law.version
   externalAuthority : b.authority ≠ scorerAuthority
+  externalLawAuthority : law.authority ≠ scorerAuthority
+  lawRegistryAuthorization : lawAuthorized law.identity law.version law.evaluate law.authority
   modelNonempty : b.model ≠ ""
   versionNonempty : b.version ≠ ""
   rationaleNonempty : b.rationale ≠ ""
@@ -96,7 +104,9 @@ inductive ColdStartRefusal (M P : Type*) where
 only truly unseen history may consult a valid external bootstrap prior. -/
 def supplyF
     (scorerAuthority : Authority)
-    (law : CalibrationLaw Θ D Evidence)
+    (law : CalibrationLaw Θ D Evidence Authority)
+    (lawAuthorized : String → String →
+      (Θ → D → Evidence → Option EReal) → Authority → Prop)
     (validParameters : Θ → Prop) (validDistribution : D → Prop)
     (ledgerAuthorizes : Ledger → Evidence → Prop)
     (updateDeclared : UpdateRule → Prop)
@@ -111,7 +121,7 @@ def supplyF
   | .unseen => match prior with
     | none => .error (.unseenWithoutPrior policy)
     | some b =>
-      if hv : ValidBootstrap scorerAuthority policy law validParameters validDistribution
+      if hv : ValidBootstrap scorerAuthority policy law lawAuthorized validParameters validDistribution
           ledgerAuthorizes updateDeclared b
       then .ok ⟨hv.evaluationFinite.choose, .bootstrap⟩
       else .error (.invalidBootstrap policy)
@@ -149,21 +159,21 @@ def machineWeightsAtSuppliedF
 
 theorem unseen_validExternalPrior_isAdmissible
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
-    (hv : ValidBootstrap scorer policy law validParameters validDistribution
+    (hv : ValidBootstrap scorer policy law lawAuthorized validParameters validDistribution
       ledgerAuthorizes updateDeclared b) :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       policy ([] : List (Step M P S O)) (some b) =
         .ok ⟨hv.evaluationFinite.choose, .bootstrap⟩ := by
   classical
   simp [supplyF, assessEmpirical, admittedPrefix, admitFrom, hv]
 
 theorem unseen_withoutPrior_refuses :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       policy ([] : List (Step M P S O)) none = .error (.unseenWithoutPrior policy) := by
   simp [supplyF, assessEmpirical, admittedPrefix, admitFrom]
 
 theorem unseen_withoutPrior_isNotZeroDefault (route : FRoute) :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       policy ([] : List (Step M P S O)) none ≠ .ok ⟨(0 : EReal), route⟩ := by
   rw [unseen_withoutPrior_refuses]
   simp
@@ -172,7 +182,7 @@ theorem malformedEmpirical_neverBootstraps
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
     (steps : List (Step M P S O))
     (h : assessEmpirical policy steps = .malformed reason) :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       policy steps (some b) = .error (.empiricalMalformed policy reason) := by
   simp [supplyF, h]
 
@@ -180,17 +190,17 @@ theorem contradictoryEmpirical_neverBootstraps
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
     (steps : List (Step M P S O))
     (h : assessEmpirical policy steps = .contradiction) :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       policy steps (some b) = .error (.empiricalContradiction policy) := by
   simp [supplyF, h]
 
 theorem selfAuthoredPrior_refuses
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
     (ha : b.authority = scorer) :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       b.policy ([] : List (Step M P S O)) (some b) = .error (.invalidBootstrap b.policy) := by
   classical
-  have hn : ¬ ValidBootstrap scorer b.policy law validParameters validDistribution
+  have hn : ¬ ValidBootstrap scorer b.policy law lawAuthorized validParameters validDistribution
       ledgerAuthorizes updateDeclared b := by
     intro hv
     exact hv.externalAuthority ha
@@ -199,10 +209,10 @@ theorem selfAuthoredPrior_refuses
 theorem priorForAnotherPolicy_refuses
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
     (hne : b.policy ≠ policy) :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       policy ([] : List (Step M P S O)) (some b) = .error (.invalidBootstrap policy) := by
   classical
-  have hn : ¬ ValidBootstrap scorer policy law validParameters validDistribution
+  have hn : ¬ ValidBootstrap scorer policy law lawAuthorized validParameters validDistribution
       ledgerAuthorizes updateDeclared b := by
     intro hv
     exact hne hv.exactPolicy
@@ -212,7 +222,7 @@ theorem coherentEmpirical_takesAuthority
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
     (steps : List (Step M P S O))
     (h : assessEmpirical policy steps = .coherent history f) :
-    supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       policy steps (some b) = .ok ⟨f, .empirical⟩ := by
   simp [supplyF, h]
 
@@ -222,7 +232,7 @@ theorem empiricalHistory_supersedesBootstrap
     (steps : List (Step M P S O))
     (h : ∃ history f, assessEmpirical b.policy steps = .coherent history f) :
     ∃ (history : List (Step M P S O)) (f : EReal),
-      supplyF scorer law validParameters validDistribution ledgerAuthorizes updateDeclared
+      supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes updateDeclared
       b.policy steps (some b) = .ok ⟨f, .empirical⟩ := by
   obtain ⟨history, f, hcoherent⟩ := h
   exact ⟨history, f, coherentEmpirical_takesAuthority b steps hcoherent⟩
@@ -263,11 +273,39 @@ theorem validCalibrationTransition_advancesAndBindsNewEvidence
       updateLaw b.updateRule t.before t.newEvidence steps t.after :=
   ⟨t.epochAdvances, t.ledgerAdvances, t.newEvidenceIdentity, t.updateLawHolds⟩
 
+theorem selfAuthoredCalibrationLaw_refuses
+    (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
+    (ha : law.authority = scorer) :
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes
+      updateDeclared b.policy ([] : List (Step M P S O)) (some b) =
+        .error (.invalidBootstrap b.policy) := by
+  classical
+  have hn : ¬ ValidBootstrap scorer b.policy law lawAuthorized validParameters
+      validDistribution ledgerAuthorizes updateDeclared b := by
+    intro hv
+    exact hv.externalLawAuthority ha
+  simp [supplyF, assessEmpirical, admittedPrefix, admitFrom, hn]
+
+theorem unauthorizedSubstitutedEvaluator_refuses
+    (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
+    (hid : b.calibrationLawId = law.identity) (hver : b.version = law.version)
+    (hmodel : b.model = law.model)
+    (hunauthorized : ¬ lawAuthorized law.identity law.version law.evaluate law.authority) :
+    supplyF scorer law lawAuthorized validParameters validDistribution ledgerAuthorizes
+      updateDeclared b.policy ([] : List (Step M P S O)) (some b) =
+        .error (.invalidBootstrap b.policy) := by
+  classical
+  have hn : ¬ ValidBootstrap scorer b.policy law lawAuthorized validParameters
+      validDistribution ledgerAuthorizes updateDeclared b := by
+    intro hv
+    exact hunauthorized hv.lawRegistryAuthorization
+  simp [supplyF, assessEmpirical, admittedPrefix, admitFrom, hn]
+
 /-- There is no field an authority can forge to alter F: identical carriers
 under the same calibration law have the same evaluated value. -/
 theorem bootstrapValue_determinedByCalibrationLaw
     (b : BootstrapPrior M P Θ D Authority Evidence Ledger UpdateRule)
-    (h₁ h₂ : ValidBootstrap scorer b.policy law validParameters validDistribution
+    (h₁ h₂ : ValidBootstrap scorer b.policy law lawAuthorized validParameters validDistribution
       ledgerAuthorizes updateDeclared b) :
     h₁.evaluationFinite.choose = h₂.evaluationFinite.choose := by
   have e₁ := h₁.evaluationFinite.choose_spec.1
@@ -285,6 +323,8 @@ end
 #print axioms coherentEmpirical_takesAuthority
 #print axioms empiricalHistory_supersedesBootstrap
 #print axioms validCalibrationTransition_advancesAndBindsNewEvidence
+#print axioms selfAuthoredCalibrationLaw_refuses
+#print axioms unauthorizedSubstitutedEvaluator_refuses
 #print axioms bootstrapValue_determinedByCalibrationLaw
 
 end DarkTower.WarMachine.Proof2.PrefixFreeEnergyColdStart
