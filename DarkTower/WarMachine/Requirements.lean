@@ -188,8 +188,10 @@ def Q6 (r : RunFacts) : Bool := decide (
   r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest →
     r.previousChoice ≠ r.currentChoice)
 
-/-! Joe: an absence, refusal, or "not supplied" on the path is a failure;
-the working path contains none. -/
+/-! Joe: an absence, refusal, or "not supplied" on the one selected/enacted
+certificate path is a failure; the working path contains none.  This is not a
+completeness claim about rejected alternatives or population-wide scorer
+diagnostics.  With no selection, the explicit abstention carrier is the path. -/
 def Q7 (r : RunFacts) : Bool := decide (r.pathAbsenceCount = 0)
 
 /-! Joe: no carrier is supplied at one, or at a hand-picked handful, while
