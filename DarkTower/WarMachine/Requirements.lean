@@ -87,6 +87,9 @@ structure RunFacts where
   preferenceSteps : Finset Nat
   /-- Horizon steps whose C-tau is graded by completed-progress count. -/
   gradedPreferenceSteps : Finset Nat
+  /-- Whether this policy family declares progressive, rather than constant or
+  terminal-only, preference semantics. -/
+  progressivePreferenceRequired : Bool
   /-- Terms that contributed to every reported policy G. -/
   gTerms : GTerms
   /-- Compared policies carrying a separately recorded risk term. -/
@@ -155,12 +158,15 @@ def Q2 (r : RunFacts) : Bool := decide (
 def Q3 (r : RunFacts) : Bool := decide (r.cascadesWithoutG = ∅)
 
 /-! Joe: G must not be risk-only, and C-tau states a preference at every
-step of the horizon. -/
+step of the horizon. Zero-valued ambiguity/information terms still count when
+their canonical carriers were evaluated. Grading at every step is required
+only for policy families that declare progressive preference semantics. -/
 def Q4 (r : RunFacts) : Bool := decide (
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
   r.gTerms.informationGain = true ∧ 0 < r.horizonLength ∧
   r.preferenceSteps = Finset.range r.horizonLength ∧
-  r.gradedPreferenceSteps = Finset.range r.horizonLength ∧
+  (r.progressivePreferenceRequired = true →
+    r.gradedPreferenceSteps = Finset.range r.horizonLength) ∧
   r.policiesWithRiskTerm = r.comparedPolicies.card ∧
   r.policiesWithAmbiguityTerm = r.comparedPolicies.card ∧
   r.policiesWithInformationTerm = r.comparedPolicies.card)
@@ -257,6 +263,7 @@ def click20 : RunFacts where
   horizonLength := 4
   preferenceSteps := {3}
   gradedPreferenceSteps := ∅
+  progressivePreferenceRequired := false
   gTerms := ⟨true, false, false⟩
   policiesWithRiskTerm := 1
   policiesWithAmbiguityTerm := 0
@@ -303,6 +310,7 @@ def good : RunFacts where
   horizonLength := 4
   preferenceSteps := Finset.range 4
   gradedPreferenceSteps := Finset.range 4
+  progressivePreferenceRequired := true
   gTerms := ⟨true, true, true⟩
   policiesWithRiskTerm := 1911
   policiesWithAmbiguityTerm := 1911
@@ -322,6 +330,18 @@ def good : RunFacts where
   earlierProgressNoGreaterRisk := 20
   differentArrangementPairs := 20
   arrangementPairsDistinguishedByG := 20
+
+/-- Deterministic likelihoods and terminal-only preferences may yield numeric
+zero epistemic terms while still carrying every term and total C-tau. -/
+def deterministicTerminal : RunFacts :=
+  { good with progressivePreferenceRequired := false, gradedPreferenceSteps := ∅ }
+
+/-- An asserted progressive schedule does not receive that exemption. -/
+def progressiveRowsMissing : RunFacts :=
+  { good with progressivePreferenceRequired := true, gradedPreferenceSteps := ∅ }
+
+theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
+theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
 
 theorem click20_not_Q1 : Q1 click20 = false := by decide
 theorem click20_not_Q2 : Q2 click20 = false := by decide
@@ -423,5 +443,7 @@ example : Q10 click20 = true := by decide
 #print axioms click20_not_conformant
 #print axioms missingG_not_Q3
 #print axioms good_conforms
+#print axioms deterministic_terminal_Q4
+#print axioms progressive_rows_missing_not_Q4
 
 end DarkTower.WarMachine.Requirements
