@@ -162,6 +162,16 @@ theorem coherent_triangle_complete_basis_accepts :
     coherentCycleBasis.valid coherentCyclePolicy = true := by
   native_decide
 
+theorem coherent_tree_semantically_valid :
+    (GluingCoherenceCertificate.mk []).Valid treePolicy :=
+  GluingCoherenceCertificate.valid_sound
+    coherent_tree_needs_no_cycle_obligations.2.2
+
+theorem coherent_triangle_semantically_valid :
+    coherentCycleBasis.Valid coherentCyclePolicy :=
+  GluingCoherenceCertificate.valid_sound
+    coherent_triangle_complete_basis_accepts.2.2
+
 theorem incoherent_triangle_complete_basis_refuses :
     coherentCycleBasis.valid incoherentCyclePolicy = false := by
   native_decide
@@ -186,6 +196,18 @@ theorem omitted_independent_cycle_refuses :
       twoCyclePolicy = false := by
   native_decide
 
+theorem two_cycle_semantically_valid :
+    twoCycleComplete.Valid twoCyclePolicy :=
+  GluingCoherenceCertificate.valid_sound omitted_independent_cycle_refuses.2.1
+
+theorem omitted_cycle_semantically_invalid :
+    ¬ (GluingCoherenceCertificate.mk
+      (twoCycleComplete.obligations.take 1)).Valid twoCyclePolicy := by
+  intro h
+  have := h.1
+  rw [omitted_independent_cycle_refuses.2.2] at this
+  contradiction
+
 def reversedDuplicatePolicy : Policy :=
   { squares := [cycleSquare, cycleSquare]
     gluings := [⟨0, .G, 1, .G, identityIso⟩,
@@ -204,6 +226,29 @@ theorem malformed_gluing_cannot_enter_admitted_basis :
     malformedMerge.requiredCycleEdges = [] ∧
     (⟨[]⟩ : GluingCoherenceCertificate).valid malformedMerge = false := by
   native_decide
+
+def typedSelfLoopPolicy : Policy :=
+  { squares := [cycleSquare]
+    gluings := [⟨0, .G, 0, .G, identityIso⟩]
+    applicationOrder := [] }
+
+def typedSelfLoopCertificate : GluingCoherenceCertificate :=
+  ⟨[⟨0, []⟩]⟩
+
+theorem typed_self_loop_semantically_refuses :
+    typedSelfLoopPolicy.requiredCycleEdges = [0] ∧
+    typedSelfLoopCertificate.valid typedSelfLoopPolicy = false ∧
+    ¬ typedSelfLoopCertificate.Valid typedSelfLoopPolicy := by
+  constructor
+  · native_decide
+  constructor
+  · native_decide
+  · intro h
+    have hv := h.1
+    have hf : typedSelfLoopCertificate.valid typedSelfLoopPolicy = false := by
+      native_decide
+    rw [hf] at hv
+    contradiction
 
 /-! Typed coherence does not invent a transport between roles of one square.
 These two gluings therefore form separate typed components even though the raw
@@ -266,5 +311,10 @@ theorem coherent_triangle_endpoints_connected_typed :
 #print axioms omitted_independent_cycle_refuses
 #print axioms reversed_duplicate_is_explicit_obligation
 #print axioms malformed_gluing_cannot_enter_admitted_basis
+#print axioms coherent_tree_semantically_valid
+#print axioms coherent_triangle_semantically_valid
+#print axioms two_cycle_semantically_valid
+#print axioms omitted_cycle_semantically_invalid
+#print axioms typed_self_loop_semantically_refuses
 #print axioms role_mismatch_forms_separate_typed_components
 end DarkTower.WarMachine.ThreeHalvesRuntimeWitness

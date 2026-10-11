@@ -2010,6 +2010,19 @@ def RequiredCycleEdgeWitness.target {p : Policy} {k : Nat}
     (w : RequiredCycleEdgeWitness p k) : Fin p.squares.length × Role :=
   ((⟨w.ig.2.j, w.bounds.2⟩, w.ig.2.rⱼ))
 
+theorem RequiredCycleEdgeWitness.lookup {p : Policy} {k : Nat}
+    (w : RequiredCycleEdgeWitness p k) : p.gluings[k]? = some w.ig.2 := by
+  have horiginal : w.ig ∈ (List.range p.gluings.length).zip p.gluings :=
+    (List.mem_filter.mp w.admitted).1
+  have hlookup := range_zip_member_getElem? horiginal
+  simpa [w.index_eq] using hlookup
+
+theorem RequiredCycleEdgeWitness.directInfo {p : Policy} {k : Nat}
+    (w : RequiredCycleEdgeWitness p k) :
+    p.orientedGluing (k, false) = some
+      ⟨(w.ig.2.i, w.ig.2.rᵢ), (w.ig.2.j, w.ig.2.rⱼ), w.ig.2.iso⟩ := by
+  simp [Policy.orientedGluing, w.lookup]
+
 theorem Policy.requiredCycleEdge_has_witness (p : Policy) {k : Nat}
     (hk : k ∈ p.requiredCycleEdges) : Nonempty (RequiredCycleEdgeWitness p k) := by
   unfold Policy.requiredCycleEdges at hk
@@ -2079,8 +2092,9 @@ theorem RequiredCycleEdgeWitness.canonicalPathInfo
 
 private def GluingCycleObligation.valid (p : Policy)
     (o : GluingCycleObligation) : Bool :=
-  decide (o.forestPath ≠ []) &&
-    decide ((o.forestPath.map Prod.fst).eraseDups = o.forestPath.map Prod.fst) &&
+  decide (o.edge ∈ p.requiredCycleEdges) &&
+    decide (o.forestPath ≠ []) &&
+    decide ((o.forestPath.map Prod.fst).Nodup) &&
     o.forestPath.all (fun step => decide (step.1 ∈ p.gluingForest)) &&
     match p.orientedGluing (o.edge, false), p.gluingPathInfo o.forestPath with
     | some direct, some path => decide (direct = path)
@@ -2128,7 +2142,7 @@ theorem GluingCycleObligation.Valid_not_typed_selfLoop
     have hv := h.1
     unfold GluingCycleObligation.valid at hv
     simp only [Bool.and_eq_true, decide_eq_true_eq] at hv
-    exact hv.1.1.1
+    exact hv.1.1.1.2
   exact hnonempty (hcanonical.trans hnil)
 
 theorem GluingCycleObligation.Valid_direct_eq_canonicalForestTransport
@@ -2167,6 +2181,56 @@ theorem GluingCycleObligation.Valid_directTransport_eq_canonicalForestTransport
   exact ⟨w, direct, canonical, hsteps, hdirect, hcanonical,
     congrArg GluingPathInfo.transport heq⟩
 
+theorem GluingCycleObligation.valid_sound
+    {p : Policy} {o : GluingCycleObligation}
+    (h : o.valid p = true) : o.Valid p := by
+  have hv := h
+  unfold GluingCycleObligation.valid at hv
+  simp only [Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true] at hv
+  rcases hv with ⟨⟨⟨⟨hrequired, hnonempty⟩, hnodup⟩, hall⟩, hmatch⟩
+  let w := Classical.choice (p.requiredCycleEdge_has_witness hrequired)
+  cases hdirect : p.orientedGluing (o.edge, false) with
+  | none => simp [hdirect] at hmatch
+  | some direct =>
+      cases hpath : p.gluingPathInfo o.forestPath with
+      | none => simp [hdirect, hpath] at hmatch
+      | some pathInfo =>
+          simp [hdirect, hpath] at hmatch
+          let r := p.pathOfComposableOrientedSteps o.forestPath pathInfo
+            hnonempty (by
+              intro step hs
+              exact hall step hs) hpath hnodup
+          rcases r with ⟨source, target, path, sourceEq, targetEq,
+            stepsEq, lengthEq⟩
+          have hdirectExpected := w.directInfo
+          rw [hdirect] at hdirectExpected
+          have hdirectEq : direct =
+              ⟨(w.ig.2.i, w.ig.2.rᵢ), (w.ig.2.j, w.ig.2.rⱼ), w.ig.2.iso⟩ :=
+            Option.some.inj hdirectExpected
+          have hsourceNat : (source.1.val, source.2) =
+              (w.source.1.val, w.source.2) := by
+            rw [sourceEq, ← hmatch, hdirectEq]
+            rfl
+          have htargetNat : (target.1.val, target.2) =
+              (w.target.1.val, w.target.2) := by
+            rw [targetEq, ← hmatch, hdirectEq]
+            rfl
+          have hsource : source = w.source :=
+            Prod.ext
+              (Fin.ext (congrArg (fun z : Nat × Role => z.1) hsourceNat))
+              (congrArg (fun z : Nat × Role => z.2) hsourceNat)
+          have htarget : target = w.target :=
+            Prod.ext
+              (Fin.ext (congrArg (fun z : Nat × Role => z.1) htargetNat))
+              (congrArg (fun z : Nat × Role => z.2) htargetNat)
+          subst source
+          subst target
+          have hcanonicalPath : path = w.canonicalPath :=
+            p.typedGluingForest_path_unique path w.canonicalPath
+          refine ⟨h, w, ?_⟩
+          rw [← stepsEq, hcanonicalPath]
+          rfl
+
 structure GluingCoherenceCertificate where
   obligations : List GluingCycleObligation
   deriving DecidableEq
@@ -2186,6 +2250,21 @@ required edge. -/
 def GluingCoherenceCertificate.Valid (p : Policy)
     (c : GluingCoherenceCertificate) : Prop :=
   c.valid p = true ∧ ∀ o ∈ c.obligations, o.Valid p
+
+theorem GluingCoherenceCertificate.valid_sound
+    {p : Policy} {c : GluingCoherenceCertificate}
+    (h : c.valid p = true) : c.Valid p := by
+  refine ⟨h, ?_⟩
+  have hv := h
+  simp only [GluingCoherenceCertificate.valid, Bool.and_eq_true,
+    decide_eq_true_eq, List.all_eq_true] at hv
+  intro o ho
+  exact GluingCycleObligation.valid_sound (hv.2 o ho)
+
+theorem GluingCoherenceCertificate.valid_iff_Valid
+    {p : Policy} {c : GluingCoherenceCertificate} :
+    c.valid p = true ↔ c.Valid p :=
+  ⟨GluingCoherenceCertificate.valid_sound, fun h => h.1⟩
 
 theorem GluingCoherenceCertificate.Valid_covers_required_canonicalPaths
     {p : Policy} {c : GluingCoherenceCertificate} (h : c.Valid p) :
