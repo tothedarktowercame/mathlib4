@@ -1477,6 +1477,113 @@ theorem Policy.orientedGluing_of_forestAdjacencyWitness (p : Policy)
       simpa [orientedTypedEndpoints, hr, typedEdge] using
         congrArg (fun z => (z.2.1.val, z.2.2)) w.endpoints
 
+noncomputable def Policy.orientedStepsOfWalk (p : Policy) :
+    {u v : Fin p.squares.length × Role} →
+      p.typedGluingForestGraph.Walk u v → List OrientedGluing
+  | _, _, .nil => []
+  | _, _, .cons h rest =>
+      let w := p.orientedForestAdjacencyWitness h
+      (w.ig.1, w.reversed) :: p.orientedStepsOfWalk rest
+
+noncomputable def Policy.orientedStepsOfPath (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (q : p.typedGluingForestGraph.Path u v) : List OrientedGluing :=
+  p.orientedStepsOfWalk q.1
+
+theorem Policy.orientedStepsOfWalk_length (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (w : p.typedGluingForestGraph.Walk u v) :
+    (p.orientedStepsOfWalk w).length = w.length := by
+  induction w with
+  | nil => rfl
+  | cons h rest ih => simp [Policy.orientedStepsOfWalk, ih]
+
+theorem Policy.orientedStepsOfPath_length (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (q : p.typedGluingForestGraph.Path u v) :
+    (p.orientedStepsOfPath q).length = q.1.length :=
+  p.orientedStepsOfWalk_length q.1
+
+theorem Policy.orientedForestAdjacencyWitness_endpointKey (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.typedGluingForestGraph.Adj u v) :
+    let w := p.orientedForestAdjacencyWitness h
+    s((typedEdge p w.ig w.bounds).1, (typedEdge p w.ig w.bounds).2) = s(u, v) := by
+  let w := p.orientedForestAdjacencyWitness h
+  cases hr : w.reversed
+  · have he : typedEdge p w.ig w.bounds = (u, v) := by
+      simpa [w, orientedTypedEndpoints, hr] using w.endpoints
+    exact congrArg (fun e => s(e.1, e.2)) he
+  · have he : ((typedEdge p w.ig w.bounds).2,
+        (typedEdge p w.ig w.bounds).1) = (u, v) := by
+      simpa [w, orientedTypedEndpoints, hr] using w.endpoints
+    simpa only [Sym2.eq_swap] using congrArg (fun e => s(e.1, e.2)) he
+
+theorem Policy.mem_orientedStepsOfWalk_indices_has_edge (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (w : p.typedGluingForestGraph.Walk u v) {n : Nat}
+    (hn : n ∈ (p.orientedStepsOfWalk w).map Prod.fst) :
+    ∃ e ∈ w.edges, ∃ ig ∈ p.indexedGluingForest,
+      ig.1 = n ∧ ∃ hb : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length,
+        s((typedEdge p ig hb).1, (typedEdge p ig hb).2) = e := by
+  induction w with
+  | nil => simp [Policy.orientedStepsOfWalk] at hn
+  | @cons u x v h rest ih =>
+      let a := p.orientedForestAdjacencyWitness h
+      simp only [Policy.orientedStepsOfWalk, List.map_cons, List.mem_cons] at hn
+      rcases hn with hn | hn
+      · refine ⟨s(u, x), by simp, a.ig, a.member, ?_, a.bounds, ?_⟩
+        · simpa [a] using hn.symm
+        · simpa [a] using p.orientedForestAdjacencyWitness_endpointKey h
+      · obtain ⟨e, he, ig, hig, hin, hb, hkey⟩ := ih hn
+        exact ⟨e, by simp [he], ig, hig, hin, hb, hkey⟩
+
+theorem Policy.orientedStepsOfWalk_indices_nodup_of_isTrail (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (w : p.typedGluingForestGraph.Walk u v) (hw : w.IsTrail) :
+    ((p.orientedStepsOfWalk w).map Prod.fst).Nodup := by
+  induction w with
+  | nil => simp [Policy.orientedStepsOfWalk]
+  | @cons u x v h rest ih =>
+      let a := p.orientedForestAdjacencyWitness h
+      rw [SimpleGraph.Walk.isTrail_cons] at hw
+      simp only [Policy.orientedStepsOfWalk, List.map_cons, List.nodup_cons]
+      refine ⟨?_, ih hw.1⟩
+      intro hmem
+      obtain ⟨e, he, ig, hig, hin, hb, hkey⟩ :=
+        p.mem_orientedStepsOfWalk_indices_has_edge rest hmem
+      have higEq : ig = a.ig :=
+        p.indexedGluingForest_index_unique hig a.member hin
+      subst ig
+      have haKey : s((typedEdge p a.ig a.bounds).1,
+          (typedEdge p a.ig a.bounds).2) = s(u, x) := by
+        simpa [a] using p.orientedForestAdjacencyWitness_endpointKey h
+      have hsame : s(u, x) = e := by
+        rw [← haKey]
+        rw [← hkey]
+      apply hw.2
+      exact hsame.symm ▸ he
+
+theorem Policy.orientedStepsOfPath_indices_nodup (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (q : p.typedGluingForestGraph.Path u v) :
+    ((p.orientedStepsOfPath q).map Prod.fst).Nodup :=
+  p.orientedStepsOfWalk_indices_nodup_of_isTrail q.1 q.2.isTrail
+
+theorem Policy.orientedStepsOfPath_nil (p : Policy)
+    (u : Fin p.squares.length × Role) :
+    p.orientedStepsOfPath (SimpleGraph.Path.nil :
+      p.typedGluingForestGraph.Path u u) = [] := by
+  rfl
+
+theorem Policy.canonical_orientedSteps_unique (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.admittedTypedGluingGraph.Reachable u v)
+    (q : p.typedGluingForestGraph.Path u v) :
+    p.orientedStepsOfPath (p.canonicalTypedGluingForestPath h) =
+      p.orientedStepsOfPath q := by
+  rw [p.canonicalTypedGluingForestPath_unique h q]
+
 def Policy.gluingPathInfo (p : Policy) : List OrientedGluing → Option GluingPathInfo
   | [] => none
   | [step] => p.orientedGluing step
@@ -1487,6 +1594,84 @@ def Policy.gluingPathInfo (p : Policy) : List OrientedGluing → Option GluingPa
             some ⟨first.source, tail.target, PMap.comp first.transport tail.transport⟩
           else none
       | _, _ => none
+
+theorem Policy.gluingPathInfo_orientedStepsOfPath_nil (p : Policy)
+    (u : Fin p.squares.length × Role) :
+    p.gluingPathInfo (p.orientedStepsOfPath (SimpleGraph.Path.nil :
+      p.typedGluingForestGraph.Path u u)) = none := by
+  rfl
+
+def Policy.orientedTransportFold (p : Policy) : List OrientedGluing → Option PMap
+  | [] => none
+  | [step] => (p.orientedGluing step).map (·.transport)
+  | step :: rest =>
+      match p.orientedGluing step, p.orientedTransportFold rest with
+      | some first, some tail => some (PMap.comp first.transport tail)
+      | _, _ => none
+
+theorem Policy.gluingPathInfo_orientedStepsOfWalk (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (w : p.typedGluingForestGraph.Walk u v) (hne : ¬ w.Nil) :
+    ∃ info,
+      p.gluingPathInfo (p.orientedStepsOfWalk w) = some info ∧
+      info.source = (u.1.val, u.2) ∧
+      info.target = (v.1.val, v.2) ∧
+      p.orientedTransportFold (p.orientedStepsOfWalk w) = some info.transport := by
+  induction w with
+  | nil => exact (hne (by simp)).elim
+  | @cons u x v hadj rest ih =>
+      let a := p.orientedForestAdjacencyWitness hadj
+      obtain ⟨first, hfirst, hsource, htarget⟩ :=
+        p.orientedGluing_of_forestAdjacencyWitness a
+      cases rest with
+      | nil =>
+          refine ⟨first, ?_, hsource, ?_, ?_⟩
+          · simpa [Policy.orientedStepsOfWalk, a, Policy.gluingPathInfo] using hfirst
+          · simpa using htarget
+          · simpa [Policy.orientedStepsOfWalk, Policy.orientedTransportFold, a,
+              hfirst]
+      | cons htail walk =>
+          obtain ⟨last, hlast, hlastSource, hlastTarget, hfold⟩ :=
+            ih (by simp)
+          have hjoin : first.target = last.source := htarget.trans hlastSource.symm
+          have hlast' : p.gluingPathInfo
+              (((p.orientedForestAdjacencyWitness htail).ig.1,
+                (p.orientedForestAdjacencyWitness htail).reversed) ::
+                p.orientedStepsOfWalk walk) = some last := by
+            simpa only [Policy.orientedStepsOfWalk] using hlast
+          have hfold' : p.orientedTransportFold
+              (((p.orientedForestAdjacencyWitness htail).ig.1,
+                (p.orientedForestAdjacencyWitness htail).reversed) ::
+                p.orientedStepsOfWalk walk) = some last.transport := by
+            simpa only [Policy.orientedStepsOfWalk] using hfold
+          let info : GluingPathInfo :=
+            ⟨first.source, last.target, PMap.comp first.transport last.transport⟩
+          refine ⟨info, ?_, ?_, ?_, ?_⟩
+          · simp only [Policy.orientedStepsOfWalk, Policy.gluingPathInfo]
+            rw [show p.orientedGluing
+                ((p.orientedForestAdjacencyWitness hadj).ig.1,
+                  (p.orientedForestAdjacencyWitness hadj).reversed) = some first by
+                  simpa [a] using hfirst]
+            rw [hlast']
+            simp [hjoin, info]
+          · exact hsource
+          · exact hlastTarget
+          · simp only [Policy.orientedStepsOfWalk, Policy.orientedTransportFold]
+            rw [show p.orientedGluing
+                ((p.orientedForestAdjacencyWitness hadj).ig.1,
+                  (p.orientedForestAdjacencyWitness hadj).reversed) = some first by
+                  simpa [a] using hfirst]
+            rw [hfold']
+
+theorem Policy.gluingPathInfo_orientedStepsOfPath (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (q : p.typedGluingForestGraph.Path u v) (hne : ¬ q.1.Nil) :
+    ∃ info,
+      p.gluingPathInfo (p.orientedStepsOfPath q) = some info ∧
+      info.source = (u.1.val, u.2) ∧
+      info.target = (v.1.val, v.2) ∧
+      p.orientedTransportFold (p.orientedStepsOfPath q) = some info.transport :=
+  p.gluingPathInfo_orientedStepsOfWalk q.1 hne
 
 structure GluingCycleObligation where
   edge : Nat
