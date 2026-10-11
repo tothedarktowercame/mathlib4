@@ -940,6 +940,57 @@ private def typedEdge (p : Policy) (ig : Nat × Gluing)
     (Fin p.squares.length × Role) × (Fin p.squares.length × Role) :=
   ((⟨ig.2.i, h.1⟩, ig.2.rᵢ), (⟨ig.2.j, h.2⟩, ig.2.rⱼ))
 
+theorem typedEdge_proof_irrel (p : Policy) (ig : Nat × Gluing)
+    (h₁ h₂ : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length) :
+    typedEdge p ig h₁ = typedEdge p ig h₂ := by
+  rfl
+
+private def typedEndpointKey? (p : Policy) (ig : Nat × Gluing) :
+    Option (Sym2 (Fin p.squares.length × Role)) :=
+  if h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length then
+    some s((typedEdge p ig h).1, (typedEdge p ig h).2)
+  else none
+
+private theorem edgeKeys_typedEdges (p : Policy) (xs : List (Nat × Gluing)) :
+    FiniteListGraphClosure.edgeKeys (typedEdges p xs) =
+      xs.filterMap (typedEndpointKey? p) := by
+  induction xs with
+  | nil => simp [FiniteListGraphClosure.edgeKeys, typedEdges]
+  | cons ig xs ih =>
+      by_cases h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length
+      · simp [typedEdges, FiniteListGraphClosure.edgeKeys, typedEndpointKey?, h,
+          typedEdge]
+        exact ih
+      · simp [typedEdges, FiniteListGraphClosure.edgeKeys, typedEndpointKey?, h]
+        exact ih
+
+private theorem filterMap_nodup_source_unique {α β : Type*}
+    {f : α → Option β} {xs : List α} {a b : α} {y : β}
+    (hn : (xs.filterMap f).Nodup) (ha : a ∈ xs) (hb : b ∈ xs)
+    (hfa : f a = some y) (hfb : f b = some y) : a = b := by
+  induction xs generalizing a b with
+  | nil => simp at ha
+  | cons x xs ih =>
+      simp only [List.mem_cons] at ha hb
+      rcases ha with rfl | ha <;> rcases hb with rfl | hb
+      · rfl
+      · simp only [List.filterMap_cons, hfa] at hn
+        exact (((List.pairwise_cons.mp hn).1 _
+          (List.mem_filterMap.mpr ⟨b, hb, hfb⟩)) rfl).elim
+      · simp only [List.filterMap_cons, hfb] at hn
+        exact (((List.pairwise_cons.mp hn).1 _
+          (List.mem_filterMap.mpr ⟨a, ha, hfa⟩)) rfl).elim
+      · apply ih
+        · cases hfx : f x with
+          | none => simpa [List.filterMap_cons, hfx] using hn
+          | some z =>
+              rw [List.filterMap_cons, hfx] at hn
+              exact hn.of_cons
+        · exact ha
+        · exact hb
+        · exact hfa
+        · exact hfb
+
 private theorem typedEdges_singleton (p : Policy) (ig : Nat × Gluing)
     (h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length) :
     typedEdges p [ig] = [typedEdge p ig h] := by
@@ -1182,6 +1233,74 @@ private theorem mem_foldl_forestStep (p : Policy) (xs acc : List (Nat × Gluing)
           · exact Or.inl hacc
           · exact Or.inr (by simp)
       · exact Or.inr (by simp [hx])
+
+theorem Policy.indexedGluingForest_member_wellFormed (p : Policy)
+    {ig : Nat × Gluing} (hig : ig ∈ p.indexedGluingForest) :
+    Gluing.wellFormed p.squares ig.2 = true := by
+  have hi := mem_foldl_forestStep p (admittedIndexedGluings p) [] ig hig
+  simp only [List.not_mem_nil, false_or] at hi
+  exact (List.mem_filter.mp hi).2
+
+theorem Policy.indexedGluingForest_member_emits_typedEdge (p : Policy)
+    {ig : Nat × Gluing} (hig : ig ∈ p.indexedGluingForest) :
+    let hb := Gluing.wellFormed_endpoint_bounds
+      (p.indexedGluingForest_member_wellFormed hig)
+    typedEdge p ig hb ∈ typedEdges p p.indexedGluingForest := by
+  dsimp
+  apply List.mem_filterMap.mpr
+  refine ⟨ig, hig, ?_⟩
+  simp [Gluing.wellFormed_endpoint_bounds,
+    p.indexedGluingForest_member_wellFormed hig, typedEdge]
+
+theorem Policy.mem_typedEdges_indexedGluingForest_iff (p : Policy)
+    {e : (Fin p.squares.length × Role) × (Fin p.squares.length × Role)} :
+    e ∈ typedEdges p p.indexedGluingForest ↔
+      ∃ ig ∈ p.indexedGluingForest,
+        ∃ hb : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length,
+          e = typedEdge p ig hb := by
+  constructor
+  · intro he
+    obtain ⟨ig, hig, hem⟩ := List.mem_filterMap.mp he
+    split at hem <;> rename_i hb
+    · exact ⟨ig, hig, hb, Option.some.inj hem.symm⟩
+    · simp at hem
+  · rintro ⟨ig, hig, hb, rfl⟩
+    exact p.indexedGluingForest_member_emits_typedEdge hig
+
+theorem Policy.indexedGluingForest_typedEndpointKey_unique (p : Policy)
+    {a b : Nat × Gluing} (ha : a ∈ p.indexedGluingForest)
+    (hb : b ∈ p.indexedGluingForest)
+    (haBound : a.2.i < p.squares.length ∧ a.2.j < p.squares.length)
+    (hbBound : b.2.i < p.squares.length ∧ b.2.j < p.squares.length)
+    (hkey : s((typedEdge p a haBound).1, (typedEdge p a haBound).2) =
+      s((typedEdge p b hbBound).1, (typedEdge p b hbBound).2)) : a = b := by
+  apply filterMap_nodup_source_unique
+    (f := typedEndpointKey? p)
+    (y := s((typedEdge p a haBound).1, (typedEdge p a haBound).2))
+  · rw [← edgeKeys_typedEdges]
+    exact p.indexedGluingForest_typedEndpointKeys_nodup
+  · exact ha
+  · exact hb
+  · simp [typedEndpointKey?, haBound, typedEdge]
+  · rw [typedEndpointKey?]
+    simp only [dif_pos hbBound]
+    exact congrArg some hkey.symm
+
+def orientedTypedEndpoints (p : Policy) (ig : Nat × Gluing)
+    (hb : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length)
+    (reversed : Bool) :
+    (Fin p.squares.length × Role) × (Fin p.squares.length × Role) :=
+  if reversed then ((typedEdge p ig hb).2, (typedEdge p ig hb).1)
+  else typedEdge p ig hb
+
+theorem orientedTypedEndpoints_forward (p : Policy) (ig : Nat × Gluing)
+    (hb : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length) :
+    orientedTypedEndpoints p ig hb false = typedEdge p ig hb := by rfl
+
+theorem orientedTypedEndpoints_reverse (p : Policy) (ig : Nat × Gluing)
+    (hb : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length) :
+    orientedTypedEndpoints p ig hb true =
+      ((typedEdge p ig hb).2, (typedEdge p ig hb).1) := by rfl
 
 /-- Every selected typed-forest edge is an actually supplied, individually
 well-formed gluing; forest construction cannot mint an edge. -/
