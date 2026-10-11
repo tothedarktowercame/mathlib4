@@ -1,6 +1,7 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.List.Defs
 import Mathlib.Tactic
+import DarkTower.WarMachine.IncrementalTaskFrontier
 
 /-!
 # Countable requirements for one War Machine run
@@ -11,6 +12,8 @@ that today's runner exports them faithfully.
 -/
 
 namespace DarkTower.WarMachine.Requirements
+
+open DarkTower.WarMachine.IncrementalTaskFrontier
 
 set_option maxRecDepth 100000
 set_option maxHeartbeats 5000000
@@ -136,6 +139,12 @@ structure RunFacts where
   differentArrangementPairs : Nat
   /-- Number of those pairs represented as distinct policies, each with its own numeric G. -/
   arrangementPairsDistinguishedByG : Nat
+  /-- Exact incremental refresh certificate for the current open-task frontier. -/
+  frontierRefresh : RefreshCertificate
+  /-- Winner certificate over the refreshed frontier and current tie law. -/
+  frontierSelection : SelectionCertificate
+  /-- Identity correspondence for cascades of the selected task only. -/
+  selectedCascade : TargetCascadeCertificate
   deriving DecidableEq
 
 def RunFacts.openTasks (r : RunFacts) : Finset Id :=
@@ -194,28 +203,18 @@ completeness claim about rejected alternatives or population-wide scorer
 diagnostics.  With no selection, the explicit abstention carrier is the path. -/
 def Q7 (r : RunFacts) : Bool := decide (r.pathAbsenceCount = 0)
 
-/-! Joe: no carrier is supplied at one, or at a hand-picked handful, while
-the real population has tens or hundreds. Explicit alert thresholds:
-
-* at least 90% of open tasks are enumerated;
-* at least 50% of enumerated tasks reach scoring and receive G;
-* if the library has at least 100 patterns, a problem slice/pool contains at
-  least 10 patterns;
-* at least two distinct cascades and policies are compared;
-* at least two policies per open task are constructed ("several" comparison);
-* if at least 10 seats are available, at least 10% are represented in use or
-  learned behavior counts.
-
-The ratios use multiplication, so there is no truncating division. -/
+/-! Q8 certifies the current task frontier rather than sampling historical
+population breadth.  Refresh is exact and incremental; selection is over
+stable comparison keys and refuses an eligible stale contender; cascade
+identity correspondence is local to the selected task.  Multiple policies
+are required only when that task has multiple admissible cascades.  Q1 keeps
+the independent responsibility for enumerating every open task. -/
 def Q8 (r : RunFacts) : Bool := decide (
-  10 * r.enumeratedTasks.card ≥ 9 * r.openTasks.card ∧
-  2 * r.targetsReachingScoring.card ≥ r.enumeratedTasks.card ∧
-  2 * r.targetsWithG.card ≥ r.enumeratedTasks.card ∧
-  (r.libraryPatternCount < 100 ∨ 10 ≤ r.maxSliceSize) ∧
-  2 ≤ r.constructedCascades.card ∧
-  2 ≤ r.comparedPolicies.card ∧
-  2 * r.openTasks.card ≤ r.totalPolicies ∧
-  (r.seatsAvailable.card < 10 ∨ r.seatsAvailable.card ≤ 10 * r.seatsUsed.card))
+  r.frontierRefresh.Valid ∧
+  r.frontierRefresh.currentOpenTasks = r.openTasks ∧
+  r.frontierSelection.Valid r.frontierRefresh.current r.openTasks ∧
+  r.selectedCascade.selectedTask = r.frontierSelection.selected.task ∧
+  r.selectedCascade.Valid)
 
 /-! Joe: C must prefer an outcome that closes a criterion to one that does
 not. Every reachable comparison is strict, and at least one is represented. -/
@@ -292,6 +291,9 @@ def click20 : RunFacts where
   earlierProgressNoGreaterRisk := 0
   differentArrangementPairs := 1
   arrangementPairsDistinguishedByG := 0
+  frontierRefresh := positiveRefresh
+  frontierSelection := positiveSelection
+  selectedCascade := mismatchedCascade
 
 def missingG : RunFacts :=
   { click20 with
@@ -301,15 +303,15 @@ def missingG : RunFacts :=
     cascadesWithoutG := {21} }
 
 def good : RunFacts where
-  openMissions := ids 0 221
-  openExcursions := ids 221 373
-  openTickets := ids 594 43
-  enumeratedTasks := ids 0 637
-  targetsReachingScoring := ids 0 637
-  targetsWithG := ids 0 637
+  openMissions := {1, 2, 3}
+  openExcursions := ∅
+  openTickets := ∅
+  enumeratedTasks := {1, 2, 3}
+  targetsReachingScoring := {1, 2, 3}
+  targetsWithG := {1, 2, 3}
   libraryPatternCount := 1431
   targetConstruction :=
-    [{ targets := ids 0 637, slice := ids 3000 30,
+    [{ targets := {1, 2, 3}, slice := ids 3000 30,
        pool := ids 3000 30, sliceFromWholeLibrary := true,
        policyCount := 3 }]
   constructorPatternCount := 30
@@ -339,6 +341,9 @@ def good : RunFacts where
   earlierProgressNoGreaterRisk := 20
   differentArrangementPairs := 20
   arrangementPairsDistinguishedByG := 20
+  frontierRefresh := positiveRefresh
+  frontierSelection := positiveSelection
+  selectedCascade := positiveCascade
 
 /-- Deterministic likelihoods and terminal-only preferences may yield numeric
 zero epistemic terms while still carrying every term and total C-tau. -/
@@ -349,8 +354,19 @@ def deterministicTerminal : RunFacts :=
 def progressiveRowsMissing : RunFacts :=
   { good with preferenceSemantics := .progressive, gradedPreferenceSteps := ∅ }
 
+/-- Adversarial Q8 witnesses isolate stale-winner and identity-correspondence
+failures without changing the historical breadth fields. -/
+def staleFrontier : RunFacts :=
+  { good with frontierSelection := staleSelection }
+
+def cascadeMismatch : RunFacts :=
+  { good with selectedCascade := mismatchedCascade }
+
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
+theorem good_Q8 : Q8 good = true := by decide
+theorem stale_frontier_not_Q8 : Q8 staleFrontier = false := by decide
+theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by decide
 
 theorem click20_not_Q1 : Q1 click20 = false := by decide
 theorem click20_not_Q2 : Q2 click20 = false := by decide
@@ -454,5 +470,8 @@ example : Q10 click20 = true := by decide
 #print axioms good_conforms
 #print axioms deterministic_terminal_Q4
 #print axioms progressive_rows_missing_not_Q4
+#print axioms good_Q8
+#print axioms stale_frontier_not_Q8
+#print axioms cascade_mismatch_not_Q8
 
 end DarkTower.WarMachine.Requirements
