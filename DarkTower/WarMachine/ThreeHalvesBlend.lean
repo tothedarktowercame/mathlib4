@@ -897,7 +897,8 @@ def Policy.components (p : Policy) : List (List Nat) :=
 /-! ## Deterministic finite cycle obligations
 
 Edges are considered in supplied order.  A well-formed edge enters the forest
-iff its two square indices are not already connected by earlier forest edges;
+iff its two typed endpoints `(square index, Role)` are not already connected
+by earlier forest edges;
 every other well-formed edge deterministically creates one obligation.  Thus
 parallel and reversed duplicate edges are explicit non-tree obligations, not
 silently deduplicated. -/
@@ -914,13 +915,60 @@ private def admittedIndexedGluings (p : Policy) : List (Nat × Gluing) :=
   ((List.range p.gluings.length).zip p.gluings).filter fun ig =>
     Gluing.wellFormed p.squares ig.2
 
+private def typedComponentStep (gluings : List Gluing)
+    (seen : Finset (Nat × Role)) : Finset (Nat × Role) :=
+  gluings.foldl (fun acc g =>
+    if (g.i, g.rᵢ) ∈ acc then insert (g.j, g.rⱼ) acc
+    else if (g.j, g.rⱼ) ∈ acc then insert (g.i, g.rᵢ) acc
+    else acc) seen
+
+private def typedComponentClosure (gluings : List Gluing) :
+    Nat → Finset (Nat × Role) → Finset (Nat × Role)
+  | 0, seen => seen
+  | n + 1, seen => typedComponentClosure gluings n
+      (typedComponentStep gluings seen)
+
+def Policy.typedComponent (p : Policy) (forest : List (Nat × Gluing))
+    (v : Nat × Role) : Finset (Nat × Role) :=
+  typedComponentClosure (forest.map Prod.snd) (p.squares.length * 4) {v}
+
 private def forestStep (p : Policy) (forest : List (Nat × Gluing))
     (ig : Nat × Gluing) : List (Nat × Gluing) :=
-  if ig.2.j ∈ component p.squares (forest.map Prod.snd) ig.2.i then forest
+  if (ig.2.j, ig.2.rⱼ) ∈ p.typedComponent forest (ig.2.i, ig.2.rᵢ) then forest
   else forest ++ [ig]
 
 def Policy.gluingForest (p : Policy) : List Nat :=
   ((admittedIndexedGluings p).foldl (forestStep p) []).map Prod.fst
+
+private theorem mem_foldl_forestStep (p : Policy) (xs acc : List (Nat × Gluing))
+    (x : Nat × Gluing) (h : x ∈ xs.foldl (forestStep p) acc) :
+    x ∈ acc ∨ x ∈ xs := by
+  induction xs generalizing acc with
+  | nil => simpa using h
+  | cons a xs ih =>
+      have hx := ih (forestStep p acc a) h
+      rcases hx with hx | hx
+      · unfold forestStep at hx
+        split at hx
+        · exact Or.inl hx
+        · have hmem : x ∈ acc ∨ x = a := by simpa using hx
+          rcases hmem with hacc | rfl
+          · exact Or.inl hacc
+          · exact Or.inr (by simp)
+      · exact Or.inr (by simp [hx])
+
+/-- Every selected typed-forest edge is an actually supplied, individually
+well-formed gluing; forest construction cannot mint an edge. -/
+theorem Policy.gluingForest_edge_admitted (p : Policy) {k : Nat}
+    (hk : k ∈ p.gluingForest) :
+    ∃ g, (k, g) ∈ (List.range p.gluings.length).zip p.gluings ∧
+      Gluing.wellFormed p.squares g = true := by
+  simp only [Policy.gluingForest, List.mem_map] at hk
+  obtain ⟨ig, hig, rfl⟩ := hk
+  have hi := mem_foldl_forestStep p (admittedIndexedGluings p) [] ig hig
+  simp only [List.not_mem_nil, false_or] at hi
+  simp only [admittedIndexedGluings, List.mem_filter] at hi
+  exact ⟨ig.2, hi.1, hi.2⟩
 
 def Policy.requiredCycleEdges (p : Policy) : List Nat :=
   (admittedIndexedGluings p).filterMap fun ig =>
