@@ -104,6 +104,46 @@ theorem malformed_gluing_merges_raw_components_only :
     malformedMerge.verdict = .bag [[0, 1]] := by
   native_decide
 
+/-! Three individually valid isomorphisms can disagree around a triangle.
+Identity followed by identity is identity, while the supplied direct edge is
+the transposition of the two-element carrier. -/
+def cycleTheory : Theory := ⟨{0, 1}, ∅⟩
+def cycleSquare : Square :=
+  ⟨cycleTheory, cycleTheory, cycleTheory, cycleTheory,
+   ⟨∅⟩, ⟨∅⟩, ⟨∅⟩, ⟨∅⟩, true, true⟩
+def identityIso : PMap := ⟨{(0, 0), (1, 1)}⟩
+def swapIso : PMap := ⟨{(0, 1), (1, 0)}⟩
+
+def incoherentCyclePolicy : Policy :=
+  { squares := [cycleSquare, cycleSquare, cycleSquare]
+    gluings := [⟨0, .G, 1, .G, identityIso⟩,
+                ⟨1, .G, 2, .G, identityIso⟩,
+                ⟨0, .G, 2, .G, swapIso⟩]
+    applicationOrder := [] }
+
+def coherentCyclePolicy : Policy :=
+  { incoherentCyclePolicy with
+    gluings := [⟨0, .G, 1, .G, identityIso⟩,
+                ⟨1, .G, 2, .G, identityIso⟩,
+                ⟨0, .G, 2, .G, identityIso⟩] }
+
+def cycleTriangle : GluingTriangleCertificate :=
+  { first := 0, second := 1, direct := 2 }
+
+theorem incoherent_cycle_is_pairwise_valid_and_connected :
+    incoherentCyclePolicy.wellFormed = true ∧
+    incoherentCyclePolicy.components = [[0, 1, 2]] ∧
+    incoherentCyclePolicy.verdict = .cascade := by
+  native_decide
+
+theorem incoherent_cycle_certificate_rejects :
+    cycleTriangle.valid incoherentCyclePolicy = false := by
+  native_decide
+
+theorem coherent_cycle_certificate_accepts :
+    cycleTriangle.valid coherentCyclePolicy = true := by
+  native_decide
+
 #print axioms publicationCadence_valid
 #print axioms publicationCadence_semantic_pushout
 #print axioms uncoveredBlend_invalid
@@ -113,4 +153,7 @@ theorem malformed_gluing_merges_raw_components_only :
 #print axioms both_aux_uncovered_refuses
 #print axioms noncommuting_consistent_refuses
 #print axioms malformed_gluing_merges_raw_components_only
+#print axioms incoherent_cycle_is_pairwise_valid_and_connected
+#print axioms incoherent_cycle_certificate_rejects
+#print axioms coherent_cycle_certificate_accepts
 end DarkTower.WarMachine.ThreeHalvesRuntimeWitness

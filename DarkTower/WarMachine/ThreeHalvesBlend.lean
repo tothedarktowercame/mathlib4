@@ -835,6 +835,37 @@ private def Gluing.wellFormed (squares : List Square) (g : Gluing) : Bool :=
 def Policy.wellFormed (p : Policy) : Bool :=
   p.gluings.all (Gluing.wellFormed p.squares)
 
+/-- Indices of two composable supplied gluings and the supplied direct gluing
+between the same typed endpoints.  This is additive evidence; it does not
+change `Policy.wellFormed`. -/
+structure GluingTriangleCertificate where
+  first : Nat
+  second : Nat
+  direct : Nat
+  deriving DecidableEq
+
+/-- Check one explicitly supplied gluing triangle.  Besides pairwise policy
+well-formedness, endpoints and roles must line up and the two-step transport
+must equal the direct transport as a partial-map graph. -/
+def GluingTriangleCertificate.valid (p : Policy)
+    (c : GluingTriangleCertificate) : Bool :=
+  match p.gluings[c.first]?, p.gluings[c.second]?, p.gluings[c.direct]? with
+  | some f, some g, some d =>
+      p.wellFormed &&
+      decide (f.j = g.i) && decide (f.rⱼ = g.rᵢ) &&
+      decide (f.i = d.i) && decide (f.rᵢ = d.rᵢ) &&
+      decide (g.j = d.j) && decide (g.rⱼ = d.rⱼ) &&
+      decide (PMap.comp f.iso g.iso = d.iso)
+  | _, _, _ => false
+
+/-!
+This certificate checks one supplied triangle; it does not assert that the
+supplied triangles cover every cycle.  Before using coherent connectivity for
+pasting or a colimit claim, one additionally needs a completeness theorem that
+the certificates cover a cycle basis of the admitted gluing graph, followed by
+path independence derived from coherence on that basis.
+-/
+
 private def componentStep (squares : List Square) (gluings : List Gluing)
     (seen : Finset Nat) : Finset Nat :=
   gluings.foldl (fun acc g =>
