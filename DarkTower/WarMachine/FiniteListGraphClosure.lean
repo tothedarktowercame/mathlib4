@@ -304,6 +304,48 @@ theorem greedyForest_edge_mem [Fintype V] (edges : List (V × V)) {e : V × V}
     (h : e ∈ greedyForest edges) : e ∈ edges :=
   (greedyForest_invariant edges).selected e h
 
+def edgeKeys (edges : List (V × V)) : List (Sym2 V) :=
+  edges.map fun e => s(e.1, e.2)
+
+private theorem edgeKey_mem_implies_reachable {forest : List (V × V)} {e : V × V}
+    (hne : e.1 ≠ e.2) (h : s(e.1, e.2) ∈ edgeKeys forest) :
+    (graph forest).Reachable e.1 e.2 := by
+  simp only [edgeKeys, List.mem_map] at h
+  obtain ⟨x, hx, heq⟩ := h
+  rw [Sym2.eq_iff] at heq
+  apply SimpleGraph.Adj.reachable
+  change (SimpleGraph.fromRel fun u v => (u, v) ∈ forest).Adj e.1 e.2
+  rw [SimpleGraph.fromRel_adj]
+  rcases heq with ⟨h₁, h₂⟩ | ⟨h₁, h₂⟩
+  · exact ⟨hne, Or.inl (by simpa [← h₁, ← h₂] using hx)⟩
+  · exact ⟨hne, Or.inr (by simpa [← h₁, ← h₂] using hx)⟩
+
+theorem edgeKeys_forestStep_nodup [Fintype V] {forest : List (V × V)}
+    (h : (edgeKeys forest).Nodup) (e : V × V) :
+    (edgeKeys (forestStep forest e)).Nodup := by
+  classical
+  unfold forestStep
+  split <;> rename_i hr
+  · exact h
+  · have hne : e.1 ≠ e.2 := fun heq => hr (heq ▸ SimpleGraph.Reachable.refl e.1)
+    rw [edgeKeys, List.map_append]
+    apply List.nodup_append.mpr
+    refine ⟨h, by simp, ?_⟩
+    intro a ha b hb hab
+    simp only [List.map_singleton, List.mem_singleton] at hb
+    exact hr (edgeKey_mem_implies_reachable (forest := forest) hne (by
+      rw [← hb, ← hab]
+      exact ha))
+
+theorem greedyForest_edgeKeys_nodup [Fintype V] (edges : List (V × V)) :
+    (edgeKeys (greedyForest edges)).Nodup := by
+  unfold greedyForest
+  induction edges using List.reverseRecOn with
+  | nil => simp [edgeKeys]
+  | append_singleton xs e ih =>
+      rw [List.foldl_append]
+      simpa using edgeKeys_forestStep_nodup ih e
+
 #print axioms mem_close_card_iff_reachable
 #print axioms empty_graph_closure
 #print axioms reverse_order_chain_reaches_last
@@ -311,5 +353,6 @@ theorem greedyForest_edge_mem [Fintype V] (edges : List (V × V)) {e : V × V}
 #print axioms greedyForest_isAcyclic
 #print axioms greedyForest_reachable_iff
 #print axioms greedyForest_edge_mem
+#print axioms greedyForest_edgeKeys_nodup
 
 end DarkTower.WarMachine.FiniteListGraphClosure
