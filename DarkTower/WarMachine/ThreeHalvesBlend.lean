@@ -1023,6 +1023,39 @@ private theorem typedEdges_forestStep (p : Policy) (forest : List (Nat × Gluing
 private def Policy.indexedGluingForest (p : Policy) : List (Nat × Gluing) :=
   (admittedIndexedGluings p).foldl (forestStep p) []
 
+private theorem foldl_forestStep_sublist (p : Policy) (xs : List (Nat × Gluing)) :
+    (xs.foldl (forestStep p) []).Sublist xs := by
+  induction xs using List.reverseRecOn with
+  | nil => simp
+  | append_singleton xs ig ih =>
+      rw [List.foldl_append]
+      simp only [List.foldl]
+      unfold forestStep
+      split
+      · exact ih.trans (List.sublist_append_left xs [ig])
+      · exact ih.append (List.Sublist.refl [ig])
+
+private theorem admittedIndexedGluings_indices_nodup (p : Policy) :
+    ((admittedIndexedGluings p).map Prod.fst).Nodup := by
+  unfold admittedIndexedGluings
+  have hz : ((((List.range p.gluings.length).zip p.gluings).map Prod.fst)).Nodup := by
+    rw [List.map_fst_zip (by simp)]
+    exact List.nodup_range
+  exact ((List.filter_sublist (p := fun ig : Nat × Gluing =>
+    Gluing.wellFormed p.squares ig.2)).map Prod.fst).nodup hz
+
+theorem Policy.indexedGluingForest_indices_nodup (p : Policy) :
+    (p.indexedGluingForest.map Prod.fst).Nodup := by
+  exact ((foldl_forestStep_sublist p (admittedIndexedGluings p)).map Prod.fst).nodup
+    (admittedIndexedGluings_indices_nodup p)
+
+theorem Policy.indexedGluingForest_index_unique (p : Policy)
+    {a b : Nat × Gluing} (ha : a ∈ p.indexedGluingForest)
+    (hb : b ∈ p.indexedGluingForest) (hindex : a.1 = b.1) : a = b := by
+  have hn := p.indexedGluingForest_indices_nodup
+  have hd : p.indexedGluingForest.Nodup := hn.of_map Prod.fst
+  exact (List.nodup_map_iff_inj_on hd).mp hn a ha b hb hindex
+
 private theorem typedEdges_foldl_forestStep (p : Policy)
     (xs acc : List (Nat × Gluing))
     (hxs : ∀ ig ∈ xs, Gluing.wellFormed p.squares ig.2 = true) :
@@ -1051,6 +1084,12 @@ theorem Policy.typedEdges_indexedGluingForest (p : Policy) :
     typedEdges_foldl_forestStep p (admittedIndexedGluings p) []
       (admittedIndexedGluings_wellFormed p)]
   rfl
+
+theorem Policy.indexedGluingForest_typedEndpointKeys_nodup (p : Policy) :
+    (FiniteListGraphClosure.edgeKeys
+      (typedEdges p p.indexedGluingForest)).Nodup := by
+  rw [p.typedEdges_indexedGluingForest]
+  exact FiniteListGraphClosure.greedyForest_edgeKeys_nodup _
 
 /-- The graph represented by the executable indexed forest. -/
 def Policy.typedGluingForestGraph (p : Policy) :
