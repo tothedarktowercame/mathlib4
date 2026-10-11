@@ -919,12 +919,41 @@ private def admittedIndexedGluings (p : Policy) : List (Nat × Gluing) :=
   ((List.range p.gluings.length).zip p.gluings).filter fun ig =>
     Gluing.wellFormed p.squares ig.2
 
+private theorem Gluing.wellFormed_endpoint_bounds {squares : List Square} {g : Gluing}
+    (h : Gluing.wellFormed squares g = true) :
+    g.i < squares.length ∧ g.j < squares.length := by
+  unfold Gluing.wellFormed at h
+  split at h <;> rename_i hi hj
+  · exact ⟨(List.getElem?_eq_some_iff.mp hi).choose,
+      (List.getElem?_eq_some_iff.mp hj).choose⟩
+  · simp at h
+
 private def typedEdges (p : Policy) (forest : List (Nat × Gluing)) :
     List ((Fin p.squares.length × Role) × (Fin p.squares.length × Role)) :=
   forest.filterMap fun ig =>
     if h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length then
       some ((⟨ig.2.i, h.1⟩, ig.2.rᵢ), (⟨ig.2.j, h.2⟩, ig.2.rⱼ))
     else none
+
+private def typedEdge (p : Policy) (ig : Nat × Gluing)
+    (h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length) :
+    (Fin p.squares.length × Role) × (Fin p.squares.length × Role) :=
+  ((⟨ig.2.i, h.1⟩, ig.2.rᵢ), (⟨ig.2.j, h.2⟩, ig.2.rⱼ))
+
+private theorem typedEdges_singleton (p : Policy) (ig : Nat × Gluing)
+    (h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length) :
+    typedEdges p [ig] = [typedEdge p ig h] := by
+  simp [typedEdges, typedEdge, h]
+
+private theorem typedEdges_cons (p : Policy) (ig : Nat × Gluing)
+    (xs : List (Nat × Gluing))
+    (h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length) :
+    typedEdges p (ig :: xs) = typedEdge p ig h :: typedEdges p xs := by
+  simp [typedEdges, typedEdge, h]
+
+private theorem typedEdges_append (p : Policy) (xs ys : List (Nat × Gluing)) :
+    typedEdges p (xs ++ ys) = typedEdges p xs ++ typedEdges p ys := by
+  exact List.filterMap_append
 
 def Policy.typedComponentFin (p : Policy) (forest : List (Nat × Gluing))
     (v : Fin p.squares.length × Role) : Finset (Fin p.squares.length × Role) :=
@@ -973,8 +1002,81 @@ private def forestStep (p : Policy) (forest : List (Nat × Gluing))
   if (ig.2.j, ig.2.rⱼ) ∈ p.typedComponent forest (ig.2.i, ig.2.rᵢ) then forest
   else forest ++ [ig]
 
+private theorem typedEdges_forestStep (p : Policy) (forest : List (Nat × Gluing))
+    (ig : Nat × Gluing) (hig : Gluing.wellFormed p.squares ig.2 = true) :
+    typedEdges p (forestStep p forest ig) =
+      FiniteListGraphClosure.forestStep (typedEdges p forest)
+        (typedEdge p ig (Gluing.wellFormed_endpoint_bounds hig)) := by
+  classical
+  have hb := Gluing.wellFormed_endpoint_bounds hig
+  have hmem := p.mem_typedComponent_iff_reachable forest
+    (ig.2.i, ig.2.rᵢ) (ig.2.j, ig.2.rⱼ) hb.1 hb.2
+  unfold forestStep FiniteListGraphClosure.forestStep
+  by_cases hr : (FiniteListGraphClosure.graph (typedEdges p forest)).Reachable
+      (⟨ig.2.i, hb.1⟩, ig.2.rᵢ) (⟨ig.2.j, hb.2⟩, ig.2.rⱼ)
+  · simp only [if_pos (hmem.mpr hr)]
+    simp [typedEdge, hr]
+  · simp only [if_neg (fun hm => hr (hmem.mp hm)), typedEdges_append]
+    rw [typedEdges_singleton p ig hb]
+    simp [typedEdge, hr]
+
+private def Policy.indexedGluingForest (p : Policy) : List (Nat × Gluing) :=
+  (admittedIndexedGluings p).foldl (forestStep p) []
+
+private theorem typedEdges_foldl_forestStep (p : Policy)
+    (xs acc : List (Nat × Gluing))
+    (hxs : ∀ ig ∈ xs, Gluing.wellFormed p.squares ig.2 = true) :
+    typedEdges p (xs.foldl (forestStep p) acc) =
+      (typedEdges p xs).foldl FiniteListGraphClosure.forestStep (typedEdges p acc) := by
+  induction xs generalizing acc with
+  | nil => simp [typedEdges]
+  | cons ig xs ih =>
+      have hig : Gluing.wellFormed p.squares ig.2 = true := hxs ig (by simp)
+      have hrest : ∀ x ∈ xs, Gluing.wellFormed p.squares x.2 = true :=
+        fun x hx => hxs x (by simp [hx])
+      simp only [List.foldl_cons]
+      rw [ih (forestStep p acc ig) hrest, typedEdges_forestStep p acc ig hig,
+        typedEdges_cons p ig xs (Gluing.wellFormed_endpoint_bounds hig), List.foldl_cons]
+
+private theorem admittedIndexedGluings_wellFormed (p : Policy) :
+    ∀ ig ∈ admittedIndexedGluings p,
+      Gluing.wellFormed p.squares ig.2 = true := by
+  intro ig hig
+  exact (List.mem_filter.mp hig).2
+
+theorem Policy.typedEdges_indexedGluingForest (p : Policy) :
+    typedEdges p p.indexedGluingForest =
+      FiniteListGraphClosure.greedyForest (typedEdges p (admittedIndexedGluings p)) := by
+  rw [Policy.indexedGluingForest,
+    typedEdges_foldl_forestStep p (admittedIndexedGluings p) []
+      (admittedIndexedGluings_wellFormed p)]
+  rfl
+
+/-- The graph represented by the executable indexed forest. -/
+def Policy.typedGluingForestGraph (p : Policy) :
+    SimpleGraph (Fin p.squares.length × Role) :=
+  FiniteListGraphClosure.graph (typedEdges p p.indexedGluingForest)
+
+/-- The graph of every supplied, individually well-formed typed gluing. -/
+def Policy.admittedTypedGluingGraph (p : Policy) :
+    SimpleGraph (Fin p.squares.length × Role) :=
+  FiniteListGraphClosure.graph (typedEdges p (admittedIndexedGluings p))
+
+theorem Policy.typedGluingForestGraph_isAcyclic (p : Policy) :
+    p.typedGluingForestGraph.IsAcyclic := by
+  rw [Policy.typedGluingForestGraph, p.typedEdges_indexedGluingForest]
+  exact FiniteListGraphClosure.greedyForest_isAcyclic _
+
+theorem Policy.typedGluingForestGraph_reachable_iff (p : Policy)
+    (u v : Fin p.squares.length × Role) :
+    p.typedGluingForestGraph.Reachable u v ↔
+      p.admittedTypedGluingGraph.Reachable u v := by
+  rw [Policy.typedGluingForestGraph, Policy.admittedTypedGluingGraph,
+    p.typedEdges_indexedGluingForest]
+  exact FiniteListGraphClosure.greedyForest_reachable_iff _ _ _
+
 def Policy.gluingForest (p : Policy) : List Nat :=
-  ((admittedIndexedGluings p).foldl (forestStep p) []).map Prod.fst
+  p.indexedGluingForest.map Prod.fst
 
 private theorem mem_foldl_forestStep (p : Policy) (xs acc : List (Nat × Gluing))
     (x : Nat × Gluing) (h : x ∈ xs.foldl (forestStep p) acc) :
