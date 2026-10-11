@@ -1241,6 +1241,33 @@ theorem Policy.indexedGluingForest_member_wellFormed (p : Policy)
   simp only [List.not_mem_nil, false_or] at hi
   exact (List.mem_filter.mp hi).2
 
+theorem Policy.indexedGluingForest_member_original (p : Policy)
+    {ig : Nat × Gluing} (hig : ig ∈ p.indexedGluingForest) :
+    ig ∈ (List.range p.gluings.length).zip p.gluings := by
+  have hi := mem_foldl_forestStep p (admittedIndexedGluings p) [] ig hig
+  simp only [List.not_mem_nil, false_or] at hi
+  exact (List.mem_filter.mp hi).1
+
+private theorem range_zip_member_getElem? {α : Type*} {xs : List α}
+    {i : Nat} {x : α} (h : (i, x) ∈ (List.range xs.length).zip xs) :
+    xs[i]? = some x := by
+  obtain ⟨n, hn, hget⟩ := List.mem_iff_getElem.mp h
+  have hnRange : n < (List.range xs.length).length := by
+    simpa [List.length_zip] using hn
+  have hnXs : n < xs.length := by simpa using hnRange
+  rw [List.getElem_zip] at hget
+  have hi : n = i := by
+    simpa using congrArg Prod.fst hget
+  have hx : xs[n] = x := by
+    simpa using congrArg Prod.snd hget
+  subst i
+  exact List.getElem?_eq_some_iff.mpr ⟨hnXs, hx⟩
+
+theorem Policy.indexedGluingForest_member_lookup (p : Policy)
+    {ig : Nat × Gluing} (hig : ig ∈ p.indexedGluingForest) :
+    p.gluings[ig.1]? = some ig.2 :=
+  range_zip_member_getElem? (p.indexedGluingForest_member_original hig)
+
 theorem Policy.indexedGluingForest_member_emits_typedEdge (p : Policy)
     {ig : Nat × Gluing} (hig : ig ∈ p.indexedGluingForest) :
     let hb := Gluing.wellFormed_endpoint_bounds
@@ -1302,6 +1329,97 @@ theorem orientedTypedEndpoints_reverse (p : Policy) (ig : Nat × Gluing)
     orientedTypedEndpoints p ig hb true =
       ((typedEdge p ig hb).2, (typedEdge p ig hb).1) := by rfl
 
+structure OrientedForestAdjacencyWitness (p : Policy)
+    (u v : Fin p.squares.length × Role) where
+  ig : Nat × Gluing
+  member : ig ∈ p.indexedGluingForest
+  bounds : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length
+  reversed : Bool
+  endpoints : orientedTypedEndpoints p ig bounds reversed = (u, v)
+
+theorem Policy.exists_orientedForestAdjacencyWitness (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.typedGluingForestGraph.Adj u v) :
+    Nonempty (OrientedForestAdjacencyWitness p u v) := by
+  change (FiniteListGraphClosure.graph
+    (typedEdges p p.indexedGluingForest)).Adj u v at h
+  rw [FiniteListGraphClosure.graph, SimpleGraph.fromRel_adj] at h
+  rcases h with ⟨_, huv | hvu⟩
+  · obtain ⟨ig, hig, hb, he⟩ :=
+      p.mem_typedEdges_indexedGluingForest_iff.mp huv
+    exact ⟨⟨ig, hig, hb, false, by
+      change typedEdge p ig hb = (u, v)
+      exact he.symm⟩⟩
+  · obtain ⟨ig, hig, hb, he⟩ :=
+      p.mem_typedEdges_indexedGluingForest_iff.mp hvu
+    exact ⟨⟨ig, hig, hb, true, by
+      change ((typedEdge p ig hb).2, (typedEdge p ig hb).1) = (u, v)
+      exact congrArg Prod.swap he.symm⟩⟩
+
+theorem Policy.orientedForestAdjacencyWitness_unique (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.typedGluingForestGraph.Adj u v)
+    (a b : OrientedForestAdjacencyWitness p u v) :
+    a.ig = b.ig ∧ a.reversed = b.reversed := by
+  rcases a with ⟨a, ha, haBound, ar, hae⟩
+  rcases b with ⟨b, hb, hbBound, br, hbe⟩
+  change a = b ∧ ar = br
+  have hkey : s((typedEdge p a haBound).1, (typedEdge p a haBound).2) =
+      s((typedEdge p b hbBound).1, (typedEdge p b hbBound).2) := by
+    have hka' : s((typedEdge p a haBound).1, (typedEdge p a haBound).2) =
+        s(u, v) := by
+      cases har : ar
+      · have ea : typedEdge p a haBound = (u, v) := by
+          simpa [orientedTypedEndpoints, har] using hae
+        exact congrArg (fun e => s(e.1, e.2)) ea
+      · have ea : ((typedEdge p a haBound).2, (typedEdge p a haBound).1) =
+            (u, v) := by simpa [orientedTypedEndpoints, har] using hae
+        simpa only [Sym2.eq_swap] using congrArg (fun e => s(e.1, e.2)) ea
+    have hkb' : s((typedEdge p b hbBound).1, (typedEdge p b hbBound).2) =
+        s(u, v) := by
+      cases hbr : br
+      · have eb : typedEdge p b hbBound = (u, v) := by
+          simpa [orientedTypedEndpoints, hbr] using hbe
+        exact congrArg (fun e => s(e.1, e.2)) eb
+      · have eb : ((typedEdge p b hbBound).2, (typedEdge p b hbBound).1) =
+            (u, v) := by simpa [orientedTypedEndpoints, hbr] using hbe
+        simpa only [Sym2.eq_swap] using congrArg (fun e => s(e.1, e.2)) eb
+    exact hka'.trans hkb'.symm
+  have hig := p.indexedGluingForest_typedEndpointKey_unique
+    ha hb haBound hbBound hkey
+  constructor
+  · exact hig
+  subst b
+  cases har : ar <;> cases hbr : br <;> simp [har, hbr]
+  · simp [orientedTypedEndpoints, har, hbr] at hae hbe
+    have huv : u = v := by
+      calc
+        u = (typedEdge p a haBound).1 := by simpa using congrArg Prod.fst hae.symm
+        _ = (typedEdge p a hbBound).1 := by rw [typedEdge_proof_irrel p a haBound hbBound]
+        _ = v := hbe.2
+    exact (h.ne huv).elim
+  · simp [orientedTypedEndpoints, har, hbr] at hae hbe
+    have huv : u = v := by
+      calc
+        u = (typedEdge p a hbBound).2 := hae.1.symm
+        _ = (typedEdge p a haBound).2 := by rw [typedEdge_proof_irrel p a hbBound haBound]
+        _ = v := by simpa using congrArg Prod.snd hbe
+    exact (h.ne huv).elim
+
+noncomputable def Policy.orientedForestAdjacencyWitness (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.typedGluingForestGraph.Adj u v) :
+    OrientedForestAdjacencyWitness p u v :=
+  Classical.choice (p.exists_orientedForestAdjacencyWitness h)
+
+theorem Policy.orientedForestAdjacencyWitness_spec_unique (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.typedGluingForestGraph.Adj u v)
+    (w : OrientedForestAdjacencyWitness p u v) :
+    (p.orientedForestAdjacencyWitness h).ig = w.ig ∧
+      (p.orientedForestAdjacencyWitness h).reversed = w.reversed :=
+  p.orientedForestAdjacencyWitness_unique h _ w
+
 /-- Every selected typed-forest edge is an actually supplied, individually
 well-formed gluing; forest construction cannot mint an edge. -/
 theorem Policy.gluingForest_edge_admitted (p : Policy) {k : Nat}
@@ -1329,6 +1447,35 @@ def Policy.orientedGluing (p : Policy) (step : OrientedGluing) :
   | some g =>
       if step.2 then some ⟨(g.j, g.rⱼ), (g.i, g.rᵢ), reversePMap g.iso⟩
       else some ⟨(g.i, g.rᵢ), (g.j, g.rⱼ), g.iso⟩
+
+theorem Policy.orientedGluing_of_forestAdjacencyWitness (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (w : OrientedForestAdjacencyWitness p u v) :
+    ∃ info,
+      p.orientedGluing (w.ig.1, w.reversed) = some info ∧
+      info.source = (u.1.val, u.2) ∧ info.target = (v.1.val, v.2) := by
+  have hl := p.indexedGluingForest_member_lookup w.member
+  cases hr : w.reversed
+  · let info : GluingPathInfo :=
+      ⟨(w.ig.2.i, w.ig.2.rᵢ), (w.ig.2.j, w.ig.2.rⱼ), w.ig.2.iso⟩
+    refine ⟨info, ?_, ?_, ?_⟩
+    · simp [Policy.orientedGluing, hl, hr, info]
+    · change (w.ig.2.i, w.ig.2.rᵢ) = (u.1.val, u.2)
+      simpa [orientedTypedEndpoints, hr, typedEdge] using
+        congrArg (fun z => (z.1.1.val, z.1.2)) w.endpoints
+    · change (w.ig.2.j, w.ig.2.rⱼ) = (v.1.val, v.2)
+      simpa [orientedTypedEndpoints, hr, typedEdge] using
+        congrArg (fun z => (z.2.1.val, z.2.2)) w.endpoints
+  · let info : GluingPathInfo :=
+      ⟨(w.ig.2.j, w.ig.2.rⱼ), (w.ig.2.i, w.ig.2.rᵢ), reversePMap w.ig.2.iso⟩
+    refine ⟨info, ?_, ?_, ?_⟩
+    · simp [Policy.orientedGluing, hl, hr, info]
+    · change (w.ig.2.j, w.ig.2.rⱼ) = (u.1.val, u.2)
+      simpa [orientedTypedEndpoints, hr, typedEdge] using
+        congrArg (fun z => (z.1.1.val, z.1.2)) w.endpoints
+    · change (w.ig.2.i, w.ig.2.rᵢ) = (v.1.val, v.2)
+      simpa [orientedTypedEndpoints, hr, typedEdge] using
+        congrArg (fun z => (z.2.1.val, z.2.2)) w.endpoints
 
 def Policy.gluingPathInfo (p : Policy) : List OrientedGluing → Option GluingPathInfo
   | [] => none
