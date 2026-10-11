@@ -205,6 +205,22 @@ theorem malformed_gluing_cannot_enter_admitted_basis :
     (⟨[]⟩ : GluingCoherenceCertificate).valid malformedMerge = false := by
   native_decide
 
+/-! The square-index forest does not by itself provide a typed transport path:
+the two incident gluings may meet the same square at different roles.  This is
+the exact blocker to a general unique `GluingPathInfo` theorem. -/
+def roleMismatchTreePolicy : Policy :=
+  { squares := [cycleSquare, cycleSquare, cycleSquare]
+    gluings := [⟨0, .G, 1, .G, identityIso⟩,
+                ⟨1, .I₁, 2, .G, identityIso⟩]
+    applicationOrder := [] }
+
+theorem square_tree_need_not_have_typed_transport_path :
+    roleMismatchTreePolicy.wellFormed = true ∧
+    roleMismatchTreePolicy.gluingForest = [0, 1] ∧
+    roleMismatchTreePolicy.components = [[0, 1, 2]] ∧
+    roleMismatchTreePolicy.gluingPathInfo [(0, false), (1, false)] = none := by
+  native_decide
+
 #print axioms publicationCadence_valid
 #print axioms publicationCadence_semantic_pushout
 #print axioms uncoveredBlend_invalid
@@ -223,4 +239,5 @@ theorem malformed_gluing_cannot_enter_admitted_basis :
 #print axioms omitted_independent_cycle_refuses
 #print axioms reversed_duplicate_is_explicit_obligation
 #print axioms malformed_gluing_cannot_enter_admitted_basis
+#print axioms square_tree_need_not_have_typed_transport_path
 end DarkTower.WarMachine.ThreeHalvesRuntimeWitness
