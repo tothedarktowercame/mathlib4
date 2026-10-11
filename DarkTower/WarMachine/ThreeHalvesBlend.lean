@@ -1678,6 +1678,88 @@ structure GluingCycleObligation where
   forestPath : List OrientedGluing
   deriving DecidableEq
 
+structure RequiredCycleEdgeWitness (p : Policy) (k : Nat) where
+  ig : Nat × Gluing
+  admitted : ig ∈ admittedIndexedGluings p
+  index_eq : ig.1 = k
+  notRetained : ig ∉ p.indexedGluingForest
+  bounds : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length
+
+def RequiredCycleEdgeWitness.source {p : Policy} {k : Nat}
+    (w : RequiredCycleEdgeWitness p k) : Fin p.squares.length × Role :=
+  ((⟨w.ig.2.i, w.bounds.1⟩, w.ig.2.rᵢ))
+
+def RequiredCycleEdgeWitness.target {p : Policy} {k : Nat}
+    (w : RequiredCycleEdgeWitness p k) : Fin p.squares.length × Role :=
+  ((⟨w.ig.2.j, w.bounds.2⟩, w.ig.2.rⱼ))
+
+theorem Policy.requiredCycleEdge_has_witness (p : Policy) {k : Nat}
+    (hk : k ∈ p.requiredCycleEdges) : Nonempty (RequiredCycleEdgeWitness p k) := by
+  unfold Policy.requiredCycleEdges at hk
+  obtain ⟨ig, hig, hfilter⟩ := List.mem_filterMap.mp hk
+  by_cases hr : ig.1 ∈ p.gluingForest
+  · simp [hr] at hfilter
+  · have hindex : ig.1 = k := by simpa [hr] using hfilter
+    have hwf := admittedIndexedGluings_wellFormed p ig hig
+    refine ⟨⟨ig, hig, hindex, ?_, Gluing.wellFormed_endpoint_bounds hwf⟩⟩
+    intro hret
+    exact hr (List.mem_map.mpr ⟨ig, hret, rfl⟩)
+
+theorem RequiredCycleEdgeWitness.admittedAdj
+    {p : Policy} {k : Nat} (w : RequiredCycleEdgeWitness p k)
+    (hne : w.source ≠ w.target) :
+    p.admittedTypedGluingGraph.Adj w.source w.target := by
+  change (FiniteListGraphClosure.graph
+    (typedEdges p (admittedIndexedGluings p))).Adj w.source w.target
+  rw [FiniteListGraphClosure.graph, SimpleGraph.fromRel_adj]
+  refine ⟨hne, ?_⟩
+  apply Or.inl
+  apply List.mem_filterMap.mpr
+  refine ⟨w.ig, w.admitted, ?_⟩
+  simp [w.bounds, RequiredCycleEdgeWitness.source,
+    RequiredCycleEdgeWitness.target]
+
+theorem RequiredCycleEdgeWitness.forestReachable
+    {p : Policy} {k : Nat} (w : RequiredCycleEdgeWitness p k) :
+    p.typedGluingForestGraph.Reachable w.source w.target := by
+  by_cases h : w.source = w.target
+  · rw [h]
+  · exact (p.typedGluingForestGraph_reachable_iff w.source w.target).mpr
+      (w.admittedAdj h).reachable
+
+noncomputable def RequiredCycleEdgeWitness.canonicalPath
+    {p : Policy} {k : Nat} (w : RequiredCycleEdgeWitness p k) :
+    p.typedGluingForestGraph.Path w.source w.target :=
+  p.canonicalTypedGluingForestPath
+    ((p.typedGluingForestGraph_reachable_iff w.source w.target).mp
+      w.forestReachable)
+
+noncomputable def RequiredCycleEdgeWitness.canonicalSteps
+    {p : Policy} {k : Nat} (w : RequiredCycleEdgeWitness p k) :
+    List OrientedGluing := p.orientedStepsOfPath w.canonicalPath
+
+theorem RequiredCycleEdgeWitness.canonicalSteps_indices_nodup
+    {p : Policy} {k : Nat} (w : RequiredCycleEdgeWitness p k) :
+    (w.canonicalSteps.map Prod.fst).Nodup :=
+  p.orientedStepsOfPath_indices_nodup w.canonicalPath
+
+theorem RequiredCycleEdgeWitness.canonicalPath_nonempty
+    {p : Policy} {k : Nat} (w : RequiredCycleEdgeWitness p k)
+    (hne : w.source ≠ w.target) : ¬ w.canonicalPath.1.Nil := by
+  intro hn
+  exact hne ((w.canonicalPath.2.nil_iff_eq).mp hn)
+
+theorem RequiredCycleEdgeWitness.canonicalPathInfo
+    {p : Policy} {k : Nat} (w : RequiredCycleEdgeWitness p k)
+    (hne : w.source ≠ w.target) :
+    ∃ info,
+      p.gluingPathInfo w.canonicalSteps = some info ∧
+      info.source = (w.source.1.val, w.source.2) ∧
+      info.target = (w.target.1.val, w.target.2) ∧
+      p.orientedTransportFold w.canonicalSteps = some info.transport :=
+  p.gluingPathInfo_orientedStepsOfPath w.canonicalPath
+    (w.canonicalPath_nonempty hne)
+
 private def GluingCycleObligation.valid (p : Policy)
     (o : GluingCycleObligation) : Bool :=
   decide (o.forestPath ≠ []) &&
@@ -1686,6 +1768,87 @@ private def GluingCycleObligation.valid (p : Policy)
     match p.orientedGluing (o.edge, false), p.gluingPathInfo o.forestPath with
     | some direct, some path => decide (direct = path)
     | _, _ => false
+
+/-- Semantic validity closes the path-choice self-exemption left open by the
+executable compatibility check: the named path is exactly the unique forest
+path derived from the required edge's typed endpoints. -/
+def GluingCycleObligation.Valid (p : Policy) (o : GluingCycleObligation) : Prop :=
+  o.valid p = true ∧
+    ∃ w : RequiredCycleEdgeWitness p o.edge,
+      o.forestPath = w.canonicalSteps
+
+theorem GluingCycleObligation.Valid_forestPath_eq_canonical
+    {p : Policy} {o : GluingCycleObligation} (h : o.Valid p) :
+    ∃ w : RequiredCycleEdgeWitness p o.edge,
+      o.forestPath = w.canonicalSteps := h.2
+
+theorem GluingCycleObligation.Valid_not_typed_selfLoop
+    {p : Policy} {o : GluingCycleObligation} (h : o.Valid p) :
+    ∀ w : RequiredCycleEdgeWitness p o.edge, w.source ≠ w.target := by
+  intro w heq
+  obtain ⟨w', hcanonical⟩ := h.2
+  have hw : w = w' := by
+    cases w with
+    | mk ig hig hindex hnot hb =>
+      cases w' with
+      | mk ig' hig' hindex' hnot' hb' =>
+        have hii : ig.1 = ig'.1 := hindex.trans hindex'.symm
+        have hnodup := admittedIndexedGluings_indices_nodup p
+        have hsourceNodup : (admittedIndexedGluings p).Nodup :=
+          hnodup.of_map Prod.fst
+        have heqIg : ig = ig' :=
+          (List.nodup_map_iff_inj_on hsourceNodup).mp hnodup
+            ig hig ig' hig' hii
+        subst ig'
+        rfl
+  subst w'
+  have hnil : w.canonicalSteps = [] := by
+    apply List.eq_nil_of_length_eq_zero
+    unfold RequiredCycleEdgeWitness.canonicalSteps
+    rw [Policy.orientedStepsOfPath_length]
+    exact (w.canonicalPath.2.nil_iff_eq.mpr heq).length_eq_zero
+  have hnonempty : o.forestPath ≠ [] := by
+    have hv := h.1
+    unfold GluingCycleObligation.valid at hv
+    simp only [Bool.and_eq_true, decide_eq_true_eq] at hv
+    exact hv.1.1.1
+  exact hnonempty (hcanonical.trans hnil)
+
+theorem GluingCycleObligation.Valid_direct_eq_canonicalForestTransport
+    {p : Policy} {o : GluingCycleObligation} (h : o.Valid p) :
+    ∃ (w : RequiredCycleEdgeWitness p o.edge)
+      (direct canonical : GluingPathInfo),
+      o.forestPath = w.canonicalSteps ∧
+      p.orientedGluing (o.edge, false) = some direct ∧
+      p.gluingPathInfo w.canonicalSteps = some canonical ∧
+      direct = canonical := by
+  obtain ⟨w, hcanonical⟩ := h.2
+  have hv := h.1
+  unfold GluingCycleObligation.valid at hv
+  simp only [Bool.and_eq_true, decide_eq_true_eq] at hv
+  have hm := hv.2
+  rw [hcanonical] at hm
+  cases hdirect : p.orientedGluing (o.edge, false) with
+  | none => simp [hdirect] at hm
+  | some direct =>
+      cases hpath : p.gluingPathInfo w.canonicalSteps with
+      | none => simp [hdirect, hpath] at hm
+      | some canonical =>
+          simp [hdirect, hpath] at hm
+          exact ⟨w, direct, canonical, hcanonical, rfl, hpath, hm⟩
+
+theorem GluingCycleObligation.Valid_directTransport_eq_canonicalForestTransport
+    {p : Policy} {o : GluingCycleObligation} (h : o.Valid p) :
+    ∃ (w : RequiredCycleEdgeWitness p o.edge)
+      (direct canonical : GluingPathInfo),
+      o.forestPath = w.canonicalSteps ∧
+      p.orientedGluing (o.edge, false) = some direct ∧
+      p.gluingPathInfo w.canonicalSteps = some canonical ∧
+      direct.transport = canonical.transport := by
+  obtain ⟨w, direct, canonical, hsteps, hdirect, hcanonical, heq⟩ :=
+    GluingCycleObligation.Valid_direct_eq_canonicalForestTransport h
+  exact ⟨w, direct, canonical, hsteps, hdirect, hcanonical,
+    congrArg GluingPathInfo.transport heq⟩
 
 structure GluingCoherenceCertificate where
   obligations : List GluingCycleObligation
@@ -1699,6 +1862,26 @@ def GluingCoherenceCertificate.valid (p : Policy)
   p.wellFormed &&
     decide (c.obligations.map (·.edge) = p.requiredCycleEdges) &&
     c.obligations.all (GluingCycleObligation.valid p)
+
+/-- Full semantic validity retains the executable gate and additionally binds
+every listed obligation to the canonical typed forest path derived from its
+required edge. -/
+def GluingCoherenceCertificate.Valid (p : Policy)
+    (c : GluingCoherenceCertificate) : Prop :=
+  c.valid p = true ∧ ∀ o ∈ c.obligations, o.Valid p
+
+theorem GluingCoherenceCertificate.Valid_covers_required_canonicalPaths
+    {p : Policy} {c : GluingCoherenceCertificate} (h : c.Valid p) :
+    c.obligations.map (·.edge) = p.requiredCycleEdges ∧
+      ∀ o ∈ c.obligations,
+        ∃ w : RequiredCycleEdgeWitness p o.edge,
+          o.forestPath = w.canonicalSteps := by
+  have hv := h.1
+  simp only [GluingCoherenceCertificate.valid, Bool.and_eq_true,
+    decide_eq_true_eq] at hv
+  refine ⟨hv.1.2, ?_⟩
+  intro o ho
+  exact (h.2 o ho).2
 
 /-- The strongest presently proved completeness result: a valid certificate
 contains exactly every deterministic non-tree edge obligation, and every
