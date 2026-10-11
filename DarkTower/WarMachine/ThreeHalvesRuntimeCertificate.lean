@@ -63,4 +63,21 @@ theorem valid_projects_pushout (r : Receipt) (h : r.valid = true) :
   simp only [Receipt.valid, Bool.and_eq_true] at h
   exact h.2
 
+/-- A valid executable receipt inhabits the semantic 3/2-pushout predicate,
+not merely its Boolean coverage test. -/
+theorem valid_projects_semantic_pushout (r : Receipt) (h : r.valid = true) :
+    IsThreeHalvesPushout r.square.span r.square.cone := by
+  have hv := h
+  simp only [Receipt.valid, Bool.and_eq_true] at hv
+  have ha₁ : r.a₁.wellFormed r.G.theory r.I₁.theory = true := by aesop
+  have ha₂ : r.a₂.wellFormed r.G.theory r.I₂.theory = true := by aesop
+  have hb₁ : r.b₁.wellFormed r.I₁.theory r.B.theory = true := by aesop
+  have hb₂ : r.b₂.wellFormed r.I₂.theory r.B.theory = true := by aesop
+  apply (pushout_iff_coverage r.square.span r.square.cone
+    (by simpa [Receipt.square] using ha₁)
+    (by simpa [Receipt.square] using ha₂)
+    (by simpa [Receipt.square] using hb₁)
+    (by simpa [Receipt.square] using hb₂)).2
+  exact valid_projects_pushout r h
+
 end DarkTower.WarMachine.ThreeHalvesRuntimeCertificate
