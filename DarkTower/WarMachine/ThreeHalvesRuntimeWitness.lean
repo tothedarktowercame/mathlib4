@@ -28,5 +28,12 @@ def publicationCadence : Receipt :=
 theorem publicationCadence_valid : publicationCadence.valid = true := by
   native_decide
 
+def uncoveredBlend : Receipt :=
+  { publicationCadence with b₂ := ⟨{(20, 30)}⟩ }
+
+theorem uncoveredBlend_invalid : uncoveredBlend.valid = false := by
+  native_decide
+
 #print axioms publicationCadence_valid
+#print axioms uncoveredBlend_invalid
 end DarkTower.WarMachine.ThreeHalvesRuntimeWitness

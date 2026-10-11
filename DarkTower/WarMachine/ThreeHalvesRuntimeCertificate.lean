@@ -1,8 +1,9 @@
 import DarkTower.WarMachine.ThreeHalvesBlend
 
 /-! A deliberately single-square runtime certificate.  It validates source
-pins, hom-set membership, required commutation, and consistency.  Pushout
-coverage, gluing, pasting and transition-kernel adequacy are out of scope. -/
+pins, hom-set membership, required commutation, consistency, and the finite
+K1' pushout-coverage criterion.  Gluing, pasting and transition-kernel
+adequacy remain out of scope. -/
 
 namespace DarkTower.WarMachine.ThreeHalvesRuntimeCertificate
 open DarkTower.WarMachine.ThreeHalvesBlend
@@ -47,11 +48,19 @@ def Receipt.valid (r : Receipt) : Bool :=
   r.a₂.wellFormed r.G.theory r.I₂.theory &&
   r.b₁.wellFormed r.I₁.theory r.B.theory &&
   r.b₂.wellFormed r.I₂.theory r.B.theory &&
-  r.requiredCommutes && r.square.cone.consistent
+  r.requiredCommutes && r.square.cone.consistent && r.square.cone.isPushout
 
 theorem valid_projects_consistent (r : Receipt) (h : r.valid = true) :
     r.square.cone.consistent = true := by
   simp only [Receipt.valid, Bool.and_eq_true] at h
   aesop
+
+/-- Coverage is computed from the pinned blend object and the two cone-leg
+graphs; it is not a receipt-supplied verdict.  By `pushout_iff_coverage`, this
+is the executable K1' pushout condition for the square. -/
+theorem valid_projects_pushout (r : Receipt) (h : r.valid = true) :
+    r.square.cone.isPushout = true := by
+  simp only [Receipt.valid, Bool.and_eq_true] at h
+  exact h.2
 
 end DarkTower.WarMachine.ThreeHalvesRuntimeCertificate
