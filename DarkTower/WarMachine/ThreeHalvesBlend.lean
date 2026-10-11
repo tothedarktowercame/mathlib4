@@ -1766,6 +1766,106 @@ theorem Policy.mem_orientedStepsOfWalk_indices_has_edge (p : Policy)
       · obtain ⟨e, he, ig, hig, hin, hb, hkey⟩ := ih hn
         exact ⟨e, by simp [he], ig, hig, hin, hb, hkey⟩
 
+theorem Policy.mem_walk_edges_has_orientedStepIndex (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (w : p.typedGluingForestGraph.Walk u v)
+    {e : Sym2 (Fin p.squares.length × Role)} (he : e ∈ w.edges) :
+    ∃ ig ∈ p.indexedGluingForest,
+      ig.1 ∈ (p.orientedStepsOfWalk w).map Prod.fst ∧
+      ∃ hb : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length,
+        s((typedEdge p ig hb).1, (typedEdge p ig hb).2) = e := by
+  induction w with
+  | nil => simp at he
+  | @cons u x v h rest ih =>
+      simp only [SimpleGraph.Walk.edges_cons, List.mem_cons] at he
+      rcases he with rfl | he
+      · let a := p.orientedForestAdjacencyWitness h
+        refine ⟨a.ig, a.member, ?_, a.bounds, ?_⟩
+        · simp [Policy.orientedStepsOfWalk, a]
+        · simpa [a] using p.orientedForestAdjacencyWitness_endpointKey h
+      · obtain ⟨ig, hig, hin, hb, hkey⟩ := ih he
+        exact ⟨ig, hig, by simp [Policy.orientedStepsOfWalk, hin], hb, hkey⟩
+
+theorem Policy.walk_edges_nodup_of_orientedStep_indices_nodup (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (w : p.typedGluingForestGraph.Walk u v)
+    (hn : ((p.orientedStepsOfWalk w).map Prod.fst).Nodup) :
+    w.edges.Nodup := by
+  induction w with
+  | nil => simp
+  | @cons u x v h rest ih =>
+      let a := p.orientedForestAdjacencyWitness h
+      simp only [Policy.orientedStepsOfWalk, List.map_cons,
+        List.nodup_cons] at hn
+      simp only [SimpleGraph.Walk.edges_cons, List.nodup_cons]
+      refine ⟨?_, ih hn.2⟩
+      intro he
+      obtain ⟨ig, hig, hin, hb, hkey⟩ :=
+        p.mem_walk_edges_has_orientedStepIndex rest he
+      have haKey : s((typedEdge p a.ig a.bounds).1,
+          (typedEdge p a.ig a.bounds).2) = s(u, x) := by
+        simpa [a] using p.orientedForestAdjacencyWitness_endpointKey h
+      have higEq : ig = a.ig :=
+        p.indexedGluingForest_typedEndpointKey_unique hig a.member hb a.bounds
+          (hkey.trans haKey.symm)
+      subst ig
+      exact hn.1 hin
+
+theorem OrientedStepsWalkResult.isTrail
+    {p : Policy} {steps : List OrientedGluing} {info : GluingPathInfo}
+    (r : OrientedStepsWalkResult p steps info)
+    (hn : (steps.map Prod.fst).Nodup) : r.walk.IsTrail := by
+  constructor
+  apply p.walk_edges_nodup_of_orientedStep_indices_nodup
+  rw [r.steps_eq]
+  exact hn
+
+theorem OrientedStepsWalkResult.isPath
+    {p : Policy} {steps : List OrientedGluing} {info : GluingPathInfo}
+    (r : OrientedStepsWalkResult p steps info)
+    (hn : (steps.map Prod.fst).Nodup) : r.walk.IsPath :=
+  (p.typedGluingForestGraph_isAcyclic.isPath_iff_isTrail r.walk).mpr
+    (r.isTrail hn)
+
+structure OrientedStepsPathResult (p : Policy)
+    (steps : List OrientedGluing) (info : GluingPathInfo) where
+  source : Fin p.squares.length × Role
+  target : Fin p.squares.length × Role
+  path : p.typedGluingForestGraph.Path source target
+  source_eq : (source.1.val, source.2) = info.source
+  target_eq : (target.1.val, target.2) = info.target
+  steps_eq : p.orientedStepsOfPath path = steps
+  length_eq : path.1.length = steps.length
+
+noncomputable def Policy.pathOfComposableOrientedSteps (p : Policy)
+    (steps : List OrientedGluing) (info : GluingPathInfo)
+    (hne : steps ≠ [])
+    (hall : ∀ step ∈ steps, step.1 ∈ p.gluingForest)
+    (hinfo : p.gluingPathInfo steps = some info)
+    (hn : (steps.map Prod.fst).Nodup) :
+    OrientedStepsPathResult p steps info := by
+  let r := p.walkOfComposableOrientedSteps steps info hne hall hinfo
+  have hpath : r.walk.IsPath := r.isPath hn
+  let q : p.typedGluingForestGraph.Path r.source r.target := ⟨r.walk, hpath⟩
+  exact ⟨r.source, r.target, q, r.source_eq, r.target_eq,
+    r.steps_eq, r.length_eq⟩
+
+theorem OrientedStepsPathResult.path_unique
+    {p : Policy} {steps : List OrientedGluing} {info : GluingPathInfo}
+    (r : OrientedStepsPathResult p steps info)
+    (q : p.typedGluingForestGraph.Path r.source r.target)
+    (_hq : p.orientedStepsOfPath q = steps) : r.path = q :=
+  p.typedGluingForest_path_unique r.path q
+
+theorem OrientedStepsPathResult.eq_canonicalForestPath
+    {p : Policy} {steps : List OrientedGluing} {info : GluingPathInfo}
+    (r : OrientedStepsPathResult p steps info) :
+    r.path = p.canonicalTypedGluingForestPath
+      ((p.typedGluingForestGraph_reachable_iff r.source r.target).mp
+        r.path.1.reachable) := by
+  symm
+  apply p.canonicalTypedGluingForestPath_unique
+
 theorem Policy.orientedStepsOfWalk_indices_nodup_of_isTrail (p : Policy)
     {u v : Fin p.squares.length × Role}
     (w : p.typedGluingForestGraph.Walk u v) (hw : w.IsTrail) :
