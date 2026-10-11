@@ -1010,6 +1010,53 @@ theorem applicationOrder_independent (p : Policy) (L : List (Nat × Nat × Nat))
   cases p
   simp [Policy.verdict, Policy.wellFormed, Policy.components, Policy.constructionOrder]
 
+/-! ## Additive application-order authorization
+
+The meaning of an application-order triple is deliberately supplied by an
+external law.  In particular, this model does not assume that application
+order equals construction order. -/
+
+structure ApplicationOrderLaw where
+  identity : Nat
+  version : Nat
+  authority : Nat
+  receipt : Nat
+  decode : List (Nat × Nat × Nat) → Option (List Nat)
+  accepts : List (Nat × Nat) → List Nat → Bool
+
+structure ApplicationOrderCertificate where
+  constructionOrder : List (Nat × Nat)
+  applicationOrder : List (Nat × Nat × Nat)
+  applicationSequence : List Nat
+  lawIdentity : Nat
+  lawVersion : Nat
+  lawAuthority : Nat
+  lawReceipt : Nat
+  deriving DecidableEq
+
+private def exactSquarePopulation (p : Policy) (xs : List Nat) : Bool :=
+  decide (xs.eraseDups = xs) &&
+    decide (xs.toFinset = (List.range p.squares.length).toFinset)
+
+/-- A certificate binds both policy orders and delegates their semantic
+relation to an externally registered law.  Population validity is independent
+of that law: every current square occurs exactly once and no foreign square
+index occurs. -/
+def ApplicationOrderCertificate.valid (p : Policy)
+    (registry : List ApplicationOrderLaw) (c : ApplicationOrderCertificate) : Bool :=
+  decide (c.constructionOrder = p.constructionOrder) &&
+    decide (c.applicationOrder = p.applicationOrder) &&
+    exactSquarePopulation p c.applicationSequence &&
+    match registry.find? fun law =>
+      law.identity = c.lawIdentity && law.version = c.lawVersion &&
+        law.authority = c.lawAuthority && law.receipt = c.lawReceipt with
+    | none => false
+    | some law =>
+        decide (law.identity ≠ 0) && decide (law.version ≠ 0) &&
+          decide (law.authority ≠ 0) && decide (law.receipt ≠ 0) &&
+          decide (law.decode c.applicationOrder = some c.applicationSequence) &&
+          law.accepts c.constructionOrder c.applicationSequence
+
 /-! ## House, boat, houseboat, and boathouse
 
 Element codes:
@@ -1307,6 +1354,72 @@ theorem diamond_application_order_witness :
     ({diamondPolicy with applicationOrder := [(1, 2, 0)]}).constructionOrder =
       diamondPolicy.constructionOrder := by
   exact applicationOrder_independent diamondPolicy [(1, 2, 0)]
+
+private def decodeFirstIndex (rows : List (Nat × Nat × Nat)) : Option (List Nat) :=
+  some (rows.map fun row => row.1)
+
+private def diamondExactOrderLaw : ApplicationOrderLaw :=
+  { identity := 71
+    version := 1
+    authority := 72
+    receipt := 73
+    decode := decodeFirstIndex
+    accepts := fun construction application =>
+      decide (construction = [(0, 1), (0, 2), (1, 3), (2, 3)]) &&
+        decide (application = [0, 1, 2, 3]) }
+
+private def applicationRows (xs : List Nat) : List (Nat × Nat × Nat) :=
+  xs.map fun i => (i, i + 10, i + 20)
+
+private def orderedDiamondPolicy : Policy :=
+  { diamondPolicy with
+    applicationOrder := applicationRows [0, 1, 2, 3] }
+
+private def diamondCertificateFor (xs : List Nat) : ApplicationOrderCertificate :=
+  { constructionOrder := [(0, 1), (0, 2), (1, 3), (2, 3)]
+    applicationOrder := applicationRows xs
+    applicationSequence := xs
+    lawIdentity := 71
+    lawVersion := 1
+    lawAuthority := 72
+    lawReceipt := 73 }
+
+private def orderedDiamondCertificate : ApplicationOrderCertificate :=
+  diamondCertificateFor [0, 1, 2, 3]
+
+private def diamondPolicyFor (xs : List Nat) : Policy :=
+  { diamondPolicy with applicationOrder := applicationRows xs }
+
+theorem ordered_diamond_certificate_valid :
+    orderedDiamondCertificate.valid orderedDiamondPolicy [diamondExactOrderLaw] = true := by
+  native_decide
+
+/-- Equal square membership is weaker than authorized ordered equality. -/
+theorem reordered_same_population_but_invalid :
+    exactSquarePopulation orderedDiamondPolicy [0, 2, 1, 3] = true ∧
+    (diamondCertificateFor [0, 2, 1, 3]).valid
+      (diamondPolicyFor [0, 2, 1, 3]) [diamondExactOrderLaw] = false := by
+  native_decide
+
+theorem duplicate_square_invalid :
+    (diamondCertificateFor [0, 1, 2, 2]).valid
+      (diamondPolicyFor [0, 1, 2, 2]) [diamondExactOrderLaw] = false := by
+  native_decide
+
+theorem omitted_square_invalid :
+    (diamondCertificateFor [0, 1, 2]).valid
+      (diamondPolicyFor [0, 1, 2]) [diamondExactOrderLaw] = false := by
+  native_decide
+
+theorem unknown_square_invalid :
+    (diamondCertificateFor [0, 1, 2, 4]).valid
+      (diamondPolicyFor [0, 1, 2, 4]) [diamondExactOrderLaw] = false := by
+  native_decide
+
+theorem substituted_application_law_invalid :
+    ({ orderedDiamondCertificate with lawIdentity := 74 }).valid
+      orderedDiamondPolicy [diamondExactOrderLaw] = false := by
+  native_decide
 
 /-! ## Vertical pasting can destroy consistency
 
