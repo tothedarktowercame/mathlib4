@@ -205,7 +205,8 @@ def Q7 (r : RunFacts) : Bool := decide (r.pathAbsenceCount = 0)
 
 /-! Q8 certifies the current task frontier rather than sampling historical
 population breadth.  Refresh is exact and incremental; selection is over
-stable comparison keys and refuses an eligible stale contender; cascade
+stable comparison keys only after every affected/additional entry has been
+recomputed; cascade
 identity correspondence is local to the selected task.  Multiple policies
 are required only when that task has multiple admissible cascades.  Q1 keeps
 the independent responsibility for enumerating every open task. -/
@@ -354,19 +355,24 @@ def deterministicTerminal : RunFacts :=
 def progressiveRowsMissing : RunFacts :=
   { good with preferenceSemantics := .progressive, gradedPreferenceSteps := ∅ }
 
-/-- Adversarial Q8 witnesses isolate stale-winner and identity-correspondence
+/-- Adversarial Q8 witnesses isolate incomplete refresh and identity-correspondence
 failures without changing the historical breadth fields. -/
-def staleFrontier : RunFacts :=
-  { good with frontierSelection := staleSelection }
+def omittedAffectedFrontier : RunFacts :=
+  { good with frontierRefresh := omittedRefresh }
 
 def cascadeMismatch : RunFacts :=
   { good with selectedCascade := mismatchedCascade }
 
+def insufficientPosteriorMultiplicity : RunFacts :=
+  { good with selectedCascade := twoAdmissibleOnePosterior }
+
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
 theorem good_Q8 : Q8 good = true := by decide
-theorem stale_frontier_not_Q8 : Q8 staleFrontier = false := by decide
+theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false := by decide
 theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by decide
+theorem insufficient_posterior_multiplicity_not_Q8 :
+    Q8 insufficientPosteriorMultiplicity = false := by decide
 
 theorem click20_not_Q1 : Q1 click20 = false := by decide
 theorem click20_not_Q2 : Q2 click20 = false := by decide
@@ -471,7 +477,8 @@ example : Q10 click20 = true := by decide
 #print axioms deterministic_terminal_Q4
 #print axioms progressive_rows_missing_not_Q4
 #print axioms good_Q8
-#print axioms stale_frontier_not_Q8
+#print axioms omitted_affected_frontier_not_Q8
 #print axioms cascade_mismatch_not_Q8
+#print axioms insufficient_posterior_multiplicity_not_Q8
 
 end DarkTower.WarMachine.Requirements

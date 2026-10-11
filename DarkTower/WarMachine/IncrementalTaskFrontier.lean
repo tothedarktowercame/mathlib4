@@ -75,7 +75,9 @@ def RefreshCertificate.Valid (c : RefreshCertificate) : Prop :=
   allIn c.recomputed (fun e => e ∈ c.current) ∧
   taskSet c.current = taskSet c.retained ∪ taskSet c.recomputed ∧
   taskSet c.current = c.currentOpenTasks ∧
-  Disjoint c.removed c.currentOpenTasks
+  Disjoint c.removed c.currentOpenTasks ∧
+  Disjoint c.delta.addedTasks (taskSet c.prior) ∧
+  Disjoint c.delta.addedTasks c.delta.removedTasks
 
 instance (c : RefreshCertificate) : Decidable c.Valid := by
   unfold RefreshCertificate.Valid
@@ -119,7 +121,6 @@ instance (a b : Entry) : Decidable (keyLE a b) := by
 
 structure SelectionCertificate where
   selected : Entry
-  unresolvedStale : List Entry
   currentEpoch : Nat
   deriving DecidableEq
 
@@ -128,19 +129,19 @@ def SelectionCertificate.Valid (frontier : List Entry) (openTasks : Finset Id)
   s.selected ∈ frontier ∧
   taskSet frontier = openTasks ∧
   s.selected.freshnessEpoch = s.currentEpoch ∧
-  allIn frontier (keyLE s.selected) ∧
-  allIn s.unresolvedStale (fun stale => ¬ keyLE stale s.selected)
+  allIn frontier (keyLE s.selected)
 
 instance (frontier : List Entry) (openTasks : Finset Id) (s : SelectionCertificate) :
     Decidable (s.Valid frontier openTasks) := by
   unfold SelectionCertificate.Valid
   infer_instance
 
+/-- Under strict refresh-before-selection there is no selectable frontier until
+every affected prior entry has a recomputed current entry. -/
 theorem unresolved_stale_contender_prevents_selection
-    (s : SelectionCertificate) (frontier : List Entry) (openTasks : Finset Id)
-    (stale : Entry) (hs : s.Valid frontier openTasks) (he : stale ∈ s.unresolvedStale)
-    (hk : keyLE stale s.selected) : False :=
-  hs.2.2.2.2 stale he hk
+    (c : RefreshCertificate) (e : Entry) (h : c.Valid)
+    (he : e ∈ c.invalidated) (homitted : e.task ∉ taskSet c.recomputed) : False :=
+  homitted (invalidated_task_cannot_be_omitted c e h he)
 
 theorem removed_task_cannot_be_selected
     (refresh : RefreshCertificate) (selection : SelectionCertificate)
@@ -151,7 +152,7 @@ theorem removed_task_cannot_be_selected
     rw [← hs.2.1]
     simp only [taskSet, Finset.mem_image, List.mem_toFinset]
     exact ⟨selection.selected, hs.1, rfl⟩
-  rcases hr with ⟨_, _, _, _, _, _, _, _, _, _, _, hdisjoint⟩
+  rcases hr with ⟨_, _, _, _, _, _, _, _, _, _, _, hdisjoint, _, _⟩
   exact Finset.disjoint_left.mp hdisjoint hm hopen
 
 /-- Retention is literal entry equality, so its comparison key and epoch need
@@ -169,7 +170,7 @@ other open tasks, and asks for multiple policies only when the selected target
 has multiple admissible cascades. -/
 structure TargetCascadeCertificate where
   selectedTask : Id
-  admissibleCascadeCount : Nat
+  availableAdmissible : Finset Id
   constructed : Finset Id
   admitted : Finset Id
   scored : Finset Id
@@ -177,10 +178,11 @@ structure TargetCascadeCertificate where
   deriving DecidableEq
 
 def TargetCascadeCertificate.Valid (c : TargetCascadeCertificate) : Prop :=
+  c.availableAdmissible = c.constructed ∧
   c.constructed = c.admitted ∧
   c.admitted = c.scored ∧
   c.scored = c.posterior ∧
-  (1 < c.admissibleCascadeCount → 1 < c.posterior.card)
+  (1 < c.availableAdmissible.card → 1 < c.posterior.card)
 
 instance (c : TargetCascadeCertificate) : Decidable c.Valid := by
   unfold TargetCascadeCertificate.Valid
@@ -188,15 +190,15 @@ instance (c : TargetCascadeCertificate) : Decidable c.Valid := by
 
 theorem constructed_admitted_mismatch_invalid
     (c : TargetCascadeCertificate) (h : c.constructed ≠ c.admitted) : ¬ c.Valid := by
-  intro hv; exact h hv.1
+  intro hv; exact h hv.2.1
 
 theorem admitted_scored_mismatch_invalid
     (c : TargetCascadeCertificate) (h : c.admitted ≠ c.scored) : ¬ c.Valid := by
-  intro hv; exact h hv.2.1
+  intro hv; exact h hv.2.2.1
 
 theorem scored_posterior_mismatch_invalid
     (c : TargetCascadeCertificate) (h : c.scored ≠ c.posterior) : ¬ c.Valid := by
-  intro hv; exact h hv.2.2.1
+  intro hv; exact h hv.2.2.2.1
 
 theorem historical_all_target_breadth_not_a_premise
     (c : TargetCascadeCertificate) (h : c.Valid)
@@ -217,8 +219,8 @@ def positiveRefresh : RefreshCertificate where
   delta := ⟨{11}, {3}, ∅⟩
   currentOpenTasks := {1, 2, 3}
 
-def positiveSelection : SelectionCertificate := ⟨retainedEntry, [], 4⟩
-def positiveCascade : TargetCascadeCertificate := ⟨1, 1, {40}, {40}, {40}, {40}⟩
+def positiveSelection : SelectionCertificate := ⟨retainedEntry, 4⟩
+def positiveCascade : TargetCascadeCertificate := ⟨1, {40}, {40}, {40}, {40}, {40}⟩
 
 /-- A literal, unchanged frontier useful for closed positive witnesses.  Keys
 are stable task identities rather than population ordinals. -/
@@ -239,10 +241,10 @@ def stableRefresh (tasks : List Id) : RefreshCertificate where
   currentOpenTasks := tasks.toFinset
 
 def stableSelection (task : Id) : SelectionCertificate :=
-  ⟨stableEntry task, [], 0⟩
+  ⟨stableEntry task, 0⟩
 
 def singletonCascade (task policy : Id) : TargetCascadeCertificate :=
-  ⟨task, 1, {policy}, {policy}, {policy}, {policy}⟩
+  ⟨task, {policy}, {policy}, {policy}, {policy}, {policy}⟩
 
 theorem positive_refresh_valid : positiveRefresh.Valid := by
   simp [RefreshCertificate.Valid, positiveRefresh, retainedEntry, changedEntry,
@@ -257,16 +259,23 @@ theorem positive_selection_valid :
 theorem positive_cascade_valid : positiveCascade.Valid := by
   simp [TargetCascadeCertificate.Valid, positiveCascade]
 
-def staleSelection : SelectionCertificate :=
-  ⟨retainedEntry, [{ changedEntry with comparisonKey := 6 }], 4⟩
-def mismatchedCascade : TargetCascadeCertificate :=
-  ⟨1, 1, {40}, {40}, {40}, {41}⟩
+def omittedRefresh : RefreshCertificate :=
+  { positiveRefresh with
+    current := [retainedEntry, addedEntry]
+    recomputed := [addedEntry]
+    currentOpenTasks := {1, 3} }
 
-theorem stale_selection_invalid :
-    ¬ staleSelection.Valid positiveRefresh.current positiveRefresh.currentOpenTasks := by
-  simp [SelectionCertificate.Valid, staleSelection, positiveRefresh, retainedEntry,
-    changedEntry, recomputedEntry, addedEntry, taskSet, keyLE, allIn]
+def mismatchedCascade : TargetCascadeCertificate :=
+  ⟨1, {40}, {40}, {40}, {40}, {41}⟩
+
+def twoAdmissibleOnePosterior : TargetCascadeCertificate :=
+  ⟨1, {40, 41}, {40, 41}, {40, 41}, {40, 41}, {40}⟩
+
+theorem omitted_refresh_invalid : ¬ omittedRefresh.Valid := by
+  native_decide
 theorem mismatched_cascade_invalid : ¬ mismatchedCascade.Valid := by
   simp [TargetCascadeCertificate.Valid, mismatchedCascade]
+theorem two_admissible_one_posterior_invalid : ¬ twoAdmissibleOnePosterior.Valid := by
+  simp [TargetCascadeCertificate.Valid, twoAdmissibleOnePosterior]
 
 end DarkTower.WarMachine.IncrementalTaskFrontier
