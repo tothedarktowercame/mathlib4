@@ -232,6 +232,22 @@ theorem role_mismatch_forms_separate_typed_components :
     roleMismatchTreePolicy.gluingPathInfo [(0, false), (1, false)] = none := by
   native_decide
 
+/-- The two role-mismatched gluing edges do not invent an intra-square role
+edge, so their outer endpoints remain in different typed forest components. -/
+theorem role_mismatch_typed_forest_endpoints_unreachable :
+    (2, .G) ∉ roleMismatchTreePolicy.typedComponent
+      [(0, ⟨0, .G, 1, .G, identityIso⟩),
+       (1, ⟨1, .I₁, 2, .G, identityIso⟩)] (0, .G) := by
+  native_decide
+
+/-- A connected endpoint pair in the coherent triangle has the unique simple
+forest path supplied by the general theorem. -/
+theorem coherent_triangle_endpoints_connected_typed :
+    (2, .G) ∈ coherentCyclePolicy.typedComponent
+      [(0, ⟨0, .G, 1, .G, identityIso⟩),
+       (1, ⟨1, .G, 2, .G, identityIso⟩)] (0, .G) := by
+  native_decide
+
 #print axioms publicationCadence_valid
 #print axioms publicationCadence_semantic_pushout
 #print axioms uncoveredBlend_invalid

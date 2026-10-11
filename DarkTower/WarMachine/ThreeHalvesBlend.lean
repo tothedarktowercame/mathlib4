@@ -1075,6 +1075,55 @@ theorem Policy.typedGluingForestGraph_reachable_iff (p : Policy)
     p.typedEdges_indexedGluingForest]
   exact FiniteListGraphClosure.greedyForest_reachable_iff _ _ _
 
+/-- Admitted typed connectivity is represented by a (possibly nil) simple
+path in the deterministic forest.  In particular, the reflexive `u = v`
+case does not require a nonempty edge path. -/
+theorem Policy.admittedTyped_reachable_iff_nonempty_forestPath (p : Policy)
+    (u v : Fin p.squares.length × Role) :
+    p.admittedTypedGluingGraph.Reachable u v ↔
+      Nonempty (p.typedGluingForestGraph.Path u v) := by
+  constructor
+  · intro h
+    have hf : p.typedGluingForestGraph.Reachable u v :=
+      (p.typedGluingForestGraph_reachable_iff u v).mpr h
+    obtain ⟨w, hw⟩ := hf.exists_isPath
+    exact ⟨⟨w, hw⟩⟩
+  · rintro ⟨q⟩
+    exact (p.typedGluingForestGraph_reachable_iff u v).mp q.1.reachable
+
+theorem Policy.exists_typedGluingForest_path (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.admittedTypedGluingGraph.Reachable u v) :
+    ∃ w : p.typedGluingForestGraph.Walk u v, w.IsPath := by
+  obtain ⟨q⟩ := (p.admittedTyped_reachable_iff_nonempty_forestPath u v).mp h
+  exact ⟨q.1, q.2⟩
+
+theorem Policy.typedGluingForest_path_unique (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (q₁ q₂ : p.typedGluingForestGraph.Path u v) : q₁ = q₂ :=
+  p.typedGluingForestGraph_isAcyclic.path_unique q₁ q₂
+
+/-- Choice is used only to package the unique mathematical path; this
+definition makes no claim of executable path extraction. -/
+noncomputable def Policy.canonicalTypedGluingForestPath (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.admittedTypedGluingGraph.Reachable u v) :
+    p.typedGluingForestGraph.Path u v :=
+  Classical.choice ((p.admittedTyped_reachable_iff_nonempty_forestPath u v).mp h)
+
+theorem Policy.canonicalTypedGluingForestPath_unique (p : Policy)
+    {u v : Fin p.squares.length × Role}
+    (h : p.admittedTypedGluingGraph.Reachable u v)
+    (q : p.typedGluingForestGraph.Path u v) :
+    p.canonicalTypedGluingForestPath h = q :=
+  p.typedGluingForest_path_unique _ _
+
+theorem Policy.canonicalTypedGluingForestPath_self (p : Policy)
+    (u : Fin p.squares.length × Role) :
+    p.canonicalTypedGluingForestPath (SimpleGraph.Reachable.refl u) =
+      SimpleGraph.Path.nil := by
+  apply p.typedGluingForest_path_unique
+
 def Policy.gluingForest (p : Policy) : List Nat :=
   p.indexedGluingForest.map Prod.fst
 
