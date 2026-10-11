@@ -1602,6 +1602,136 @@ theorem Policy.orientedStepsOfPath_length (p : Policy)
     (p.orientedStepsOfPath q).length = q.1.length :=
   p.orientedStepsOfWalk_length q.1
 
+def Policy.gluingPathInfo (p : Policy) : List OrientedGluing → Option GluingPathInfo
+  | [] => none
+  | [step] => p.orientedGluing step
+  | step :: rest =>
+      match p.orientedGluing step, p.gluingPathInfo rest with
+      | some first, some tail =>
+          if first.target = tail.source then
+            some ⟨first.source, tail.target, PMap.comp first.transport tail.transport⟩
+          else none
+      | _, _ => none
+
+structure OrientedStepsWalkResult (p : Policy)
+    (steps : List OrientedGluing) (info : GluingPathInfo) where
+  source : Fin p.squares.length × Role
+  target : Fin p.squares.length × Role
+  walk : p.typedGluingForestGraph.Walk source target
+  source_eq : (source.1.val, source.2) = info.source
+  target_eq : (target.1.val, target.2) = info.target
+  steps_eq : p.orientedStepsOfWalk walk = steps
+  length_eq : walk.length = steps.length
+
+theorem Policy.gluingPathInfo_nil (p : Policy) :
+    p.gluingPathInfo [] = none := rfl
+
+noncomputable def Policy.walkOfComposableOrientedSteps (p : Policy)
+    (steps : List OrientedGluing) (info : GluingPathInfo)
+    (hne : steps ≠ [])
+    (hall : ∀ step ∈ steps, step.1 ∈ p.gluingForest)
+    (hinfo : p.gluingPathInfo steps = some info) :
+    OrientedStepsWalkResult p steps info := by
+  induction steps generalizing info with
+  | nil => exact (hne rfl).elim
+  | cons step rest ih =>
+      let sw := p.orientedForestStepWitness step (hall step (by simp))
+      let hex := sw.orientedGluing_info
+      let first := Classical.choose hex
+      have hfirstData := Classical.choose_spec hex
+      have hfirst := hfirstData.1
+      have hfirstSource := hfirstData.2.1
+      have hfirstTarget := hfirstData.2.2
+      cases rest with
+      | nil =>
+          have heq : first = info := by
+            change p.orientedGluing step = some info at hinfo
+            exact Option.some.inj (hfirst.symm.trans hinfo)
+          subst info
+          let walk : p.typedGluingForestGraph.Walk sw.source sw.target :=
+            .cons sw.adj .nil
+          have hencoded : p.orientedStepsOfWalk walk = [step] := by
+            have hu := p.orientedForestAdjacencyWitness_spec_unique sw.adj
+              ⟨sw.ig, sw.member, sw.bounds, step.2, rfl⟩
+            simp only [walk, Policy.orientedStepsOfWalk]
+            have hp : ((p.orientedForestAdjacencyWitness sw.adj).ig.1,
+                (p.orientedForestAdjacencyWitness sw.adj).reversed) = step := by
+              apply Prod.ext
+              · exact congrArg Prod.fst hu.1 |>.trans sw.index_eq
+              · exact hu.2
+            rw [hp]
+          exact ⟨sw.source, sw.target, walk, hfirstSource.symm,
+            hfirstTarget.symm, hencoded, by simp [walk]⟩
+      | cons next tail =>
+          cases htailInfo : p.gluingPathInfo (next :: tail) with
+          | none =>
+              change (match p.orientedGluing step,
+                  p.gluingPathInfo (next :: tail) with
+                | some first, some tail =>
+                    if first.target = tail.source then
+                      some ⟨first.source, tail.target,
+                        PMap.comp first.transport tail.transport⟩
+                    else none
+                | _, _ => none) = some info at hinfo
+              rw [hfirst, htailInfo] at hinfo
+              contradiction
+          | some tailInfo =>
+              have hrestNonempty : next :: tail ≠ [] := by simp
+              have hrestAll : ∀ s ∈ next :: tail, s.1 ∈ p.gluingForest := by
+                intro s hs
+                exact hall s (by simp [hs])
+              let tailResult := ih tailInfo hrestNonempty hrestAll htailInfo
+              rcases tailResult with
+                ⟨tailSource, tailTarget, tailWalk, tailSourceEq, tailTargetEq,
+                  tailStepsEq, tailLengthEq⟩
+              change (match p.orientedGluing step,
+                  p.gluingPathInfo (next :: tail) with
+                | some first, some tail =>
+                    if first.target = tail.source then
+                      some ⟨first.source, tail.target,
+                        PMap.comp first.transport tail.transport⟩
+                    else none
+                | _, _ => none) = some info at hinfo
+              rw [hfirst, htailInfo] at hinfo
+              simp at hinfo
+              have hjoinNat : first.target = tailInfo.source := hinfo.1
+              have hrecord :
+                  (⟨first.source, tailInfo.target,
+                    PMap.comp first.transport tailInfo.transport⟩ :
+                    GluingPathInfo) = info := hinfo.2
+              have htypedNat :
+                  (sw.target.1.val, sw.target.2) =
+                    (tailSource.1.val, tailSource.2) :=
+                hfirstTarget.symm.trans
+                  (hjoinNat.trans tailSourceEq.symm)
+              have hjoinTyped : sw.target = tailSource :=
+                Prod.ext
+                  (Fin.ext (congrArg (fun z : Nat × Role => z.1) htypedNat))
+                  (congrArg (fun z : Nat × Role => z.2) htypedNat)
+              subst tailSource
+              let walk : p.typedGluingForestGraph.Walk sw.source tailTarget :=
+                .cons sw.adj tailWalk
+              have hencodedHead :
+                  ((p.orientedForestAdjacencyWitness sw.adj).ig.1,
+                    (p.orientedForestAdjacencyWitness sw.adj).reversed) = step := by
+                have hu := p.orientedForestAdjacencyWitness_spec_unique sw.adj
+                  ⟨sw.ig, sw.member, sw.bounds, step.2, rfl⟩
+                apply Prod.ext
+                · exact congrArg Prod.fst hu.1 |>.trans sw.index_eq
+                · exact hu.2
+              have hinfoEq : info =
+                  ⟨first.source, tailInfo.target,
+                    PMap.comp first.transport tailInfo.transport⟩ :=
+                hrecord.symm
+              refine ⟨sw.source, tailTarget, walk, ?_, ?_, ?_, ?_⟩
+              · rw [hinfoEq]
+                exact hfirstSource.symm
+              · rw [hinfoEq]
+                exact tailTargetEq
+              · simp only [walk, Policy.orientedStepsOfWalk, hencodedHead,
+                  tailStepsEq]
+              · simp [walk, tailLengthEq]
+
 theorem Policy.orientedForestAdjacencyWitness_endpointKey (p : Policy)
     {u v : Fin p.squares.length × Role}
     (h : p.typedGluingForestGraph.Adj u v) :
@@ -1681,17 +1811,6 @@ theorem Policy.canonical_orientedSteps_unique (p : Policy)
     p.orientedStepsOfPath (p.canonicalTypedGluingForestPath h) =
       p.orientedStepsOfPath q := by
   rw [p.canonicalTypedGluingForestPath_unique h q]
-
-def Policy.gluingPathInfo (p : Policy) : List OrientedGluing → Option GluingPathInfo
-  | [] => none
-  | [step] => p.orientedGluing step
-  | step :: rest =>
-      match p.orientedGluing step, p.gluingPathInfo rest with
-      | some first, some tail =>
-          if first.target = tail.source then
-            some ⟨first.source, tail.target, PMap.comp first.transport tail.transport⟩
-          else none
-      | _, _ => none
 
 theorem Policy.gluingPathInfo_orientedStepsOfPath_nil (p : Policy)
     (u : Fin p.squares.length × Role) :
