@@ -174,9 +174,142 @@ theorem edge_order_does_not_change_final_reachability :
         (Fintype.card (Fin 5)) {(0 : Fin 5)} := by
   native_decide
 
+/-! ## Greedy spanning forests
+
+The following lemmas package the graph invariant used by clients which retain
+an edge precisely when its endpoints are not yet connected. -/
+
+theorem graph_append (xs ys : List (V × V)) :
+    graph (xs ++ ys) = graph xs ⊔ graph ys := by
+  ext u v
+  simp only [graph, SimpleGraph.fromRel_adj, List.mem_append,
+    SimpleGraph.sup_adj]
+  aesop
+
+theorem graph_singleton (e : V × V) :
+    graph [e] = SimpleGraph.edge e.1 e.2 := by
+  ext u v
+  simp only [graph, SimpleGraph.fromRel_adj, List.mem_singleton,
+    SimpleGraph.edge_adj]
+  aesop
+
+theorem reachable_sup_edge_eq_of_reachable (G : SimpleGraph V) {u v : V}
+    (huv : G.Reachable u v) :
+    (G ⊔ SimpleGraph.edge u v).Reachable = G.Reachable := by
+  funext x y
+  apply propext
+  constructor
+  · rintro ⟨w⟩
+    induction w with
+    | nil => exact SimpleGraph.Reachable.refl _
+    | @cons a b c hab w ih =>
+        have hab' : G.Reachable a b := by
+          rcases hab with hab | hab
+          · exact hab.reachable
+          · simp only [SimpleGraph.edge_adj] at hab
+            rcases hab with (⟨rfl, rfl⟩ | ⟨rfl, rfl⟩)
+            · exact huv
+            · exact huv.symm
+        exact hab'.trans ih
+  · exact SimpleGraph.Reachable.mono le_sup_left
+
+theorem reachable_sup_edge_congr (G H : SimpleGraph V) {u v : V}
+    (h : G.Reachable = H.Reachable) :
+    (G ⊔ SimpleGraph.edge u v).Reachable =
+      (H ⊔ SimpleGraph.edge u v).Reachable := by
+  funext x y
+  apply propext
+  constructor
+  · rintro ⟨w⟩
+    induction w with
+    | nil => exact SimpleGraph.Reachable.refl _
+    | @cons a b c hab w ih =>
+        have hab' : (H ⊔ SimpleGraph.edge u v).Reachable a b := by
+          rcases hab with hab | hab
+          · exact SimpleGraph.Reachable.mono le_sup_left (h ▸ hab.reachable)
+          · exact SimpleGraph.Adj.reachable (Or.inr hab)
+        exact hab'.trans ih
+  · rintro ⟨w⟩
+    induction w with
+    | nil => exact SimpleGraph.Reachable.refl _
+    | @cons a b c hab w ih =>
+        have hab' : (G ⊔ SimpleGraph.edge u v).Reachable a b := by
+          rcases hab with hab | hab
+          · exact SimpleGraph.Reachable.mono le_sup_left (h.symm ▸ hab.reachable)
+          · exact SimpleGraph.Adj.reachable (Or.inr hab)
+        exact hab'.trans ih
+
+noncomputable def forestStep [Fintype V]
+    (forest : List (V × V)) (e : V × V) : List (V × V) :=
+  by
+    classical
+    exact if (graph forest).Reachable e.1 e.2 then forest else forest ++ [e]
+
+noncomputable def greedyForest [Fintype V] (edges : List (V × V)) : List (V × V) :=
+  edges.foldl forestStep []
+
+structure ForestInvariant (processed forest : List (V × V)) : Prop where
+  acyclic : (graph forest).IsAcyclic
+  reachability : (graph forest).Reachable = (graph processed).Reachable
+  selected : ∀ e ∈ forest, e ∈ processed
+
+theorem empty_forest_invariant : ForestInvariant ([] : List (V × V)) [] := by
+  constructor
+  · rw [show graph ([] : List (V × V)) = ⊥ by ext <;> simp [graph]]
+    exact SimpleGraph.isAcyclic_bot
+  · rfl
+  · simp
+
+theorem forestInvariant_step [Fintype V] {processed forest : List (V × V)}
+    (h : ForestInvariant processed forest) (e : V × V) :
+    ForestInvariant (processed ++ [e]) (forestStep forest e) := by
+  classical
+  unfold forestStep
+  split <;> rename_i hre
+  · constructor
+    · exact h.acyclic
+    · rw [graph_append, graph_singleton,
+        reachable_sup_edge_eq_of_reachable (graph processed) (h.reachability ▸ hre)]
+      exact h.reachability
+    · intro x hx
+      exact List.mem_append_left [e] (h.selected x hx)
+  · constructor
+    · rw [graph_append, graph_singleton]
+      exact h.acyclic.sup_edge_of_not_reachable hre
+    · rw [graph_append, graph_append, graph_singleton]
+      exact reachable_sup_edge_congr _ _ h.reachability
+    · intro x hx
+      rcases List.mem_append.mp hx with hx | hx
+      · exact List.mem_append_left [e] (h.selected x hx)
+      · exact List.mem_append_right processed hx
+
+theorem greedyForest_invariant [Fintype V] (edges : List (V × V)) :
+    ForestInvariant edges (greedyForest edges) := by
+  unfold greedyForest
+  induction edges using List.reverseRecOn with
+  | nil => exact empty_forest_invariant
+  | append_singleton xs e ih =>
+      rw [List.foldl_append]
+      simpa using forestInvariant_step ih e
+
+theorem greedyForest_isAcyclic [Fintype V] (edges : List (V × V)) :
+    (graph (greedyForest edges)).IsAcyclic :=
+  (greedyForest_invariant edges).acyclic
+
+theorem greedyForest_reachable_iff [Fintype V] (edges : List (V × V)) (u v : V) :
+    (graph (greedyForest edges)).Reachable u v ↔ (graph edges).Reachable u v := by
+  rw [(greedyForest_invariant edges).reachability]
+
+theorem greedyForest_edge_mem [Fintype V] (edges : List (V × V)) {e : V × V}
+    (h : e ∈ greedyForest edges) : e ∈ edges :=
+  (greedyForest_invariant edges).selected e h
+
 #print axioms mem_close_card_iff_reachable
 #print axioms empty_graph_closure
 #print axioms reverse_order_chain_reaches_last
 #print axioms edge_order_does_not_change_final_reachability
+#print axioms greedyForest_isAcyclic
+#print axioms greedyForest_reachable_iff
+#print axioms greedyForest_edge_mem
 
 end DarkTower.WarMachine.FiniteListGraphClosure
