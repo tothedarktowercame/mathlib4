@@ -304,6 +304,25 @@ theorem greedyForest_edge_mem [Fintype V] (edges : List (V × V)) {e : V × V}
     (h : e ∈ greedyForest edges) : e ∈ edges :=
   (greedyForest_invariant edges).selected e h
 
+theorem greedyForest_edge_ne [Fintype V] (edges : List (V × V)) {e : V × V}
+    (h : e ∈ greedyForest edges) : e.1 ≠ e.2 := by
+  classical
+  unfold greedyForest at h
+  induction edges using List.reverseRecOn with
+  | nil => simp at h
+  | append_singleton xs x ih =>
+      rw [List.foldl_append] at h
+      simp only [List.foldl] at h
+      unfold forestStep at h
+      split at h <;> rename_i hr
+      · exact ih h
+      · rcases List.mem_append.mp h with h | h
+        · exact ih h
+        · have hex : e = x := by simpa using h
+          subst x
+          intro heq
+          exact hr (heq ▸ SimpleGraph.Reachable.refl e.1)
+
 def edgeKeys (edges : List (V × V)) : List (Sym2 V) :=
   edges.map fun e => s(e.1, e.2)
 
@@ -353,6 +372,7 @@ theorem greedyForest_edgeKeys_nodup [Fintype V] (edges : List (V × V)) :
 #print axioms greedyForest_isAcyclic
 #print axioms greedyForest_reachable_iff
 #print axioms greedyForest_edge_mem
+#print axioms greedyForest_edge_ne
 #print axioms greedyForest_edgeKeys_nodup
 
 end DarkTower.WarMachine.FiniteListGraphClosure

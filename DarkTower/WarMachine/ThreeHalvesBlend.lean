@@ -1477,6 +1477,104 @@ theorem Policy.orientedGluing_of_forestAdjacencyWitness (p : Policy)
       simpa [orientedTypedEndpoints, hr, typedEdge] using
         congrArg (fun z => (z.2.1.val, z.2.2)) w.endpoints
 
+structure OrientedForestStepWitness (p : Policy) (step : OrientedGluing) where
+  ig : Nat × Gluing
+  member : ig ∈ p.indexedGluingForest
+  index_eq : ig.1 = step.1
+  bounds : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length
+  endpoints_ne : (orientedTypedEndpoints p ig bounds step.2).1 ≠
+    (orientedTypedEndpoints p ig bounds step.2).2
+
+def OrientedForestStepWitness.source {p : Policy} {step : OrientedGluing}
+    (w : OrientedForestStepWitness p step) : Fin p.squares.length × Role :=
+  (orientedTypedEndpoints p w.ig w.bounds step.2).1
+
+def OrientedForestStepWitness.target {p : Policy} {step : OrientedGluing}
+    (w : OrientedForestStepWitness p step) : Fin p.squares.length × Role :=
+  (orientedTypedEndpoints p w.ig w.bounds step.2).2
+
+theorem Policy.gluingForest_member_has_unique_entry (p : Policy) {k : Nat}
+    (hk : k ∈ p.gluingForest) :
+    ∃! ig : Nat × Gluing,
+      ig ∈ p.indexedGluingForest ∧ ig.1 = k ∧
+      p.gluings[ig.1]? = some ig.2 ∧
+      Gluing.wellFormed p.squares ig.2 = true ∧
+      ∃ hb : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length,
+        typedEdge p ig hb ∈ typedEdges p p.indexedGluingForest := by
+  unfold Policy.gluingForest at hk
+  obtain ⟨ig, hig, hik⟩ := List.mem_map.mp hk
+  have hwf := p.indexedGluingForest_member_wellFormed hig
+  have hb := Gluing.wellFormed_endpoint_bounds hwf
+  refine ⟨ig, ⟨hig, hik, p.indexedGluingForest_member_lookup hig, hwf,
+    hb, p.indexedGluingForest_member_emits_typedEdge hig⟩, ?_⟩
+  intro other ho
+  exact p.indexedGluingForest_index_unique ho.1 hig (ho.2.1.trans hik.symm)
+
+noncomputable def Policy.orientedForestStepWitness (p : Policy) (step : OrientedGluing)
+    (hk : step.1 ∈ p.gluingForest) : OrientedForestStepWitness p step := by
+  let hex := (p.gluingForest_member_has_unique_entry hk).exists
+  let ig := Classical.choose hex
+  have hdata := Classical.choose_spec hex
+  have hig := hdata.1
+  have hik := hdata.2.1
+  have hwf := hdata.2.2.2.1
+  let hb := Gluing.wellFormed_endpoint_bounds hwf
+  have hem := p.indexedGluingForest_member_emits_typedEdge hig
+  have hne := FiniteListGraphClosure.greedyForest_edge_ne
+    (typedEdges p (admittedIndexedGluings p))
+    (show typedEdge p ig hb ∈
+      FiniteListGraphClosure.greedyForest
+        (typedEdges p (admittedIndexedGluings p)) by
+      rw [← p.typedEdges_indexedGluingForest]
+      exact hem)
+  refine ⟨ig, hig, hik, hb, ?_⟩
+  cases hr : step.2
+  · simpa [orientedTypedEndpoints, hr] using hne
+  · simpa [orientedTypedEndpoints, hr] using hne.symm
+
+theorem OrientedForestStepWitness.adj
+    {p : Policy} {step : OrientedGluing}
+    (w : OrientedForestStepWitness p step) :
+    p.typedGluingForestGraph.Adj w.source w.target := by
+  change (FiniteListGraphClosure.graph
+    (typedEdges p p.indexedGluingForest)).Adj w.source w.target
+  rw [FiniteListGraphClosure.graph, SimpleGraph.fromRel_adj]
+  refine ⟨w.endpoints_ne, ?_⟩
+  have hem := p.indexedGluingForest_member_emits_typedEdge w.member
+  cases hr : step.2
+  · exact Or.inl (by simpa [OrientedForestStepWitness.source,
+      OrientedForestStepWitness.target, orientedTypedEndpoints, hr] using hem)
+  · exact Or.inr (by simpa [OrientedForestStepWitness.source,
+      OrientedForestStepWitness.target, orientedTypedEndpoints, hr] using hem)
+
+theorem OrientedForestStepWitness.orientedGluing_info
+    {p : Policy} {step : OrientedGluing}
+    (w : OrientedForestStepWitness p step) :
+    ∃ info, p.orientedGluing step = some info ∧
+      info.source = (w.source.1.val, w.source.2) ∧
+      info.target = (w.target.1.val, w.target.2) := by
+  let a : OrientedForestAdjacencyWitness p w.source w.target :=
+    ⟨w.ig, w.member, w.bounds, step.2, rfl⟩
+  obtain ⟨info, hi, hs, ht⟩ := p.orientedGluing_of_forestAdjacencyWitness a
+  have hstep : (w.ig.1, step.2) = step := by
+    apply Prod.ext
+    · exact w.index_eq
+    · rfl
+  exact ⟨info, hstep ▸ hi, hs, ht⟩
+
+theorem OrientedForestStepWitness.unique_of_endpoints
+    {p : Policy} {step step' : OrientedGluing}
+    (w : OrientedForestStepWitness p step)
+    (w' : OrientedForestStepWitness p step')
+    (hs : w.source = w'.source) (ht : w.target = w'.target) :
+    w.ig = w'.ig ∧ step.2 = step'.2 := by
+  let a : OrientedForestAdjacencyWitness p w.source w.target :=
+    ⟨w.ig, w.member, w.bounds, step.2, rfl⟩
+  let b : OrientedForestAdjacencyWitness p w.source w.target :=
+    ⟨w'.ig, w'.member, w'.bounds, step'.2, by
+      exact Prod.ext hs.symm ht.symm⟩
+  exact p.orientedForestAdjacencyWitness_unique w.adj a b
+
 noncomputable def Policy.orientedStepsOfWalk (p : Policy) :
     {u v : Fin p.squares.length × Role} →
       p.typedGluingForestGraph.Walk u v → List OrientedGluing
