@@ -1032,6 +1032,7 @@ structure ApplicationOrderCertificate where
   lawVersion : Nat
   lawAuthority : Nat
   lawReceipt : Nat
+  selectorAuthority : Nat
   deriving DecidableEq
 
 private def exactSquarePopulation (p : Policy) (xs : List Nat) : Bool :=
@@ -1054,6 +1055,8 @@ def ApplicationOrderCertificate.valid (p : Policy)
     | some law =>
         decide (law.identity ≠ 0) && decide (law.version ≠ 0) &&
           decide (law.authority ≠ 0) && decide (law.receipt ≠ 0) &&
+          decide (c.selectorAuthority ≠ 0) &&
+          decide (c.selectorAuthority ≠ law.authority) &&
           decide (law.decode c.applicationOrder = some c.applicationSequence) &&
           law.accepts c.constructionOrder c.applicationSequence
 
@@ -1382,7 +1385,8 @@ private def diamondCertificateFor (xs : List Nat) : ApplicationOrderCertificate 
     lawIdentity := 71
     lawVersion := 1
     lawAuthority := 72
-    lawReceipt := 73 }
+    lawReceipt := 73
+    selectorAuthority := 74 }
 
 private def orderedDiamondCertificate : ApplicationOrderCertificate :=
   diamondCertificateFor [0, 1, 2, 3]
@@ -1419,6 +1423,32 @@ theorem unknown_square_invalid :
 theorem substituted_application_law_invalid :
     ({ orderedDiamondCertificate with lawIdentity := 74 }).valid
       orderedDiamondPolicy [diamondExactOrderLaw] = false := by
+  native_decide
+
+theorem self_authorized_application_order_invalid :
+    ({ orderedDiamondCertificate with selectorAuthority := 72 }).valid
+      orderedDiamondPolicy [diamondExactOrderLaw] = false := by
+  native_decide
+
+private def alternateDiamondLaw : ApplicationOrderLaw :=
+  { identity := 71
+    version := 1
+    authority := 72
+    receipt := 73
+    decode := decodeFirstIndex
+    accepts := fun construction application =>
+      decide (construction = [(0, 1), (0, 2), (1, 3), (2, 3)]) &&
+        decide (application = [0, 2, 1, 3]) }
+
+/-- Matching labels do not make a substituted implementation authorized.  The
+crafted certificate fails against the fixed registry.  Replacing the registry
+itself makes it pass, because registry trust is an external premise rather
+than cryptographic authentication supplied by Lean. -/
+theorem substituted_law_implementation_boundary :
+    (diamondCertificateFor [0, 2, 1, 3]).valid
+        (diamondPolicyFor [0, 2, 1, 3]) [diamondExactOrderLaw] = false ∧
+      (diamondCertificateFor [0, 2, 1, 3]).valid
+        (diamondPolicyFor [0, 2, 1, 3]) [alternateDiamondLaw] = true := by
   native_decide
 
 /-! ## Vertical pasting can destroy consistency
