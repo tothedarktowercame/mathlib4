@@ -4,6 +4,7 @@ import Mathlib.Data.Finset.Image
 import Mathlib.Data.Finset.Prod
 import Mathlib.Data.Finset.Sort
 import Mathlib.Data.List.Basic
+import DarkTower.WarMachine.FiniteListGraphClosure
 
 /-! # A finite 3/2-blend carrier
 
@@ -653,6 +654,9 @@ def Cone.isoCones {s : Span} (c d : Cone s) : Bool :=
 inductive Role | G | I₁ | I₂ | B
   deriving DecidableEq, Repr
 
+instance : Fintype Role :=
+  Fintype.ofList [.G, .I₁, .I₂, .B] (by intro r; cases r <;> simp)
+
 structure Square where
   G : Theory
   I₁ : Theory
@@ -915,22 +919,54 @@ private def admittedIndexedGluings (p : Policy) : List (Nat × Gluing) :=
   ((List.range p.gluings.length).zip p.gluings).filter fun ig =>
     Gluing.wellFormed p.squares ig.2
 
-private def typedComponentStep (gluings : List Gluing)
-    (seen : Finset (Nat × Role)) : Finset (Nat × Role) :=
-  gluings.foldl (fun acc g =>
-    if (g.i, g.rᵢ) ∈ acc then insert (g.j, g.rⱼ) acc
-    else if (g.j, g.rⱼ) ∈ acc then insert (g.i, g.rᵢ) acc
-    else acc) seen
+private def typedEdges (p : Policy) (forest : List (Nat × Gluing)) :
+    List ((Fin p.squares.length × Role) × (Fin p.squares.length × Role)) :=
+  forest.filterMap fun ig =>
+    if h : ig.2.i < p.squares.length ∧ ig.2.j < p.squares.length then
+      some ((⟨ig.2.i, h.1⟩, ig.2.rᵢ), (⟨ig.2.j, h.2⟩, ig.2.rⱼ))
+    else none
 
-private def typedComponentClosure (gluings : List Gluing) :
-    Nat → Finset (Nat × Role) → Finset (Nat × Role)
-  | 0, seen => seen
-  | n + 1, seen => typedComponentClosure gluings n
-      (typedComponentStep gluings seen)
+def Policy.typedComponentFin (p : Policy) (forest : List (Nat × Gluing))
+    (v : Fin p.squares.length × Role) : Finset (Fin p.squares.length × Role) :=
+  FiniteListGraphClosure.close (typedEdges p forest)
+    (Fintype.card (Fin p.squares.length × Role)) {v}
 
 def Policy.typedComponent (p : Policy) (forest : List (Nat × Gluing))
     (v : Nat × Role) : Finset (Nat × Role) :=
-  typedComponentClosure (forest.map Prod.snd) (p.squares.length * 4) {v}
+  if h : v.1 < p.squares.length then
+    (p.typedComponentFin forest (⟨v.1, h⟩, v.2)).image
+      (fun x => (x.1.val, x.2))
+  else {v}
+
+theorem Policy.mem_typedComponentFin_iff_reachable (p : Policy)
+    (forest : List (Nat × Gluing))
+    (u v : Fin p.squares.length × Role) :
+    v ∈ p.typedComponentFin forest u ↔
+      (FiniteListGraphClosure.graph (typedEdges p forest)).Reachable u v := by
+  unfold Policy.typedComponentFin
+  simpa using FiniteListGraphClosure.mem_close_card_iff_reachable
+    (typedEdges p forest) u v
+
+theorem Policy.mem_typedComponent_iff_reachable (p : Policy)
+    (forest : List (Nat × Gluing)) (u v : Nat × Role)
+    (hu : u.1 < p.squares.length) (hv : v.1 < p.squares.length) :
+    v ∈ p.typedComponent forest u ↔
+      (FiniteListGraphClosure.graph (typedEdges p forest)).Reachable
+        (⟨u.1, hu⟩, u.2) (⟨v.1, hv⟩, v.2) := by
+  rw [Policy.typedComponent]
+  simp only [dif_pos hu, Finset.mem_image]
+  constructor
+  · rintro ⟨x, hx, hval⟩
+    have heq : x = (⟨v.1, hv⟩, v.2) := by
+      apply Prod.ext
+      · apply Fin.ext
+        exact congrArg (fun z : Nat × Role => z.1) hval
+      · exact congrArg (fun z : Nat × Role => z.2) hval
+    subst x
+    exact (p.mem_typedComponentFin_iff_reachable forest _ _).mp hx
+  · intro hr
+    refine ⟨(⟨v.1, hv⟩, v.2), ?_, rfl⟩
+    exact (p.mem_typedComponentFin_iff_reachable forest _ _).mpr hr
 
 private def forestStep (p : Policy) (forest : List (Nat × Gluing))
     (ig : Nat × Gluing) : List (Nat × Gluing) :=
