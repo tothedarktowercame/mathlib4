@@ -894,6 +894,107 @@ result a cascade only after `Policy.wellFormed` succeeds. -/
 def Policy.components (p : Policy) : List (List Nat) :=
   (List.range p.squares.length).foldl (addComponent p.squares p.gluings) []
 
+/-! ## Deterministic finite cycle obligations
+
+Edges are considered in supplied order.  A well-formed edge enters the forest
+iff its two square indices are not already connected by earlier forest edges;
+every other well-formed edge deterministically creates one obligation.  Thus
+parallel and reversed duplicate edges are explicit non-tree obligations, not
+silently deduplicated. -/
+
+abbrev OrientedGluing := Nat × Bool -- index, reversed?
+
+structure GluingPathInfo where
+  source : Nat × Role
+  target : Nat × Role
+  transport : PMap
+  deriving DecidableEq
+
+private def admittedIndexedGluings (p : Policy) : List (Nat × Gluing) :=
+  ((List.range p.gluings.length).zip p.gluings).filter fun ig =>
+    Gluing.wellFormed p.squares ig.2
+
+private def forestStep (p : Policy) (forest : List (Nat × Gluing))
+    (ig : Nat × Gluing) : List (Nat × Gluing) :=
+  if ig.2.j ∈ component p.squares (forest.map Prod.snd) ig.2.i then forest
+  else forest ++ [ig]
+
+def Policy.gluingForest (p : Policy) : List Nat :=
+  ((admittedIndexedGluings p).foldl (forestStep p) []).map Prod.fst
+
+def Policy.requiredCycleEdges (p : Policy) : List Nat :=
+  (admittedIndexedGluings p).filterMap fun ig =>
+    if ig.1 ∈ p.gluingForest then none else some ig.1
+
+private def reversePMap (f : PMap) : PMap :=
+  ⟨f.rel.image Prod.swap⟩
+
+def Policy.orientedGluing (p : Policy) (step : OrientedGluing) :
+    Option GluingPathInfo :=
+  match p.gluings[step.1]? with
+  | none => none
+  | some g =>
+      if step.2 then some ⟨(g.j, g.rⱼ), (g.i, g.rᵢ), reversePMap g.iso⟩
+      else some ⟨(g.i, g.rᵢ), (g.j, g.rⱼ), g.iso⟩
+
+def Policy.gluingPathInfo (p : Policy) : List OrientedGluing → Option GluingPathInfo
+  | [] => none
+  | [step] => p.orientedGluing step
+  | step :: rest =>
+      match p.orientedGluing step, p.gluingPathInfo rest with
+      | some first, some tail =>
+          if first.target = tail.source then
+            some ⟨first.source, tail.target, PMap.comp first.transport tail.transport⟩
+          else none
+      | _, _ => none
+
+structure GluingCycleObligation where
+  edge : Nat
+  forestPath : List OrientedGluing
+  deriving DecidableEq
+
+private def GluingCycleObligation.valid (p : Policy)
+    (o : GluingCycleObligation) : Bool :=
+  decide (o.forestPath ≠ []) &&
+    decide ((o.forestPath.map Prod.fst).eraseDups = o.forestPath.map Prod.fst) &&
+    o.forestPath.all (fun step => decide (step.1 ∈ p.gluingForest)) &&
+    match p.orientedGluing (o.edge, false), p.gluingPathInfo o.forestPath with
+    | some direct, some path => decide (direct = path)
+    | _, _ => false
+
+structure GluingCoherenceCertificate where
+  obligations : List GluingCycleObligation
+  deriving DecidableEq
+
+/-- Coverage is computed, never claimed: obligation edge indices must equal the
+deterministic non-tree edge list exactly and each forest transport must equal
+its direct edge.  A malformed policy cannot validate. -/
+def GluingCoherenceCertificate.valid (p : Policy)
+    (c : GluingCoherenceCertificate) : Bool :=
+  p.wellFormed &&
+    decide (c.obligations.map (·.edge) = p.requiredCycleEdges) &&
+    c.obligations.all (GluingCycleObligation.valid p)
+
+/-- The strongest presently proved completeness result: a valid certificate
+contains exactly every deterministic non-tree edge obligation, and every
+listed forest transport agrees with that edge. -/
+theorem GluingCoherenceCertificate.valid_covers_required_edges
+    (p : Policy) (c : GluingCoherenceCertificate) (h : c.valid p = true) :
+    c.obligations.map (·.edge) = p.requiredCycleEdges ∧
+      c.obligations.all (GluingCycleObligation.valid p) = true := by
+  simp only [GluingCoherenceCertificate.valid, Bool.and_eq_true,
+    decide_eq_true_eq] at h
+  exact ⟨h.1.2, h.2⟩
+
+/-!
+Still required for a semantic path-independence theorem: prove that the
+ordered forest selected above is acyclic and spans each admitted component,
+that its validated path is the unique simple forest path, and then derive
+equality of arbitrary composable transports by reducing each path difference
+to the checked non-tree obligations.  This executable slice does not claim
+that theorem or a colimit/pasting result.
+-/
+
 private theorem componentStep_subset (squares : List Square) (gluings : List Gluing)
     (seen : Finset Nat) : seen ⊆ componentStep squares gluings seen := by
   unfold componentStep

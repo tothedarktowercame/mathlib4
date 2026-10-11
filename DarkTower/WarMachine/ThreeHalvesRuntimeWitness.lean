@@ -144,6 +144,67 @@ theorem coherent_cycle_certificate_accepts :
     cycleTriangle.valid coherentCyclePolicy = true := by
   native_decide
 
+def treePolicy : Policy :=
+  { coherentCyclePolicy with gluings := coherentCyclePolicy.gluings.take 2 }
+
+def coherentCycleBasis : GluingCoherenceCertificate :=
+  ⟨[⟨2, [(0, false), (1, false)]⟩]⟩
+
+theorem coherent_tree_needs_no_cycle_obligations :
+    treePolicy.gluingForest = [0, 1] ∧
+    treePolicy.requiredCycleEdges = [] ∧
+    (⟨[]⟩ : GluingCoherenceCertificate).valid treePolicy = true := by
+  native_decide
+
+theorem coherent_triangle_complete_basis_accepts :
+    coherentCyclePolicy.gluingForest = [0, 1] ∧
+    coherentCyclePolicy.requiredCycleEdges = [2] ∧
+    coherentCycleBasis.valid coherentCyclePolicy = true := by
+  native_decide
+
+theorem incoherent_triangle_complete_basis_refuses :
+    coherentCycleBasis.valid incoherentCyclePolicy = false := by
+  native_decide
+
+def twoCyclePolicy : Policy :=
+  { squares := [cycleSquare, cycleSquare, cycleSquare, cycleSquare]
+    gluings := [⟨0, .G, 1, .G, identityIso⟩,
+                ⟨1, .G, 2, .G, identityIso⟩,
+                ⟨2, .G, 3, .G, identityIso⟩,
+                ⟨0, .G, 2, .G, identityIso⟩,
+                ⟨1, .G, 3, .G, identityIso⟩]
+    applicationOrder := [] }
+
+def twoCycleComplete : GluingCoherenceCertificate :=
+  ⟨[⟨3, [(0, false), (1, false)]⟩,
+     ⟨4, [(1, false), (2, false)]⟩]⟩
+
+theorem omitted_independent_cycle_refuses :
+    twoCyclePolicy.requiredCycleEdges = [3, 4] ∧
+    twoCycleComplete.valid twoCyclePolicy = true ∧
+    (⟨twoCycleComplete.obligations.take 1⟩ : GluingCoherenceCertificate).valid
+      twoCyclePolicy = false := by
+  native_decide
+
+def reversedDuplicatePolicy : Policy :=
+  { squares := [cycleSquare, cycleSquare]
+    gluings := [⟨0, .G, 1, .G, identityIso⟩,
+                ⟨1, .G, 0, .G, identityIso⟩]
+    applicationOrder := [] }
+
+theorem reversed_duplicate_is_explicit_obligation :
+    reversedDuplicatePolicy.gluingForest = [0] ∧
+    reversedDuplicatePolicy.requiredCycleEdges = [1] ∧
+    (⟨[⟨1, [(0, true)]⟩]⟩ : GluingCoherenceCertificate).valid
+      reversedDuplicatePolicy = true := by
+  native_decide
+
+theorem malformed_gluing_cannot_enter_admitted_basis :
+    malformedMerge.gluingForest = [] ∧
+    malformedMerge.requiredCycleEdges = [] ∧
+    (⟨[]⟩ : GluingCoherenceCertificate).valid malformedMerge = false := by
+  native_decide
+
 #print axioms publicationCadence_valid
 #print axioms publicationCadence_semantic_pushout
 #print axioms uncoveredBlend_invalid
@@ -156,4 +217,10 @@ theorem coherent_cycle_certificate_accepts :
 #print axioms incoherent_cycle_is_pairwise_valid_and_connected
 #print axioms incoherent_cycle_certificate_rejects
 #print axioms coherent_cycle_certificate_accepts
+#print axioms coherent_tree_needs_no_cycle_obligations
+#print axioms coherent_triangle_complete_basis_accepts
+#print axioms incoherent_triangle_complete_basis_refuses
+#print axioms omitted_independent_cycle_refuses
+#print axioms reversed_duplicate_is_explicit_obligation
+#print axioms malformed_gluing_cannot_enter_admitted_basis
 end DarkTower.WarMachine.ThreeHalvesRuntimeWitness
