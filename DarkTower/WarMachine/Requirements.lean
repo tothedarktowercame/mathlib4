@@ -2,6 +2,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.List.Defs
 import Mathlib.Tactic
 import DarkTower.WarMachine.IncrementalTaskFrontier
+import DarkTower.WarMachine.FactorizedPreferenceSemantics
 
 /-!
 # Countable requirements for one War Machine run
@@ -14,6 +15,7 @@ that today's runner exports them faithfully.
 namespace DarkTower.WarMachine.Requirements
 
 open DarkTower.WarMachine.IncrementalTaskFrontier
+open DarkTower.WarMachine.FactorizedPreferenceSemantics
 
 set_option maxRecDepth 100000
 set_option maxHeartbeats 5000000
@@ -135,6 +137,15 @@ structure RunFacts where
   earlierProgressPairs : Nat
   /-- Those pairs whose earlier trace has no greater cumulative normalized risk. -/
   earlierProgressNoGreaterRisk : Nat
+  /-- Authorized factorization of completion from conditional relevance.
+  `none` means flat class weights cannot establish Q9. -/
+  factorizedPreference : Option DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate
+  /-- Exact retained registry authorizing the certificate's calibration. -/
+  calibrationAuthorizations :
+    List DarkTower.WarMachine.FactorizedPreferenceSemantics.CalibrationAuthorization
+  /-- Exact retained registry authorizing the certificate's factorization law. -/
+  factorizationAuthorizations :
+    List DarkTower.WarMachine.FactorizedPreferenceSemantics.FactorizationAuthorization
   /-- Number of compared cascade pairs with the same pattern set and different arrangements. -/
   differentArrangementPairs : Nat
   /-- Number of those pairs represented as distinct policies, each with its own numeric G. -/
@@ -217,13 +228,39 @@ def Q8 (r : RunFacts) : Bool := decide (
   r.selectedCascade.selectedTask = r.frontierSelection.selected.task ∧
   r.selectedCascade.Valid)
 
-/-! Joe: C must prefer an outcome that closes a criterion to one that does
-not. Every reachable comparison is strict, and at least one is represented. -/
+private instance calibrationAuthorizedDecidable
+    (registry : List FactorizedPreferenceSemantics.CalibrationAuthorization)
+    (receipt : FactorizedPreferenceSemantics.Id)
+    (calibration : FactorizedPreferenceSemantics.RelevanceCalibration) :
+    Decidable (FactorizedPreferenceSemantics.CalibrationAuthorized
+      registry receipt calibration) := by
+  unfold FactorizedPreferenceSemantics.CalibrationAuthorized
+  infer_instance
+
+private instance factorizationAuthorizedDecidable
+    (registry : List FactorizedPreferenceSemantics.FactorizationAuthorization)
+    (selectorAuthority identity : FactorizedPreferenceSemantics.Id)
+    (version : Nat) (authority receipt : FactorizedPreferenceSemantics.Id) :
+    Decidable (FactorizedPreferenceSemantics.FactorizationAuthorized registry
+      selectorAuthority identity version authority receipt) := by
+  unfold FactorizedPreferenceSemantics.FactorizationAuthorized
+  infer_instance
+
+private instance factorizedCertificateValidDecidable
+    (calibrationRegistry : List FactorizedPreferenceSemantics.CalibrationAuthorization)
+    (factorizationRegistry : List FactorizedPreferenceSemantics.FactorizationAuthorization)
+    (certificate : FactorizedPreferenceSemantics.Certificate) :
+    Decidable (FactorizedPreferenceSemantics.Certificate.Valid calibrationRegistry
+      factorizationRegistry certificate) := by
+  unfold FactorizedPreferenceSemantics.Certificate.Valid
+  infer_instance
+
+/-! Joe: completion is structurally prior to conditional relevance.  A flat
+four-way probability table is not a Q9 witness. -/
 def Q9 (r : RunFacts) : Bool := decide (
-  0 < r.completionPreferencePairs ∧
-  r.completionPairsStrictlyPreferred = r.completionPreferencePairs ∧
-  0 < r.earlierProgressPairs ∧
-  r.earlierProgressNoGreaterRisk = r.earlierProgressPairs)
+  ∃ certificate, r.factorizedPreference = some certificate ∧
+    DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate.Valid
+      r.calibrationAuthorizations r.factorizationAuthorizations certificate)
 
 /-! Joe: policies are cascades in a specific geometric arrangement. Whenever
 the same patterns occur in two compared arrangements, both arrangements are
@@ -245,6 +282,21 @@ def conforms (r : RunFacts) : Bool := violations r = []
 
 private def ids (start count : Nat) : Finset Id :=
   Finset.Ico start (start + count)
+
+def goodCalibration : DarkTower.WarMachine.FactorizedPreferenceSemantics.RelevanceCalibration :=
+  ⟨101, 1, 102, 103, 0, 1, 2⟩
+
+def goodCalibrationAuthorization :
+    DarkTower.WarMachine.FactorizedPreferenceSemantics.CalibrationAuthorization :=
+  ⟨104, goodCalibration, 102⟩
+
+def goodFactorizationAuthorization :
+    DarkTower.WarMachine.FactorizedPreferenceSemantics.FactorizationAuthorization :=
+  ⟨105, 106, 1, 107, .completionThenConditionalRelevance⟩
+
+def goodPreferenceCertificate :
+    DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate :=
+  ⟨goodCalibration, 108, 106, 1, 107, 104, 105⟩
 
 /-! Click 20 provenance. The selection certificate/exporter supplies reaching
 scoring, with-G, constructed/compared singleton counts, horizon/preference
@@ -290,6 +342,9 @@ def click20 : RunFacts where
   completionPairsStrictlyPreferred := 0
   earlierProgressPairs := 1
   earlierProgressNoGreaterRisk := 0
+  factorizedPreference := none
+  calibrationAuthorizations := []
+  factorizationAuthorizations := []
   differentArrangementPairs := 1
   arrangementPairsDistinguishedByG := 0
   frontierRefresh := positiveRefresh
@@ -340,6 +395,9 @@ def good : RunFacts where
   completionPairsStrictlyPreferred := 12
   earlierProgressPairs := 20
   earlierProgressNoGreaterRisk := 20
+  factorizedPreference := some goodPreferenceCertificate
+  calibrationAuthorizations := [goodCalibrationAuthorization]
+  factorizationAuthorizations := [goodFactorizationAuthorization]
   differentArrangementPairs := 20
   arrangementPairsDistinguishedByG := 20
   frontierRefresh := positiveRefresh
@@ -366,6 +424,13 @@ def cascadeMismatch : RunFacts :=
 def insufficientPosteriorMultiplicity : RunFacts :=
   { good with selectedCascade := twoAdmissibleOnePosterior }
 
+/-- Every unrelated Q9 carrier is populated, but the certificate substitutes
+the factorization identity without a matching retained authorization. -/
+def substitutedFactorization : RunFacts :=
+  { good with
+    factorizedPreference := some
+      { goodPreferenceCertificate with factorizationIdentity := 109 } }
+
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
 theorem good_Q8 : Q8 good = true := by decide
@@ -373,6 +438,8 @@ theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false :=
 theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by decide
 theorem insufficient_posterior_multiplicity_not_Q8 :
     Q8 insufficientPosteriorMultiplicity = false := by decide
+theorem good_Q9 : Q9 good = true := by decide
+theorem substituted_factorization_not_Q9 : Q9 substitutedFactorization = false := by decide
 
 theorem click20_not_Q1 : Q1 click20 = false := by decide
 theorem click20_not_Q2 : Q2 click20 = false := by decide
