@@ -856,7 +856,10 @@ private def addComponent (squares : List Square) (gluings : List Gluing)
     List (List Nat) :=
   if cs.any (fun c => i ∈ c) then cs else cs ++ [component squares gluings i]
 
-/-- Connected components in increasing order of their least square index. -/
+/-- Raw-input connected components in increasing order of their least square
+index.  This intentionally traverses every supplied gluing, including a
+malformed one, and is diagnostic data only.  `Policy.verdict` may call the
+result a cascade only after `Policy.wellFormed` succeeds. -/
 def Policy.components (p : Policy) : List (List Nat) :=
   (List.range p.squares.length).foldl (addComponent p.squares p.gluings) []
 

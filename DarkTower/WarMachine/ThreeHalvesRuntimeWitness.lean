@@ -90,6 +90,20 @@ theorem noncommuting_consistent_refuses :
     noncommutingConsistent.valid = false := by
   native_decide
 
+/-! A malformed gluing can connect the raw diagnostic graph, but cannot
+produce an admitted cascade verdict.  Its empty graph is not a total
+isomorphism between the two nonempty `G` objects. -/
+def malformedMerge : Policy :=
+  { squares := [publicationCadence.square, publicationCadence.square]
+    gluings := [⟨0, .G, 1, .G, ⟨∅⟩⟩]
+    applicationOrder := [] }
+
+theorem malformed_gluing_merges_raw_components_only :
+    malformedMerge.components = [[0, 1]] ∧
+    malformedMerge.wellFormed = false ∧
+    malformedMerge.verdict = .bag [[0, 1]] := by
+  native_decide
+
 #print axioms publicationCadence_valid
 #print axioms publicationCadence_semantic_pushout
 #print axioms uncoveredBlend_invalid
@@ -98,4 +112,5 @@ theorem noncommuting_consistent_refuses :
 #print axioms both_aux_inconsistent_passes
 #print axioms both_aux_uncovered_refuses
 #print axioms noncommuting_consistent_refuses
+#print axioms malformed_gluing_merges_raw_components_only
 end DarkTower.WarMachine.ThreeHalvesRuntimeWitness
