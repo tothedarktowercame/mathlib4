@@ -38,7 +38,64 @@ def uncoveredBlend : Receipt :=
 theorem uncoveredBlend_invalid : uncoveredBlend.valid = false := by
   native_decide
 
+/-! The flag matrix is intentionally measured, not repaired here.  The
+inconsistent square remains jointly covered; each auxiliary flag removes its
+route from consistency, while either flag independently discharges the
+separate commutation requirement. -/
+def inconsistentCovered : Receipt :=
+  { publicationCadence with b₂ := ⟨{(20, 32), (21, 30)}⟩ }
+
+def inconsistentAux₁ : Receipt :=
+  { inconsistentCovered with aux₁ := true }
+
+def inconsistentAux₂ : Receipt :=
+  { inconsistentCovered with aux₂ := true }
+
+def inconsistentBothAux : Receipt :=
+  { inconsistentCovered with aux₁ := true, aux₂ := true }
+
+def uncoveredBothAux : Receipt :=
+  { uncoveredBlend with aux₁ := true, aux₂ := true }
+
+def noncommutingConsistent : Receipt :=
+  { publicationCadence with a₂ := ⟨∅⟩ }
+
+theorem noAux_inconsistent_refuses : inconsistentCovered.valid = false := by
+  native_decide
+
+theorem aux1_only_inconsistent_passes : inconsistentAux₁.valid = true := by
+  native_decide
+
+theorem aux2_only_inconsistent_passes : inconsistentAux₂.valid = true := by
+  native_decide
+
+theorem both_aux_inconsistent_passes :
+    inconsistentBothAux.square.commutes = false ∧
+    inconsistentBothAux.square.cone.consistent = true ∧
+    inconsistentBothAux.square.cone.isPushout = true ∧
+    inconsistentBothAux.valid = true := by
+  native_decide
+
+theorem both_aux_uncovered_refuses :
+    uncoveredBothAux.requiredCommutes = true ∧
+    uncoveredBothAux.square.cone.consistent = true ∧
+    uncoveredBothAux.square.cone.isPushout = false ∧
+    uncoveredBothAux.valid = false := by
+  native_decide
+
+theorem noncommuting_consistent_refuses :
+    noncommutingConsistent.square.commutes = false ∧
+    noncommutingConsistent.square.cone.consistent = true ∧
+    noncommutingConsistent.square.cone.isPushout = true ∧
+    noncommutingConsistent.valid = false := by
+  native_decide
+
 #print axioms publicationCadence_valid
 #print axioms publicationCadence_semantic_pushout
 #print axioms uncoveredBlend_invalid
+#print axioms aux1_only_inconsistent_passes
+#print axioms aux2_only_inconsistent_passes
+#print axioms both_aux_inconsistent_passes
+#print axioms both_aux_uncovered_refuses
+#print axioms noncommuting_consistent_refuses
 end DarkTower.WarMachine.ThreeHalvesRuntimeWitness
