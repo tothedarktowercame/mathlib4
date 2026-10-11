@@ -48,7 +48,7 @@ structure RelevanceCalibration where
 
 def RelevanceCalibration.Valid (selectorAuthority : Id)
     (c : RelevanceCalibration) : Prop :=
-  c.identity ≠ 0 ∧ c.registrationToken ≠ 0 ∧
+  c.identity ≠ 0 ∧ c.version ≠ 0 ∧ c.authority ≠ 0 ∧ c.registrationToken ≠ 0 ∧
   c.authority ≠ selectorAuthority ∧
   c.focusedCost < c.relatedCost ∧ c.relatedCost < c.unrelatedCost
 
@@ -109,25 +109,37 @@ structure FactorizationAuthorization where
   law : FactorizationLaw
   deriving DecidableEq, Repr
 
+def CalibrationAuthorized (registry : List CalibrationAuthorization)
+    (receipt : Id) (calibration : RelevanceCalibration) : Prop :=
+  receipt ≠ 0 ∧
+  ∃ authorization ∈ registry,
+    authorization.receipt = receipt ∧
+    authorization.calibration = calibration ∧
+    authorization.authorizedBy = calibration.authority
+
+def FactorizationAuthorized (registry : List FactorizationAuthorization)
+    (selectorAuthority identity : Id) (version : Nat) (authority receipt : Id) : Prop :=
+  identity ≠ 0 ∧ version ≠ 0 ∧ authority ≠ 0 ∧ receipt ≠ 0 ∧
+  ∃ authorization ∈ registry,
+    authorization.receipt = receipt ∧
+    authorization.identity = identity ∧
+    authorization.version = version ∧
+    authorization.authority = authority ∧
+    authorization.authority ≠ selectorAuthority ∧
+    authorization.law = .completionThenConditionalRelevance
+
 def Certificate.Valid (calibrationRegistry : List CalibrationAuthorization)
     (factorizationRegistry : List FactorizationAuthorization) (c : Certificate) : Prop :=
   c.calibration.Valid c.selectorAuthority ∧
-  c.factorizationIdentity ≠ 0 ∧ c.factorizationVersion ≠ 0 ∧
-  (∃ authorization ∈ calibrationRegistry,
-    authorization.receipt = c.calibrationAuthorization ∧
-    authorization.calibration = c.calibration ∧
-    authorization.authorizedBy = c.calibration.authority) ∧
-  (∃ authorization ∈ factorizationRegistry,
-    authorization.receipt = c.factorizationAuthorization ∧
-    authorization.identity = c.factorizationIdentity ∧
-    authorization.version = c.factorizationVersion ∧
-    authorization.authority = c.factorizationAuthority ∧
-    authorization.authority ≠ c.selectorAuthority ∧
-    authorization.law = .completionThenConditionalRelevance)
+  CalibrationAuthorized calibrationRegistry c.calibrationAuthorization c.calibration ∧
+  FactorizationAuthorized factorizationRegistry c.selectorAuthority
+    c.factorizationIdentity c.factorizationVersion c.factorizationAuthority
+    c.factorizationAuthorization
 
-instance (calibrationRegistry : List CalibrationAuthorization)
+noncomputable instance (calibrationRegistry : List CalibrationAuthorization)
     (factorizationRegistry : List FactorizationAuthorization) (c : Certificate) :
     Decidable (c.Valid calibrationRegistry factorizationRegistry) := by
+  classical
   unfold Certificate.Valid
   infer_instance
 
@@ -155,12 +167,12 @@ theorem relevance_cannot_reverse_completion
 theorem focused_before_related (c : RelevanceCalibration) (selectorAuthority : Id)
     (h : c.Valid selectorAuthority) :
     Preferred c ⟨.completed, some .focused⟩ ⟨.completed, some .related⟩ := by
-  simp [Preferred, Outcome.Valid, relevanceCost, h.2.2.2.1]
+  simp [Preferred, Outcome.Valid, relevanceCost, h.2.2.2.2.2.1]
 
 theorem related_before_unrelated (c : RelevanceCalibration) (selectorAuthority : Id)
     (h : c.Valid selectorAuthority) :
     Preferred c ⟨.completed, some .related⟩ ⟨.completed, some .unrelated⟩ := by
-  simp [Preferred, Outcome.Valid, relevanceCost, h.2.2.2.2]
+  simp [Preferred, Outcome.Valid, relevanceCost, h.2.2.2.2.2.2]
 
 theorem unmeasured_is_not_observed_noncompletion
     (c : RelevanceCalibration) (r₁ r₂ : Option Relevance) :
@@ -188,7 +200,7 @@ theorem flat_table_without_receipt_is_not_certificate
     (_focused _related _unrelated _stop : Nat) :
     ¬ ∃ certificate : Certificate, Certificate.Valid [] [] certificate := by
   rintro ⟨certificate, h⟩
-  rcases h.2.2.2.1 with ⟨authorization, member, _⟩
+  rcases h.2.1 with ⟨_, authorization, member, _⟩
   simp at member
 
 /-- Positive witness without fixing calibration values: any externally
@@ -199,6 +211,9 @@ theorem authorized_factorization_valid
     (hcalibration : calibration.Valid selectorAuthority)
     (hfactorization : factorizationIdentity ≠ 0)
     (hversion : factorizationVersion ≠ 0)
+    (hreceipt : receipt ≠ 0)
+    (hfactorizationReceipt : factorizationReceipt ≠ 0)
+    (hfactorizationAuthority : factorizationAuthority ≠ 0)
     (hauthority : factorizationAuthority ≠ selectorAuthority) :
     let calibrationAuthorization : CalibrationAuthorization :=
       ⟨receipt, calibration, calibration.authority⟩
@@ -209,7 +224,9 @@ theorem authorized_factorization_valid
       ⟨calibration, selectorAuthority, factorizationIdentity, factorizationVersion,
         factorizationAuthority, receipt, factorizationReceipt⟩
     certificate.Valid [calibrationAuthorization] [factorizationAuthorization] := by
-  simp [Certificate.Valid, hcalibration, hfactorization, hversion, hauthority]
+  simp [Certificate.Valid, CalibrationAuthorized, FactorizationAuthorized,
+    hcalibration, hfactorization, hversion, hreceipt, hfactorizationReceipt,
+    hfactorizationAuthority, hauthority]
 
 theorem self_authorized_calibration_invalid
     (calibrationRegistry : List CalibrationAuthorization)
@@ -217,25 +234,53 @@ theorem self_authorized_calibration_invalid
     (hself : certificate.selectorAuthority = certificate.calibration.authority) :
     ¬ certificate.Valid calibrationRegistry factorizationRegistry := by
   intro h
-  exact h.1.2.2.1 hself.symm
+  exact h.1.2.2.2.2.1 hself.symm
+
+theorem matching_calibration_singleton_authorized
+    (authorization : CalibrationAuthorization)
+    (hreceipt : authorization.receipt ≠ 0)
+    (hauthority : authorization.authorizedBy = authorization.calibration.authority) :
+    CalibrationAuthorized [authorization] authorization.receipt authorization.calibration := by
+  exact ⟨hreceipt, authorization, by simp, rfl, rfl, hauthority⟩
 
 theorem substituted_calibration_not_authorized
-    (authorization : CalibrationAuthorization) (certificate : Certificate)
-    (hsubstitution : authorization.calibration ≠ certificate.calibration) :
-    ¬ certificate.Valid [authorization] [] := by
+    (authorization : CalibrationAuthorization) (receipt : Id)
+    (certificateCalibration : RelevanceCalibration)
+    (_hreceipt : authorization.receipt = receipt) (_hreceiptPresent : receipt ≠ 0)
+    (_hauthority : authorization.authorizedBy = certificateCalibration.authority)
+    (hsubstitution : authorization.calibration ≠ certificateCalibration) :
+    ¬ CalibrationAuthorized [authorization] receipt certificateCalibration := by
   intro h
-  rcases h.2.2.2.1 with ⟨registered, member, _, heq, _⟩
+  rcases h with ⟨_, registered, member, _, heq, _⟩
   simp only [List.mem_singleton] at member
   subst registered
   exact hsubstitution heq
 
+theorem matching_factorization_singleton_authorized
+    (authorization : FactorizationAuthorization) (selectorAuthority : Id)
+    (hidentity : authorization.identity ≠ 0) (hversion : authorization.version ≠ 0)
+    (hauthority : authorization.authority ≠ 0)
+    (hreceipt : authorization.receipt ≠ 0)
+    (hseparate : authorization.authority ≠ selectorAuthority)
+    (hlaw : authorization.law = .completionThenConditionalRelevance) :
+    FactorizationAuthorized [authorization] selectorAuthority authorization.identity
+      authorization.version authorization.authority authorization.receipt := by
+  exact ⟨hidentity, hversion, hauthority, hreceipt, authorization, by simp,
+    rfl, rfl, rfl, rfl, hseparate, hlaw⟩
+
 theorem substituted_factorization_not_authorized
-    (authorization : FactorizationAuthorization) (certificate : Certificate)
-    (hidentity : authorization.identity ≠ certificate.factorizationIdentity ∨
-      authorization.version ≠ certificate.factorizationVersion) :
-    ¬ certificate.Valid [] [authorization] := by
+    (authorization : FactorizationAuthorization) (selectorAuthority identity : Id)
+    (version : Nat) (authority receipt : Id)
+    (_hidentityPresent : identity ≠ 0) (_hversionPresent : version ≠ 0)
+    (_hauthorityPresent : authority ≠ 0) (_hreceiptPresent : receipt ≠ 0)
+    (_hreceipt : authorization.receipt = receipt)
+    (_hauthority : authorization.authority = authority)
+    (_hseparate : authorization.authority ≠ selectorAuthority)
+    (_hlaw : authorization.law = .completionThenConditionalRelevance)
+    (hidentity : authorization.identity ≠ identity ∨ authorization.version ≠ version) :
+    ¬ FactorizationAuthorized [authorization] selectorAuthority identity version authority receipt := by
   intro h
-  rcases h.2.2.2.2 with ⟨registered, member, _, hid, hver, _⟩
+  rcases h with ⟨_, _, _, _, registered, member, _, hid, hver, _⟩
   simp only [List.mem_singleton] at member
   subst registered
   exact hidentity.elim (fun bad => bad hid) (fun bad => bad hver)
@@ -244,7 +289,7 @@ theorem unauthorized_factorization_invalid
     (calibrationRegistry : List CalibrationAuthorization) (certificate : Certificate) :
     ¬ certificate.Valid calibrationRegistry [] := by
   intro h
-  rcases h.2.2.2.2 with ⟨authorization, member, _⟩
+  rcases h.2.2 with ⟨_, _, _, _, authorization, member, _⟩
   simp at member
 
 end DarkTower.WarMachine.FactorizedPreferenceSemantics
