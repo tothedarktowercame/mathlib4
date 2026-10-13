@@ -39,6 +39,12 @@ structure Delta (Fact : Type*) where
 
 namespace Delta
 
+@[ext] theorem ext {p q : Delta Fact} (hremove : p.remove = q.remove)
+    (hadd : p.add = q.add) : p = q := by
+  cases p
+  cases q
+  simp_all
+
 /-- Interpret an edit as a state transformation. -/
 def apply (d : Delta Fact) (s : Snapshot Fact) : Snapshot Fact :=
   (s \ d.remove) ∪ d.add
@@ -142,6 +148,46 @@ theorem apply_eraseAdd_of_mem (d : Delta Fact) (s : Snapshot Fact) (f : Fact)
     simp [apply, eraseAdd, hs, hnr]
   · simp [apply, eraseAdd, hxf]
 
+/-- Erase a finite family of removal instructions. -/
+def eraseRemoves (d : Delta Fact) (fs : Finset Fact) : Delta Fact where
+  remove := d.remove \ fs
+  add := d.add
+  disjoint := d.disjoint.mono_left (by
+    intro x hx
+    exact (Finset.mem_sdiff.mp hx).1)
+
+/-- Removing facts already absent at the typed source is a semantic no-op. -/
+theorem apply_eraseRemoves_of_disjoint (d : Delta Fact) (s fs : Finset Fact)
+    (hfs : Disjoint fs s) (hsub : fs ⊆ d.remove) :
+    (eraseRemoves d fs).apply s = d.apply s := by
+  ext x
+  by_cases hx : x ∈ fs
+  · have hxs : x ∉ s := Finset.disjoint_left.mp hfs hx
+    have hxr : x ∈ d.remove := hsub hx
+    have hxa : x ∉ d.add := Finset.disjoint_left.mp d.disjoint hxr
+    simp [apply, eraseRemoves, hx, hxs, hxr, hxa]
+  · simp [apply, eraseRemoves, hx]
+
+/-- Erase a finite family of addition instructions. -/
+def eraseAdds (d : Delta Fact) (fs : Finset Fact) : Delta Fact where
+  remove := d.remove
+  add := d.add \ fs
+  disjoint := d.disjoint.mono_right (by
+    intro x hx
+    exact (Finset.mem_sdiff.mp hx).1)
+
+/-- Adding facts already present at the typed source is a semantic no-op. -/
+theorem apply_eraseAdds_of_subset (d : Delta Fact) (s fs : Finset Fact)
+    (hsource : fs ⊆ s) (hsub : fs ⊆ d.add) :
+    (eraseAdds d fs).apply s = d.apply s := by
+  ext x
+  by_cases hx : x ∈ fs
+  · have hxs : x ∈ s := hsource hx
+    have hxa : x ∈ d.add := hsub hx
+    have hxr : x ∉ d.remove := fun hr ↦ Finset.disjoint_left.mp d.disjoint hr hxa
+    simp [apply, eraseAdds, hx, hxs, hxa, hxr]
+  · simp [apply, eraseAdds, hx]
+
 end Delta
 
 /-- A delta together with the boundary equation it claims. -/
@@ -182,6 +228,41 @@ def dropAdd {A B : Snapshot Fact} (d : CertifiedDelta A B) (f : Fact)
     (hA : f ∈ A) (hf : f ∈ d.edit.add) : CertifiedDelta A B where
   edit := Delta.eraseAdd d.edit f
   correct := (Delta.apply_eraseAdd_of_mem d.edit A f hA hf).trans d.correct
+
+/-- Cancel all removal instructions licensed by absence at the typed source. -/
+def dropAbsentRemoves {A B : Snapshot Fact} (d : CertifiedDelta A B) :
+    CertifiedDelta A B where
+  edit := Delta.eraseRemoves d.edit (d.edit.remove \ A)
+  correct := by
+    exact (Delta.apply_eraseRemoves_of_disjoint d.edit A (d.edit.remove \ A)
+      (by simp [Finset.disjoint_left]) Finset.sdiff_subset).trans d.correct
+
+/-- Cancel all addition instructions licensed by presence at the typed source. -/
+def dropPresentAdds {A B : Snapshot Fact} (d : CertifiedDelta A B) :
+    CertifiedDelta A B where
+  edit := Delta.eraseAdds d.edit (d.edit.add ∩ A)
+  correct := by
+    exact (Delta.apply_eraseAdds_of_subset d.edit A (d.edit.add ∩ A)
+      Finset.inter_subset_right Finset.inter_subset_left).trans d.correct
+
+/-- Source-licensed cancellation puts every certified edit into its canonical endpoint form. -/
+theorem dropPresentAdds_dropAbsentRemoves_eq_between {A B : Snapshot Fact}
+    (d : CertifiedDelta A B) :
+    (dropPresentAdds (dropAbsentRemoves d)).edit = (between A B).edit := by
+  apply Delta.ext <;> simp only [dropPresentAdds, dropAbsentRemoves, Delta.eraseAdds,
+    Delta.eraseRemoves, between]
+  · ext x
+    have hd := Finset.disjoint_left.mp d.edit.disjoint
+    have hc : x ∈ d.edit.apply A ↔ x ∈ B := by rw [d.correct]
+    by_cases hA : x ∈ A <;> by_cases hB : x ∈ B <;>
+      by_cases hr : x ∈ d.edit.remove <;> by_cases ha : x ∈ d.edit.add <;>
+      simp_all [Delta.apply, Delta.between]
+  · ext x
+    have hd := Finset.disjoint_left.mp d.edit.disjoint
+    have hc : x ∈ d.edit.apply A ↔ x ∈ B := by rw [d.correct]
+    by_cases hA : x ∈ A <;> by_cases hB : x ∈ B <;>
+      by_cases hr : x ∈ d.edit.remove <;> by_cases ha : x ∈ d.edit.add <;>
+      simp_all [Delta.apply, Delta.between]
 
 end CertifiedDelta
 
@@ -253,6 +334,10 @@ inductive Step : {A B : Snapshot Fact} → Derivation A B → Derivation A B →
   | dropAdd {A B} (d : CertifiedDelta A B) (f : Fact)
       (hA : f ∈ A) (hf : f ∈ d.edit.add) :
       Step (.atom d) (.atom (CertifiedDelta.dropAdd d f hA hf))
+  | dropAbsentRemoves {A B} (d : CertifiedDelta A B) :
+      Step (.atom d) (.atom (CertifiedDelta.dropAbsentRemoves d))
+  | dropPresentAdds {A B} (d : CertifiedDelta A B) :
+      Step (.atom d) (.atom (CertifiedDelta.dropPresentAdds d))
   | identify {A B} (p q : CertifiedDelta A B) (h : p.edit = q.edit) :
       Step (.atom p) (.atom q)
   | idLeft {A B} (d : Derivation A B) : Step (.seq (.id A) d) d
@@ -275,6 +360,14 @@ theorem Step.sound : {A B : Snapshot Fact} → {d e : Derivation A B} →
   | _, _, _, _, .dropAdd d f hA hf => by
       simp only [run]
       exact (Delta.apply_eraseAdd_of_mem d.edit _ f hA hf).symm
+  | _, _, _, _, .dropAbsentRemoves d => by
+      simp only [run]
+      exact (Delta.apply_eraseRemoves_of_disjoint d.edit _ (d.edit.remove \ _)
+        (by simp [Finset.disjoint_left]) Finset.sdiff_subset).symm
+  | _, _, _, _, .dropPresentAdds d => by
+      simp only [run]
+      exact (Delta.apply_eraseAdds_of_subset d.edit _ (d.edit.add ∩ _)
+        Finset.inter_subset_right Finset.inter_subset_left).symm
   | _, _, _, _, .identify p q h => by cases CertifiedDelta.ext h; rfl
   | _, _, _, _, .idLeft d => by simp [run]
   | _, _, _, _, .idRight d => by simp [run]
@@ -284,6 +377,31 @@ theorem Path.sound : {A B : Snapshot Fact} → {d e : Derivation A B} →
     Path d e → run d A = run e A
   | _, _, _, _, .refl _ => rfl
   | _, _, _, _, .cons h t => (h.sound).trans t.sound
+
+/-- The general checked proof diagram for compositional endpoint deltas.
+
+Every `A → B → C` pair is fused structurally, then the two complete classes of
+source-licensed redundant edits are cancelled, and the result is identified
+with the canonical `A → C` delta. -/
+def betweenSeqNormalizationPath (A B C : Snapshot Fact) :
+    Path
+      (.seq (.atom (CertifiedDelta.between A B)) (.atom (CertifiedDelta.between B C)))
+      (.atom (CertifiedDelta.between A C)) := by
+  let fused := CertifiedDelta.comp (CertifiedDelta.between A B) (CertifiedDelta.between B C)
+  let noAbsentRemoves := CertifiedDelta.dropAbsentRemoves fused
+  let canonical := CertifiedDelta.dropPresentAdds noAbsentRemoves
+  exact .cons (.fuse (CertifiedDelta.between A B) (CertifiedDelta.between B C))
+    (.cons (.dropAbsentRemoves fused)
+      (.cons (.dropPresentAdds noAbsentRemoves)
+        (.cons (.identify canonical (CertifiedDelta.between A C)
+          (CertifiedDelta.dropPresentAdds_dropAbsentRemoves_eq_between fused)) (.refl _))))
+
+/-- Soundness of the general rewrite path, now obtained from its checked rows rather than the
+separate extensional eight-case proof. -/
+theorem betweenSeqNormalizationPath_sound (A B C : Snapshot Fact) :
+    run (.seq (.atom (CertifiedDelta.between A B)) (.atom (CertifiedDelta.between B C))) A =
+      run (.atom (CertifiedDelta.between A C)) A :=
+  (betweenSeqNormalizationPath A B C).sound
 
 end Derivation
 
