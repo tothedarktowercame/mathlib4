@@ -488,6 +488,88 @@ def parAtom {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
     @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B') :=
   .atom (CertifiedDelta.tensor p q)
 
+/-- Lift a whole sequential diagram into the left lane, keeping the right snapshot fixed. -/
+def liftLeft {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    (B : Snapshot Right) : {A A' : Snapshot Left} →
+      @Derivation Left _ A A' →
+      @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B)
+  | _, _, .id A => .id (snapshotTensor A B)
+  | _, _, .atom p => parAtom p (CertifiedDelta.nil B)
+  | _, _, .seq f g => .seq (liftLeft B f) (liftLeft B g)
+
+/-- Lift a whole sequential diagram into the right lane, keeping the left snapshot fixed. -/
+def liftRight {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    (A : Snapshot Left) : {B B' : Snapshot Right} →
+      @Derivation Right _ B B' →
+      @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A B')
+  | _, _, .id B => .id (snapshotTensor A B)
+  | _, _, .atom q => parAtom (CertifiedDelta.nil A) q
+  | _, _, .seq f g => .seq (liftRight A f) (liftRight A g)
+
+/-- Recursive parallel composition.  The retained syntax performs the left lane then the right;
+`ParallelStep.interchange` below certifies that the opposite scheduling has the same meaning. -/
+def par {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    {A A' : Snapshot Left} {B B' : Snapshot Right}
+    (p : @Derivation Left _ A A') (q : @Derivation Right _ B B') :
+    @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B') :=
+  .seq (liftLeft B p) (liftRight A' q)
+
+/-- The opposite scheduling of `par`, used as the right side of interchange. -/
+def parRightFirst {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    {A A' : Snapshot Left} {B B' : Snapshot Right}
+    (p : @Derivation Left _ A A') (q : @Derivation Right _ B B') :
+    @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B') :=
+  .seq (liftRight A q) (liftLeft B' p)
+
+/-- Executing a left-lane lift preserves the fixed right component. -/
+theorem run_liftLeft {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    (B : Snapshot Right) : {A A' : Snapshot Left} →
+      (p : @Derivation Left _ A A') →
+      run (liftLeft B p) (snapshotTensor A B) = snapshotTensor (run p A) B
+  | _, _, .id _ => rfl
+  | _, _, .atom p => by
+      simp only [liftLeft, parAtom, run, CertifiedDelta.tensor]
+      rw [Delta.apply_tensor, p.correct]
+      change snapshotTensor _ ((Delta.between B B).apply B) = _
+      rw [Delta.apply_between]
+  | _, _, .seq f g => by
+      simp only [liftLeft, run]
+      rw [run_liftLeft B f, run_source f, run_liftLeft B g]
+
+/-- Executing a right-lane lift preserves the fixed left component. -/
+theorem run_liftRight {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    (A : Snapshot Left) : {B B' : Snapshot Right} →
+      (q : @Derivation Right _ B B') →
+      run (liftRight A q) (snapshotTensor A B) = snapshotTensor A (run q B)
+  | _, _, .id _ => rfl
+  | _, _, .atom q => by
+      simp only [liftRight, parAtom, run, CertifiedDelta.tensor]
+      rw [Delta.apply_tensor, q.correct]
+      change snapshotTensor ((Delta.between A A).apply A) _ = _
+      rw [Delta.apply_between]
+  | _, _, .seq f g => by
+      simp only [liftRight, run]
+      rw [run_liftRight A f, run_source f, run_liftRight A g]
+
+/-- A checked parallel rewrite.  It is separate from sequential `Step` because its two lanes may
+have different fact types; both are embedded into the common `Sum` boundary. -/
+inductive ParallelStep {Left Right : Type*} [DecidableEq Left] [DecidableEq Right] :
+    {A A' : Snapshot Left} → {B B' : Snapshot Right} →
+    @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B') →
+    @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B') → Type _
+  | interchange {A A' B B'} (p : @Derivation Left _ A A') (q : @Derivation Right _ B B') :
+      ParallelStep (par p q) (parRightFirst p q)
+
+/-- Interchange is justified by the two component interpretations, not merely by endpoint typing. -/
+theorem ParallelStep.sound {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    {A A' : Snapshot Left} {B B' : Snapshot Right}
+    {d e : @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B')} :
+    ParallelStep d e → run d (snapshotTensor A B) = run e (snapshotTensor A B)
+  | .interchange p q => by
+      simp only [par, parRightFirst, run]
+      rw [run_liftLeft B p, run_source p, run_liftRight A' q,
+        run_liftRight A q, run_source q, run_liftLeft B' p, run_source p]
+
 end Derivation
 
 section ParallelFixture
@@ -501,6 +583,20 @@ example :
       (snapshotTensor ({1} : Snapshot Nat) ({10} : Snapshot Nat)) =
       snapshotTensor ({2} : Snapshot Nat) ({20} : Snapshot Nat) := by
   apply Derivation.run_source
+
+/-- Recursive parallel composition and its opposite schedule are connected by a checked
+interchange rewrite. -/
+def parallelInterchange : Derivation.ParallelStep
+    (Derivation.par (.atom leftParallel) (.atom rightParallel))
+    (Derivation.parRightFirst (.atom leftParallel) (.atom rightParallel)) :=
+  .interchange _ _
+
+example :
+    Derivation.run (Derivation.par (.atom leftParallel) (.atom rightParallel))
+        (snapshotTensor ({1} : Snapshot Nat) ({10} : Snapshot Nat)) =
+      Derivation.run (Derivation.parRightFirst (.atom leftParallel) (.atom rightParallel))
+        (snapshotTensor ({1} : Snapshot Nat) ({10} : Snapshot Nat)) :=
+  parallelInterchange.sound
 
 end ParallelFixture
 
