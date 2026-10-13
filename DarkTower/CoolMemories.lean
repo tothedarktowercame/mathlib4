@@ -407,6 +407,21 @@ end Derivation
 
 /-! ## Independent edits and interchange -/
 
+/-- Tensor two snapshots by placing their facts in disjoint tagged namespaces. -/
+def snapshotTensor {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    (A : Snapshot Left) (B : Snapshot Right) : Snapshot (Sum Left Right) :=
+  A.map ⟨Sum.inl, Sum.inl_injective⟩ ∪ B.map ⟨Sum.inr, Sum.inr_injective⟩
+
+@[simp] theorem mem_snapshotTensor_inl {Left Right : Type*}
+    [DecidableEq Left] [DecidableEq Right] (A : Snapshot Left) (B : Snapshot Right) (x : Left) :
+    Sum.inl x ∈ snapshotTensor A B ↔ x ∈ A := by
+  simp [snapshotTensor]
+
+@[simp] theorem mem_snapshotTensor_inr {Left Right : Type*}
+    [DecidableEq Left] [DecidableEq Right] (A : Snapshot Left) (B : Snapshot Right) (x : Right) :
+    Sum.inr x ∈ snapshotTensor A B ↔ x ∈ B := by
+  simp [snapshotTensor]
+
 namespace Delta
 
 /-- Lift an edit to the left half of a disjoint sum of fact namespaces. -/
@@ -425,6 +440,21 @@ def inr {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
   disjoint := by
     simpa [Finset.disjoint_left] using d.disjoint
 
+/-- Parallel composition of edits in disjoint tagged namespaces. -/
+def tensor {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    (p : Delta Left) (q : Delta Right) : Delta (Sum Left Right) :=
+  comp (inl p) (inr q)
+
+/-- Tensor interpretation acts independently on the two component snapshots. -/
+theorem apply_tensor {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    (p : Delta Left) (q : Delta Right) (A : Snapshot Left) (B : Snapshot Right) :
+    (tensor p q).apply (snapshotTensor A B) =
+      snapshotTensor (p.apply A) (q.apply B) := by
+  ext x
+  have hp := Finset.disjoint_left.mp p.disjoint
+  have hq := Finset.disjoint_left.mp q.disjoint
+  cases x <;> simp_all [tensor, comp, apply, inl, inr, snapshotTensor]
+
 /-- Edits on disjoint fact namespaces commute.  This is the semantic interchange law. -/
 theorem inl_inr_interchange {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
     (p : Delta Left) (q : Delta Right) (s : Snapshot (Sum Left Right)) :
@@ -433,6 +463,46 @@ theorem inl_inr_interchange {Left Right : Type*} [DecidableEq Left] [DecidableEq
   cases x <;> simp [apply, inl, inr]
 
 end Delta
+
+namespace CertifiedDelta
+
+/-- Parallel composition of certified edits.  The `Sum` boundary makes independence structural. -/
+def tensor {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    {A A' : Snapshot Left} {B B' : Snapshot Right}
+    (p : CertifiedDelta A A') (q : CertifiedDelta B B') :
+    CertifiedDelta (snapshotTensor A B) (snapshotTensor A' B') where
+  edit := Delta.tensor p.edit q.edit
+  correct := by rw [Delta.apply_tensor, p.correct, q.correct]
+
+end CertifiedDelta
+
+namespace Derivation
+
+/-- The first parallel proof-diagram constructor, for two atomic certified boxes.
+
+This is deliberately narrower than recursive `par`: it validates the tagged-boundary design
+without changing the existing sequential syntax. -/
+def parAtom {Left Right : Type*} [DecidableEq Left] [DecidableEq Right]
+    {A A' : Snapshot Left} {B B' : Snapshot Right}
+    (p : CertifiedDelta A A') (q : CertifiedDelta B B') :
+    @Derivation (Sum Left Right) _ (snapshotTensor A B) (snapshotTensor A' B') :=
+  .atom (CertifiedDelta.tensor p q)
+
+end Derivation
+
+section ParallelFixture
+
+def leftParallel : CertifiedDelta ({1} : Snapshot Nat) {2} := CertifiedDelta.between {1} {2}
+def rightParallel : CertifiedDelta ({10} : Snapshot Nat) {20} := CertifiedDelta.between {10} {20}
+
+/-- A concrete two-memory parallel diagram reaches both declared targets. -/
+example :
+    Derivation.run (Derivation.parAtom leftParallel rightParallel)
+      (snapshotTensor ({1} : Snapshot Nat) ({10} : Snapshot Nat)) =
+      snapshotTensor ({2} : Snapshot Nat) ({20} : Snapshot Nat) := by
+  apply Derivation.run_source
+
+end ParallelFixture
 
 /-! ## Executable planted failures
 
