@@ -46,7 +46,7 @@ def toMermaid {Fact : Type*} [LinearOrder Fact] [Repr Fact]
   let a := snapshotLabel w.source
   let b := snapshotLabel w.middle
   let c := snapshotLabel w.target
-  s!"flowchart LR\n  A[\"{a}\"] -->|Δ A B| B[\"{b}\"]\n  B -->|Δ B C| C[\"{c}\"]\n  A ==>|normalise: cancel + reassociate| C"
+  s!"flowchart LR\n  A[\"{a}\"] -->|Δ A B| B[\"{b}\"]\n  B -->|Δ B C| C[\"{c}\"]\n  A ==>|endpoint equality: checked by Lean| C"
 
 def sampleWitness : DeltaCompositionWitness Nat :=
   witness ({1, 2} : Snapshot Nat) ({2, 3} : Snapshot Nat) ({2, 4} : Snapshot Nat)
