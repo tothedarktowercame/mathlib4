@@ -18,8 +18,9 @@ There are three levels:
 * `CertifiedDelta A B` carries the proof that an edit takes the declared source to target;
 * `Derivation A B` is a typed diagram (identity, one box, or sequential composition).
 
-Sequential derivations retain their intermediate boundary.  `normalise` forgets that syntax only
-after proving its interpretation and returns the canonical one-box delta between the endpoints.
+Sequential derivations retain their intermediate boundary.  The concrete transient example below
+reaches a canonical one-box delta by checked rewrites.  A general normalisation path is future work;
+the two theorems after `Delta.comp` identify exactly which source-relative edits it must cancel.
 -/
 
 namespace DarkTower.CoolMemories
@@ -88,6 +89,24 @@ theorem apply_comp (p q : Delta Fact) (s : Snapshot Fact) :
     by_cases hpr : x ∈ p.remove <;> by_cases hpa : x ∈ p.add <;>
     by_cases hqr : x ∈ q.remove <;> by_cases hqa : x ∈ q.add <;>
     simp_all [apply, comp]
+
+/-- A fused pair of canonical deltas removes either a canonical endpoint removal or a fact that
+was absent at `A`, appeared at `B`, and disappeared again at `C`.  The latter is precisely the
+source-relative removal that a general checked normaliser must cancel. -/
+theorem mem_comp_between_remove_iff (A B C : Snapshot Fact) (x : Fact) :
+    x ∈ (comp (between A B) (between B C)).remove ↔
+      (x ∈ A ∧ x ∉ C) ∨ (x ∉ A ∧ x ∈ B ∧ x ∉ C) := by
+  by_cases hA : x ∈ A <;> by_cases hB : x ∈ B <;> by_cases hC : x ∈ C <;>
+    simp [comp, between, hA, hB, hC]
+
+/-- Dually, a fused pair adds either a canonical endpoint addition or a fact that was present at
+`A`, absent at `B`, and present again at `C`.  The latter is the source-relative addition that a
+general checked normaliser must cancel. -/
+theorem mem_comp_between_add_iff (A B C : Snapshot Fact) (x : Fact) :
+    x ∈ (comp (between A B) (between B C)).add ↔
+      (x ∈ C ∧ x ∉ A) ∨ (x ∈ A ∧ x ∉ B ∧ x ∈ C) := by
+  by_cases hA : x ∈ A <;> by_cases hB : x ∈ B <;> by_cases hC : x ∈ C <;>
+    simp [comp, between, hA, hB, hC]
 
 /-- Remove one redundant removal instruction. -/
 def eraseRemove (d : Delta Fact) (f : Fact) : Delta Fact where
