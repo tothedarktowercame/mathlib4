@@ -150,9 +150,13 @@ structure RunFacts where
   differentArrangementPairs : Nat
   /-- Number of those pairs represented as distinct policies, each with its own numeric G. -/
   arrangementPairsDistinguishedByG : Nat
-  /-- Exact incremental refresh certificate for the current open-task frontier. -/
+  /-- Every open task, each either eligible for ranking or excluded with its
+  recorded typed reason. -/
+  frontierCensus : EligibilityCensus
+  /-- Exact refresh certificate for the eligible frontier (an audit of a full
+  recomputation against the persisted prior frontier). -/
   frontierRefresh : RefreshCertificate
-  /-- Winner certificate over the refreshed frontier and current tie law. -/
+  /-- Winner certificate over the refreshed eligible frontier and current tie law. -/
   frontierSelection : SelectionCertificate
   /-- Identity correspondence for cascades of the selected task only. -/
   selectedCascade : TargetCascadeCertificate
@@ -221,12 +225,23 @@ recomputed; cascade
 identity correspondence is local to the selected task.  Multiple policies
 are required only when that task has multiple admissible cascades.  Q1 keeps
 the independent responsibility for enumerating every open task. -/
+def q6Excludable (r : RunFacts) : Finset Id :=
+  if r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest
+  then {r.previousChoice.cascade} else ∅
+
+/-! Ruling 2b (codex-68, 2026-10-15): selection ranges over the certified
+eligible frontier; the complete open-task census is kept beside it, each
+excluded task with its typed reason and no comparison key.  Ruling 1a: a
+policy removed before the one comparison is justified only by Q6 (the
+previous run refused it on the same selection inputs). -/
 def Q8 (r : RunFacts) : Bool := decide (
+  r.frontierCensus.Valid r.openTasks ∧
   r.frontierRefresh.Valid ∧
-  r.frontierRefresh.currentOpenTasks = r.openTasks ∧
-  r.frontierSelection.Valid r.frontierRefresh.current r.openTasks ∧
+  r.frontierRefresh.currentOpenTasks = r.frontierCensus.eligible ∧
+  r.frontierSelection.Valid r.frontierRefresh.current r.frontierCensus.eligible ∧
   r.selectedCascade.selectedTask = r.frontierSelection.selected.task ∧
-  r.selectedCascade.Valid)
+  r.selectedCascade.Valid ∧
+  r.selectedCascade.requirementExcluded ⊆ q6Excludable r)
 
 private instance calibrationAuthorizedDecidable
     (registry : List FactorizedPreferenceSemantics.CalibrationAuthorization)
@@ -347,6 +362,7 @@ def click20 : RunFacts where
   factorizationAuthorizations := []
   differentArrangementPairs := 1
   arrangementPairsDistinguishedByG := 0
+  frontierCensus := ⟨{1, 2, 3}, []⟩
   frontierRefresh := positiveRefresh
   frontierSelection := positiveSelection
   selectedCascade := mismatchedCascade
@@ -400,6 +416,7 @@ def good : RunFacts where
   factorizationAuthorizations := [goodFactorizationAuthorization]
   differentArrangementPairs := 20
   arrangementPairsDistinguishedByG := 20
+  frontierCensus := ⟨{1, 2, 3}, []⟩
   frontierRefresh := positiveRefresh
   frontierSelection := positiveSelection
   selectedCascade := positiveCascade
@@ -424,6 +441,35 @@ def cascadeMismatch : RunFacts :=
 def insufficientPosteriorMultiplicity : RunFacts :=
   { good with selectedCascade := twoAdmissibleOnePosterior }
 
+/-- Census witnesses (ruling 2b).  Task 4 is open and excluded with a reason;
+it carries no comparison key and is outside the ranked frontier. -/
+def excludedWithReason : RunFacts :=
+  { good with openTickets := {4}, frontierCensus := ⟨{1, 2, 3}, [⟨4, 77⟩]⟩ }
+
+def omittedOpenTask : RunFacts :=
+  { good with openTickets := {4} }
+
+def inventedEligibleTask : RunFacts :=
+  { good with frontierCensus := ⟨{1, 2, 3, 4}, []⟩ }
+
+def unreasonedExclusion : RunFacts :=
+  { good with openTickets := {4}, frontierCensus := ⟨{1, 2, 3}, [⟨4, 0⟩]⟩ }
+
+/-- Exclusion witnesses (ruling 1a).  `good`'s previous run chose cascade
+50000, was refused, and had the same input digest. -/
+def q6ExcludedCascade : TargetCascadeCertificate :=
+  ⟨1, {40, 50000}, {40, 50000}, {40, 50000}, {40, 50000}, {50000}, {40}⟩
+
+def q6Excluded : RunFacts :=
+  { good with selectedCascade := q6ExcludedCascade }
+
+def exclusionWithoutQ6 : RunFacts :=
+  { good with selectedCascade := q6ExcludedCascade, currentInputDigest := 8 }
+
+def exclusionOfAnotherPolicy : RunFacts :=
+  { good with selectedCascade :=
+      ⟨1, {40, 50000}, {40, 50000}, {40, 50000}, {40, 50000}, {40}, {50000}⟩ }
+
 /-- Every unrelated Q9 carrier is populated, but the certificate substitutes
 the factorization identity without a matching retained authorization. -/
 def substitutedFactorization : RunFacts :=
@@ -438,6 +484,13 @@ theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false :=
 theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by decide
 theorem insufficient_posterior_multiplicity_not_Q8 :
     Q8 insufficientPosteriorMultiplicity = false := by decide
+theorem excluded_with_reason_Q8 : Q8 excludedWithReason = true := by decide
+theorem omitted_open_task_not_Q8 : Q8 omittedOpenTask = false := by decide
+theorem invented_eligible_task_not_Q8 : Q8 inventedEligibleTask = false := by decide
+theorem unreasoned_exclusion_not_Q8 : Q8 unreasonedExclusion = false := by decide
+theorem q6_excluded_Q8 : Q8 q6Excluded = true := by decide
+theorem exclusion_without_q6_not_Q8 : Q8 exclusionWithoutQ6 = false := by decide
+theorem exclusion_of_another_policy_not_Q8 : Q8 exclusionOfAnotherPolicy = false := by decide
 theorem good_Q9 : Q9 good = true := by decide
 theorem substituted_factorization_not_Q9 : Q9 substitutedFactorization = false := by decide
 
@@ -547,5 +600,12 @@ example : Q10 click20 = true := by decide
 #print axioms omitted_affected_frontier_not_Q8
 #print axioms cascade_mismatch_not_Q8
 #print axioms insufficient_posterior_multiplicity_not_Q8
+#print axioms excluded_with_reason_Q8
+#print axioms omitted_open_task_not_Q8
+#print axioms invented_eligible_task_not_Q8
+#print axioms unreasoned_exclusion_not_Q8
+#print axioms q6_excluded_Q8
+#print axioms exclusion_without_q6_not_Q8
+#print axioms exclusion_of_another_policy_not_Q8
 
 end DarkTower.WarMachine.Requirements

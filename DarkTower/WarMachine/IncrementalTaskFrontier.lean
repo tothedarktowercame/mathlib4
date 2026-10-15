@@ -165,15 +165,56 @@ theorem no_global_reindexing_required
   rcases h with ⟨_, _, _, hretained, _⟩
   exact ⟨e, (hretained e he).2.2.2, rfl, rfl, rfl⟩
 
+/-- The open-task census beside the ranked frontier.  Every open task is
+exactly one of: eligible for ranking, or excluded with the typed reason the
+selector recorded (reason id `0` stands for "no reason" and is refused).
+Excluded tasks carry no comparison key: the selector never ranked them. -/
+structure Exclusion where
+  task : Id
+  reason : Id
+  deriving DecidableEq
+
+structure EligibilityCensus where
+  eligible : Finset Id
+  excluded : List Exclusion
+  deriving DecidableEq
+
+def excludedTasks (xs : List Exclusion) : Finset Id :=
+  xs.toFinset.image (·.task)
+
+def EligibilityCensus.Valid (c : EligibilityCensus) (openTasks : Finset Id) : Prop :=
+  (c.excluded.map (·.task)).Nodup ∧
+  allIn c.excluded (fun x => x.reason ≠ 0) ∧
+  Disjoint c.eligible (excludedTasks c.excluded) ∧
+  c.eligible ∪ excludedTasks c.excluded = openTasks
+
+instance (c : EligibilityCensus) (openTasks : Finset Id) :
+    Decidable (c.Valid openTasks) := by
+  unfold EligibilityCensus.Valid
+  infer_instance
+
+theorem omitted_open_task_invalid (c : EligibilityCensus) (openTasks : Finset Id)
+    (t : Id) (ht : t ∈ openTasks) (he : t ∉ c.eligible)
+    (hx : t ∉ excludedTasks c.excluded) : ¬ c.Valid openTasks := by
+  intro h
+  have : t ∈ c.eligible ∪ excludedTasks c.excluded := by rw [h.2.2.2]; exact ht
+  rcases Finset.mem_union.mp this with h1 | h1
+  · exact he h1
+  · exact hx h1
+
 /-- Target-local cascade identity correspondence.  It does not quantify over
-other open tasks, and asks for multiple policies only when the selected target
-has multiple admissible cascades. -/
+other open tasks.  Every stage holds the same truthful set up to scoring; a
+requirement may then remove scored policies before the one comparison
+(`requirementExcluded`, justified at Q8 by the run's Q6 facts), and the
+posterior is exactly what remains.  Multiple posterior policies are required
+only when more than one selectable policy remains. -/
 structure TargetCascadeCertificate where
   selectedTask : Id
   availableAdmissible : Finset Id
   constructed : Finset Id
   admitted : Finset Id
   scored : Finset Id
+  requirementExcluded : Finset Id
   posterior : Finset Id
   deriving DecidableEq
 
@@ -181,8 +222,9 @@ def TargetCascadeCertificate.Valid (c : TargetCascadeCertificate) : Prop :=
   c.availableAdmissible = c.constructed ∧
   c.constructed = c.admitted ∧
   c.admitted = c.scored ∧
-  c.scored = c.posterior ∧
-  (1 < c.availableAdmissible.card → 1 < c.posterior.card)
+  c.requirementExcluded ⊆ c.scored ∧
+  c.posterior = c.scored \ c.requirementExcluded ∧
+  (1 < (c.scored \ c.requirementExcluded).card → 1 < c.posterior.card)
 
 instance (c : TargetCascadeCertificate) : Decidable c.Valid := by
   unfold TargetCascadeCertificate.Valid
@@ -197,7 +239,12 @@ theorem admitted_scored_mismatch_invalid
   intro hv; exact h hv.2.2.1
 
 theorem scored_posterior_mismatch_invalid
-    (c : TargetCascadeCertificate) (h : c.scored ≠ c.posterior) : ¬ c.Valid := by
+    (c : TargetCascadeCertificate) (h : c.posterior ≠ c.scored \ c.requirementExcluded) :
+    ¬ c.Valid := by
+  intro hv; exact h hv.2.2.2.2.1
+
+theorem exclusion_outside_scored_invalid
+    (c : TargetCascadeCertificate) (h : ¬ c.requirementExcluded ⊆ c.scored) : ¬ c.Valid := by
   intro hv; exact h hv.2.2.2.1
 
 theorem historical_all_target_breadth_not_a_premise
@@ -220,7 +267,7 @@ def positiveRefresh : RefreshCertificate where
   currentOpenTasks := {1, 2, 3}
 
 def positiveSelection : SelectionCertificate := ⟨retainedEntry, 4⟩
-def positiveCascade : TargetCascadeCertificate := ⟨1, {40}, {40}, {40}, {40}, {40}⟩
+def positiveCascade : TargetCascadeCertificate := ⟨1, {40}, {40}, {40}, {40}, ∅, {40}⟩
 
 /-- A literal, unchanged frontier useful for closed positive witnesses.  Keys
 are stable task identities rather than population ordinals. -/
@@ -244,7 +291,7 @@ def stableSelection (task : Id) : SelectionCertificate :=
   ⟨stableEntry task, 0⟩
 
 def singletonCascade (task policy : Id) : TargetCascadeCertificate :=
-  ⟨task, {policy}, {policy}, {policy}, {policy}, {policy}⟩
+  ⟨task, {policy}, {policy}, {policy}, {policy}, ∅, {policy}⟩
 
 theorem positive_refresh_valid : positiveRefresh.Valid := by
   simp [RefreshCertificate.Valid, positiveRefresh, retainedEntry, changedEntry,
@@ -257,7 +304,7 @@ theorem positive_selection_valid :
   simp [SelectionCertificate.Valid, positiveSelection, positiveRefresh, retainedEntry,
     recomputedEntry, addedEntry, taskSet, keyLE, allIn]
 theorem positive_cascade_valid : positiveCascade.Valid := by
-  simp [TargetCascadeCertificate.Valid, positiveCascade]
+  decide
 
 def omittedRefresh : RefreshCertificate :=
   { positiveRefresh with
@@ -266,16 +313,29 @@ def omittedRefresh : RefreshCertificate :=
     currentOpenTasks := {1, 3} }
 
 def mismatchedCascade : TargetCascadeCertificate :=
-  ⟨1, {40}, {40}, {40}, {40}, {41}⟩
+  ⟨1, {40}, {40}, {40}, {40}, ∅, {41}⟩
 
 def twoAdmissibleOnePosterior : TargetCascadeCertificate :=
-  ⟨1, {40, 41}, {40, 41}, {40, 41}, {40, 41}, {40}⟩
+  ⟨1, {40, 41}, {40, 41}, {40, 41}, {40, 41}, ∅, {40}⟩
+
+/-- The previous run's refused policy 41, removed by Q6 before selection:
+truthful stages, and a posterior of what remains. -/
+def requirementExcludedCascade : TargetCascadeCertificate :=
+  ⟨1, {40, 41}, {40, 41}, {40, 41}, {40, 41}, {41}, {40}⟩
+
+/-- An exclusion that names a policy that was never scored. -/
+def foreignExclusionCascade : TargetCascadeCertificate :=
+  ⟨1, {40, 41}, {40, 41}, {40, 41}, {40, 41}, {42}, {40, 41}⟩
 
 theorem omitted_refresh_invalid : ¬ omittedRefresh.Valid := by
   native_decide
 theorem mismatched_cascade_invalid : ¬ mismatchedCascade.Valid := by
-  simp [TargetCascadeCertificate.Valid, mismatchedCascade]
+  decide
 theorem two_admissible_one_posterior_invalid : ¬ twoAdmissibleOnePosterior.Valid := by
-  simp [TargetCascadeCertificate.Valid, twoAdmissibleOnePosterior]
+  decide
+theorem requirement_excluded_cascade_valid : requirementExcludedCascade.Valid := by
+  decide
+theorem foreign_exclusion_invalid : ¬ foreignExclusionCascade.Valid := by
+  decide
 
 end DarkTower.WarMachine.IncrementalTaskFrontier
