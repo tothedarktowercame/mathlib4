@@ -7,12 +7,15 @@ open Holes
 /-- The corrected ruled organisation-outcome vocabulary.  The authority is
 `futon2:src/futon2/aif/full_loop_cohort.clj:31-33`, enforced at
 `futon2:src/futon2/aif/full_loop_cohort.clj:317` and
-`futon2:src/futon2/aif/tripwire.clj:189`.  The twelve-member correction is recorded
+`futon2:src/futon2/aif/tripwire.clj:189`.  The original twelve-member correction is recorded
 at `futon2:holes/labs/wm-contract/aif-equations.edn:214` and explained by
 `futon2:holes/labs/wm-contract/C574-F10-disposition-enumeration.md:187`: the
-earlier fourteen counted literal syntax, not the vocabulary. -/
+earlier fourteen counted literal syntax, not the vocabulary.  The later
+`:grounded-progress` and `:already-satisfied` terminal dispositions are retained
+as named-zero support until a preference authority assigns them mass. -/
 inductive FlightDisposition where
-  | groundedChange | groundedNoChange | artifactOnly | abstained
+  | groundedChange | groundedProgress | alreadySatisfied
+  | groundedNoChange | artifactOnly | abstained
   | noSelection | agentUnavailable | guardrailRefusal | dispatchFailed
   | buildFailed | substrateUnavailable | incomplete | cancelled
   deriving DecidableEq, Repr
@@ -20,7 +23,8 @@ inductive FlightDisposition where
 /-- Declaration-order enumeration, following `Channel.all` at
 `mathlib4:DarkTower/WarMachine/Holes.lean:1238-1241`. -/
 def FlightDisposition.all : List FlightDisposition :=
-  [.groundedChange, .groundedNoChange, .artifactOnly, .abstained,
+  [.groundedChange, .groundedProgress, .alreadySatisfied,
+   .groundedNoChange, .artifactOnly, .abstained,
    .noSelection, .agentUnavailable, .guardrailRefusal, .dispatchFailed,
    .buildFailed, .substrateUnavailable, .incomplete, .cancelled]
 
@@ -66,10 +70,11 @@ def organisationOutcome (d : FlightDisposition) : Outcome SeedObs :=
 def observedDispositions : List FlightDisposition :=
   [.agentUnavailable, .buildFailed, .groundedChange, .incomplete, .noSelection]
 
-/-- The seven named zero-mass organisation outcomes: the ruled vocabulary less
+/-- The nine named zero-mass organisation outcomes: the ruled vocabulary less
 the five observed dispositions. -/
 def namedZeroDispositions : List FlightDisposition :=
-  [.groundedNoChange, .artifactOnly, .abstained, .guardrailRefusal,
+  [.groundedProgress, .alreadySatisfied, .groundedNoChange,
+   .artifactOnly, .abstained, .guardrailRefusal,
    .dispatchFailed, .substrateUnavailable, .cancelled]
 
 /-- D3's named-empty `C_ser` occasion region (an anomaly on the board, not an
@@ -89,6 +94,8 @@ noncomputable def seed : PreferenceDistribution SeedObs where
   support := fun _ => FlightDisposition.all.map organisationOutcome
   mass := fun _ o => match o with
     | ⟨.organization, .groundedChange⟩ => 1 / 2
+    | ⟨.organization, .groundedProgress⟩ => 0
+    | ⟨.organization, .alreadySatisfied⟩ => 0
     | ⟨.organization, .agentUnavailable⟩ => 1 / 8
     | ⟨.organization, .buildFailed⟩ => 1 / 8
     | ⟨.organization, .incomplete⟩ => 1 / 8
@@ -121,7 +128,7 @@ def PositivePreferenceOnSupport {PolicyIndex : Type*} (Q : PredictiveOutcomeKern
   ∀ π o, o ∈ Q.support π → 0 < Cdist.mass () o
 
 /-- The seed meets the real-valued risk side-condition exactly when predictive
-support avoids all seven named zeros.  This leaves seven live obligations on a
+support avoids all nine named zeros.  This leaves nine live obligations on a
 future `Q`; it does not manufacture one. -/
 theorem seed_positivePreference_iff_support_avoids_namedZeros
     {PolicyIndex : Type*} (Q : PredictiveOutcomeKernel PolicyIndex SeedObs) :

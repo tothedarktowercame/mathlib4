@@ -2,7 +2,7 @@ import DarkTower.WarMachine.PreferenceRiskSeparation
 import DarkTower.WarMachine.F10RuledCarrier
 
 /-! Separated-risk successor witness, Joe's 2026-09-09 sitting.
-The twelve-member seed is F10RuledCarrier.seed; the measured constant cohort
+The full ruled seed is F10RuledCarrier.seed; the measured constant cohort
 predicts groundedChange with mass one. Runtime correspondence is checked by a
 separate executable receipt, not assumed here. No observation bridge is claimed. -/
 namespace DarkTower.WarMachine.PreferenceRiskWitness
@@ -29,8 +29,8 @@ theorem concrete_scalarKL :
   norm_num [scalarKL, groundedPrediction, seed, FlightDisposition.all, organisationOutcome]
 
 /-- The full named support, including zeros, remains in both distributions. -/
-theorem same_twelve_support : groundedPrediction.support () = seed.support () ∧
-    (groundedPrediction.support ()).length = 12 := by
+theorem same_full_support : groundedPrediction.support () = seed.support () ∧
+    (groundedPrediction.support ()).length = 14 := by
   norm_num [groundedPrediction, seed, FlightDisposition.all]
 
 /-- A positive prediction at a named zero is rejected independently of this cohort. -/
@@ -41,7 +41,7 @@ theorem abstained_refuses (Q : ProbabilityKernel Unit (Outcome SeedObs))
   preferred_zero_refuses Q seed () _ hs hp (by rfl)
 
 #print axioms concrete_scalarKL
-#print axioms same_twelve_support
+#print axioms same_full_support
 #print axioms abstained_refuses
 end
 end DarkTower.WarMachine.PreferenceRiskWitness
