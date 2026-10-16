@@ -22,18 +22,42 @@ set_option maxHeartbeats 5000000
 
 abbrev Id := Nat
 
+/-- One task-level action in the support the outer selector chose from.
+Outer selection precedes inner construction: an outer action is not a
+constructed policy. -/
+structure OuterAction where
+  /-- Stable id of the task the action advances. -/
+  task : Id
+  /-- Stable identity of the task-level action (its type and target). -/
+  action : Id
+  deriving DecidableEq
+
+/-- The inner construction census of one task, made after the outer choice.
+A pin or digest of `0` is a recorded absence. -/
 structure TargetConstruction where
-  /-- Stable target ids sharing this exact slice/pool construction fact. The
-  exporter may group targets only when all remaining fields are identical. -/
+  /-- Stable ids of the tasks this construction serves. -/
   targets : Finset Id
+  /-- Stable identity of the outer action the construction serves. -/
+  action : Id
+  /-- Digest of the current reading (excerpt and analysis) the family was built from. -/
+  reading : Id
+  /-- Pin of the whole pattern-library manifest the slice was checked against. -/
+  library : Id
+  /-- Pin of the pattern graph the constructor read. -/
+  graph : Id
+  /-- Digest of the retraction and transition-kernel parameters. -/
+  kernel : Id
   /-- Pattern ids returned by query-time retrieval from the pinned library. -/
   slice : Finset Id
-  /-- Pattern ids the constructor was actually permitted to use. -/
+  /-- Pattern ids the constructed policies actually arrange. -/
   pool : Finset Id
-  /-- True exactly when the recorded slice was queried over the whole pinned library. -/
+  /-- True exactly when every slice pattern is in the pinned whole-library
+  manifest with the bytes the reading cited. -/
   sliceFromWholeLibrary : Bool
-  /-- Number of extensionally distinct policies constructed for this target. -/
+  /-- Number of extensionally distinct valid policies constructed. -/
   policyCount : Nat
+  /-- Stable identities of those policies (arranged structural keys). -/
+  policies : Finset Id
   deriving DecidableEq
 
 structure Choice where
@@ -124,7 +148,10 @@ structure RunFacts where
   targetsWithG : Finset Id
   /-- Number of pattern files in the pinned pattern-library manifest. -/
   libraryPatternCount : Nat
-  /-- Per-target retrieval slice, constructor pool and policy coverage. -/
+  /-- One task-level action per task in the outer selector's support. -/
+  outerActions : List OuterAction
+  /-- Inner construction census: slice, pool, pins and policies, per
+  constructed task. -/
   targetConstruction : List TargetConstruction
   /-- Number of distinct patterns across pools the constructor could draw on. -/
   constructorPatternCount : Nat
@@ -209,13 +236,36 @@ def RunFacts.maxSliceSize (r : RunFacts) : Nat :=
 def Q1 (r : RunFacts) : Bool := decide (r.enumeratedTasks = r.openTasks)
 
 /-! Joe: cascades are derived per problem from the pattern library; the pool is
-the query-time slice, and every open target has an action from the start. -/
+the query-time slice, and every open target has an action from the start.
+
+Ruling (codex-68, 2026-10-16, option (c), bounded by Q8 eligibility): the
+action every task has from the start is its task-level action in the outer
+support.  Exactly the Q8-eligible tasks carry one each; an open task Q8
+excludes is accounted for by its typed exclusion and carries none.  Inner
+construction happens after the outer choice and only for the selected task:
+exactly one construction entry, for that task and its outer action, with a
+recorded reading, library, graph and kernel, the pool equal to a slice drawn
+from the whole pinned library, a positive count of distinct valid policies,
+and those policies exactly the selected cascade's constructed set, containing
+every compared policy.  Unselected tasks are not said to have inner policies. -/
 def Q2 (r : RunFacts) : Bool := decide (
+  (∀ a ∈ r.outerActions, a.task ∈ r.frontierCensus.eligible) ∧
+  (∀ t ∈ r.frontierCensus.eligible, ∃ a ∈ r.outerActions, a.task = t) ∧
+  r.outerActions.length = r.frontierCensus.eligible.card ∧
+  (r.outerActions.map OuterAction.action).Nodup ∧
+  r.frontierSelection.selected.task ∈ r.frontierCensus.eligible ∧
+  r.selectedCascade.selectedTask = r.frontierSelection.selected.task ∧
+  r.targetConstruction.length = 1 ∧
   (∀ tc ∈ r.targetConstruction,
-    tc.targets ⊆ r.openTasks ∧ tc.pool = tc.slice ∧ tc.sliceFromWholeLibrary = true ∧
-      tc.slice.card ≤ r.libraryPatternCount ∧ 0 < tc.policyCount) ∧
-  (r.targetConstruction.map (fun tc : TargetConstruction => tc.targets)).foldl (· ∪ ·) ∅ =
-    r.openTasks ∧
+    tc.targets = {r.frontierSelection.selected.task} ∧
+    (∃ a ∈ r.outerActions,
+      a.task = r.frontierSelection.selected.task ∧ a.action = tc.action) ∧
+    tc.reading ≠ 0 ∧ tc.library ≠ 0 ∧ tc.graph ≠ 0 ∧ tc.kernel ≠ 0 ∧
+    tc.pool = tc.slice ∧ tc.sliceFromWholeLibrary = true ∧
+    tc.slice.card ≤ r.libraryPatternCount ∧
+    0 < tc.policyCount ∧ tc.policies.card = tc.policyCount ∧
+    tc.policies = r.selectedCascade.constructed ∧
+    r.comparedPolicies ⊆ tc.policies) ∧
   r.constructorPatternCount =
     ((r.targetConstruction.map (fun tc : TargetConstruction => tc.pool)).foldl (· ∪ ·) ∅).card)
 
@@ -376,9 +426,11 @@ def click20 : RunFacts where
   targetsReachingScoring := {0, 1, 2}
   targetsWithG := {0}
   libraryPatternCount := 1431
+  outerActions := []
   targetConstruction :=
-    [{ targets := {0}, slice := {10, 11}, pool := {10, 11},
-       sliceFromWholeLibrary := false, policyCount := 1 }]
+    [{ targets := {0}, action := 0, reading := 0, library := 0, graph := 0, kernel := 0,
+       slice := {10, 11}, pool := {10, 11},
+       sliceFromWholeLibrary := false, policyCount := 1, policies := {20} }]
   constructorPatternCount := 2
   constructedCascades := {20}
   comparedPolicies := {30}
@@ -434,6 +486,24 @@ def goodPolicy (policy horizon : Nat)
   normalization := normalization
   terms := terms
 
+/-- The selected task's construction: task 1 (the selection of
+`positiveSelection`), its outer action 71, and the two compared policies. -/
+def goodConstruction : TargetConstruction where
+  targets := {1}
+  action := 71
+  reading := 81
+  library := 82
+  graph := 83
+  kernel := 84
+  slice := ids 3000 30
+  pool := ids 3000 30
+  sliceFromWholeLibrary := true
+  policyCount := 2
+  policies := {60000, 60001}
+
+def goodCascade : TargetCascadeCertificate :=
+  ⟨1, {60000, 60001}, {60000, 60001}, {60000, 60001}, {60000, 60001}, ∅, {60000, 60001}⟩
+
 def good : RunFacts where
   openMissions := {1, 2, 3}
   openExcursions := ∅
@@ -442,10 +512,8 @@ def good : RunFacts where
   targetsReachingScoring := {1, 2, 3}
   targetsWithG := {1, 2, 3}
   libraryPatternCount := 1431
-  targetConstruction :=
-    [{ targets := {1, 2, 3}, slice := ids 3000 30,
-       pool := ids 3000 30, sliceFromWholeLibrary := true,
-       policyCount := 3 }]
+  outerActions := [⟨1, 71⟩, ⟨2, 72⟩, ⟨3, 73⟩]
+  targetConstruction := [goodConstruction]
   constructorPatternCount := 30
   constructedCascades := ids 50000 (3 * 637)
   comparedPolicies := {60000, 60001}
@@ -476,7 +544,7 @@ def good : RunFacts where
   frontierCensus := ⟨{1, 2, 3}, []⟩
   frontierRefresh := positiveRefresh
   frontierSelection := positiveSelection
-  selectedCascade := positiveCascade
+  selectedCascade := goodCascade
 
 /-- Deterministic likelihoods and terminal-only preferences may yield numeric
 zero epistemic terms while still carrying every term and total C-tau. -/
@@ -575,6 +643,84 @@ def substitutedFactorization : RunFacts :=
     factorizedPreference := some
       { goodPreferenceCertificate with factorizationIdentity := 109 } }
 
+/-- Q2 witnesses (ruling (c)).  `good` has outer actions for its three
+eligible tasks and one construction, for the selected task 1. -/
+def actionForExcludedTask : RunFacts :=
+  { excludedWithReason with outerActions := good.outerActions ++ [⟨4, 74⟩] }
+
+def omittedOuterAction : RunFacts :=
+  { good with outerActions := [⟨1, 71⟩, ⟨2, 72⟩] }
+
+def duplicateOuterAction : RunFacts :=
+  { good with outerActions := [⟨1, 71⟩, ⟨2, 72⟩, ⟨3, 73⟩, ⟨3, 73⟩] }
+
+def sharedOuterActionIdentity : RunFacts :=
+  { good with outerActions := [⟨1, 71⟩, ⟨2, 71⟩, ⟨3, 73⟩] }
+
+def foreignOuterAction : RunFacts :=
+  { good with outerActions := good.outerActions ++ [⟨9, 79⟩] }
+
+def unselectedTaskConstructed : RunFacts :=
+  { good with targetConstruction :=
+      [goodConstruction, { goodConstruction with targets := {2}, action := 72 }] }
+
+def wrongSelectedTask : RunFacts :=
+  { good with targetConstruction := [{ goodConstruction with targets := {2}, action := 72 }] }
+
+def wrongSelectedAction : RunFacts :=
+  { good with targetConstruction := [{ goodConstruction with action := 72 }] }
+
+def noConstruction : RunFacts :=
+  { good with targetConstruction := [] }
+
+def omittedPolicy : RunFacts :=
+  { good with targetConstruction :=
+      [{ goodConstruction with policies := {60000}, policyCount := 1 }] }
+
+def inventedPolicy : RunFacts :=
+  { good with targetConstruction :=
+      [{ goodConstruction with policies := {60000, 60001, 60002}, policyCount := 3 }] }
+
+def duplicatePolicyCounted : RunFacts :=
+  { good with targetConstruction := [{ goodConstruction with policyCount := 3 }] }
+
+def zeroPolicyFamily : RunFacts :=
+  { good with
+      targetConstruction := [{ goodConstruction with policies := ∅, policyCount := 0 }]
+      selectedCascade := ⟨1, ∅, ∅, ∅, ∅, ∅, ∅⟩
+      comparedPolicies := ∅ }
+
+def poolNotSlice : RunFacts :=
+  { good with targetConstruction := [{ goodConstruction with pool := ids 3000 31 }] }
+
+def sliceNotFromLibrary : RunFacts :=
+  { good with targetConstruction := [{ goodConstruction with sliceFromWholeLibrary := false }] }
+
+def readingUnpinned : RunFacts :=
+  { good with targetConstruction := [{ goodConstruction with reading := 0 }] }
+
+def comparedOutsideConstruction : RunFacts :=
+  { good with comparedPolicies := {60000, 60002} }
+
+theorem good_Q2 : Q2 good = true := by decide
+theorem excluded_task_without_action_Q2 : Q2 excludedWithReason = true := by decide
+theorem action_for_excluded_task_not_Q2 : Q2 actionForExcludedTask = false := by decide
+theorem omitted_outer_action_not_Q2 : Q2 omittedOuterAction = false := by decide
+theorem duplicate_outer_action_not_Q2 : Q2 duplicateOuterAction = false := by decide
+theorem shared_outer_action_identity_not_Q2 : Q2 sharedOuterActionIdentity = false := by decide
+theorem foreign_outer_action_not_Q2 : Q2 foreignOuterAction = false := by decide
+theorem unselected_task_constructed_not_Q2 : Q2 unselectedTaskConstructed = false := by decide
+theorem wrong_selected_task_not_Q2 : Q2 wrongSelectedTask = false := by decide
+theorem wrong_selected_action_not_Q2 : Q2 wrongSelectedAction = false := by decide
+theorem no_construction_not_Q2 : Q2 noConstruction = false := by decide
+theorem omitted_policy_not_Q2 : Q2 omittedPolicy = false := by decide
+theorem invented_policy_not_Q2 : Q2 inventedPolicy = false := by decide
+theorem duplicate_policy_counted_not_Q2 : Q2 duplicatePolicyCounted = false := by decide
+theorem zero_policy_family_not_Q2 : Q2 zeroPolicyFamily = false := by decide
+theorem pool_not_slice_not_Q2 : Q2 poolNotSlice = false := by decide
+theorem slice_not_from_library_not_Q2 : Q2 sliceNotFromLibrary = false := by decide
+theorem reading_unpinned_not_Q2 : Q2 readingUnpinned = false := by decide
+theorem compared_outside_construction_not_Q2 : Q2 comparedOutsideConstruction = false := by decide
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
 theorem good_Q4_mixed_horizons : Q4 good = true := by decide
@@ -723,5 +869,24 @@ example : Q10 click20 = true := by decide
 #print axioms q6_excluded_Q8
 #print axioms exclusion_without_q6_not_Q8
 #print axioms exclusion_of_another_policy_not_Q8
+#print axioms good_Q2
+#print axioms excluded_task_without_action_Q2
+#print axioms action_for_excluded_task_not_Q2
+#print axioms omitted_outer_action_not_Q2
+#print axioms duplicate_outer_action_not_Q2
+#print axioms shared_outer_action_identity_not_Q2
+#print axioms foreign_outer_action_not_Q2
+#print axioms unselected_task_constructed_not_Q2
+#print axioms wrong_selected_task_not_Q2
+#print axioms wrong_selected_action_not_Q2
+#print axioms no_construction_not_Q2
+#print axioms omitted_policy_not_Q2
+#print axioms invented_policy_not_Q2
+#print axioms duplicate_policy_counted_not_Q2
+#print axioms zero_policy_family_not_Q2
+#print axioms pool_not_slice_not_Q2
+#print axioms slice_not_from_library_not_Q2
+#print axioms reading_unpinned_not_Q2
+#print axioms compared_outside_construction_not_Q2
 
 end DarkTower.WarMachine.Requirements
