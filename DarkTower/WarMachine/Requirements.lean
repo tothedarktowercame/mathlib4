@@ -237,6 +237,7 @@ and there are as many records as compared policies. -/
 def Q4 (r : RunFacts) : Bool := decide (
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
   r.gTerms.informationGain = true ∧
+  r.comparedPolicies.Nonempty ∧
   (∀ p ∈ r.policyPreferences, p.policy ∈ r.comparedPolicies) ∧
   (∀ c ∈ r.comparedPolicies, ∃ p ∈ r.policyPreferences, p.policy = c) ∧
   r.policyPreferences.length = r.comparedPolicies.card ∧
@@ -518,6 +519,15 @@ def policyTermMissing : RunFacts :=
   { good with policyPreferences :=
       [goodPolicy 60000 4, goodPolicy 60001 2 .perStepCapacityAndPattern ⟨true, true, false⟩] }
 
+/-- Q4 certifies an actual comparison, not a vacuous empty menu. -/
+def noComparedPolicies : RunFacts :=
+  { good with
+      comparedPolicies := ∅
+      policyPreferences := []
+      policiesWithRiskTerm := 0
+      policiesWithAmbiguityTerm := 0
+      policiesWithInformationTerm := 0 }
+
 /-- Adversarial Q8 witnesses isolate incomplete refresh and identity-correspondence
 failures without changing the historical breadth fields. -/
 def omittedAffectedFrontier : RunFacts :=
@@ -575,6 +585,7 @@ theorem omitted_policy_record_not_Q4 : Q4 omittedPolicyRecord = false := by deci
 theorem foreign_policy_record_not_Q4 : Q4 foreignPolicyRecord = false := by decide
 theorem duplicate_policy_record_not_Q4 : Q4 duplicatePolicyRecord = false := by decide
 theorem policy_term_missing_not_Q4 : Q4 policyTermMissing = false := by decide
+theorem no_compared_policies_not_Q4 : Q4 noComparedPolicies = false := by decide
 theorem good_Q8 : Q8 good = true := by decide
 theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false := by decide
 theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by decide
@@ -700,6 +711,7 @@ example : Q10 click20 = true := by decide
 #print axioms foreign_policy_record_not_Q4
 #print axioms duplicate_policy_record_not_Q4
 #print axioms policy_term_missing_not_Q4
+#print axioms no_compared_policies_not_Q4
 #print axioms good_Q8
 #print axioms omitted_affected_frontier_not_Q8
 #print axioms cascade_mismatch_not_Q8
