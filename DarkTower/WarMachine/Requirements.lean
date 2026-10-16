@@ -68,6 +68,47 @@ inductive PreferenceSemantics where
   | terminalOnly | constant | progressive
   deriving DecidableEq, Repr
 
+/-- Declared normalization of a compared policy's G terms.  Under
+`perStepCapacityAndPattern` risk is divided by `H · log |outcomes|`,
+ambiguity by `H`, and information gain by the policy's distinct-pattern
+count: G is a controller objective over per-step rates, not raw cumulative
+EFE, so policies with different horizons are comparable.  `rawCumulative` is
+the unnormalized horizon sum, comparable only at equal horizons.  There is no
+`undeclared` constructor: an absent, unrecognized or unbound declaration is
+not recomputable. -/
+inductive GNormalization where
+  | perStepCapacityAndPattern | rawCumulative
+  deriving DecidableEq, Repr
+
+/-- One compared policy's horizon and preference facts, over its own horizon. -/
+structure PolicyPreference where
+  /-- Stable id of the compared policy. -/
+  policy : Id
+  /-- Number of future steps scored for this policy, from its observation model. -/
+  horizon : Nat
+  /-- Zero-based steps whose C-tau row states a real preference. -/
+  preferenceSteps : Finset Nat
+  /-- Steps whose C-tau is graded by completed-progress count. -/
+  gradedPreferenceSteps : Finset Nat
+  /-- The policy's declared preference semantics. -/
+  semantics : PreferenceSemantics
+  /-- The normalization under which this policy's G was compared. -/
+  normalization : GNormalization
+  /-- Terms recorded and evaluated for this policy's G. -/
+  terms : GTerms
+  deriving DecidableEq
+
+/-- Every term evaluated, a positive horizon, a preference at every step, and
+grading at every step under progressive semantics. -/
+def PolicyPreference.Valid (p : PolicyPreference) : Prop :=
+  p.terms = ⟨true, true, true⟩ ∧ 0 < p.horizon ∧
+  p.preferenceSteps = Finset.range p.horizon ∧
+  (p.semantics = .progressive → p.gradedPreferenceSteps = Finset.range p.horizon)
+
+instance (p : PolicyPreference) : Decidable p.Valid := by
+  unfold PolicyPreference.Valid
+  infer_instance
+
 structure RunFacts where
   /-- Canonical ids of open missions; counted from the pinned mission registry. -/
   openMissions : Finset Id
@@ -93,15 +134,8 @@ structure RunFacts where
   comparedPolicies : Finset Id
   /-- Constructed cascade ids for which the record has no numeric G. -/
   cascadesWithoutG : Finset Id
-  /-- Number of future steps scored, read from the observation-model horizon. -/
-  horizonLength : Nat
-  /-- Zero-based horizon steps whose C-tau row states a real preference. -/
-  preferenceSteps : Finset Nat
-  /-- Horizon steps whose C-tau is graded by completed-progress count. -/
-  gradedPreferenceSteps : Finset Nat
-  /-- Whether this policy family declares progressive, rather than constant or
-  terminal-only, preference semantics. -/
-  preferenceSemantics : PreferenceSemantics
+  /-- One record per compared policy, each over its own horizon. -/
+  policyPreferences : List PolicyPreference
   /-- Terms that contributed to every reported policy G. -/
   gTerms : GTerms
   /-- Compared policies carrying a separately recorded risk term. -/
@@ -191,13 +225,25 @@ def Q3 (r : RunFacts) : Bool := decide (r.cascadesWithoutG = ∅)
 /-! Joe: G must not be risk-only, and C-tau states a preference at every
 step of the horizon. Zero-valued ambiguity/information terms still count when
 their canonical carriers were evaluated. Grading at every step is required
-only for policy families that declare progressive preference semantics. -/
+only for policy families that declare progressive preference semantics.
+
+Ruling (codex-68, 2026-10-16): each compared policy has its own horizon.
+Policies with different horizons are comparable only because their G terms
+share the per-step capacity-and-pattern normalization, so every compared
+policy records one common law, and a law other than that one requires equal
+horizons. The policy records are exactly the compared policies, one each:
+every record is of a compared policy, every compared policy has a record,
+and there are as many records as compared policies. -/
 def Q4 (r : RunFacts) : Bool := decide (
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
-  r.gTerms.informationGain = true ∧ 0 < r.horizonLength ∧
-  r.preferenceSteps = Finset.range r.horizonLength ∧
-  (r.preferenceSemantics = .progressive →
-    r.gradedPreferenceSteps = Finset.range r.horizonLength) ∧
+  r.gTerms.informationGain = true ∧
+  (∀ p ∈ r.policyPreferences, p.policy ∈ r.comparedPolicies) ∧
+  (∀ c ∈ r.comparedPolicies, ∃ p ∈ r.policyPreferences, p.policy = c) ∧
+  r.policyPreferences.length = r.comparedPolicies.card ∧
+  (∀ p ∈ r.policyPreferences, p.Valid) ∧
+  (∀ p ∈ r.policyPreferences, ∀ q ∈ r.policyPreferences,
+    p.normalization = q.normalization ∧
+    (p.normalization = .perStepCapacityAndPattern ∨ p.horizon = q.horizon)) ∧
   r.policiesWithRiskTerm = r.comparedPolicies.card ∧
   r.policiesWithAmbiguityTerm = r.comparedPolicies.card ∧
   r.policiesWithInformationTerm = r.comparedPolicies.card)
@@ -336,10 +382,10 @@ def click20 : RunFacts where
   constructedCascades := {20}
   comparedPolicies := {30}
   cascadesWithoutG := ∅
-  horizonLength := 4
-  preferenceSteps := {3}
-  gradedPreferenceSteps := ∅
-  preferenceSemantics := .terminalOnly
+  policyPreferences :=
+    [{ policy := 30, horizon := 4, preferenceSteps := {3}, gradedPreferenceSteps := ∅,
+       semantics := .terminalOnly, normalization := .rawCumulative,
+       terms := ⟨true, false, false⟩ }]
   gTerms := ⟨true, false, false⟩
   policiesWithRiskTerm := 1
   policiesWithAmbiguityTerm := 0
@@ -374,6 +420,19 @@ def missingG : RunFacts :=
     targetsWithG := click20.openTasks
     cascadesWithoutG := {21} }
 
+/-- A compared policy with every term, preference and grading over its own
+horizon, under the per-step normalization. -/
+def goodPolicy (policy horizon : Nat)
+    (normalization : GNormalization := .perStepCapacityAndPattern)
+    (terms : GTerms := ⟨true, true, true⟩) : PolicyPreference where
+  policy := policy
+  horizon := horizon
+  preferenceSteps := Finset.range horizon
+  gradedPreferenceSteps := Finset.range horizon
+  semantics := .progressive
+  normalization := normalization
+  terms := terms
+
 def good : RunFacts where
   openMissions := {1, 2, 3}
   openExcursions := ∅
@@ -388,16 +447,13 @@ def good : RunFacts where
        policyCount := 3 }]
   constructorPatternCount := 30
   constructedCascades := ids 50000 (3 * 637)
-  comparedPolicies := ids 60000 (3 * 637)
+  comparedPolicies := {60000, 60001}
   cascadesWithoutG := ∅
-  horizonLength := 4
-  preferenceSteps := Finset.range 4
-  gradedPreferenceSteps := Finset.range 4
-  preferenceSemantics := .progressive
+  policyPreferences := [goodPolicy 60000 4, goodPolicy 60001 2]
   gTerms := ⟨true, true, true⟩
-  policiesWithRiskTerm := 1911
-  policiesWithAmbiguityTerm := 1911
-  policiesWithInformationTerm := 1911
+  policiesWithRiskTerm := 2
+  policiesWithAmbiguityTerm := 2
+  policiesWithInformationTerm := 2
   interpretationOrder := .selectionBeforeInterpretation
   pathAbsenceCount := 0
   previousChoice := ⟨0, 50000⟩
@@ -424,11 +480,43 @@ def good : RunFacts where
 /-- Deterministic likelihoods and terminal-only preferences may yield numeric
 zero epistemic terms while still carrying every term and total C-tau. -/
 def deterministicTerminal : RunFacts :=
-  { good with preferenceSemantics := .terminalOnly, gradedPreferenceSteps := ∅ }
+  { good with policyPreferences := good.policyPreferences.map (fun p => { p with semantics := .terminalOnly, gradedPreferenceSteps := ∅ }) }
 
 /-- An asserted progressive schedule does not receive that exemption. -/
 def progressiveRowsMissing : RunFacts :=
-  { good with preferenceSemantics := .progressive, gradedPreferenceSteps := ∅ }
+  { good with policyPreferences := good.policyPreferences.map (fun p => { p with gradedPreferenceSteps := ∅ }) }
+
+/-- `good` compares horizons 4 and 2 under the per-step normalization.  The
+same horizons as raw cumulative sums are not comparable. -/
+def mixedHorizonsRaw : RunFacts :=
+  { good with policyPreferences := good.policyPreferences.map (fun p => { p with normalization := .rawCumulative }) }
+
+/-- Equal horizons as raw cumulative sums are comparable. -/
+def equalHorizonsRaw : RunFacts :=
+  { good with policyPreferences :=
+      [goodPolicy 60000 4 .rawCumulative,
+       goodPolicy 60001 4 .rawCumulative] }
+
+/-- Two compared policies under different laws share no comparison scale. -/
+def mixedNormalization : RunFacts :=
+  { good with policyPreferences :=
+      [goodPolicy 60000 4, goodPolicy 60001 4 .rawCumulative] }
+
+/-- A compared policy without its record, and a record for a policy that was
+not compared. -/
+def omittedPolicyRecord : RunFacts :=
+  { good with policyPreferences := [goodPolicy 60000 4] }
+
+def foreignPolicyRecord : RunFacts :=
+  { good with policyPreferences := [goodPolicy 60000 4, goodPolicy 60002 2] }
+
+def duplicatePolicyRecord : RunFacts :=
+  { good with policyPreferences := [goodPolicy 60000 4, goodPolicy 60001 2, goodPolicy 60001 3] }
+
+/-- Information gain evaluated for one compared policy only. -/
+def policyTermMissing : RunFacts :=
+  { good with policyPreferences :=
+      [goodPolicy 60000 4, goodPolicy 60001 2 .perStepCapacityAndPattern ⟨true, true, false⟩] }
 
 /-- Adversarial Q8 witnesses isolate incomplete refresh and identity-correspondence
 failures without changing the historical breadth fields. -/
@@ -479,6 +567,14 @@ def substitutedFactorization : RunFacts :=
 
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
+theorem good_Q4_mixed_horizons : Q4 good = true := by decide
+theorem mixed_horizons_raw_not_Q4 : Q4 mixedHorizonsRaw = false := by decide
+theorem equal_horizons_raw_Q4 : Q4 equalHorizonsRaw = true := by decide
+theorem mixed_normalization_not_Q4 : Q4 mixedNormalization = false := by decide
+theorem omitted_policy_record_not_Q4 : Q4 omittedPolicyRecord = false := by decide
+theorem foreign_policy_record_not_Q4 : Q4 foreignPolicyRecord = false := by decide
+theorem duplicate_policy_record_not_Q4 : Q4 duplicatePolicyRecord = false := by decide
+theorem policy_term_missing_not_Q4 : Q4 policyTermMissing = false := by decide
 theorem good_Q8 : Q8 good = true := by decide
 theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false := by decide
 theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by decide
@@ -596,6 +692,14 @@ example : Q10 click20 = true := by decide
 #print axioms good_conforms
 #print axioms deterministic_terminal_Q4
 #print axioms progressive_rows_missing_not_Q4
+#print axioms good_Q4_mixed_horizons
+#print axioms mixed_horizons_raw_not_Q4
+#print axioms equal_horizons_raw_Q4
+#print axioms mixed_normalization_not_Q4
+#print axioms omitted_policy_record_not_Q4
+#print axioms foreign_policy_record_not_Q4
+#print axioms duplicate_policy_record_not_Q4
+#print axioms policy_term_missing_not_Q4
 #print axioms good_Q8
 #print axioms omitted_affected_frontier_not_Q8
 #print axioms cascade_mismatch_not_Q8
