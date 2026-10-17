@@ -101,20 +101,25 @@ structure OpenHole where
   reentryCondition : Nat
   deriving DecidableEq, Repr
 
-/-- The identity chain is explicit: the selected and scored composition is the
-saved composition named by every journal entry. -/
+/-- The identity chain has two deliberately distinct stages.  Selection and
+scoring bind the structural cascade; compilation creates a new executable
+refinement identity, and the journal binds that executable identity.  The
+projection clause in `ExecutableCascade.Valid` connects the stages without
+falsely equating their digests. -/
 structure IdentityChain where
-  selected : Nat
-  scored : Nat
-  saved : Nat
-  journal : Nat
+  selectedStructural : Nat
+  scoredStructural : Nat
+  savedStructural : Nat
+  savedExecutable : Nat
+  journalExecutable : Nat
   deriving DecidableEq, Repr
 
 def IdentityChain.Valid (i : IdentityChain) : Bool :=
-  decide (i.selected ≠ 0) &&
-  decide (i.selected = i.scored) &&
-  decide (i.scored = i.saved) &&
-  decide (i.saved = i.journal)
+  decide (i.selectedStructural ≠ 0) &&
+  decide (i.savedExecutable ≠ 0) &&
+  decide (i.selectedStructural = i.scoredStructural) &&
+  decide (i.scoredStructural = i.savedStructural) &&
+  decide (i.savedExecutable = i.journalExecutable)
 
 /-- Executable refinement. `policy` may differ from `structural.blend` only by
 its application order.  That order has a separately authorized certificate.
@@ -218,7 +223,7 @@ private def exactCertificate : ThreeHalvesBlend.ApplicationOrderCertificate wher
   lawReceipt := 83
   selectorAuthority := 84
 
-private def identity80 : IdentityChain := ⟨80, 80, 80, 80⟩
+private def identity80 : IdentityChain := ⟨80, 80, 80, 96, 96⟩
 
 private def closedClause (n : Nat) : OperationalClause := ⟨n, 90, 91, 92⟩
 
@@ -258,7 +263,11 @@ theorem omitted_occurrence_invalid :
   native_decide
 
 theorem substituted_identity_invalid :
-    ({good with identity := ⟨80, 80, 81, 80⟩}).Valid [exactLaw] = false := by
+    ({good with identity := ⟨80, 80, 81, 96, 96⟩}).Valid [exactLaw] = false := by
+  native_decide
+
+theorem journal_bound_to_structural_not_executable_invalid :
+    ({good with identity := ⟨80, 80, 80, 96, 80⟩}).Valid [exactLaw] = false := by
   native_decide
 
 #print axioms valid_forgets_exactly
