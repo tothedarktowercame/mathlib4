@@ -20,6 +20,12 @@ def OuterCascadePolicyRecomputable
     (selection : OuterCascadePolicyObjective.SelectionCertificate) : Prop :=
   selection.Valid carrier
 
+instance (carrier : OuterCascadePolicyObjective.Carrier)
+    (selection : OuterCascadePolicyObjective.SelectionCertificate) :
+    Decidable (OuterCascadePolicyRecomputable carrier selection) := by
+  unfold OuterCascadePolicyRecomputable
+  infer_instance
+
 open DarkTower.WarMachine.IncrementalTaskFrontier
 open DarkTower.WarMachine.FactorizedPreferenceSemantics
 
@@ -227,6 +233,10 @@ structure RunFacts where
   frontierSelection : SelectionCertificate
   /-- Identity correspondence for cascades of the selected task only. -/
   selectedCascade : TargetCascadeCertificate
+  /-- Complete occurrence-grain Cascade Live policy menu and evidence. -/
+  outerPolicyCarrier : OuterCascadePolicyObjective.Carrier
+  /-- Strict-minimum certificate projected to the enacted cascade. -/
+  outerPolicySelection : OuterCascadePolicyObjective.SelectionCertificate
   deriving DecidableEq
 
 def RunFacts.openTasks (r : RunFacts) : Finset Id :=
@@ -255,6 +265,12 @@ from the whole pinned library, a positive count of distinct valid policies,
 and those policies exactly the selected cascade's constructed set, containing
 every compared policy.  Unselected tasks are not said to have inner policies. -/
 def Q2 (r : RunFacts) : Bool := decide (
+  r.outerPolicyCarrier.Valid ∧
+  r.outerPolicySelection.selected ∈ r.outerPolicyCarrier.evidence ∧
+  r.outerPolicySelection.selected.policy.target = r.currentChoice.target ∧
+  r.outerPolicySelection.selected.policy.cascadeDigest = r.currentChoice.cascade ∧
+  (r.outerPolicyCarrier.menu.identities.map (·.occurrencePolicy)).toFinset =
+    r.comparedPolicies ∧
   (∀ a ∈ r.outerActions, a.task ∈ r.frontierCensus.eligible) ∧
   (∀ t ∈ r.frontierCensus.eligible, ∃ a ∈ r.outerActions, a.task = t) ∧
   r.outerActions.length = r.frontierCensus.eligible.card ∧
@@ -291,6 +307,7 @@ horizons. The policy records are exactly the compared policies, one each:
 every record is of a compared policy, every compared policy has a record,
 and there are as many records as compared policies. -/
 def Q4 (r : RunFacts) : Bool := decide (
+  r.outerPolicyCarrier.Valid ∧
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
   r.gTerms.informationGain = true ∧
   r.comparedPolicies.Nonempty ∧
@@ -338,6 +355,7 @@ excluded task with its typed reason and no comparison key.  Ruling 1a: a
 policy removed before the one comparison is justified only by Q6 (the
 previous run refused it on the same selection inputs). -/
 def Q8 (r : RunFacts) : Bool := decide (
+  OuterCascadePolicyRecomputable r.outerPolicyCarrier r.outerPolicySelection ∧
   r.frontierCensus.Valid r.openTasks ∧
   r.frontierRefresh.Valid ∧
   r.frontierRefresh.currentOpenTasks = r.frontierCensus.eligible ∧
@@ -416,6 +434,17 @@ def goodPreferenceCertificate :
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate :=
   ⟨goodCalibration, 108, 106, 1, 107, 104, 105⟩
 
+open DarkTower.WarMachine.OuterCascadePolicyObjective in
+def goodOuterEvidenceA : Evidence := base 60000 1 50000 2 1 (1/2) neutral
+open DarkTower.WarMachine.OuterCascadePolicyObjective in
+def goodOuterEvidenceB : Evidence := base 60001 1 50001 2 1 (1/2) ⟨1, 0, 0⟩
+open DarkTower.WarMachine.OuterCascadePolicyObjective in
+def goodOuterCarrier : Carrier :=
+  { menu := { identities := [goodOuterEvidenceA.policy, goodOuterEvidenceB.policy] }
+    evidence := [goodOuterEvidenceA, goodOuterEvidenceB] }
+def goodOuterSelection : OuterCascadePolicyObjective.SelectionCertificate :=
+  ⟨goodOuterEvidenceB⟩
+
 /-! Click 20 provenance. The selection certificate/exporter supplies reaching
 scoring, with-G, constructed/compared singleton counts, horizon/preference
 rows, risk-only terms, and 62 path-scoped absences. The 221/373/43 historical
@@ -471,6 +500,8 @@ def click20 : RunFacts where
   frontierRefresh := positiveRefresh
   frontierSelection := positiveSelection
   selectedCascade := mismatchedCascade
+  outerPolicyCarrier := OuterCascadePolicyObjective.tiedCarrier
+  outerPolicySelection := OuterCascadePolicyObjective.tiedSelection
 
 def missingG : RunFacts :=
   { click20 with
@@ -551,11 +582,30 @@ def good : RunFacts where
   frontierRefresh := positiveRefresh
   frontierSelection := positiveSelection
   selectedCascade := goodCascade
+  outerPolicyCarrier := goodOuterCarrier
+  outerPolicySelection := goodOuterSelection
 
 /-- Deterministic likelihoods and terminal-only preferences may yield numeric
 zero epistemic terms while still carrying every term and total C-tau. -/
 def deterministicTerminal : RunFacts :=
   { good with policyPreferences := good.policyPreferences.map (fun p => { p with semantics := .terminalOnly, gradedPreferenceSteps := ∅ }) }
+
+def missingOuterPolicyCertificate : RunFacts :=
+  { good with outerPolicyCarrier := { goodOuterCarrier with evidence := [] } }
+
+def tiedOuterPolicyCertificate : RunFacts :=
+  { good with
+    outerPolicyCarrier := OuterCascadePolicyObjective.tiedCarrier
+    outerPolicySelection := OuterCascadePolicyObjective.tiedSelection }
+
+def wrongOuterPolicyDecomposition : RunFacts :=
+  { good with outerPolicyCarrier :=
+      { goodOuterCarrier with evidence :=
+          [{ goodOuterEvidenceA with novelty := 3/4 }, goodOuterEvidenceB] } }
+
+def substitutedOuterPolicyDigest : RunFacts :=
+  { good with outerPolicySelection :=
+      ⟨{ goodOuterEvidenceB with policy := { goodOuterEvidenceB.policy with cascadeDigest := 59999 } }⟩ }
 
 /-- An asserted progressive schedule does not receive that exemption. -/
 def progressiveRowsMissing : RunFacts :=
@@ -708,66 +758,88 @@ def readingUnpinned : RunFacts :=
 def comparedOutsideConstruction : RunFacts :=
   { good with comparedPolicies := {60000, 60002} }
 
-theorem good_Q2 : Q2 good = true := by decide
-theorem excluded_task_without_action_Q2 : Q2 excludedWithReason = true := by decide
-theorem action_for_excluded_task_not_Q2 : Q2 actionForExcludedTask = false := by decide
-theorem omitted_outer_action_not_Q2 : Q2 omittedOuterAction = false := by decide
-theorem duplicate_outer_action_not_Q2 : Q2 duplicateOuterAction = false := by decide
-theorem shared_outer_action_identity_not_Q2 : Q2 sharedOuterActionIdentity = false := by decide
-theorem foreign_outer_action_not_Q2 : Q2 foreignOuterAction = false := by decide
-theorem unselected_task_constructed_not_Q2 : Q2 unselectedTaskConstructed = false := by decide
-theorem wrong_selected_task_not_Q2 : Q2 wrongSelectedTask = false := by decide
-theorem wrong_selected_action_not_Q2 : Q2 wrongSelectedAction = false := by decide
-theorem no_construction_not_Q2 : Q2 noConstruction = false := by decide
-theorem omitted_policy_not_Q2 : Q2 omittedPolicy = false := by decide
-theorem invented_policy_not_Q2 : Q2 inventedPolicy = false := by decide
-theorem duplicate_policy_counted_not_Q2 : Q2 duplicatePolicyCounted = false := by decide
-theorem zero_policy_family_not_Q2 : Q2 zeroPolicyFamily = false := by decide
-theorem pool_not_slice_not_Q2 : Q2 poolNotSlice = false := by decide
-theorem slice_not_from_library_not_Q2 : Q2 sliceNotFromLibrary = false := by decide
-theorem reading_unpinned_not_Q2 : Q2 readingUnpinned = false := by decide
-theorem compared_outside_construction_not_Q2 : Q2 comparedOutsideConstruction = false := by decide
-theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by decide
-theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by decide
-theorem good_Q4_mixed_horizons : Q4 good = true := by decide
-theorem mixed_horizons_raw_not_Q4 : Q4 mixedHorizonsRaw = false := by decide
-theorem equal_horizons_raw_Q4 : Q4 equalHorizonsRaw = true := by decide
-theorem mixed_normalization_not_Q4 : Q4 mixedNormalization = false := by decide
-theorem omitted_policy_record_not_Q4 : Q4 omittedPolicyRecord = false := by decide
-theorem foreign_policy_record_not_Q4 : Q4 foreignPolicyRecord = false := by decide
-theorem duplicate_policy_record_not_Q4 : Q4 duplicatePolicyRecord = false := by decide
-theorem policy_term_missing_not_Q4 : Q4 policyTermMissing = false := by decide
-theorem no_compared_policies_not_Q4 : Q4 noComparedPolicies = false := by decide
-theorem good_Q8 : Q8 good = true := by decide
-theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false := by decide
-theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by decide
+theorem good_Q2 : Q2 good = true := by native_decide
+theorem missing_outer_policy_not_Q2 : Q2 missingOuterPolicyCertificate = false := by native_decide
+theorem missing_outer_policy_fails_Q2_Q4_Q8 :
+    Q2 missingOuterPolicyCertificate = false ∧
+    Q4 missingOuterPolicyCertificate = false ∧
+    Q8 missingOuterPolicyCertificate = false := by native_decide
+theorem missing_outer_policy_not_conforms : conforms missingOuterPolicyCertificate = false := by native_decide
+theorem tied_outer_policy_not_Q8 : Q8 tiedOuterPolicyCertificate = false := by native_decide
+theorem tied_outer_policy_not_conforms : conforms tiedOuterPolicyCertificate = false := by native_decide
+theorem wrong_outer_policy_decomposition_not_Q4 :
+    Q4 wrongOuterPolicyDecomposition = false := by native_decide
+theorem wrong_outer_policy_decomposition_not_Q8 :
+    Q8 wrongOuterPolicyDecomposition = false := by native_decide
+theorem wrong_outer_policy_decomposition_not_conforms :
+    conforms wrongOuterPolicyDecomposition = false := by native_decide
+theorem substituted_outer_policy_digest_not_Q2 :
+    Q2 substitutedOuterPolicyDigest = false := by native_decide
+theorem substituted_outer_policy_digest_not_Q8 :
+    Q8 substitutedOuterPolicyDigest = false := by native_decide
+theorem substituted_outer_policy_digest_not_conforms :
+    conforms substitutedOuterPolicyDigest = false := by native_decide
+theorem valid_outer_policy_Q2_Q4_Q8_and_conforms :
+    Q2 good = true ∧ Q4 good = true ∧ Q8 good = true ∧ conforms good = true := by native_decide
+theorem excluded_task_without_action_Q2 : Q2 excludedWithReason = true := by native_decide
+theorem action_for_excluded_task_not_Q2 : Q2 actionForExcludedTask = false := by native_decide
+theorem omitted_outer_action_not_Q2 : Q2 omittedOuterAction = false := by native_decide
+theorem duplicate_outer_action_not_Q2 : Q2 duplicateOuterAction = false := by native_decide
+theorem shared_outer_action_identity_not_Q2 : Q2 sharedOuterActionIdentity = false := by native_decide
+theorem foreign_outer_action_not_Q2 : Q2 foreignOuterAction = false := by native_decide
+theorem unselected_task_constructed_not_Q2 : Q2 unselectedTaskConstructed = false := by native_decide
+theorem wrong_selected_task_not_Q2 : Q2 wrongSelectedTask = false := by native_decide
+theorem wrong_selected_action_not_Q2 : Q2 wrongSelectedAction = false := by native_decide
+theorem no_construction_not_Q2 : Q2 noConstruction = false := by native_decide
+theorem omitted_policy_not_Q2 : Q2 omittedPolicy = false := by native_decide
+theorem invented_policy_not_Q2 : Q2 inventedPolicy = false := by native_decide
+theorem duplicate_policy_counted_not_Q2 : Q2 duplicatePolicyCounted = false := by native_decide
+theorem zero_policy_family_not_Q2 : Q2 zeroPolicyFamily = false := by native_decide
+theorem pool_not_slice_not_Q2 : Q2 poolNotSlice = false := by native_decide
+theorem slice_not_from_library_not_Q2 : Q2 sliceNotFromLibrary = false := by native_decide
+theorem reading_unpinned_not_Q2 : Q2 readingUnpinned = false := by native_decide
+theorem compared_outside_construction_not_Q2 : Q2 comparedOutsideConstruction = false := by native_decide
+theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by native_decide
+theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by native_decide
+theorem good_Q4_mixed_horizons : Q4 good = true := by native_decide
+theorem mixed_horizons_raw_not_Q4 : Q4 mixedHorizonsRaw = false := by native_decide
+theorem equal_horizons_raw_Q4 : Q4 equalHorizonsRaw = true := by native_decide
+theorem mixed_normalization_not_Q4 : Q4 mixedNormalization = false := by native_decide
+theorem omitted_policy_record_not_Q4 : Q4 omittedPolicyRecord = false := by native_decide
+theorem foreign_policy_record_not_Q4 : Q4 foreignPolicyRecord = false := by native_decide
+theorem duplicate_policy_record_not_Q4 : Q4 duplicatePolicyRecord = false := by native_decide
+theorem policy_term_missing_not_Q4 : Q4 policyTermMissing = false := by native_decide
+theorem no_compared_policies_not_Q4 : Q4 noComparedPolicies = false := by native_decide
+theorem good_Q8 : Q8 good = true := by native_decide
+theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false := by native_decide
+theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by native_decide
 theorem insufficient_posterior_multiplicity_not_Q8 :
-    Q8 insufficientPosteriorMultiplicity = false := by decide
-theorem excluded_with_reason_Q8 : Q8 excludedWithReason = true := by decide
-theorem omitted_open_task_not_Q8 : Q8 omittedOpenTask = false := by decide
-theorem invented_eligible_task_not_Q8 : Q8 inventedEligibleTask = false := by decide
-theorem unreasoned_exclusion_not_Q8 : Q8 unreasonedExclusion = false := by decide
-theorem q6_excluded_Q8 : Q8 q6Excluded = true := by decide
-theorem exclusion_without_q6_not_Q8 : Q8 exclusionWithoutQ6 = false := by decide
-theorem exclusion_of_another_policy_not_Q8 : Q8 exclusionOfAnotherPolicy = false := by decide
-theorem good_Q9 : Q9 good = true := by decide
-theorem substituted_factorization_not_Q9 : Q9 substitutedFactorization = false := by decide
+    Q8 insufficientPosteriorMultiplicity = false := by native_decide
+theorem excluded_with_reason_Q8 : Q8 excludedWithReason = true := by native_decide
+theorem omitted_open_task_not_Q8 : Q8 omittedOpenTask = false := by native_decide
+theorem invented_eligible_task_not_Q8 : Q8 inventedEligibleTask = false := by native_decide
+theorem unreasoned_exclusion_not_Q8 : Q8 unreasonedExclusion = false := by native_decide
+theorem q6_excluded_Q8 : Q8 q6Excluded = true := by native_decide
+theorem exclusion_without_q6_not_Q8 : Q8 exclusionWithoutQ6 = false := by native_decide
+theorem exclusion_of_another_policy_not_Q8 : Q8 exclusionOfAnotherPolicy = false := by native_decide
+theorem good_Q9 : Q9 good = true := by native_decide
+theorem substituted_factorization_not_Q9 : Q9 substitutedFactorization = false := by native_decide
 
-theorem click20_not_Q1 : Q1 click20 = false := by decide
-theorem click20_not_Q2 : Q2 click20 = false := by decide
-theorem click20_not_Q4 : Q4 click20 = false := by decide
-theorem click20_not_Q5 : Q5 click20 = false := by decide
-theorem click20_not_Q6 : Q6 click20 = false := by decide
-theorem click20_not_Q7 : Q7 click20 = false := by decide
-theorem click20_not_Q8 : Q8 click20 = false := by decide
-theorem click20_not_Q9 : Q9 click20 = false := by decide
-theorem click20_not_Q10 : Q10 click20 = false := by decide
+theorem click20_not_Q1 : Q1 click20 = false := by native_decide
+theorem click20_not_Q2 : Q2 click20 = false := by native_decide
+theorem click20_not_Q4 : Q4 click20 = false := by native_decide
+theorem click20_not_Q5 : Q5 click20 = false := by native_decide
+theorem click20_not_Q6 : Q6 click20 = false := by native_decide
+theorem click20_not_Q7 : Q7 click20 = false := by native_decide
+theorem click20_not_Q8 : Q8 click20 = false := by native_decide
+theorem click20_not_Q9 : Q9 click20 = false := by native_decide
+theorem click20_not_Q10 : Q10 click20 = false := by native_decide
 theorem click20_violations :
-    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q8, .q9, .q10] := by decide
-theorem click20_not_conformant : conforms click20 = false := by decide
-theorem missingG_not_Q3 : Q3 missingG = false := by decide
-theorem good_conforms : conforms good = true := by decide
-theorem good_has_no_violations : violations good = [] := by decide
+    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q8, .q9, .q10] := by native_decide
+theorem click20_not_conformant : conforms click20 = false := by native_decide
+theorem missingG_not_Q3 : Q3 missingG = false := by native_decide
+theorem good_conforms : conforms good = true := by native_decide
+theorem good_has_no_violations : violations good = [] := by native_decide
 
 /--
 error: Tactic `decide` proved that the proposition
@@ -777,12 +849,12 @@ is false
 #guard_msgs in
 example : Q1 click20 = true := by decide
 /--
-error: Tactic `decide` proved that the proposition
+error: Tactic `native_decide` evaluated that the proposition
   Q2 click20 = true
 is false
 -/
 #guard_msgs in
-example : Q2 click20 = true := by decide
+example : Q2 click20 = true := by native_decide
 /--
 error: Tactic `decide` proved that the proposition
   Q3 missingG = true
@@ -791,12 +863,12 @@ is false
 #guard_msgs in
 example : Q3 missingG = true := by decide
 /--
-error: Tactic `decide` proved that the proposition
+error: Tactic `native_decide` evaluated that the proposition
   Q4 click20 = true
 is false
 -/
 #guard_msgs in
-example : Q4 click20 = true := by decide
+example : Q4 click20 = true := by native_decide
 /--
 error: Tactic `decide` proved that the proposition
   Q5 click20 = true
@@ -819,12 +891,12 @@ is false
 #guard_msgs in
 example : Q7 click20 = true := by decide
 /--
-error: Tactic `decide` proved that the proposition
+error: Tactic `native_decide` evaluated that the proposition
   Q8 click20 = true
 is false
 -/
 #guard_msgs in
-example : Q8 click20 = true := by decide
+example : Q8 click20 = true := by native_decide
 /--
 error: Tactic `decide` proved that the proposition
   Q9 click20 = true
