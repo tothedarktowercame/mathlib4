@@ -3,6 +3,7 @@ import Mathlib.Data.List.Defs
 import Mathlib.Tactic
 import DarkTower.WarMachine.IncrementalTaskFrontier
 import DarkTower.WarMachine.FactorizedPreferenceSemantics
+import DarkTower.WarMachine.OuterCascadePolicyObjective
 
 /-!
 # Countable requirements for one War Machine run
@@ -13,6 +14,11 @@ that today's runner exports them faithfully.
 -/
 
 namespace DarkTower.WarMachine.Requirements
+
+def OuterCascadePolicyRecomputable
+    (carrier : OuterCascadePolicyObjective.Carrier)
+    (selection : OuterCascadePolicyObjective.SelectionCertificate) : Prop :=
+  selection.Valid carrier
 
 open DarkTower.WarMachine.IncrementalTaskFrontier
 open DarkTower.WarMachine.FactorizedPreferenceSemantics
