@@ -9,6 +9,8 @@ import DarkTower.Contract.Emit
 This module separates vocabulary fixed by the written records from laws that
 remain unproved.  `CLOSED-BY-RECORD` declarations transcribe an agreed shape or
 definition; `HOLE` declarations name an implementation or proof still owed.
+
+- Level-1 self-heal routing table and record witnesses: `DarkTower.WarMachine.SelfHealRoute`.
 -/
 
 open Set
