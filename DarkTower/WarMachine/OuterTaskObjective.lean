@@ -106,12 +106,11 @@ def FrontierCertificate.Valid (registry : List ObjectiveRegistration)
   c.evaluations.map (·.entry) = c.refresh.current ∧
   allIn c.evaluations (EvaluationCertificate.Valid registry selectorAuthority objective)
 
-def objectiveLE (a b : EvaluationCertificate) : Prop :=
-  a.entry.comparisonKey < b.entry.comparisonKey ∨
-    (a.entry.comparisonKey = b.entry.comparisonKey ∧ a.entry.task ≤ b.entry.task)
+def objectiveLT (a b : EvaluationCertificate) : Prop :=
+  a.entry.comparisonKey < b.entry.comparisonKey
 
-instance (a b : EvaluationCertificate) : Decidable (objectiveLE a b) := by
-  unfold objectiveLE
+instance (a b : EvaluationCertificate) : Decidable (objectiveLT a b) := by
+  unfold objectiveLT
   infer_instance
 
 structure SelectionCertificate where
@@ -123,17 +122,20 @@ def SelectionCertificate.Valid (registry : List ObjectiveRegistration)
     (frontier : FrontierCertificate) (s : SelectionCertificate) : Prop :=
   frontier.Valid registry selectorAuthority objective ∧
   s.selected ∈ frontier.evaluations ∧
-  allIn frontier.evaluations (objectiveLE s.selected)
+  ∀ candidate ∈ frontier.evaluations,
+    candidate ≠ s.selected → objectiveLT s.selected candidate
 
-/-- A valid selection is the deterministic minimum under declared objective
-value, with stable task identity as the tie law. -/
-theorem selected_is_minimum (registry : List ObjectiveRegistration) (selectorAuthority : Id)
+/-- A valid selection is the unique strict minimum under the declared
+objective value. Distinct candidates with equal values invalidate selection. -/
+theorem selected_is_strict_minimum (registry : List ObjectiveRegistration)
+    (selectorAuthority : Id)
     (objective : Objective) (frontier : FrontierCertificate)
     (selection : SelectionCertificate)
     (h : selection.Valid registry selectorAuthority objective frontier)
-    (candidate : EvaluationCertificate) (hc : candidate ∈ frontier.evaluations) :
-    objectiveLE selection.selected candidate := by
-  exact h.2.2 candidate hc
+    (candidate : EvaluationCertificate) (hc : candidate ∈ frontier.evaluations)
+    (hne : candidate ≠ selection.selected) :
+    objectiveLT selection.selected candidate := by
+  exact h.2.2 candidate hc hne
 
 theorem selected_belongs_to_fully_refreshed_frontier
     (registry : List ObjectiveRegistration) (selectorAuthority : Id)
@@ -236,9 +238,30 @@ theorem witnessEvaluation_valid (task value : Nat) :
   simp [EvaluationCertificate.Valid, Authorized, witnessRegistration, witnessEvaluation,
     witnessInput, witnessObjective, requiredDependencies, channelDependencies]
 
-theorem tie_breaks_by_stable_task_identity :
-    objectiveLE (witnessEvaluation 1 5) (witnessEvaluation 2 5) := by
-  simp [objectiveLE, witnessEvaluation]
+def tiedWitnessRefresh : RefreshCertificate :=
+  { stableRefresh [1, 2] with
+    prior := []
+    current := [(witnessEvaluation 1 5).entry, (witnessEvaluation 2 5).entry]
+    retained := []
+    recomputed := [(witnessEvaluation 1 5).entry, (witnessEvaluation 2 5).entry]
+    delta := ⟨∅, {1, 2}, ∅⟩ }
+
+def tiedWitnessFrontier : FrontierCertificate where
+  refresh := tiedWitnessRefresh
+  evaluations := [witnessEvaluation 1 5, witnessEvaluation 2 5]
+
+def tiedWitnessSelection : SelectionCertificate :=
+  ⟨witnessEvaluation 1 5⟩
+
+/-- Stable task identity is not an admissible tie law: equal objective values
+for two distinct candidates invalidate the selection certificate. -/
+theorem tied_objective_minimum_invalid :
+    ¬ tiedWitnessSelection.Valid [witnessRegistration] 9 witnessObjective
+      tiedWitnessFrontier := by
+  intro h
+  have hlt := h.2.2 (witnessEvaluation 2 5)
+    (by simp [tiedWitnessFrontier]) (by decide)
+  simpa [objectiveLT, tiedWitnessSelection, witnessEvaluation] using hlt
 
 def substitutedWitness : EvaluationCertificate :=
   { witnessEvaluation 1 5 with objectiveIdentity := 71 }

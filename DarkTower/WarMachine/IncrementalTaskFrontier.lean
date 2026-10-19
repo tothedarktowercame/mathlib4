@@ -111,12 +111,11 @@ theorem added_task_cannot_be_omitted
   rw [hrecomputed]
   exact Finset.mem_union_right _ ht
 
-def keyLE (a b : Entry) : Prop :=
-  a.comparisonKey < b.comparisonKey ∨
-    (a.comparisonKey = b.comparisonKey ∧ a.task ≤ b.task)
+def keyLT (a b : Entry) : Prop :=
+  a.comparisonKey < b.comparisonKey
 
-instance (a b : Entry) : Decidable (keyLE a b) := by
-  unfold keyLE
+instance (a b : Entry) : Decidable (keyLT a b) := by
+  unfold keyLT
   infer_instance
 
 structure SelectionCertificate where
@@ -129,7 +128,7 @@ def SelectionCertificate.Valid (frontier : List Entry) (openTasks : Finset Id)
   s.selected ∈ frontier ∧
   taskSet frontier = openTasks ∧
   s.selected.freshnessEpoch = s.currentEpoch ∧
-  allIn frontier (keyLE s.selected)
+  ∀ candidate ∈ frontier, candidate ≠ s.selected → keyLT s.selected candidate
 
 instance (frontier : List Entry) (openTasks : Finset Id) (s : SelectionCertificate) :
     Decidable (s.Valid frontier openTasks) := by
@@ -302,7 +301,18 @@ theorem positive_refresh_valid : positiveRefresh.Valid := by
 theorem positive_selection_valid :
     positiveSelection.Valid positiveRefresh.current positiveRefresh.currentOpenTasks := by
   simp [SelectionCertificate.Valid, positiveSelection, positiveRefresh, retainedEntry,
-    recomputedEntry, addedEntry, taskSet, keyLE, allIn]
+    recomputedEntry, addedEntry, taskSet, keyLT]
+
+def tiedEntry : Entry :=
+  { recomputedEntry with comparisonKey := retainedEntry.comparisonKey }
+
+def tiedSelectionFrontier : List Entry := [retainedEntry, tiedEntry]
+
+/-- A tied objective minimum is not selectable, even when task identity would
+previously have broken the tie. -/
+theorem tied_minimum_selection_invalid :
+    ¬ positiveSelection.Valid tiedSelectionFrontier {1, 2} := by
+  native_decide
 theorem positive_cascade_valid : positiveCascade.Valid := by
   decide
 
