@@ -216,9 +216,10 @@ sha256 `fd9b8ca9b5f9a9fa46ba3a37429992d2815a84cbbe9446a341370dae4db0daf0`
 pins `:run-record`
 `data/wm-runs/tick-run-record-2026-10-19-08771834-5add-4b3e-9459-abeaab21477c.edn`
 sha256 `923239a8acbd52097cea7968de10959e32a5ff373a5ca53e837dbf771816a4a0`.
-That tick record's `[:acceptance-observation :status] :refused` establishes
-an acceptance-stage refusal (kind not recorded; `reviewRefused` carried over
-as for click 1). Its `:meta-self-heal/readiness`
+That tick record's `:acceptance-observation {:status :refused
+:reason :meta-self-heal/acceptance-review-refused :review-status :refused}`
+establishes `reviewRefused` (revision 2a: the kind is recorded; the earlier
+"carried over" remark was wrong). Its `:meta-self-heal/readiness`
 `{:status :absent :absent-terms [:acceptance-test]}` is the F2a preflight
 observation retained by the runner (`full_loop_runner.clj:1320`), not a
 `production-readiness` result; it is mapped to `readinessReady` because the
