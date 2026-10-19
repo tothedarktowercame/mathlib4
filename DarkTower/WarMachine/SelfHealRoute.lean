@@ -119,7 +119,9 @@ records only `:binding-status :absent`, `:run-record-absence`, and
 The serving API last-result fields `:diagnosis :status :available`,
 `[:acceptance :status] :refused`, `[:route] :dedicated-meta-self-heal`, and
 `:ordinary-selection-called? false` were transcribed in PACKETS finding F2c,
-commit `fba86a35b`. F7 is the pending durable-disposition repair. -/
+commit `fba86a35b`. F7 (futon3c `baa9d55fa`, landed 2026-10-19) now retains a
+refused click's disposition in its binding, so clicks from click 3 on can be
+record witnesses; click 1 itself remains historically unrecorded. -/
 def click1ObservedPath : List RouteState :=
   [ activeInjury, diagnosisPrepared, admissionRun, reviewRefused, readinessReady,
     routeRefused, terminalRecord ]
