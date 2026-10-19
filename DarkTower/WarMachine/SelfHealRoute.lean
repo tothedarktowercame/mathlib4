@@ -27,6 +27,14 @@ design of the runtime and is not transcribed here; `noFallback` says nothing
 about it. Whether that retry is within Joe's ruling is open (hole, not
 decided here).
 
+Revision 3 (claude-2, 2026-10-19, Joe's go): `route!` has two refusals
+after readiness besides missing configuration. A refused
+`coordinator/prepare` is `preparationRefused` (futon2 `df2209a33`); a
+transaction whose pins disagree with the diagnosis or acceptance observation
+is `bindingRefused`. Before `df2209a33` the first was recorded as the second
+(click `wm-click-c78d0f27`); the decided account is
+`futon2/holes/labs/wm-contract/logic-model/jit/SelfHealPrepare.lean`.
+
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
 until one is named.
@@ -70,6 +78,8 @@ inductive RouteState where
   -- route (`route!`)
   | routeEnacted
   | routeRefused            -- `:production-config-required` with route terms
+  | preparationRefused      -- `:preparation-refused`: `coordinator/prepare` returned no transaction
+  | bindingRefused          -- `:diagnosis-transaction-mismatch` / `:acceptance-transaction-mismatch`
   | enacted
   | ordinarySelection
   | terminalRecord
@@ -113,11 +123,17 @@ def transitions : List (RouteState × RouteState) :=
     -- `full_loop_runtime.clj:502-505`: ready input enters dedicated `route!`.
     (readinessReady, routeEnacted),
     (readinessReady, routeRefused),
+    -- `route!` after futon2 `df2209a33`: a refused prepare is its own refusal;
+    -- the binding checks run only against a transaction (rev 3).
+    (readinessReady, preparationRefused),
+    (readinessReady, bindingRefused),
     (routeEnacted, enacted),
     -- `phases.md`, ruling: typed refusals terminate and do not fall back.
     (readinessRefused, terminalRecord),
     (ledgerUnreadable, terminalRecord),
     (routeRefused, terminalRecord),
+    (preparationRefused, terminalRecord),
+    (bindingRefused, terminalRecord),
     (enacted, terminalRecord) ]
 
 /-- Every state of the (now finite) vocabulary; the fuel bound for `reaches`. -/
@@ -125,7 +141,8 @@ def allStates : List RouteState :=
   [ noActiveInjury, activeInjury, diagnosisPrepared, diagnosisRefused,
     acceptanceUnavailable, proposalRefused, admissionRun, admissionRefused,
     reviewAccepted, reviewRefused, readinessReady, readinessRefused, ledgerUnreadable,
-    routeEnacted, routeRefused, enacted, ordinarySelection, terminalRecord ]
+    routeEnacted, routeRefused, preparationRefused, bindingRefused, enacted,
+    ordinarySelection, terminalRecord ]
 
 /-- Boolean equality for the route-state vocabulary. -/
 def stateEq (left right : RouteState) : Bool := decide (left = right)
@@ -268,5 +285,27 @@ acceptance refused then `route!` refused, was not a table path: that table
 sent an acceptance refusal straight to `terminalRecord`. -/
 theorem click4_runtimeOrderIsTabled :
     edge proposalRefused readinessReady && edge readinessReady routeRefused = true := by decide
+
+/-- Click `wm-click-c78d0f27` (closed 2026-10-19 19:43:49Z). Its durable binding
+`futon3c/data/wm-click-run-bindings/click-run-binding-wm-click-c78d0f27-deca-4390-9b30-f36418714a54.edn`
+carries `:runtime-disposition {:status :refused
+:reason :meta-self-heal/diagnosis-transaction-mismatch :route :dedicated-meta-self-heal
+:ordinary-selection-called? false}`. The recorded reason is masked: no
+transaction existed, because production supplied 5 of the 10 work-order
+fields (`SelfHealPrepare.production_prepare_refuses_c78d0f27`), and the binding
+check compared the diagnosis with an absent work order
+(`SelfHealPrepare.click_c78d0f27_masked`). The record establishes only the
+suffix after readiness; the step is `preparationRefused`, by that account,
+not `bindingRefused` as the reason word suggests. -/
+def clickC78d0f27Suffix : List RouteState :=
+  [ readinessReady, preparationRefused, terminalRecord ]
+
+theorem clickC78d0f27_suffixConforms : conformsSuffix clickC78d0f27Suffix = true := by decide
+
+/-- A refused prepare ends the click; it never reaches enactment or ordinary
+work. -/
+theorem preparationRefused_terminates :
+    reaches preparationRefused enacted = false ∧
+      reaches preparationRefused ordinarySelection = false := by decide
 
 end DarkTower.WarMachine.SelfHealRoute
