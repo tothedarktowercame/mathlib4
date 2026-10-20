@@ -2361,4 +2361,29 @@ theorem requeuedChildren_beforeF40 (p : Bool) :
   refine ⟨by decide, by decide, ?_⟩
   cases p <;> rfl
 
+/-- **Rev 29: the re-queued child under F40, predicted before the one click.** F40a (futon2
+`acea15054`, the fixture projected at `f5c7b6d96`): `(R selected-entry)` has an arm for the
+sealed route, so `entryF40` holds on every route. The three consumers of the entry, read at
+`acea15054` by codex-1 and checked in review: `[:action :precedence]` on the live decision is a
+co-apply map, so the co-apply gate passes; `selected-target` returns the mission;
+`construct-selected-action` returns a construction. No refusal between the entry and
+`(R retain-selection!)` is known. F40b (futon2 `477a9cae6`, pin corrected at `2196fc575`):
+`(R reconcile-selection-publication)` writes the two receipts onto the decision the cell
+carries, judgment or sorry, and leaves a decision-less sorry untouched, so the stub of rev 28
+is never written and `retainedSourceF40b` is the source whichever cell exists. Prediction for
+the one re-queue click after the reload at 21:43Z: if the outer selector seals a policy
+again, the child's selection is retained as a judgment, its record's `:selection-event` is
+`:cascade-selected` with the chosen target, and the click runs on past selection into
+enactment, which no revision has read: the model predicts nothing past the loop node. If the
+child instead closes on another injury, it is re-queued (`requeues` 3 to 4), not abandoned:
+the budget-spent abandonment of rev 28 needs two more such closes. A `:no-selection` close on
+the sealed route is one finding against `entryF40`; a record whose `:decision` lacks the
+action while the trace has it is one against `retainedSourceF40b`; a refusal between the
+entry and the judgment is a consumer rev 28 did not name. -/
+theorem requeuedChild_F40 :
+    (∀ r : SelectionRoute, r.entryF40 = true) ∧
+      (∀ j : Bool, (retainedSourceF40b j).carriesAction = true) ∧
+      RetryClickOutcome.otherInjury.nextToday false false ⟨4, 3⟩ = .queued ⟨4, 4⟩ := by
+  refine ⟨fun r => by cases r <;> rfl, fun j => by cases j <;> rfl, by decide⟩
+
 end DarkTower.WarMachine.SelfHealRoute
