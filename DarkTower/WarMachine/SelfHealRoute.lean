@@ -2375,8 +2375,9 @@ the one re-queue click after the reload at 21:43Z: if the outer selector seals a
 again, the child's selection is retained as a judgment, its record's `:selection-event` is
 `:cascade-selected` with the chosen target, and the click runs on past selection into
 enactment, which no revision has read: the model predicts nothing past the loop node. If the
-child instead closes on another injury, it is re-queued (`requeues` 3 to 4), not abandoned:
-the budget-spent abandonment of rev 28 needs two more such closes. A `:no-selection` close on
+child instead closes on another injury, it is re-queued, not abandoned (this is the first of
+the three re-queues; the witness entry is rev 28's generic ⟨4, 3⟩ with retries unspent): the
+budget-spent abandonment of rev 28 needs two more such closes. A `:no-selection` close on
 the sealed route is one finding against `entryF40`; a record whose `:decision` lacks the
 action while the trace has it is one against `retainedSourceF40b`; a refusal between the
 entry and the judgment is a consumer rev 28 did not name. -/
