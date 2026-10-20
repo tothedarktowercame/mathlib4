@@ -283,9 +283,9 @@ inductive RouteTerm where
 carried are record detail for the certificate producer, not part of the
 state. -/
 inductive RouteState where
-  /-- Rev 6: the one ledger read, `diagnosis-context` (P:755). `prepare-diagnosis` (P:769)
-  and `production-readiness` (P:801) decide from it, before any injury is known.
-  Order error 3: `route!` reads the ledger a second time (P:923-925), and that read has no
+  /-- Rev 6: the one ledger read, `diagnosis-context` (P:807). `prepare-diagnosis` (P:821)
+  and `production-readiness` (P:853) decide from it, before any injury is known.
+  Order error 3: `route!` reads the ledger a second time (P lines 979-981), and that read has no
   state here. A runtime that reads twice conforms only while the two reads agree. M6a is
   to make `route!` use the context's read.
   Rev 8 note: with one read, a stale context overwrites a ledger file that changed
@@ -308,7 +308,7 @@ inductive RouteState where
   injury id. That branch has no status literal of its own. -/
   | activeInjury
   /-- Rev 6, row #5: the ledger loaded, but `ledger/active-injuries` did not return
-  `:computed` (P:780, `:diagnosis-active-set-unavailable`). A terminal refusal.
+  `:computed` (`:diagnosis-active-set-unavailable`). A terminal refusal.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): the observation
   `(P prepare-diagnosis {:status :unavailable :reason :meta-self-heal/diagnosis-active-set-unavailable})`,
   then the refusal
@@ -318,22 +318,22 @@ inductive RouteState where
   not reached, because the R arm ends the click on the same context first. -/
   | activeSetUnavailable
   /-- Rev 7: the start of a retry click. Its options carry `:meta-repair-retry`
-  (S:989-995): the child of a parent that ended `:awaiting-retry`, launched only after
+  (S lines 990-1001): the child of a parent that ended `:awaiting-retry`, launched only after
   the parent click is durably complete. It makes no ledger read of its own and no
-  diagnosis (R:473-477). It carries the acceptance observation
+  diagnosis (R lines 473-477). It carries the acceptance observation
   `:acceptance-retry-not-prepared` (#22), which is typed, not a state.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(S close-click! :meta-repair-retry)` sets the option, in the
   child `click!` it launches after the parent's release. In `run-opportunity!` the branch is
   `(R run-opportunity! retry)`, and its one site is the observation
   `(R run-opportunity! {:status :not-required :reason :meta-self-heal/acceptance-retry-not-prepared})`. -/
   | retryClick
-  /-- Rev 7: `attributable-retry-readiness` (P:896-915) returns `:ready` with the
-  attribution. The retry then runs ordinary work (R:500-502), and `route!` is not
+  /-- Rev 7: `attributable-retry-readiness` (P:952-972) returns `:ready` with the
+  attribution. The retry then runs ordinary work (R lines 511-513), and `route!` is not
   called.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P attributable-retry-readiness {:status :ready :attribution})`,
   then `(R run-opportunity! retry)` runs `run-ordinary-opportunity!`. -/
   | retryReady
-  /-- Rev 7, #57: `:meta-self-heal/retry-attribution-refused` (P:918), with `:expected`
+  /-- Rev 7, #57: `:meta-self-heal/retry-attribution-refused`, with `:expected`
   and `:supplied`.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P attributable-retry-readiness :meta-self-heal/retry-attribution-refused)`,
   returned by `(R run-opportunity! (= :refused (:status readiness)))`. -/
@@ -913,11 +913,11 @@ inductive CoordinationPhase where
 
 /-- `:held` reasons (`held!`, C:208). The port answered and the transaction waits. -/
 inductive HeldReason where
-  /-- `:author-failed` (C:268). -/
+  /-- `:author-failed` (C:321). -/
   | authorFailed
-  /-- `:review-rejected` (C:290). -/
+  /-- `:review-rejected` (C:343). -/
   | reviewRejected
-  /-- `:enact-failed` (C:313). -/
+  /-- `:enact-failed` (C:366). -/
   | enactFailed
   deriving DecidableEq, Repr
 
@@ -925,25 +925,25 @@ inductive HeldReason where
 without `:ledger`, and today `store/persist-ledger!` refuses it, so `route!` reports
 `:checkpoint-persist-failed` instead (row #66). -/
 inductive CoordinatorRefusal where
-  /-- `:coordinator/input-refused` (C:237); no ledger. -/
+  /-- `:coordinator/input-refused` (C:290); no ledger. -/
   | inputRefused
-  /-- `:coordinator/resume-state-refused` (C:257); no ledger. -/
+  /-- `:coordinator/resume-state-refused` (C:310); no ledger. -/
   | resumeStateRefused
-  /-- `:coordinator/port-receipt-refused` (C:188); carries `:phase`, no ledger. -/
+  /-- `:coordinator/port-receipt-refused` (C:193); carries `:phase`, no ledger. -/
   | portReceiptRefused
-  /-- `:coordinator/port-threw` (C:194); carries `:phase`, no ledger. -/
+  /-- `:coordinator/port-threw` (C:199); carries `:phase`, no ledger. -/
   | portThrew
-  /-- `:coordinator/author-payload-refused` (C:272); carries a ledger. -/
+  /-- `:coordinator/author-payload-refused` (C:325); carries a ledger. -/
   | authorPayloadRefused
-  /-- `:coordinator/review-patch-substitution` (C:292); carries a ledger. -/
+  /-- `:coordinator/review-patch-substitution` (C:345); carries a ledger. -/
   | reviewPatchSubstitution
-  /-- `:coordinator/enact-payload-refused` (C:318); carries a ledger. -/
+  /-- `:coordinator/enact-payload-refused` (C:371); carries a ledger. -/
   | enactPayloadRefused
-  /-- `:coordinator/retry-attribution-refused` (C:345); carries a ledger. -/
+  /-- `:coordinator/retry-attribution-refused` (C:245, C:398); carries a ledger. -/
   | retryAttributionRefused
-  /-- `:coordinator/ledger-transition-refused` (C:201); carries the ledger it refused. -/
+  /-- `:coordinator/ledger-transition-refused` (C:206); carries the ledger it refused. -/
   | ledgerTransitionRefused
-  /-- `:coordinator/malformed` (C:379, C:381); no ledger. -/
+  /-- `:coordinator/malformed` (C:430, C:432); no ledger. -/
   | malformed
   deriving DecidableEq, Repr
 
@@ -955,26 +955,25 @@ inductive PersistWrite where
 
 /-- How a transaction closed after enactment: the final `coordinate` result's `:status`. -/
 inductive ClosingStatus where
-  /-- `:discharged` (C:357, C:364): the retry succeeded.
+  /-- `:discharged`: the retry succeeded.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate :discharged)`,
   the arm `(= :succeeded (:status retry-receipt))`, after
-  `append-transition!` of `:state :discharged`. The C cites above are from before C moved;
-  at this HEAD the literal is C:415. -/
+  `append-transition!` of `:state :discharged`. At this HEAD the literal is C:415. -/
   | discharged
-  /-- `:reopened` (C:375, via `ledger/append-retry-result`): the retry did not discharge.
+  /-- `:reopened` (via `ledger/append-retry-result`): the retry did not discharge.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the `:else`
   arm of the retry receipt. The status is computed, `(get-in reopened [:entry :state])`
   (C:426 at this HEAD), and is `:reopened` when `(L append-retry-result :reopened)` takes
   its second arm. -/
   | reopened
-  /-- `:abandoned` (C:375): the attempt after this one would exceed the budget.
+  /-- `:abandoned`: the attempt after this one would exceed the budget.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the same
   computed status (C:426 at this HEAD), `:abandoned` when
   `(L append-retry-result :attempt-limit-exhausted)` takes its first arm. A second
   abandoned literal exists; it is `RetryNext.abandoned .retryBudgetSpent`, not
   this constructor: `(not C coordinate-queued-retry :retry-budget-spent)`. -/
   | abandoned
-  /-- `:awaiting-retry` (C:349): the retry port queued the retry click. The production
+  /-- `:awaiting-retry`: the retry port queued the retry click. The production
   retry port only persists and enqueues, so this is the closing status a production
   click is expected to reach. The M4a shape does not name it (finding).
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate-queued-retry :awaiting-retry)` (C:248 at
@@ -986,9 +985,9 @@ inductive ClosingStatus where
   and active.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): not a `coordinate` status. It is the retry
   click's `(T integrate :retry-inconclusive)` observation: the non-injury arm for every
-  reason except a successful task outcome (T:236), `(not T classify :successful-task-outcome)`,
+  reason except a successful task outcome (T line 236), `(not T classify :successful-task-outcome)`,
   and
-  `(T append-other-injury-retry-observation :retry-inconclusive)` (T:189). -/
+  `(T append-other-injury-retry-observation :retry-inconclusive)` (T line 189). -/
   | retryInconclusive
   deriving DecidableEq, Repr
 
@@ -1172,13 +1171,13 @@ theorem retryPaths_conform :
 /-- What `classify` (T:111-167) says of the retry click's terminal record, as `integrate`
 (T:185-275) receives it. -/
 inductive RetryClickOutcome where
-  /-- `:successful-task-outcome` (T:126-128): no failure kind, and an outcome in
+  /-- `:successful-task-outcome`: no failure kind, and an outcome in
   `successful-outcomes` (T:15). The only outcome that tests the repair and passes.
   Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T classify :successful-task-outcome)`, the `non-injury-reason` arm for a nil
   failure kind and an outcome in `successful-outcomes`; `integrate` then appends
   `(T integrate :discharged)` for the enacted entry. -/
   | successfulTaskOutcome
-  /-- `:injury` with the enacted entry's injury id: `append-retry-result` (T:244, L:299-317).
+  /-- `:injury` with the enacted entry's injury id: `append-retry-result` (L:299-317).
   The retry failed for the same cause.
   Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T integrate ledger/append-retry-result)`, the arm
   `(= :enacted (:state previous))` with `(= (:retry-click previous) (:click-id classification))`;
@@ -1186,9 +1185,9 @@ inductive RetryClickOutcome where
   keyword literal. -/
   | sameInjury
   /-- `:injury` with a different injury id, and the record is ingested. Cited at futon2
-  `b5dd9269c` (M10b-4). `integrate` binds `other-injury-retry?` (T:247-251). If the
-  different id is unknown, it opens a new injury (T:253-266). If it is active, it appends
-  a `:repeated-active-injury` observation (T:288-297). Either way it then appends the
+  `b5dd9269c` (M10b-4). `integrate` binds `other-injury-retry?` (T lines 247-251). If the
+  different id is unknown, it opens a new injury (T lines 253-266). If it is active, it appends
+  a `:repeated-active-injury` observation (T lines 288-297). Either way it then appends the
   attributed `:retry-inconclusive` observation for the enacted entry through
   `append-other-injury-retry-observation` (T:185-196). The enacted entry's state is
   untouched. Added in rev 8 (finding) and widened by the rev 8 review. Rev 11 split off
@@ -1201,7 +1200,7 @@ inductive RetryClickOutcome where
   | otherInjury
   /-- Rev 11: `:injury` with a different injury id, and the record is refused, not
   ingested (at `b5dd9269c`). This happens when the different id is itself `:enacted` and
-  this click is not its retry click (`:injury/retry-click-mismatch`, T:268-286), or when
+  this click is not its retry click (`:injury/retry-click-mismatch`), or when
   the different id is terminal (`:injury/terminal-history-requires-new-transaction`,
   T:299-300). `integrate` returns `{:status :refused}` with no ledger, so no observation is
   written and the pin stays un-ingested. It is a separate constructor, not an
@@ -1238,7 +1237,7 @@ inductive RetryClickOutcome where
   Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T explicit-non-injury-kinds :diagnostic-only)`, read in
   `classify`'s `non-injury-reason`. -/
   | diagnosticOnly
-  /-- `:absent-terminal-failure` (T:129-130): no failure kind and no outcome.
+  /-- `:absent-terminal-failure`: no failure kind and no outcome.
   Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T classify :absent-terminal-failure)`, the `non-injury-reason` arm for a nil
   failure kind and a nil outcome. -/
   | absentTerminalFailure
@@ -1344,7 +1343,7 @@ inductive AbandonReason where
   Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(L append-requeue :retry-budget-spent)` (L:397), the
   arm where the entry's requeue count has reached the ledger's retry limit (L:394), with
   the attempt carried over unchanged. `(C coordinate-queued-retry :retry-budget-spent)`
-  (C:261) returns it, after reading the appended entry's state (C:260), before any
+  (C:261) returns it, after reading the appended entry's state (C line 260), before any
   retry port call. `validate-ledger` accepts it only when the requeue count equals the
   retry limit (L:174-176). -/
   | retryBudgetSpent
@@ -1360,20 +1359,20 @@ structure RetryEntry where
 /-- What the injury does after a retry click closes. -/
 inductive RetryNext where
   /-- A fresh retry click is queued for the same enacted entry.
-  Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(C coordinate-queued-retry ledger/append-requeue)`
-  (C:258), on the arm where `ledger/pending-requeue` (C:247, L:331) finds the attributed
+  Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(C coordinate-queued-retry ledger/append-requeue)`,
+  on the arm where `ledger/pending-requeue` (C line 247, L:331) finds the attributed
   observation, and then `(L append-requeue :enacted)` (L:402), a new enacted entry with a
   new retry click. The entry's fields: `attempt` is the ledger's attempt, copied from the
   previous entry (L:392); `requeues` is the ledger's requeue count, read at L:390 and
-  written incremented at L:404. On the `recur` (C:267), C reads that count back (C:232)
-  and, being positive, calls the retry port with the requeue ordinal (C:233-238). The
+  written incremented at L:404. On the `recur` (C line 267), C reads that count back (C line 232)
+  and, being positive, calls the retry port with the requeue ordinal (C lines 233-238). The
   queued click then ends the same way as `awaitingNothingQueued`: the new entry has no
   observation yet, so `coordinate` returns the awaiting-retry status. In the code the
   two constructors differ by the appended entry and the port call, not by the status. -/
   | queued (entry : RetryEntry)
   /-- The transaction ends `:awaiting-retry`, and nothing is queued.
   Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(C coordinate-queued-retry :awaiting-retry)`
-  (C:248), the arm where `ledger/pending-requeue` (C:247) returns nil. -/
+  (C:248), the arm where `ledger/pending-requeue` (C line 247) returns nil. -/
   | awaitingNothingQueued
   /-- Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): no producing site of its own; see
   `ClosingStatus.discharged`, which `next` passes through. -/
