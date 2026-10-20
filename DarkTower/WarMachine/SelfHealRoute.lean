@@ -176,19 +176,24 @@ discharges nor reopens. Today's discharge-on-abstention is the violation witness
   `:queued` receipt and ends `:awaiting-retry`, and no child is queued again. The table
   would need a re-queue edge, from `retryInconclusive` (and from a missing record) back
   to a queued retry. It is not added here.
-* Rev 9: the re-queue edge (`RetryClickOutcome.next`) is not realisable inside
-  `coordinate` alone. Receipts are append-only and `invoke-once` replays a recorded one
-  (C:177-179). The retry click id is named from the repair id and attempt
-  (futon3c `meta_self_heal_adapters.clj` A:432), so a re-queue at the same attempt
-  would reuse the id. The runner keys the child by `meta-retry/<retry-click>` (S:991);
-  a reused key with the same payload returns the earlier click's status and runs
-  nothing (S:1119-1121), and with a different payload refuses with 409 (S:1122-1124).
-  Either way no fresh retry runs. The ledger's `:enacted` rule requires an `:approved`
-  predecessor (L:136-143), so a second enacted-stage entry is invalid, and
-  `:abandoned` validates only with `attempt = :attempt-limit` and reason
-  `:attempt-limit-exhausted` (L:158-161), so `retryBudgetSpent` cannot be recorded
-  today. M10b therefore touches the ledger, the adapter's id, the coordinator and the
-  runner. The table is the law; it is not weakened to fit.
+* Rev 9 said (2026-10-20, M11L), with the commit that answered each sentence
+  (rev 10, read at futon2 `493388b7b` and futon3c `7efc13bd8`):
+  - "a re-queue at the same attempt would reuse the id": answered by futon3c
+    `e4f58cfc4`. `retry-click-id` mints by ordinal (A:414-426); ordinal 0 keeps
+    `wm-retry-...`, and positive ordinals give the disjoint `wm-requeue-<n>-...`.
+  - "either way no fresh retry runs": answered by futon3c `f2e5a9fa6` and `7efc13bd8`.
+    The child is keyed `meta-retry/<retry-click>` (S:997), and a re-queue carries a fresh
+    click, so the runner's reused-key branches are not reached by it.
+  - "a second enacted-stage entry is invalid": answered by futon2 `6308c946a`.
+    `append-requeue` (L:367-404) appends a new enacted-stage entry with
+    `:requeues (inc requeues)`, and the validator steps `:requeues` by one (L:151-152).
+  - "`retryBudgetSpent` cannot be recorded today": answered by `6308c946a`. L:394-398
+    appends `:abandoned :retry-budget-spent`, and L:174-175 admits it at
+    `requeues = retry-limit`.
+  - "M10b therefore touches the ledger, the adapter's id, the coordinator and the
+    runner": it did (`6308c946a`, `e4f58cfc4`, `aa3ec313b`, `f2e5a9fa6`, `7efc13bd8`,
+    `493388b7b`).
+  The table is the law; it is not weakened to fit.
 * Rev 9: `successfulTaskOutcome` is the only discharge, but `:successful-task-outcome`
   (T:126-128) means the ordinary task succeeded, not that it exercised the injured work.
   Whether a successful retry of different work tests the repair is not decided here.
@@ -203,6 +208,36 @@ law (`closingToday_eq_closing`, futon2 `11fe9094a`). The law adds the re-queue e
 budget kept separate from `:attempt-limit`. `requeue_todayAwaitsForever` is the reason for
 M10b. The rev 8 code is kept as `closingBefore83f72ba1e`. T and L are cited at futon2
 `11fe9094a`, C at the same commit (`meta_repair_coordinator.clj`).
+
+Revision 10 (claude-2, 2026-10-20, packet M12L from claude-5): the re-queue edge is met
+for the outcomes the code observes, and not for two. C, L, T and P are cited at futon2
+`493388b7b`; A and S at futon3c `7efc13bd8`. The rev 9 functions are kept as
+`nextBeforeAa3ec313b` and `resumeBeforeAa3ec313b`. `nextToday_eq_next_ofObserved` says
+the code meets `next` on every outcome except `otherInjury` and `recordUnreadable`.
+`requeue_todayMissesUnobserved` is the witness for those two.
+
+**Holes (rev 10, not decided).**
+* The re-queue detector is `pending-requeue` (L:331-344): it needs a `:retry-inconclusive`
+  observation that names the current retry click. Only the no-work branch of `integrate`
+  writes one (T:222-227). A retry that fails with a different cause (T:233-277: open,
+  repeat observation, or refusal) writes none, and neither does a retry that left no
+  record. In both cases the coordinator ends `:awaiting-retry` with nothing queued
+  (C:247-251), every later click repeats that, and the retry budget is never spent. This
+  is rev 9's await-forever for those two outcomes. The law is not weakened; the code is
+  the open side (`requeue_todayMissesUnobserved`).
+* No live click has re-queued yet. No `:retry-requeue-<n>` receipt exists, and on
+  2026-10-20 there is no `transaction.edn` under `data/wm-meta-injuries`. Rev 10 states
+  by reading that the code meets the law; the record witness is missing (observed, not
+  recorded, as for L1's click 1).
+* `retriesSpent` is a Bool in the law. Today it is `requeues >= retry-limit`, with the
+  limit kept on the ledger (L:92, L:394). Whether the counter belongs in the model is not
+  decided here.
+* `RetryEntry` carries no click id. The across-click edge (rev 7: a queued retry is the
+  next click's `retryClick` start) relies on the re-queued child being keyed
+  `meta-retry/<new click>` (S:997), with the new id minted at ordinal `requeues + 1`
+  (C:252-257). No field is added for this without a case.
+* The rev 9 question whether a successful retry of different work tests the repair still
+  stands.
 
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
@@ -1123,11 +1158,12 @@ def RetryClickOutcome.next (budgetSpent retriesSpent : Bool) (o : RetryClickOutc
       else .queued { e with requeues := e.requeues + 1 }
   | .awaitingRetry => .awaitingNothingQueued
 
-/-- Today, after an inconclusive close: the entry stays `:enacted`. The next click resumes
-`transaction.edn` (P:705-710). `coordinate` reaches the retry phase, `invoke-once` finds
+/-- The next step before futon2 `aa3ec313b` (M10b-3b), at `11fe9094a`. Kept as the record
+of the disagreement that M10b removed. After an inconclusive close the entry stayed
+`:enacted`. The next click resumed `transaction.edn` (P:705-710). `coordinate` reaches the retry phase, `invoke-once` finds
 the recorded `:queued` receipt and returns it without calling the port (C:177-179). The
 `:queued` branch then ends `:awaiting-retry` (C:348-352), and no child is queued. -/
-def RetryClickOutcome.nextToday (budgetSpent : Bool) (o : RetryClickOutcome)
+def RetryClickOutcome.nextBeforeAa3ec313b (budgetSpent : Bool) (o : RetryClickOutcome)
     (_e : RetryEntry) : RetryNext :=
   match o.closingToday budgetSpent with
   | .discharged => .discharged
@@ -1135,8 +1171,10 @@ def RetryClickOutcome.nextToday (budgetSpent : Bool) (o : RetryClickOutcome)
   | .abandoned => .abandoned .attemptLimitExhausted
   | _ => .awaitingNothingQueued
 
-/-- Today's resume of an `:awaiting-retry` transaction: the same replay, the same end. -/
-def resumeToday : RetryNext → RetryNext
+/-- The resume of an `:awaiting-retry` transaction before `aa3ec313b`: the same replay,
+the same end. Renamed with `nextBeforeAa3ec313b`; rev 10 defines no `resumeToday`, since
+today's resume is the call to `coordinate-queued-retry` that `nextToday` describes. -/
+def resumeBeforeAa3ec313b : RetryNext → RetryNext
   | .awaitingNothingQueued => .awaitingNothingQueued
   | n => n
 
@@ -1158,16 +1196,90 @@ theorem requeue_consumesNoAttempt (b r : Bool) (o : RetryClickOutcome) (e e' : R
   cases r <;> cases hc : o.closing b <;> simp [RetryClickOutcome.next, hc] at h
   all_goals (subst h; rfl)
 
-/-- **The reason M10b exists.** Under the abstention regime every retry is inconclusive.
-Today the next step is then `awaitingNothingQueued`, and resuming it gives the same step
-again, while the law queues a fresh retry. -/
+/-- **The reason M10b existed.** Under the abstention regime every retry was inconclusive.
+Before `aa3ec313b` the next step was then `awaitingNothingQueued`, and resuming it gave the
+same step again, while the law queues a fresh retry. -/
 theorem requeue_todayAwaitsForever (b : Bool) (e : RetryEntry) :
-    RetryClickOutcome.ordinarySelectionAbstention.nextToday b e = .awaitingNothingQueued ∧
-      resumeToday .awaitingNothingQueued = .awaitingNothingQueued ∧
+    RetryClickOutcome.ordinarySelectionAbstention.nextBeforeAa3ec313b b e =
+        .awaitingNothingQueued ∧
+      resumeBeforeAa3ec313b .awaitingNothingQueued = .awaitingNothingQueued ∧
       RetryClickOutcome.ordinarySelectionAbstention.next b false e =
         .queued { e with requeues := e.requeues + 1 } ∧
       RetryNext.awaitingNothingQueued ≠ .queued { e with requeues := e.requeues + 1 } := by
+  cases b <;> simp [RetryClickOutcome.nextBeforeAa3ec313b, RetryClickOutcome.next,
+    RetryClickOutcome.closingToday, RetryClickOutcome.closing, resumeBeforeAa3ec313b]
+
+/-! ## Rev 10: the re-queue edge, as the code now has it -/
+
+/-- Whether the retry click's outcome leaves a `:retry-inconclusive` observation that
+names the enacted entry's click. That observation is what `pending-requeue` (L:331-344)
+detects. Only the no-work branch of `integrate` writes it (T:222-227). A different-cause
+injury takes the injury branch (T:233-277) and writes none, and a missing record reaches
+`integrate` not at all. -/
+def RetryClickOutcome.observedInconclusive : RetryClickOutcome → Bool
+  | .otherInjury => false
+  | .recordUnreadable => false
+  | _ => true
+
+/-- The next step today (futon2 `aa3ec313b`, wired by futon3c `7efc13bd8` and futon2
+`493388b7b`). The `:queued` branch of the retry phase enters `coordinate-queued-retry`
+(C:401-402, C:227-267). When `pending-requeue` finds the observation (C:247), it mints
+`(retry-click-id repair-id attempt (inc n))` (C:252-257, A:414-426) and calls
+`append-requeue` (C:258). With `requeues >= retry-limit` (L:394) that appends `:abandoned
+:retry-budget-spent` (L:397-398), and the coordinator returns with no port call (C:261).
+Otherwise it appends a new enacted-stage entry with the same `:attempt` and
+`:requeues (inc requeues)` (L:399-404), and the recur queues the new click (C:267). With
+no observation it ends `:awaiting-retry` and queues nothing (C:247-251). The other
+closings are as in `next`. -/
+def RetryClickOutcome.nextToday (budgetSpent retriesSpent : Bool) (o : RetryClickOutcome)
+    (e : RetryEntry) : RetryNext :=
+  match o.closingToday budgetSpent with
+  | .discharged => .discharged
+  | .reopened => .reopened
+  | .abandoned => .abandoned .attemptLimitExhausted
+  | .retryInconclusive =>
+      if !o.observedInconclusive then .awaitingNothingQueued
+      else if retriesSpent then .abandoned .retryBudgetSpent
+      else .queued { e with requeues := e.requeues + 1 }
+  | .awaitingRetry => .awaitingNothingQueued
+
+/-- The code meets `next` on every outcome that leaves the observation. -/
+theorem nextToday_eq_next_ofObserved (b r : Bool) (o : RetryClickOutcome) (e : RetryEntry)
+    (h : o.observedInconclusive = true) : o.nextToday b r e = o.next b r e := by
+  cases b <;> cases r <;> cases o <;>
+    simp_all [RetryClickOutcome.nextToday, RetryClickOutcome.next,
+      RetryClickOutcome.closingToday, RetryClickOutcome.closing,
+      RetryClickOutcome.observedInconclusive]
+
+/-- The code and the law differ on exactly `otherInjury` and `recordUnreadable`. -/
+theorem nextToday_disagreement (b r : Bool) (o : RetryClickOutcome) (e : RetryEntry) :
+    o.nextToday b r e ≠ o.next b r e ↔ o ∈ [.otherInjury, .recordUnreadable] := by
+  cases b <;> cases r <;> cases o <;>
+    simp [RetryClickOutcome.nextToday, RetryClickOutcome.next,
+      RetryClickOutcome.closingToday, RetryClickOutcome.closing,
+      RetryClickOutcome.observedInconclusive]
+
+/-- **Witness: the re-queue misses two inconclusive outcomes.** A retry that left no
+record, or failed with a different cause, is inconclusive under the law, which queues a
+fresh retry. Today no `:retry-inconclusive` observation is written for it (T:222-227,
+T:233-277), so `pending-requeue` is nil (L:331-344) and the coordinator ends
+`:awaiting-retry` with nothing queued (C:247-251). -/
+theorem requeue_todayMissesUnobserved (b : Bool) (e : RetryEntry) :
+    RetryClickOutcome.recordUnreadable.nextToday b false e = .awaitingNothingQueued ∧
+      RetryClickOutcome.otherInjury.nextToday b false e = .awaitingNothingQueued ∧
+      RetryClickOutcome.recordUnreadable.next b false e =
+        .queued { e with requeues := e.requeues + 1 } ∧
+      RetryClickOutcome.otherInjury.next b false e =
+        .queued { e with requeues := e.requeues + 1 } := by
   cases b <;> simp [RetryClickOutcome.nextToday, RetryClickOutcome.next,
-    RetryClickOutcome.closingToday, RetryClickOutcome.closing, resumeToday]
+    RetryClickOutcome.closingToday, RetryClickOutcome.closing,
+    RetryClickOutcome.observedInconclusive]
+
+/-- The no-work outcome the abstention regime produces is met: an abstained retry
+re-queues today. -/
+theorem requeue_abstentionMet (b r : Bool) (e : RetryEntry) :
+    RetryClickOutcome.ordinarySelectionAbstention.nextToday b r e =
+      RetryClickOutcome.ordinarySelectionAbstention.next b r e :=
+  nextToday_eq_next_ofObserved b r _ e rfl
 
 end DarkTower.WarMachine.SelfHealRoute
