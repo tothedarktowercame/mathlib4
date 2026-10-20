@@ -107,6 +107,15 @@ clicks all had a computed active set.
 * Which conformance M6a chooses, given the elision above: end the click before the
   acceptance observation, or extend the table with
   `(activeSetUnavailable, acceptanceUnavailable)` and a `route!`-level refusal.
+* `activeSetUnavailable` cannot be reached from a ledger file (claude-5's finding, M7L).
+  futon2 `05e71feb9`: `meta_injury_store.clj` L36-49 `load-ledger` refuses
+  `:store/tampered-ledger` unless `validate-ledger` is `:valid`, and
+  `meta_injury_ledger.clj` L284-288 `active-injuries` runs the same `validate-ledger`
+  on the same in-memory value (`diagnosis-context`, P:761-764). `validate-ledger`
+  (L231) reads no clock and does no IO, so the second check cannot disagree with the
+  first. A throw inside `transitions` would escape as an exception rather than give
+  `:unavailable`. The state is reachable only by construction, like
+  `:acceptance-review-malformed` (refusal-totality #52).
 
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
@@ -522,7 +531,9 @@ def click8df4e8d2 : BoundaryObservation :=
 `:acceptance-review-refused`, `:review-status :refused`,
 `:review-reason :acceptance-test-did-not-fail-for-injury-reason`. The bounded run is
 `:ran :failed` exit 1. The PACKETS prose says the test did not compile, and the run
-recorded `failed`, not `errored`. File
+recorded `failed`, not `errored`. The run is read from this file at
+`[:result :runtime-disposition :acceptance-observation :request :result]`: the review
+request that `admit-acceptance!` carries on its refusal. File
 `click-wm-click-1a6de51f-47bd-418e-a008-8a1ce6600bee.edn`, sha256
 `8dc5edeaf73bafa72adeb084209e5ad51c65af9554b98f456191986126c8d442`. -/
 def click1a6de51f : BoundaryObservation :=
@@ -533,7 +544,8 @@ def click1a6de51f : BoundaryObservation :=
 `wm-click-78180753-7302-44a2-9710-932e571d2f58` (20:41-20:57Z). Each has the same
 observation: `:acceptance-review-refused`, `:review-status :failed`,
 `:review-reason :meta-self-heal/producer-invoke-failed` (429), and bounded run
-`:ran :failed` exit 1. sha256 respectively
+`:ran :failed` exit 1, read from each file at
+`[:result :runtime-disposition :acceptance-observation :request :result]`. sha256 respectively
 `2cf7272a570702b00c9d263085bd8091b19627d4f5056dcfe994ba01e1300bb4`,
 `49d46875fd942b7eaed36d850d19d4a2bcd783ba9dc74f640dd0c004b027b515`,
 `3674d5a972c6a08eb1f447c78172010c1f91338ad559f5dcfc7ad1ab6731825a`. -/
