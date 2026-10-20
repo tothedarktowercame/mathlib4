@@ -2182,4 +2182,60 @@ theorem click12_predicted :
           click12LedgerWrites ++ click11RetryLedgerWrites = d755c886PredictedLedgerPath := by
   decide
 
+/-! ## Rev 27: click 12 and its retry child read against their predictions -/
+
+/-- **Click 12 as it ran**, `wm-click-6696240e` (2026-10-20 19:42:5x-19:43:21Z): the
+transaction resumed at attempt 4, no retirement, no seat called (the evidence store has no
+zai-2 or zai-3 record in the window), `(A enact!)` under F37 and F39 sealed, the ledger took
+ordinal 16 `:enacted` with `:integration-commit` at main's HEAD, the retry port queued
+`wm-retry-repair/…-4`, and the click closed `:awaiting-retry`. Every element of
+`click12_predicted` held. -/
+def click12ObservedPath : List RouteState := click12PredictedPath
+
+def click12ObservedObservation : CoordinationObservation := click12PredictedObservation
+
+theorem click12_matched :
+    click12ObservedPath = click12PredictedPath ∧
+      click12ObservedObservation = click12PredictedObservation := by decide
+
+/-- **The retry child as it ran**, `wm-retry-repair/…-4` (19:43:21-19:47:05Z, run
+`2026-10-20-881a8839`): `(P attributable-retry-readiness)` admitted it and ordinary work ran,
+but the War Machine selected nothing (`:failure {:kind :no-selection :stage :selection-world}`,
+166 missions, 449 excursions and 155 tickets available to choose). `(T classify)` has no
+non-injury kind for `:no-selection` (only `:abstained` is in `explicit-non-injury-kinds`),
+so the record is an injury with a different cause: `(T integrate "nil? previous")` opened
+injury `821c15d0` (ordinal 17, `:open`, attempt 1) and
+`(T append-other-injury-retry-observation ledger/append-observation)` left the
+`:retry-inconclusive` observation for `d755c886`'s enacted entry (ordinal 18). That is
+`RetryClickOutcome.otherInjury`, the third of the model's outcomes, not the two
+`click11Retry_predictedClose` named. The repair was not tested: the ordinary click never
+reached the loop node it fixes. -/
+def click11RetryObservedOutcome : RetryClickOutcome := .otherInjury
+
+/-- The retry child's finding, and what the law says the next self-heal click does with it:
+the route path conformed; the outcome was neither of the two named; and a different-cause
+retry re-queues one child for attempt 4 (`(C coordinate-queued-retry ledger/append-requeue)`)
+without discharging. -/
+theorem click11Retry_finding :
+    conformsPath click11RetryPredictedPath = true ∧
+      click11RetryObservedOutcome ≠ .successfulTaskOutcome ∧
+      click11RetryObservedOutcome ≠ .ordinarySelectionAbstention ∧
+      click11RetryObservedOutcome.nextToday false false ⟨4, 0⟩ = .queued ⟨4, 1⟩ := by
+  decide
+
+/-- The ledger as the two clicks and the child left it, from ordinal 11, for `d755c886` alone:
+the predicted path short of its discharge. -/
+def d755c886LedgerAfterClick12 : List LedgerState :=
+  [.abandoned, .reopened, .claimed, .authored, .reviewed, .enacted]
+
+theorem d755c886_afterClick12 :
+    ledgerConforms d755c886LedgerAfterClick12 = true ∧
+      d755c886LedgerAfterClick12 ++ [.discharged] = d755c886PredictedLedgerPath := by decide
+
+/-- The requeue budget: with `:retry-limit 3`, three more inconclusive children abandon the
+injury `retryBudgetSpent` while the new injury `821c15d0` waits for its own attempt. -/
+theorem d755c886_requeueBudget :
+    RetryClickOutcome.otherInjury.nextToday false true ⟨4, 3⟩ = .abandoned .retryBudgetSpent := by
+  decide
+
 end DarkTower.WarMachine.SelfHealRoute
