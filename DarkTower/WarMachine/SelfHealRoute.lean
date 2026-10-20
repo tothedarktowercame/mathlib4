@@ -35,6 +35,26 @@ is `bindingRefused`. Before `df2209a33` the first was recorded as the second
 (click `wm-click-c78d0f27`); the decided account is
 `futon2/holes/labs/wm-contract/logic-model/jit/SelfHealPrepare.lean`.
 
+Revision 4 (claude-2, 2026-10-20, packet M2a from claude-5): a defect
+vocabulary for the author/reviewer boundary, the class-1 rows of
+`futon2/holes/labs/wm-contract/logic-model/refusal-totality-2026-10-19.md`
+(futon2 `315425cbd`). Five clicks on 2026-10-19 all stopped at
+`routeRefused [:acceptance-test]`, and the route alone cannot tell them apart. Their
+causes sit in the acceptance observation, so they are given as `ProposalDefect` and
+`AdmissionDefect` *beside* the path. `RouteState` is unchanged (22 states): this is
+the rev 2 principle, terms beside the state rather than in it. `BoundaryDefect.state`
+places each defect by the state docstrings. A transport failure at review has no
+reviewer answer, so it is `admissionRefused`, not `reviewRefused`.
+`wm_route_check.py` at futon2 `8c48e2a16` sends it to `reviewRefused`
+(`checkerPlacement_isViolation`). Line citations P = futon2 `9b97bb99c`
+`src/futon2/aif/meta_self_heal_production.clj` (unchanged since `e5c5208c9`),
+A = futon3c `840251d7c` `src/futon3c/wm/meta_self_heal_adapters.clj`.
+
+**Hole (not decided).** Should a bounded run whose test does not compile refuse at
+admission, before a reviewer invoke, as F16 does for passes-before-repair? Today the
+runner records it as `:failed` exit 1 (A:373, click `1a6de51f`), so nothing before
+review can tell it from a test that fails for the injury.
+
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
 until one is named.
@@ -43,7 +63,15 @@ until one is named.
 namespace DarkTower.WarMachine.SelfHealRoute
 
 /-- Absence terms a readiness refusal can carry
-(`meta_self_heal_production.clj`, `production-readiness`, futon2 `e4e53617a`). -/
+(`meta_self_heal_production.clj`, `production-readiness`, futon2 `e4e53617a`).
+
+Rev 4 note (claude-5 confirmed, futon3c `840251d7c` `runner_service.clj:368`):
+`meta-self-heal-preflight!` returns its `configured` map, so a production click's
+options carry `:meta-self-heal/readiness-route :ordinary` into the worker. The
+runtime readiness therefore waives `diagnosisPort`, `acceptanceRunPort`,
+`acceptanceProposalPort` and `acceptanceReviewPort`, and in production a
+`readinessRefused` carries only `transactionPath` or `repairPorts`. `route!` still
+checks the run port, as `RouteTerm.acceptanceRunPort`. -/
 inductive ReadinessTerm where
   | transactionPath | repairPorts | acceptanceRunPort | diagnosisPort
   | acceptanceProposalPort | acceptanceReviewPort
@@ -307,5 +335,178 @@ work. -/
 theorem preparationRefused_terminates :
     reaches preparationRefused enacted = false ∧
       reaches preparationRefused ordinarySelection = false := by decide
+
+/-! ## Rev 4: the author/reviewer boundary's defects -/
+
+/-- Why `produce-acceptance!` did not return `:proposed`. Every constructor is placed
+at `proposalRefused`. -/
+inductive ProposalDefect where
+  /-- Transport or seat failure on the author's proposal invoke:
+  `:producer-invoke-failed` (A:233) or `:producer-seat-unavailable` (A:227),
+  carried as `:acceptance-reason` of `:acceptance-unavailable` (P:460).
+  Unwitnessed at proposal on disk. -/
+  | transport
+  /-- The author answered, but not with one EDN map: `:producer-response-malformed`
+  (A:237) as `:acceptance-reason` of `:acceptance-unavailable` (P:460).
+  Witness: click `8df4e8d2`. -/
+  | unreadableAnswer
+  /-- The author's own typed refusal: `:acceptance-status :refused` under
+  `:acceptance-unavailable` (P:460). Witness: click `fca1c921`. -/
+  | authorRefused
+  /-- `:acceptance-prose-or-malformed` (P:470): the answer is not a concrete test.
+  Unwitnessed. -/
+  | prose
+  /-- `:acceptance-proposal-source-mismatch` (P:467): the test source's namespace or
+  path disagree. Unwitnessed. -/
+  | sourceMismatch
+  /-- `:acceptance-request-function-unresolvable` (P:526): a function the diagnosis
+  names does not resolve in the serving JVM. Unwitnessed. -/
+  | unresolvableFunction
+  deriving DecidableEq, Repr
+
+/-- Why `admit-acceptance!` did not return `:accepted`. -/
+inductive AdmissionDefect where
+  /-- `:acceptance-run-refused` (P:618): the bounded run did not return a valid `:ran`
+  result (it covers A:359, A:390-398 and the un-namespaced A:393). Unwitnessed. -/
+  | runRefused
+  /-- `:acceptance-test-passes-before-repair` (P:622, F16): refused before any reviewer
+  invoke. Unwitnessed on a click (off-click replay 5 only). -/
+  | passesBeforeRepair
+  /-- `:acceptance-review-refused` (P:628) with `:review-status :failed`: the review
+  invoke failed in transport (`:producer-invoke-failed`, A:233), so there is no reviewer
+  answer. Witnesses: clicks `36b47627`, `fdc08aea`, `78180753` (429). -/
+  | noReviewerAnswer
+  /-- `:acceptance-review-refused` (P:628) with `:review-status :refused`: the reviewer
+  answered on the merits. Witnesses: click `1a6de51f`
+  (`:acceptance-test-did-not-fail-for-injury-reason`) and click `6cdf2a7c` (reason not
+  recorded, under the pre-run contract). -/
+  | reviewerRefused
+  deriving DecidableEq, Repr
+
+/-- A defect at the author/reviewer boundary. -/
+inductive BoundaryDefect where
+  | proposal (defect : ProposalDefect)
+  | admission (defect : AdmissionDefect)
+  deriving DecidableEq, Repr
+
+/-- The placement law: the state each defect belongs to, by the `RouteState`
+docstrings. `admissionRefused` is "refused before or without a reviewer answer", so
+only a reviewer's own refusal is `reviewRefused`. -/
+def BoundaryDefect.state : BoundaryDefect → RouteState
+  | .proposal _ => proposalRefused
+  | .admission .runRefused => admissionRefused
+  | .admission .passesBeforeRepair => admissionRefused
+  | .admission .noReviewerAnswer => admissionRefused
+  | .admission .reviewerRefused => reviewRefused
+
+/-- What a bounded run recorded (A:372-373). A test that does not compile is recorded
+`failed` (see the module hole). -/
+inductive RunOutcome where
+  | passed | failed | errored
+  deriving DecidableEq, Repr
+
+/-- An acceptance observation as a route check reports it: the state, the defect
+beside it, and the bounded run's outcome when there was one.
+
+Why a record plus a placement function, rather than a defect-indexed state: the
+function is the single placement law, and the record is what a click's observation
+gives a checker. A checker's verdict is then a record, and `placed` says whether it
+obeys the law. Putting the defect inside the state would grow `RouteState`, and every
+edge would have to be repeated per defect. -/
+structure BoundaryObservation where
+  state : RouteState
+  defect : Option BoundaryDefect
+  run : Option RunOutcome
+  deriving DecidableEq, Repr
+
+/-- An observation obeys the placement law. -/
+def BoundaryObservation.placed (o : BoundaryObservation) : Bool :=
+  match o.defect with
+  | none => true
+  | some d => stateEq d.state o.state
+
+/-! Frozen witnesses. Each is read from the click's acceptance record under
+`futon3c/data/wm-click-acceptances/`. That is run data and not in git, so each is cited
+by path and sha256 (read 2026-10-20) rather than at a commit. -/
+
+/-- Click `wm-click-8df4e8d2-e6ad-4768-9af1-c79a78e67680` (Zai cast, 21:14Z):
+`:acceptance-unavailable`, `:acceptance-reason :meta-self-heal/producer-response-malformed`.
+No bounded run. File `click-wm-click-8df4e8d2-e6ad-4768-9af1-c79a78e67680.edn`, sha256
+`5d5508fcb26fee687a822a6cef850cc883078b9e716ab1268c46caf79394f2f7`. -/
+def click8df4e8d2 : BoundaryObservation :=
+  { state := proposalRefused, defect := some (.proposal .unreadableAnswer), run := none }
+
+/-- Click `wm-click-1a6de51f-47bd-418e-a008-8a1ce6600bee` (21:03Z):
+`:acceptance-review-refused`, `:review-status :refused`,
+`:review-reason :acceptance-test-did-not-fail-for-injury-reason`. The bounded run is
+`:ran :failed` exit 1. The PACKETS prose says the test did not compile, and the run
+recorded `failed`, not `errored`. File
+`click-wm-click-1a6de51f-47bd-418e-a008-8a1ce6600bee.edn`, sha256
+`8dc5edeaf73bafa72adeb084209e5ad51c65af9554b98f456191986126c8d442`. -/
+def click1a6de51f : BoundaryObservation :=
+  { state := reviewRefused, defect := some (.admission .reviewerRefused), run := some .failed }
+
+/-- Clicks `wm-click-36b47627-6e08-4402-a09f-1ef09caa8bdc`,
+`wm-click-fdc08aea-f82e-4d85-9ca7-5cbce88bad85` and
+`wm-click-78180753-7302-44a2-9710-932e571d2f58` (20:41-20:57Z). Each has the same
+observation: `:acceptance-review-refused`, `:review-status :failed`,
+`:review-reason :meta-self-heal/producer-invoke-failed` (429), and bounded run
+`:ran :failed` exit 1. sha256 respectively
+`2cf7272a570702b00c9d263085bd8091b19627d4f5056dcfe994ba01e1300bb4`,
+`49d46875fd942b7eaed36d850d19d4a2bcd783ba9dc74f640dd0c004b027b515`,
+`3674d5a972c6a08eb1f447c78172010c1f91338ad559f5dcfc7ad1ab6731825a`. -/
+def click36b47627 : BoundaryObservation :=
+  { state := admissionRefused, defect := some (.admission .noReviewerAnswer), run := some .failed }
+def clickFdc08aea : BoundaryObservation := click36b47627
+def click78180753 : BoundaryObservation := click36b47627
+
+/-- Click `wm-click-fca1c921-75a7-4ebf-8713-0c464ffbfb0f`: `:acceptance-unavailable`,
+`:acceptance-status :refused`, `:acceptance-reason nil` (the author's own refusal,
+F10/F11 era). sha256
+`a2cfe991a6f528181bb87a39d2c48a224446a617aa82efe2fe7d89ad90559b2a`. -/
+def clickFca1c921 : BoundaryObservation :=
+  { state := proposalRefused, defect := some (.proposal .authorRefused), run := none }
+
+/-- Click `wm-click-6cdf2a7c-fc11-4988-840c-2a03184b1772`: `:acceptance-review-refused`,
+`:review-status :refused`, reason not recorded. Its acceptance record holds no
+bounded-run result (the runner arrived after this click). sha256
+`d5b2e9dc2f64dbf09789ea3925f963d4522679e181e7c175c4478a24ec3a9d32`. -/
+def click6cdf2a7c : BoundaryObservation :=
+  { state := reviewRefused, defect := some (.admission .reviewerRefused), run := none }
+
+/-- Every witness obeys the placement law. -/
+theorem witnesses_placed :
+    click8df4e8d2.placed = true ∧ click1a6de51f.placed = true ∧
+      click36b47627.placed = true ∧ clickFdc08aea.placed = true ∧
+      click78180753.placed = true ∧ clickFca1c921.placed = true ∧
+      click6cdf2a7c.placed = true := by decide
+
+/-- The 2026-10-19 Zai click, the uncompilable-test click and the 429 clicks are three
+distinct (state, defect) pairs. The route alone gave all of them the same
+`routeRefused`. -/
+theorem todaysClicks_distinct :
+    (click8df4e8d2.state, click8df4e8d2.defect) ≠ (click1a6de51f.state, click1a6de51f.defect) ∧
+      (click8df4e8d2.state, click8df4e8d2.defect) ≠ (click36b47627.state, click36b47627.defect) ∧
+      (click1a6de51f.state, click1a6de51f.defect) ≠ (click36b47627.state, click36b47627.defect) := by
+  decide
+
+/-- What `wm_route_check.py` (futon2 `8c48e2a16`, rule `reviewRefused` on a non-nil
+`review-status`) reports for clicks `36b47627`, `fdc08aea`, `78180753`. -/
+def checkerPlacement_36b47627 : BoundaryObservation :=
+  { click36b47627 with state := reviewRefused }
+
+/-- The checker's placement of the 429 clicks violates the law: their defect belongs at
+`admissionRefused`, and `reviewRefused` is not that state. -/
+theorem checkerPlacement_isViolation :
+    (BoundaryDefect.admission .noReviewerAnswer).state = admissionRefused ∧
+      admissionRefused ≠ reviewRefused ∧
+      checkerPlacement_36b47627.placed = false := by decide
+
+/-- Every witness state continues to readiness, as the runtime does after any
+acceptance observation. -/
+theorem witnesses_reachReadiness :
+    edge click8df4e8d2.state readinessReady = true ∧
+      edge click1a6de51f.state readinessReady = true ∧
+      edge click36b47627.state readinessReady = true := by decide
 
 end DarkTower.WarMachine.SelfHealRoute
