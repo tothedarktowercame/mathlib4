@@ -301,7 +301,7 @@ inductive RouteState where
   `(P prepare-diagnosis {:status :not-required :reason :meta-self-heal/no-durable-injury-ledger})`
   (#3); an empty active set,
   `(P prepare-diagnosis {:status :not-required :reason :meta-self-heal/no-active-injury})`
-  (#6). `route!` then returns nil (`(P route! (when (seq (:injuries active))))`). -/
+  (#6). `route!` then returns nil (`(P route! "(when (seq (:injuries active))")`). -/
   | noActiveInjury
   /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P prepare-diagnosis :else)`: the ledger loaded, the
   active set computed and is non-empty, and `produce-diagnosis!` is called on its first
@@ -336,7 +336,7 @@ inductive RouteState where
   /-- Rev 7, #57: `:meta-self-heal/retry-attribution-refused`, with `:expected`
   and `:supplied`.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P attributable-retry-readiness :meta-self-heal/retry-attribution-refused)`,
-  returned by `(R run-opportunity! (= :refused (:status readiness)))`. -/
+  returned by `(R run-opportunity! "(= :refused (:status readiness))")`. -/
   | retryRefused
   -- diagnosis stage (`prepare-diagnosis`)
   /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P produce-diagnosis! {:status :available})`, after
@@ -382,9 +382,9 @@ inductive RouteState where
   | proposalRefused
   /-- `admit-acceptance!` entered.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no producing site. `(P prepare-acceptance)` calls
-  `admit-acceptance!` when `produce-acceptance!` returns
-  `(P produce-acceptance-from-request! {:status :proposed})`; the entry has no status
-  literal. -/
+  `admit-acceptance!` when `produce-acceptance!` returns `{:status :proposed}` from
+  `(P produce-acceptance-from-request!)`; the entry has no status literal. Rev 22: the
+  `:proposed` map is a guard, cited by function only, so it makes no edge. -/
   | admissionRun
   /-- Admission refused before or without a reviewer answer.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): before the reviewer is called: from
@@ -428,9 +428,9 @@ inductive RouteState where
   | ledgerUnreadable
   -- route (`route!`)
   /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no producing site. `(P route!)` enters the checkpoint loop
-  when `(P diagnosis-transaction-binding {:status :valid})` and
-  `(P acceptance-transaction-binding {:status :valid})` both hold; the entry has no status
-  literal. -/
+  when `(P diagnosis-transaction-binding)` and `(P acceptance-transaction-binding)` both
+  return `{:status :valid}`; the entry has no status literal. Rev 22: the two `:valid` maps
+  are guards, cited by function only, so they make no edge. -/
   | routeEnacted
   /-- `:production-config-required` with route terms.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P route! :meta-self-heal/production-config-required)`,
@@ -444,13 +444,14 @@ inductive RouteState where
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P diagnosis-transaction-binding :meta-self-heal/diagnosis-transaction-mismatch)`,
   `(P acceptance-transaction-binding :meta-self-heal/acceptance-transaction-mismatch)`,
   and also `(P acceptance-transaction-binding :meta-self-heal/acceptance-transaction-unadmitted)`,
-  which the trailing comment did not name; `(P route! (if-not (= :valid (:status binding))))`
+  which the trailing comment did not name; `(P route! "(if-not (= :valid (:status binding))")`
   returns them. -/
   | bindingRefused
   /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P route! settle)` on the result of the `coordinate` call after
   the checkpoint loop, when that result is a closing: the status literals are those of
-  `ClosingStatus`, `(C coordinate-queued-retry {:status :awaiting-retry})`,
-  `(C coordinate {:status :discharged})` and the computed `(C coordinate {:status (get-in reopened [:entry :state])})`. -/
+  `ClosingStatus`: `:awaiting-retry` from `(C coordinate-queued-retry)`, `:discharged` from
+  `(C coordinate)` and the computed `(C coordinate "{:status (get-in reopened [:entry :state])")`.
+  Rev 22: the maps are cited by function only; they realise `ClosingStatus`, not this state. -/
   | enacted
   /-- Rev 5: a port answered and the transaction waits (`:held`).
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(C held! {:status :held})`, returned through `(P route! settle)`.
