@@ -491,7 +491,11 @@ theorem todaysClicks_distinct :
   decide
 
 /-- What `wm_route_check.py` (futon2 `8c48e2a16`, rule `reviewRefused` on a non-nil
-`review-status`) reports for clicks `36b47627`, `fdc08aea`, `78180753`. -/
+`review-status`) would report for the observation of clicks `36b47627`, `fdc08aea`,
+`78180753`. Their bindings carry no run record (the runner returned none), so the checker
+read only the runtime disposition and their sidecars show the `routeRefused` suffix with a
+position-0 gap: the rule was wrong but never fired on them. Corrected at futon2 `43d649752`
+(M2b, claude-5): `:review-status :failed` projects to `admissionRefused`. -/
 def checkerPlacement_36b47627 : BoundaryObservation :=
   { click36b47627 with state := reviewRefused }
 
