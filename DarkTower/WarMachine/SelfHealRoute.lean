@@ -216,12 +216,20 @@ for the outcomes the code observes, and not for two. C, L, T and P are cited at 
 the code meets `next` on every outcome except `otherInjury` and `recordUnreadable`.
 `requeue_todayMissesUnobserved` is the witness for those two.
 
+Revision 11 (claude-2, 2026-10-20, from claude-5 after M10b-4, futon2 `d0a890f22`,
+review `b5dd9269c`): the ingested different-cause arms now write the observation
+(T:185-196, T:246-301 at `b5dd9269c`), so `otherInjury` is met
+(`requeue_otherInjuryMet`). The refused arms are split off as `otherInjuryRefused`, which
+joins `recordUnreadable` in the disagreement.
+
 **Holes (rev 10, not decided).**
 * The re-queue detector is `pending-requeue` (L:331-344): it needs a `:retry-inconclusive`
   observation that names the current retry click. Only the no-work branch of `integrate`
-  writes one (T:222-227). A retry that fails with a different cause (T:233-277: open,
-  repeat observation, or refusal) writes none, and neither does a retry that left no
-  record. In both cases the coordinator ends `:awaiting-retry` with nothing queued
+  writes one (T:222-227). At rev 10, a retry that failed with a different cause
+  (T:233-277: open, repeat observation, or refusal) wrote none, and neither did a retry
+  that left no record. Since rev 11 (`b5dd9269c`) the open and repeat arms write it
+  (T:253-266, T:288-297); the refusal arms (T:268-286, T:299-300) and a missing record
+  still do not. In those cases the coordinator ends `:awaiting-retry` with nothing queued
   (C:247-251), every later click repeats that, and the retry budget is never spent. This
   is rev 9's await-forever for those two outcomes. The law is not weakened; the code is
   the open side (`requeue_todayMissesUnobserved`).
@@ -1015,12 +1023,25 @@ inductive RetryClickOutcome where
   /-- `:injury` with the enacted entry's injury id: `append-retry-result` (T:244, L:299-317).
   The retry failed for the same cause. -/
   | sameInjury
-  /-- `:injury` with a different injury id. `integrate` looks that id up on its own
-  (T:227): unknown, it opens a new injury (T:229-239); active, it appends a repeat
-  observation (T:261-266); terminal, it refuses (T:268-270). In every case the enacted
-  entry is untouched. This constructor is not in the packet; it is added here (finding).
-  Rev 8 review (claude-5) widened the docstring from the unknown case alone. -/
+  /-- `:injury` with a different injury id, and the record is ingested. Cited at futon2
+  `b5dd9269c` (M10b-4). `integrate` binds `other-injury-retry?` (T:247-251). If the
+  different id is unknown, it opens a new injury (T:253-266). If it is active, it appends
+  a `:repeated-active-injury` observation (T:288-297). Either way it then appends the
+  attributed `:retry-inconclusive` observation for the enacted entry through
+  `append-other-injury-retry-observation` (T:185-196). The enacted entry's state is
+  untouched. Added in rev 8 (finding) and widened by the rev 8 review. Rev 11 split off
+  the refused arms as `otherInjuryRefused`. -/
   | otherInjury
+  /-- Rev 11: `:injury` with a different injury id, and the record is refused, not
+  ingested (at `b5dd9269c`). This happens when the different id is itself `:enacted` and
+  this click is not its retry click (`:injury/retry-click-mismatch`, T:268-286), or when
+  the different id is terminal (`:injury/terminal-history-requires-new-transaction`,
+  T:299-300). `integrate` returns `{:status :refused}` with no ledger, so no observation is
+  written and the pin stays un-ingested. It is a separate constructor, not an
+  unobserved `otherInjury`, because the coordinator receives a refusal rather than an
+  ingested record without an observation. Under the law it is still inconclusive for the
+  enacted injury. -/
+  | otherInjuryRefused
   /-- `:ordinary-selection-abstention` (T:82): an abstention. -/
   | ordinarySelectionAbstention
   /-- `:evaluated-no-action` (T:81, T:66-70): scored, and no action chosen. -/
@@ -1059,6 +1080,7 @@ def RetryClickOutcome.closingBefore83f72ba1e (budgetSpent : Bool) :
     RetryClickOutcome → ClosingStatus
   | .sameInjury => if budgetSpent then .abandoned else .reopened
   | .otherInjury => .retryInconclusive
+  | .otherInjuryRefused => .retryInconclusive
   | .recordUnreadable => .retryInconclusive
   | _ => .discharged
 
@@ -1102,6 +1124,7 @@ def RetryClickOutcome.closingToday (budgetSpent : Bool) : RetryClickOutcome → 
   | .successfulTaskOutcome => .discharged
   | .sameInjury => if budgetSpent then .abandoned else .reopened
   | .otherInjury => .retryInconclusive
+  | .otherInjuryRefused => .retryInconclusive
   | .recordUnreadable => .retryInconclusive
   | .ordinarySelectionAbstention => .retryInconclusive
   | .evaluatedNoAction => .retryInconclusive
@@ -1213,11 +1236,13 @@ theorem requeue_todayAwaitsForever (b : Bool) (e : RetryEntry) :
 
 /-- Whether the retry click's outcome leaves a `:retry-inconclusive` observation that
 names the enacted entry's click. That observation is what `pending-requeue` (L:331-344)
-detects. Only the no-work branch of `integrate` writes it (T:222-227). A different-cause
-injury takes the injury branch (T:233-277) and writes none, and a missing record reaches
-`integrate` not at all. -/
+detects. The no-work branch of `integrate` writes it (T:222-227 at `493388b7b`). Since
+rev 11 (futon2 `b5dd9269c`, M10b-4), the ingested different-cause arms also write it,
+through `append-other-injury-retry-observation` (T:185-196, T:253-266, T:288-297). The
+refused arms (T:268-286, T:299-300) write none, and a missing record reaches `integrate`
+not at all. -/
 def RetryClickOutcome.observedInconclusive : RetryClickOutcome → Bool
-  | .otherInjury => false
+  | .otherInjuryRefused => false
   | .recordUnreadable => false
   | _ => true
 
@@ -1251,25 +1276,27 @@ theorem nextToday_eq_next_ofObserved (b r : Bool) (o : RetryClickOutcome) (e : R
       RetryClickOutcome.closingToday, RetryClickOutcome.closing,
       RetryClickOutcome.observedInconclusive]
 
-/-- The code and the law differ on exactly `otherInjury` and `recordUnreadable`. -/
+/-- The code and the law differ on exactly `otherInjuryRefused` and `recordUnreadable`
+(rev 11; at rev 10 the list held `otherInjury` instead of `otherInjuryRefused`). -/
 theorem nextToday_disagreement (b r : Bool) (o : RetryClickOutcome) (e : RetryEntry) :
-    o.nextToday b r e ≠ o.next b r e ↔ o ∈ [.otherInjury, .recordUnreadable] := by
+    o.nextToday b r e ≠ o.next b r e ↔ o ∈ [.otherInjuryRefused, .recordUnreadable] := by
   cases b <;> cases r <;> cases o <;>
     simp [RetryClickOutcome.nextToday, RetryClickOutcome.next,
       RetryClickOutcome.closingToday, RetryClickOutcome.closing,
       RetryClickOutcome.observedInconclusive]
 
 /-- **Witness: the re-queue misses two inconclusive outcomes.** A retry that left no
-record, or failed with a different cause, is inconclusive under the law, which queues a
-fresh retry. Today no `:retry-inconclusive` observation is written for it (T:222-227,
-T:233-277), so `pending-requeue` is nil (L:331-344) and the coordinator ends
-`:awaiting-retry` with nothing queued (C:247-251). -/
+record, or whose different-cause record was refused (T:268-286, T:299-300 at
+`b5dd9269c`), is inconclusive under the law, which queues a fresh retry. Today no
+`:retry-inconclusive` observation is written for it, so `pending-requeue` is nil
+(L:331-344) and the coordinator ends `:awaiting-retry` with nothing queued (C:247-251).
+At rev 10 the second outcome was every `otherInjury`; M10b-4 closed the ingested arms. -/
 theorem requeue_todayMissesUnobserved (b : Bool) (e : RetryEntry) :
     RetryClickOutcome.recordUnreadable.nextToday b false e = .awaitingNothingQueued ∧
-      RetryClickOutcome.otherInjury.nextToday b false e = .awaitingNothingQueued ∧
+      RetryClickOutcome.otherInjuryRefused.nextToday b false e = .awaitingNothingQueued ∧
       RetryClickOutcome.recordUnreadable.next b false e =
         .queued { e with requeues := e.requeues + 1 } ∧
-      RetryClickOutcome.otherInjury.next b false e =
+      RetryClickOutcome.otherInjuryRefused.next b false e =
         .queued { e with requeues := e.requeues + 1 } := by
   cases b <;> simp [RetryClickOutcome.nextToday, RetryClickOutcome.next,
     RetryClickOutcome.closingToday, RetryClickOutcome.closing,
@@ -1280,6 +1307,11 @@ re-queues today. -/
 theorem requeue_abstentionMet (b r : Bool) (e : RetryEntry) :
     RetryClickOutcome.ordinarySelectionAbstention.nextToday b r e =
       RetryClickOutcome.ordinarySelectionAbstention.next b r e :=
+  nextToday_eq_next_ofObserved b r _ e rfl
+
+/-- Rev 11 (M10b-4): an ingested different-cause retry re-queues today. -/
+theorem requeue_otherInjuryMet (b r : Bool) (e : RetryEntry) :
+    RetryClickOutcome.otherInjury.nextToday b r e = RetryClickOutcome.otherInjury.next b r e :=
   nextToday_eq_next_ofObserved b r _ e rfl
 
 end DarkTower.WarMachine.SelfHealRoute
