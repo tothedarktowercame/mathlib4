@@ -1848,4 +1848,252 @@ inductive CarriedBindings where
   | retryClick
   deriving DecidableEq, Repr
 
+/-! ## Rev 25: the ledger's table, and the next click predicted before it runs
+
+Rev 25 (claude-5, 2026-10-20 19:30Z) is written before the click it describes, on Joe's word
+that evening: the model predicts the click, and the click either matches or yields one
+finding. Nothing in this section is transcribed from a click record. It is read from the code
+at futon2 `38419663c` and futon3c `1fdd28a3f`, and from the three packets dispatched at
+19:25Z: F35 (`(L allowed-predecessors :abandoned)`, `(L state-defects :reopen/correction-evidence)`,
+`(L effective-attempt-limit)`), F36 (the reviewer answer contract in `(A agency-invoke!)`),
+and F37 (`(A enact! :patch-not-on-canonical-branch)`, `(A enact! :reload-receipts)`). The five
+anchors in that list that do not resolve against the code at those shas are the prediction's
+claim on the code; they resolve when the packets land. Three of the theorems below say why
+those packets exist: each is a place where the never-exercised stretch from review to enact
+would have refused a correct repair, found by reading the code against the path this section
+predicts. -/
+
+/-- The injury ledger's states, `(L states)`. `:open` is `opened` here because `open` is a
+Lean keyword. -/
+inductive LedgerState where
+  | opened | claimed | authored | reviewed | enacted | discharged | reopened | abandoned
+  deriving DecidableEq, Repr
+
+/-- `(L allowed-predecessors)` as F35 leaves it, written as (predecessor, state) pairs. The
+one pair F35 adds is `(abandoned, reopened)`: a reopen whose predecessor is `:abandoned` is a
+corrected reopen, admitted only with `:reason :port-refusal-corrected`, the sha of the port
+fix as `:correction-commit`, and the refused receipts' pins as `:corrected-port-receipt-pins`
+(`(L state-defects :reopen/correction-evidence)`). -/
+def ledgerTransitions : List (LedgerState × LedgerState) :=
+  [ (.opened, .claimed), (.reopened, .claimed),
+    (.claimed, .authored),
+    (.authored, .reviewed),
+    (.reviewed, .enacted), (.enacted, .enacted),
+    (.enacted, .discharged),
+    (.enacted, .reopened), (.claimed, .reopened),
+    (.abandoned, .reopened),
+    (.enacted, .abandoned), (.claimed, .abandoned) ]
+
+/-- The same table before F35, at futon2 `38419663c`. -/
+def ledgerTransitionsBeforeF35 : List (LedgerState × LedgerState) :=
+  ledgerTransitions.filter fun p =>
+    !(decide (p = (LedgerState.abandoned, LedgerState.reopened)))
+
+/-- Adjacent pairs of a ledger path are edges of the given table. -/
+def ledgerConformsIn (table : List (LedgerState × LedgerState)) : List LedgerState → Bool
+  | [] => true
+  | [_] => true
+  | a :: b :: rest =>
+      table.any (fun p => decide (p = (a, b))) && ledgerConformsIn table (b :: rest)
+
+/-- Conformance to the table as F35 leaves it. -/
+def ledgerConforms : List LedgerState → Bool := ledgerConformsIn ledgerTransitions
+
+/-- Before F35 nothing follows `:abandoned`: `(L terminal-states)` by state, and no row of
+`(L allowed-predecessors)` names it. That is why injury `d755c886`, abandoned on two port
+refusals of a correct answer, could not be picked up again. -/
+theorem abandoned_terminalBeforeF35 :
+    ledgerTransitionsBeforeF35.all (fun p => !(decide (p.1 = LedgerState.abandoned))) = true := by
+  decide
+
+/-- The one entry F35 writes by hand to the live ledger, after the fix is reviewed. -/
+def f35LedgerWrite : List LedgerState := [.reopened]
+
+/-- What the predicted self-heal click writes: the claim at attempt 4, then one entry per
+port phase (`(C coordinate)`: `:authored`, `:reviewed`, `:enacted`). -/
+def click11LedgerWrites : List LedgerState := [.claimed, .authored, .reviewed, .enacted]
+
+/-- What the retry child writes when the ordinary click it runs closes successfully:
+`(T integrate :discharged)`. -/
+def click11RetryLedgerWrites : List LedgerState := [.discharged]
+
+/-- Injury `d755c886`'s ledger path from its ordinal 11 (`:abandoned`, attempt 3) to
+discharge, and who writes each part. -/
+def d755c886PredictedLedgerPath : List LedgerState :=
+  [.abandoned] ++ f35LedgerWrite ++ click11LedgerWrites ++ click11RetryLedgerWrites
+
+theorem d755c886_ledgerPathConforms :
+    ledgerConforms d755c886PredictedLedgerPath = true ∧
+      d755c886PredictedLedgerPath =
+        [.abandoned, .reopened, .claimed, .authored, .reviewed, .enacted, .discharged] := by
+  decide
+
+/-- Without F35 the same path is not a ledger path: its first step is the missing edge. -/
+theorem d755c886_ledgerPathNeedsF35 :
+    ledgerConformsIn ledgerTransitionsBeforeF35 d755c886PredictedLedgerPath = false ∧
+      ledgerConformsIn ledgerTransitionsBeforeF35 d755c886PredictedLedgerPath.tail = true := by
+  decide
+
+/-- F35: the attempt budget after corrected reopens, `(L effective-attempt-limit)`: the
+ledger's `:attempt-limit` plus the number of refused receipts each corrected reopen names.
+`(L append-retry-result :attempt-limit-exhausted)` and `(L state-defects :abandonment/not-exhausted)`
+read this value, so a later author failure at attempt 4 reopens at 5 and one at 5 abandons at
+5, and `:attempt/changed-outside-reopen` is never provoked by an abandonment written below the
+attempt it follows (the shape the unmodified `append-retry-result` would have produced). -/
+def effectiveAttemptLimit (attemptLimit : Nat) (correctedReceipts : List Nat) : Nat :=
+  attemptLimit + correctedReceipts.sum
+
+/-- Injury `d755c886`: limit 3, one correction naming the two refused receipts (ordinals 9 and
+11 of the live ledger), so attempts 4 and 5 remain. The predicted click uses attempt 4. -/
+theorem d755c886_attemptBudget :
+    effectiveAttemptLimit 3 [2] = 5 ∧ effectiveAttemptLimit 3 [] = 3 := by decide
+
+/-- **The predicted self-heal click**, `(S click!)` on injury `d755c886` after F35, F36 and
+F37 are reviewed and reloaded. From the ledger read: the active set is the corrected
+`:reopened` at attempt 4; diagnosis and acceptance are supplied from the carried attempt-3
+work order (`(P carried-bindings-observation :carried-transaction)`, F32), so admission
+accepts without a seat; readiness is ready; `route!` retires the held attempt-3 transaction
+at resume time (`(P retire-stale-transaction!)`; data on the result, not a state) and
+prepares attempt 4; the bindings are valid; `coordinate` claims, authors on zai-2 (whose
+answer the F33 port now reads), reviews on zai-3 under the F36 contract, enacts through
+`(A enact!)` under F37 with the repair an ancestor of futon2 main's HEAD, and the retry port
+only queues (`(C coordinate-queued-retry :awaiting-retry)`), so the click closes
+`:awaiting-retry` and ends. No continuation pass: the author succeeds at the first attempt
+of the click. -/
+def click11PredictedPath : List RouteState :=
+  [ ledgerRead, activeInjury, diagnosisPrepared, admissionRun, reviewAccepted,
+    readinessReady, routeEnacted, enacted, terminalRecord ]
+
+/-- The same path with its attempt, for the rev 24 bound. -/
+def click11PredictedAttemptPath : AttemptPath :=
+  click11PredictedPath.map fun s => (s, 4)
+
+/-- The predicted coordination result: closed `:awaiting-retry`, phase `:final` (the
+coordinator's awaiting-retry map carries no `:phase`, so `(P route! settle)` keeps the
+loop's), no continuation. -/
+def click11PredictedObservation : CoordinationObservation :=
+  { state := enacted, phase := .final, outcome := .closed .awaitingRetry }
+
+theorem click11_predictedConforms :
+    conformsPath click11PredictedPath = true ∧
+      click11PredictedObservation.placed = true ∧
+      click11PredictedObservation.continuationPlaced = true ∧
+      click11PredictedAttemptPath.retiredAttempts = [] := by
+  decide
+
+/-- **The predicted retry child**, launched by `(S close-click! :meta-repair-retry)` after the
+parent's release, not charged to the ordinary click budget (its options drop
+`:ordinary-click/issue!`). `(P attributable-retry-readiness)` admits it from the enacted
+entry; it runs ordinary work; its terminal record is ingested by
+`(T classify :successful-task-outcome)` and `(T integrate :discharged)` appends the discharge. -/
+def click11RetryPredictedPath : List RouteState :=
+  [ retryClick, retryReady, ordinarySelection, terminalRecord ]
+
+theorem click11Retry_predictedConforms : conformsPath click11RetryPredictedPath = true := by
+  decide
+
+/-- The retry child's predicted close: a successful task outcome discharges the injury at
+attempt 4 with no re-queue; the named alternative is an ordinary abstention, which re-queues
+one child (requeue 1 of 3) and discharges nothing. -/
+theorem click11Retry_predictedClose :
+    RetryClickOutcome.successfulTaskOutcome.nextToday false false ⟨4, 0⟩ = .discharged ∧
+      RetryClickOutcome.ordinarySelectionAbstention.nextToday false false ⟨4, 0⟩ =
+        .queued ⟨4, 1⟩ := by
+  decide
+
+/-- The close outcomes an ordinary click can record without a failure kind
+(`outcome-kinds` in futon2 `full_loop_cohort.clj`, the non-failure members). -/
+inductive OrdinaryClose where
+  | groundedChange | groundedProgress | alreadySatisfied | groundedNoChange | artifactOnly
+  | abstained | noSelection
+  deriving DecidableEq, Repr
+
+/-- Which of them `(T classify :successful-task-outcome)` counts as success:
+`(T successful-outcomes)` is `#{:success :closed :grounded-change :cohort-complete}`, and
+of the ordinary closes only `:grounded-change` is in it. -/
+def OrdinaryClose.successfulForT : OrdinaryClose → Bool
+  | .groundedChange => true
+  | _ => false
+
+/-- **Predicted hazard, not fixed before the click.** A retry child that closes
+`:grounded-progress`, `:already-satisfied`, `:grounded-no-change` or `:artifact-only` with no
+failure kind is not a successful task outcome for `(T classify)`; with a nil failure kind and
+a present outcome it takes the injury branch with a nil cause key, so the retry is ingested as
+a different injury (`RetryClickOutcome.otherInjury`), the enacted entry gets a
+`:retry-inconclusive` observation, and a child is re-queued. If the click ends there, that is
+the finding, and the repair is to `(T successful-outcomes)`. -/
+theorem retryClose_onlyGroundedChangeDischarges (o : OrdinaryClose) :
+    o.successfulForT = true ↔ o = .groundedChange := by
+  cases o <;> decide
+
+/-- What `(L state-defects :review/evidence)` and `(C coordinate :coordinator/review-patch-substitution)`
+read of a review answer: `:status :succeeded`, the payload's `:patch-sha` equal to the author's,
+and a sha-shaped `:reviewer-sha`. -/
+structure ReviewAnswer where
+  succeeded : Bool
+  patchShaMatchesAuthor : Bool
+  reviewerShaIsSha : Bool
+  deriving DecidableEq, Repr
+
+/-- A review answer reaches enactment only through all three. -/
+def ReviewAnswer.reachesEnact (a : ReviewAnswer) : Bool :=
+  a.succeeded && a.patchShaMatchesAuthor && a.reviewerShaIsSha
+
+/-- **Why F36 exists.** Before it, the review prompt in `(A agency-invoke!)` stated no answer
+shape (only the author phase had a contract, F25), so nothing told the seat to return
+`:patch-sha` and `:reviewer-sha`; an answer missing either is refused at the ledger or by the
+coordinator, never at the port. F36 puts the three requirements in the prompt. -/
+theorem reviewAnswer_needsAllThree (a : ReviewAnswer) :
+    a.reachesEnact = true ↔ a = { succeeded := true, patchShaMatchesAuthor := true,
+                                  reviewerShaIsSha := true } := by
+  cases a with
+  | mk s p r => cases s <;> cases p <;> cases r <;> decide
+
+/-- What `(L state-defects :enactment/evidence)` reads of an `:enacted` entry: which of
+`:reload-receipt` (a single pin) and `:integration-commit` (a sha) it carries. -/
+structure EnactEvidence where
+  reloadReceipt : Bool
+  integrationCommit : Bool
+  deriving DecidableEq, Repr
+
+/-- The ledger admits exactly one of the two. -/
+def EnactEvidence.admitted (e : EnactEvidence) : Bool :=
+  e.reloadReceipt != e.integrationCommit
+
+/-- `(A enact!)` before F37 answers with both keys, and `(C coordinate)` copies both onto the
+entry, so a valid ledger refuses the enactment (`:coordinator/ledger-transition-refused`). -/
+def enactPayloadBeforeF37 : EnactEvidence := { reloadReceipt := true, integrationCommit := true }
+
+/-- After F37 the reload records travel on the sealed port receipt as `:reload-receipts` and
+the entry carries the integration commit alone. -/
+def enactPayloadF37 : EnactEvidence := { reloadReceipt := false, integrationCommit := true }
+
+/-- **Why F37 exists (1).** -/
+theorem enactEvidence_beforeF37Refused :
+    enactPayloadBeforeF37.admitted = false ∧ enactPayloadF37.admitted = true := by decide
+
+/-- Where the reviewed patch sits relative to the canonical branch's HEAD. -/
+structure PatchPlacement where
+  onBranch : Bool
+  commitsAfter : Nat
+  deriving DecidableEq, Repr
+
+/-- `(A enact!)` before F37: the patch must be HEAD itself. -/
+def PatchPlacement.integratedBeforeF37 (p : PatchPlacement) : Bool :=
+  p.onBranch && p.commitsAfter == 0
+
+/-- `(A enact!)` under F37: the patch must be an ancestor of HEAD
+(`git merge-base --is-ancestor`), else `:patch-not-on-canonical-branch`. -/
+def PatchPlacement.integratedF37 (p : PatchPlacement) : Bool := p.onBranch
+
+/-- **Why F37 exists (2).** The repair for `d755c886` is futon2 main `b463d85cc`, and main
+has taken four unrelated commits since (and takes more before any click); before F37 the
+enactment of a correctly integrated repair was refused as `:patch-not-canonical-head`. A
+patch off the branch is still refused. -/
+theorem d755c886_repairIntegration :
+    ({ onBranch := true, commitsAfter := 4 } : PatchPlacement).integratedBeforeF37 = false ∧
+      ({ onBranch := true, commitsAfter := 4 } : PatchPlacement).integratedF37 = true ∧
+      ({ onBranch := false, commitsAfter := 0 } : PatchPlacement).integratedF37 = false := by
+  decide
+
 end DarkTower.WarMachine.SelfHealRoute
