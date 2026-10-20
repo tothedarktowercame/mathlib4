@@ -2543,7 +2543,8 @@ inductive InconclusiveCause where
 `(L state-defects :requeue/evidence)` refuses a requeue that does not. -/
 def spendsBudgetToday : InconclusiveCause → Bool := fun _ => true
 
-/-- The law, F43 (not yet dispatched; after F41 and F42): a child that died on another open
+/-- The law, F43 (landed on futon2 main at `488931416`, codex-1, 2026-10-20 23:39Z; loaded into
+the serving JVM 23:52Z; see rev 35): a child that died on another open
 injury is evidence about that injury, not about this repair, so it re-queues without
 spending the budget. The budget then bounds only children that ran and tested nothing, and
 `retryBudgetSpent` becomes a verdict on the patch, which no correction can reopen, as
@@ -2658,15 +2659,21 @@ inductive AnswerShape where
   | bareObject
   | oneFencedObject
   | proseThenBareObject
+  /-- A bare object followed by a second object (rev 35: found in the F44a review). -/
+  | objectThenObject
   | other
   deriving DecidableEq, Repr
 
-/-- Today the bare object and the one fence decode; prose before an unfenced object does not
-(`json/parse-string` fails on the prose, and there is no fence to find). -/
+/-- Before F44a the bare object and the one fence decode; prose before an unfenced object does
+not (`json/parse-string` fails on the prose, and there is no fence to find). Rev 35 correction:
+an object followed by a second object also decoded, to the first, since cheshire's
+`parse-string` stops at the end of the first value and ignores what follows; rev 34 had filed
+that shape under `other`. -/
 def decodesToday : AnswerShape → Bool
   | .bareObject => true
   | .oneFencedObject => true
   | .proseThenBareObject => false
+  | .objectThenObject => true
   | .other => false
 
 /-- What the handler does with the two answers (`full_loop_runtime.clj` 233-240): the author's
@@ -2722,14 +2729,23 @@ theorem clicks13_14_authorRefused (r : AnswerShape) :
 theorem resumeKind_blind :
     ResumeStep.authorRefused.kindToday = ResumeStep.reviewerRefused.kindToday := by decide
 
-/-- F44a (`handoff_contract.clj` `response-json-object`): prose around exactly one unfenced
-top-level object decodes, as prose around one fence already does; two objects, or an object
-with braces in the prose, still refuse as nil. The author prompt (`full_loop_runtime.clj` 149)
+/-- F44a (`handoff_contract.clj` `response-json-object`; landed on futon2 main at `75881d3c9`,
+2026-10-20 23:47Z, loaded into the serving JVM 23:48Z, see rev 35): when no fence is present,
+the balanced top-level `{…}` spans are counted outside JSON strings, and exactly one span that
+parses to a map decodes, with prose before or after it; two spans, a `{` left open in the
+prose, arrays, scalars and malformed JSON refuse as nil. So prose around one unfenced object
+now decodes, as prose around one fence already does, and an object followed by a second
+object, which decoded before, no longer does. The author prompt (`full_loop_runtime.clj` 149)
 asks for "one JSON object" and the seat answers with a sentence first; the contract's own note
 records the fence rule being relaxed for the same reason. -/
 def decodesF44a : AnswerShape → Bool
   | .proseThenBareObject => true
+  | .objectThenObject => false
   | s => decodesToday s
+
+/-- Rev 35: F44a refuses the two-object shape that the whole-string parse admitted. -/
+theorem f44a_refusesTwoObjects :
+    decodesToday .objectThenObject = true ∧ decodesF44a .objectThenObject = false := by decide
 
 /-- F44b (`open-cascade-resume-handler`): a nil author answer is its own kind,
 `:open-cascade-author-answer-invalid`, with the author's job id beside it; the review kind is
@@ -2756,6 +2772,35 @@ theorem f44a_reachesReviewer (r : AnswerShape) :
 theorem f44b_namesTheAuthor (r : AnswerShape) :
     (resumeStep decodesToday .proseThenBareObject r).kindF44b = .authorAnswerInvalid := by
   cases r <;> decide
+
+/-! ## Rev 35: F43 and F44a are the serving laws (2026-10-20 23:52Z)
+
+F43 landed at futon2 `488931416` (codex-1, job `invoke-1792539495510-190-b014d41d`; receipt
+`~/notes/test-receipts/F43.json`, 34 tests, 450 assertions; the production ledger reads
+`:valid` through the reloaded namespace). F44a landed at `75881d3c9` (codex-3's draft, job
+`invoke-1792539505280-191-84507e5e`, finished by claude-5: the draft's walker reset its span
+start at every inner `}` and threw `NullPointerException` on the click 14 answer itself, whose
+object holds nested objects; the draft's test pinned invented prose and could not see it;
+receipt `F44a.json`, 36 tests, 158 assertions, the click 14 answer verbatim in
+`test/futon2/aif/fixtures/f44a-click14-author-answer.txt`). F44b is dispatched (codex-3, job
+`invoke-1792539905090-194-2a6ab815`). The serving decode is `decodesF44a`; the serving budget
+rule is `spendsBudgetF43`. Prediction for click 15 (after F44b lands) stays
+`f44a_reachesReviewer`; `d755c886`'s next other-injury child re-queues at `requeues` 2, not 3
+(`f43_budgetCountsNoInjuryOnly`). -/
+
+/-- The decode the serving JVM runs since 23:48Z. -/
+def servingDecodes : AnswerShape → Bool := decodesF44a
+
+/-- The budget rule the serving JVM runs since 23:52Z. -/
+def servingSpendsBudget : InconclusiveCause → Bool := spendsBudgetF43
+
+theorem serving_reachesReviewer (r : AnswerShape) :
+    (resumeStep servingDecodes .proseThenBareObject r).reviewerContacted = true :=
+  f44a_reachesReviewer r
+
+theorem serving_d755c886_nextRequeueUnchanged :
+    requeuesAfter servingSpendsBudget [.otherOpenInjury, .otherOpenInjury, .otherOpenInjury] = 0 := by
+  decide
 
 
 end DarkTower.WarMachine.SelfHealRoute
