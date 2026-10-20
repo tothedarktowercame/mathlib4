@@ -58,7 +58,9 @@ review can tell it from a test that fails for the injury.
 Revision 5 (claude-2, 2026-10-20, packet M4L from claude-5): the coordination stage
 after `routeEnacted`, refusal class 3 of `refusal-totality-2026-10-19.md`. Three new
 states, `coordinationHeld`, `coordinationRefused` and `persistRefused`, each ending at
-`terminalRecord`, so `RouteState` has 23 states. Why a click stopped inside the
+`terminalRecord`, so `RouteState` has 23 states. (Rev 23, F31: one click may now run
+several author attempts, so `coordinationHeld` may stand for several attempts of one
+click; see `HeldReason.authorFailed`.) Why a click stopped inside the
 transaction is given beside the path, as `CoordinationOutcome`, in the same way as
 `BoundaryDefect`. The table is written against the record shape of packet M4a
 (codex-3, `~/notes/packet-codex-route-coordinator-result-2026-10-20.md`), not against
@@ -936,11 +938,22 @@ inductive HeldReason where
   from `:claimed`, or `:abandoned` with `(L append-retry-result :attempt-limit-exhausted)`
   (the same pin) when n+1 would exceed `:attempt-limit`; `(L allowed-predecessors :claimed)`
   admits both, and `(L state-defects :reopen/author-failure-evidence)` and
-  `(L state-defects :abandonment/author-failure-evidence)` refuse them without the pin. On a
-  later click `(P route! retire-stale-transaction!)` retires the attempt-n transaction, whose
-  `:work-order :attempt` is below the ledger's, and `prepare` builds attempt n+1; the author
-  is dispatched afresh on that click, not on the click that reopened. This across-click edge
-  is not in the state graph (see the note on `ClosingStatus.reopened`). -/
+  `(L state-defects :abandonment/author-failure-evidence)` refuse them without the pin.
+  Rev 23 (futon2 `fba25030a`, F31): the click does not stop there. `route!` runs the
+  checkpoint loop as `(P route! run-attempt)` and loops over attempts. When an attempt is
+  held `:author-failed` with both its ledger and transaction writes persisted, the ledger is
+  reloaded, and if the injury's active entry is `:reopened` the same click goes on:
+  `(P route! retire-stale-transaction!)` retires the attempt-n transaction (a refused
+  retirement is the click's disposition), `prepare` builds attempt n+1 from the reloaded
+  ledger with `(P continued-work-order-options)` (the three claim sessions suffixed
+  `/attempt-` and the attempt number, because `(L state-defects :claim/session-not-fresh)`
+  refuses a reused one), the diagnosis and acceptance bindings are re-run against the new
+  transaction, and `run-attempt` runs again. The loop stops on any other result, or when the
+  active entry is `:abandoned`; the ledger's `:attempt-limit` bounds it. `coordinationHeld`
+  is where the click ends only when the last attempt of the loop is held; the attempts it
+  moved past are listed in order in the disposition's `(P route! :continued-from)`, each with
+  its attempt, reason and retired transaction. This in-click loop is not in the state graph
+  (see the note on `ClosingStatus.reopened`). -/
   | authorFailed
   /-- `(C coordinate :review-rejected)`. -/
   | reviewRejected
@@ -999,7 +1012,10 @@ inductive ClosingStatus where
   there, so it does not produce this closing status. `(L allowed-predecessors :claimed)`
   lists `:reopened` and `:abandoned` from both `:enacted` and `:claimed`, and
   `(L state-defects :reopen/reason-unexpected)` refuses an `:author-failed` reopen from
-  `:enacted`, so the two paths cannot be confused in a valid ledger. -/
+  `:enacted`, so the two paths cannot be confused in a valid ledger.
+  Rev 23 (F31): the author arm's `:reopened` entry is consumed by the same click, whose
+  continuation (`(P route! run-attempt)`) retires the attempt-n transaction and authors
+  attempt n+1; the in-click loop is not in the state graph. -/
   | reopened
   /-- `:abandoned`: the attempt after this one would exceed the budget.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the same
@@ -1009,7 +1025,8 @@ inductive ClosingStatus where
   this constructor: `(not C coordinate-queued-retry :retry-budget-spent)`.
   Rev 21: as for `reopened`, the author arm's `:abandoned :attempt-limit-exhausted` entry
   (predecessor `:claimed`, carrying `:port-receipt-pin`) is returned under `:held`, not as
-  this closing status. -/
+  this closing status. Rev 23 (F31): that entry ends the click's continuation; the hold
+  of that attempt is the click's disposition. -/
   | abandoned
   /-- `:awaiting-retry`: the retry port queued the retry click. The production
   retry port only persists and enqueues, so this is the closing status a production
