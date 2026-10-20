@@ -291,50 +291,184 @@ inductive RouteState where
   Rev 8 note: with one read, a stale context overwrites a ledger file that changed
   between the read and coordination's persist. That is the one-read design taken
   literally, and it is pinned by `route-decides-from-the-context-read-not-a-second-read`
-  (futon2 `6dd147e6a`). -/
+  (futon2 `6dd147e6a`).
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P diagnosis-context {:durable-ledger :active-injuries})`.
+  The map has no `:status`, so no status literal is the site. Since then `route!` takes
+  `(:meta-diagnosis-context opts)` and reads the ledger itself only when it is given no
+  context (`(P route! durable)`), so order error 3 no longer arises from `run-opportunity!`. -/
   | ledgerRead
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no ledger file,
+  `(P prepare-diagnosis {:status :not-required :reason :meta-self-heal/no-durable-injury-ledger})`
+  (#3); an empty active set,
+  `(P prepare-diagnosis {:status :not-required :reason :meta-self-heal/no-active-injury})`
+  (#6). `route!` then returns nil (`(P route! (when (seq (:injuries active))))`). -/
   | noActiveInjury
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P prepare-diagnosis :else)`: the ledger loaded, the
+  active set computed and is non-empty, and `produce-diagnosis!` is called on its first
+  injury id. That branch has no status literal of its own. -/
   | activeInjury
   /-- Rev 6, row #5: the ledger loaded, but `ledger/active-injuries` did not return
-  `:computed` (P:780, `:diagnosis-active-set-unavailable`). A terminal refusal. -/
+  `:computed` (P:780, `:diagnosis-active-set-unavailable`). A terminal refusal.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): the observation
+  `(P prepare-diagnosis {:status :unavailable :reason :meta-self-heal/diagnosis-active-set-unavailable})`,
+  then the refusal
+  `(R run-opportunity! {:status :refused :reason :meta-self-heal/active-set-unavailable})`
+  in the first `cond` arm. `(P route! :meta-self-heal/active-set-unavailable)` is the
+  same guard for a caller that is not `run-opportunity!`; from `run-opportunity!` it is
+  not reached, because the R arm ends the click on the same context first. -/
   | activeSetUnavailable
   /-- Rev 7: the start of a retry click. Its options carry `:meta-repair-retry`
   (S:989-995): the child of a parent that ended `:awaiting-retry`, launched only after
   the parent click is durably complete. It makes no ledger read of its own and no
   diagnosis (R:473-477). It carries the acceptance observation
-  `:acceptance-retry-not-prepared` (#22), which is typed, not a state. -/
+  `:acceptance-retry-not-prepared` (#22), which is typed, not a state.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(S close-click! :meta-repair-retry)` sets the option, in the
+  child `click!` it launches after the parent's release. In `run-opportunity!` the branch is
+  `(R run-opportunity! retry)`, and its one site is the observation
+  `(R run-opportunity! {:status :not-required :reason :meta-self-heal/acceptance-retry-not-prepared})`. -/
   | retryClick
   /-- Rev 7: `attributable-retry-readiness` (P:896-915) returns `:ready` with the
   attribution. The retry then runs ordinary work (R:500-502), and `route!` is not
-  called. -/
+  called.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P attributable-retry-readiness {:status :ready :attribution})`,
+  then `(R run-opportunity! retry)` runs `run-ordinary-opportunity!`. -/
   | retryReady
   /-- Rev 7, #57: `:meta-self-heal/retry-attribution-refused` (P:918), with `:expected`
-  and `:supplied`. -/
+  and `:supplied`.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P attributable-retry-readiness :meta-self-heal/retry-attribution-refused)`,
+  returned by `(R run-opportunity! (= :refused (:status readiness)))`. -/
   | retryRefused
   -- diagnosis stage (`prepare-diagnosis`)
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P produce-diagnosis! {:status :available})`, after
+  `persist-diagnosis!` returned `:persisted`; or a supplied pin,
+  `(P prepare-diagnosis {:status :present :source :supplied})`. -/
   | diagnosisPrepared
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): every non-`:available` result of `produce-diagnosis!`:
+  `(P produce-diagnosis! :meta-self-heal/diagnosis-source-pin-unavailable)`,
+  `(P produce-diagnosis! :meta-self-heal/diagnosis-port-unavailable)`,
+  `(P produce-diagnosis! :meta-self-heal/diagnosis-port-returned-nil)`,
+  `(P produce-diagnosis! :meta-self-heal/diagnosis-port-malformed)`,
+  `(P produce-diagnosis! :meta-self-heal/diagnosis-unavailable)` (a port that threw lands
+  here, its reason carried as `:diagnosis-reason`),
+  `(P produce-diagnosis! :meta-self-heal/diagnosis-response-missing)`,
+  `(P produce-diagnosis! :meta-self-heal/diagnosis-production-functions-absent)`;
+  passed through from `(P source-record :meta-self-heal/diagnosis-source-pin-mismatch)`,
+  `(P source-record :meta-self-heal/diagnosis-source-unreadable)`,
+  `(P persist-diagnosis! :meta-self-heal/diagnosis-path-conflict)` and
+  `(P persist-diagnosis! :meta-self-heal/diagnosis-persist-failed)`. -/
   | diagnosisRefused
   -- acceptance stage (`prepare-acceptance`)
-  | acceptanceUnavailable   -- diagnosis not `:available`: `:acceptance-diagnosis-unavailable`
-  | proposalRefused         -- `produce-acceptance!` did not return `:proposed`
-  | admissionRun            -- `admit-acceptance!` entered
-  | admissionRefused        -- admission refused before or without a reviewer answer
+  /-- Diagnosis not `:available`: `:acceptance-diagnosis-unavailable`.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P prepare-acceptance {:status :unavailable :reason :meta-self-heal/acceptance-diagnosis-unavailable})`,
+  the `:else` arm. -/
+  | acceptanceUnavailable
+  /-- `produce-acceptance!` did not return `:proposed`.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): from `(P read-diagnosis-receipt)`:
+  `:meta-self-heal/acceptance-diagnosis-pin-unavailable`,
+  `:meta-self-heal/acceptance-diagnosis-pin-mismatch`,
+  `:meta-self-heal/acceptance-diagnosis-unreadable`,
+  `:meta-self-heal/acceptance-diagnosis-identity-mismatch`, and that function's own
+  `:meta-self-heal/acceptance-diagnosis-unavailable` and
+  `:meta-self-heal/diagnosis-production-functions-absent`;
+  `(P produce-acceptance! :meta-self-heal/acceptance-port-unavailable)`,
+  `(P produce-acceptance! :meta-self-heal/acceptance-request-function-unresolvable)`;
+  `(P produce-acceptance-from-request! :meta-self-heal/acceptance-port-returned-nil)`,
+  `(P produce-acceptance-from-request! :meta-self-heal/acceptance-port-malformed)`,
+  `(P produce-acceptance-from-request! :meta-self-heal/acceptance-unavailable)` (a port
+  that threw lands here), `(P produce-acceptance-from-request! :meta-self-heal/acceptance-proposal-source-mismatch)`,
+  `(P produce-acceptance-from-request! :meta-self-heal/acceptance-prose-or-malformed)`;
+  and the proposal receipt's write, `(P persist-acceptance! :meta-self-heal/acceptance-path-conflict)`,
+  `(P persist-acceptance! :meta-self-heal/acceptance-persist-failed)`. -/
+  | proposalRefused
+  /-- `admit-acceptance!` entered.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no producing site. `(P prepare-acceptance)` calls
+  `admit-acceptance!` when `produce-acceptance!` returns
+  `(P produce-acceptance-from-request! {:status :proposed})`; the entry has no status
+  literal. -/
+  | admissionRun
+  /-- Admission refused before or without a reviewer answer.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): before the reviewer is called: from
+  `(P read-acceptance-proposal)`, `:meta-self-heal/acceptance-proposal-pin-unavailable`,
+  `:meta-self-heal/acceptance-proposal-pin-mismatch`,
+  `:meta-self-heal/acceptance-proposal-unreadable`,
+  `:meta-self-heal/acceptance-proposal-not-proposed`,
+  `:meta-self-heal/acceptance-proposal-review-state-invalid`,
+  `:meta-self-heal/acceptance-proposal-identity-mismatch`, that function's
+  `:meta-self-heal/acceptance-proposal-source-mismatch` and
+  `:meta-self-heal/acceptance-proposal-not-concrete`;
+  `(P admit-acceptance! :meta-self-heal/acceptance-run-port-unavailable)`,
+  `(P admit-acceptance! :meta-self-heal/acceptance-review-port-unavailable)`,
+  `(P admit-acceptance! :meta-self-heal/acceptance-run-refused)` (a run that threw lands
+  here), `(P admit-acceptance! :meta-self-heal/acceptance-test-passes-before-repair)`.
+  A reviewer that throws is not here: its answer becomes `{:status :failed}` and lands in
+  `reviewRefused`. -/
+  | admissionRefused
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P admit-acceptance! {:status :accepted :acceptance-admission-pin})`,
+  after `persist-acceptance!` returned `:persisted`. -/
   | reviewAccepted
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): the reviewer was called and gave no usable acceptance:
+  `(P admit-acceptance! :meta-self-heal/acceptance-review-malformed)`,
+  `(P admit-acceptance! :meta-self-heal/acceptance-review-refused)` (a reviewer that
+  threw lands here, `:review-status :failed`),
+  `(P admit-acceptance! :meta-self-heal/acceptance-review-identity-mismatch)`. -/
   | reviewRefused
   -- readiness (`production-readiness`)
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P production-readiness {:status :ready :active-injury?})`,
+  the `:else` arm, or the ordinary-route arm that keeps the absence as
+  `{:self-heal {:status :absent}}`. -/
   | readinessReady
-  | readinessRefused        -- `:production-config-required` with port terms
-  | ledgerUnreadable        -- `:ledger-unreadable`
+  /-- `:production-config-required` with port terms.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P production-readiness :meta-self-heal/production-config-required)`,
+  with `:route :dedicated-meta-self-heal` and `:before-ration-spend? true`. -/
+  | readinessRefused
+  /-- `:ledger-unreadable`.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P production-readiness :meta-self-heal/ledger-unreadable)`.
+  Diagnosis has already recorded the same fact as
+  `(P prepare-diagnosis {:status :unavailable :reason :meta-self-heal/diagnosis-ledger-unavailable})`. -/
+  | ledgerUnreadable
   -- route (`route!`)
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no producing site. `(P route!)` enters the checkpoint loop
+  when `(P diagnosis-transaction-binding {:status :valid})` and
+  `(P acceptance-transaction-binding {:status :valid})` both hold; the entry has no status
+  literal. -/
   | routeEnacted
-  | routeRefused            -- `:production-config-required` with route terms
-  | preparationRefused      -- `:preparation-refused`: `coordinator/prepare` returned no transaction
-  | bindingRefused          -- `:diagnosis-transaction-mismatch` / `:acceptance-transaction-mismatch`
+  /-- `:production-config-required` with route terms.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P route! :meta-self-heal/production-config-required)`,
+  with `:absent-terms` from `:transaction-path`, `:repair-ports`, `:acceptance-run-port`,
+  `:diagnosis-evidence`, `:acceptance-test`. -/
+  | routeRefused
+  /-- `:preparation-refused`: `coordinator/prepare` returned no transaction.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P route! :meta-self-heal/preparation-refused)`. -/
+  | preparationRefused
+  /-- `:diagnosis-transaction-mismatch` / `:acceptance-transaction-mismatch`.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P diagnosis-transaction-binding :meta-self-heal/diagnosis-transaction-mismatch)`,
+  `(P acceptance-transaction-binding :meta-self-heal/acceptance-transaction-mismatch)`,
+  and also `(P acceptance-transaction-binding :meta-self-heal/acceptance-transaction-unadmitted)`,
+  which the trailing comment did not name; `(P route! (if-not (= :valid (:status binding))))`
+  returns them. -/
+  | bindingRefused
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P route! settle)` on the result of the `coordinate` call after
+  the checkpoint loop, when that result is a closing: the status literals are those of
+  `ClosingStatus`, `(C coordinate-queued-retry {:status :awaiting-retry})`,
+  `(C coordinate {:status :discharged})` and the computed `(C coordinate {:status (get-in reopened [:entry :state])})`. -/
   | enacted
-  | coordinationHeld        -- rev 5: a port answered and the transaction waits (`:held`)
-  | coordinationRefused     -- rev 5: `coordinator/coordinate` refused, with or without a ledger
-  | persistRefused          -- rev 5: a `:checkpoint` result's ledger or transaction write failed
+  /-- Rev 5: a port answered and the transaction waits (`:held`).
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(C held! {:status :held})`, returned through `(P route! settle)`.
+  The reasons are `HeldReason`'s. -/
+  | coordinationHeld
+  /-- Rev 5: `coordinator/coordinate` refused, with or without a ledger.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): a `(C coordinate)` refusal returned through
+  `(P route! settle)`. The reasons are `CoordinatorRefusal`'s. -/
+  | coordinationRefused
+  /-- Rev 5: a `:checkpoint` result's ledger or transaction write failed.
+  Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P route! :meta-self-heal/checkpoint-persist-failed)`. -/
+  | persistRefused
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no status literal. `(R run-opportunity! run-ordinary-opportunity!)`,
+  from two branches: `retry` after `retryReady`, and `(or routed ...)` when `route!`
+  returned nil. -/
   | ordinarySelection
+  /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no producing site in the files read (P, C, R, A, S, T). It is
+  the click's record, written after `run-opportunity!` returns. -/
   | terminalRecord
   deriving DecidableEq, Repr
 
