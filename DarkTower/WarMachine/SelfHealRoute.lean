@@ -2578,4 +2578,184 @@ theorem f43_budgetCountsNoInjuryOnly (cs : List InconclusiveCause) :
   | nil => rfl
   | cons c cs ih => cases c <;> simp [requeuesAfter, spendsBudgetF43, noInjuryCount, ih, Nat.add_comm]
 
+/-! ## Rev 34: click 14 read (`f42_closeAccepted` held); the open-cascade resume, read from clicks 13 and 14 -/
+
+/-- Click 14 (claude-2, job `invoke-1792536244542-166-a0bce589`; parent click
+`wm-click-0fce6172`, child `wm-requeue-2-4-repair/239cf988…`, run `bcf648e3`, 22:45:31Z to
+22:51:08Z, cohort `:wm-contract-machinery-144-v1` attempt-001). Bytes read here from
+`attempt-001/002-selection.edn` (the file, `ls -l`) and from the daily trace's form with that
+`:run/id` (`pr-str`, UTF-8): the cell, the form, the receipt's carrier inside the cell (a
+seven-entry menu inside it, 8,402,675 bytes of `:entries`; the receipt's bare `:sealed-menu` is
+the F42a pointer `:carried-on-carrier`), and the decision's certificate after F42b (its carrier
+projection's `:sealed-menu` is the pointer `:carried-on-receipt`). `formBytesF42` was an upper
+figure built from click 13's menu; click 14's menu is a different seven entries, and the cell
+came in 3.5 MB under it. -/
+def click14CellBytes : Nat := 16890536
+def click14FormBytes : Nat := 17066553
+def click14CarrierBytes : Nat := 10325510
+def click14CertificateBytes : Nat := 1325821
+
+/-- The cell was appended (`:checkpoint/type :selection`, `:event/sequence 2`, 22:51:03.88Z),
+as the size law says; the certificate is a tenth of the carrier it used to copy. -/
+theorem click14_appendAccepted :
+    closeAppendBySize click14CellBytes = .accepted ∧ click14CellBytes < formBytesF42 ∧
+      click14CertificateBytes < carrierBytes := by decide
+
+/-- The keys `(R persist-run-record!)` writes under the record's `:decision`
+(`full_loop_runner.clj` 1265): a `select-keys` over the retained decision for the first seven,
+then `:g-term-decomposition`, `:abstention` and `:chosen`. `:action` is not among them. The
+chosen action's id and target are written by `(R chosen-summary)` (800), which reads
+`(:action decision)` and writes `{:target :id :precedence :unreached-wants :construction-kind}`
+(with `:candidate` when the selection law names one) or `{:status :absent :reason :no-chosen-action}`. -/
+def recordDecisionKeys : List String :=
+  ["selection-law", "selection-certificate", "initial-belief-receipt",
+   "enumeration-completeness", "measured-a", "accumulation", "accumulation-bmr",
+   "g-term-decomposition", "abstention", "chosen"]
+
+/-- So a record's `[:decision :action :id]` is nil on every run, and "the record carries the
+action" (`RecordDecisionSource.carriesAction`) is read at `[:decision :chosen :id]`. The click 14
+packet (claude-5) named `[:decision :action :id]`; claude-2 read it nil there and present on the
+trace's decision. That is this projection, not a lost decision: rev 28's
+`click11Retry_recordShadowed` already read the stub's record at `:chosen`. -/
+theorem recordDecision_actionAtChosen :
+    "action" ∉ recordDecisionKeys ∧ "chosen" ∈ recordDecisionKeys := by decide
+
+/-- **Click 14 witness.** No judgment decision: the cell's `:payload :judgment` holds five
+context keys (`:effective-run-configuration :open-stop-lines :repair-lifecycle-census
+:world-at-selection :belief-source`) and no `:controller-decision`; the sorry (`:kind
+:no-selection`, `:downstream-refusal {:status :error :kind :open-cascade-review-answer-invalid}`)
+holds `:decision :status :selected`, action `M-self-improvement-loop/policy-1bbcf6a06eb2766b5e77`.
+The record: `[:decision :chosen :id]` is that id, `:selection-event` is `:cascade-selected` with
+target `M-self-improvement-loop`, `:abstention :not-abstained`, no `:close-refusal` anywhere
+(record, `007-closed.edn`, terminal publication, trace); the close is `:outcome :incomplete`,
+`:failure-kind :open-cascade-review-answer-invalid`, `:stage :cascade-resume`, `:repairable true`,
+sequences 3 to 6 the four `:not-reached-…` sorries. So the source is the sorry's decision and
+`f42_closeAccepted`'s three conjuncts held; nothing is found against `formBytesF42` or
+`retainedSourceF41`. The cell's `:kind :no-selection` with a selected decision inside is the
+downstream-refusal shape rev 32 named: the kind says no judgment cell was written, not that
+nothing was selected; `entryF40` reads the close's kind, which here is the resume's, and is not
+contradicted. Ledger: ordinal 22 `:enacted` attempt 4 requeues 2 (the re-queue after click 13,
+written before this child ran); 23 opens injury `42fd2c21` on this record,
+`:open-cascade-review-answer-invalid` at `:cascade-resume`; 24 `:retry-inconclusive` for
+`d755c886` with 23's cause pin (`InconclusiveCause.otherOpenInjury`); no abandonment;
+`transaction.edn` `:active`. `(L append-requeue)` abandons when `requeues ≥ retry-limit` (3)
+before incrementing, so the next click's parent re-queues at 3 and the one after abandons
+`retryBudgetSpent` with no pin, unless F43 lands first. -/
+theorem click14_f42Held :
+    retainedSourceF41 false (closeAppendBySize click14CellBytes) = .sorryDecision ∧
+      (retainedSourceF41 false (closeAppendBySize click14CellBytes)).carriesAction = true := by
+  decide
+
+/-! ### The open-cascade resume (`(R open-cascade-resume-handler)`, `full_loop_runtime.clj` 211),
+the stretch rev 29 to 33 declined to predict -/
+
+/-- The shape of a seat's answer as `(H response-json-object)` (`handoff_contract.clj` 9) reads
+it, through `(H response-map)` on a done job's `:result`: the whole string one JSON object;
+exactly one ``` fence holding one object, prose before or after it allowed (occ-c6325db5,
+2026-10-17); prose and then one unfenced object; anything else (prose only, two fences, an
+array, a scalar, malformed JSON). -/
+inductive AnswerShape where
+  | bareObject
+  | oneFencedObject
+  | proseThenBareObject
+  | other
+  deriving DecidableEq, Repr
+
+/-- Today the bare object and the one fence decode; prose before an unfenced object does not
+(`json/parse-string` fails on the prose, and there is no fence to find). -/
+def decodesToday : AnswerShape → Bool
+  | .bareObject => true
+  | .oneFencedObject => true
+  | .proseThenBareObject => false
+  | .other => false
+
+/-- What the handler does with the two answers (`full_loop_runtime.clj` 233-240): the author's
+answer is decoded; the reviewer is contacted only when it decoded
+(`reviewed (when author-answer …)`); a nil `reviewed`, from either side, answers
+`{:status :error :kind :open-cascade-review-answer-invalid}`; otherwise `(O handle-error!)` runs
+with the reviewed answer. -/
+inductive ResumeStep where
+  | authorRefused
+  | reviewerRefused
+  | reviewed
+  deriving DecidableEq, Repr
+
+def resumeStep (decodes : AnswerShape → Bool) (author reviewer : AnswerShape) : ResumeStep :=
+  if decodes author then (if decodes reviewer then .reviewed else .reviewerRefused)
+  else .authorRefused
+
+def ResumeStep.reviewerContacted : ResumeStep → Bool
+  | .authorRefused => false
+  | .reviewerRefused => true
+  | .reviewed => true
+
+/-- The failure kind the handler writes: one kind for both refusals. -/
+inductive ResumeKind where
+  | reviewAnswerInvalid
+  | handled
+  deriving DecidableEq, Repr
+
+def ResumeStep.kindToday : ResumeStep → ResumeKind
+  | .reviewed => .handled
+  | .authorRefused => .reviewAnswerInvalid
+  | .reviewerRefused => .reviewAnswerInvalid
+
+/-- **Clicks 13 and 14 witness.** Both author jobs went to zai-2 in mode work (click 13:
+`invoke-1792533220197-142-54551274`, requisition `f7374bcc…`, 27 holes, 21:53:40Z to 21:59:05Z,
+answer 9,262 characters, prose for 229 then one unfenced object; click 14:
+`invoke-1792536618647-168-cc36fe17`, requisition `790c9db1…`, 8 holes, 22:50:18Z to 22:50:57Z,
+answer 3,293 characters, prose for 448 then one unfenced object). Each object parses from its
+first `{`; neither answer as a whole does; neither holds a fence. The reviewer (zai-3) has no
+Agency job in either window, and the phases log's `:tripwire/snapshot` on the close has
+`:reviewer-job nil`. The authoring is durable and repeated: click 13's commit `fc7356769`;
+click 14's answer says requisition `790c9db1` was already authored at `3c97ed709` (zai-2,
+2026-10-18 21:28Z, job `invoke-1792358883295-16649-91797711`, dispatched by `wm-full-loop`), so
+that held cascade has been re-authored on each click since, and each click's ledger entry
+(ordinals 20 and 23) names the review. -/
+theorem clicks13_14_authorRefused (r : AnswerShape) :
+    resumeStep decodesToday .proseThenBareObject r = .authorRefused ∧
+      (resumeStep decodesToday .proseThenBareObject r).reviewerContacted = false ∧
+      (resumeStep decodesToday .proseThenBareObject r).kindToday = .reviewAnswerInvalid := by
+  cases r <;> decide
+
+/-- The kind does not say which answer was refused. -/
+theorem resumeKind_blind :
+    ResumeStep.authorRefused.kindToday = ResumeStep.reviewerRefused.kindToday := by decide
+
+/-- F44a (`handoff_contract.clj` `response-json-object`): prose around exactly one unfenced
+top-level object decodes, as prose around one fence already does; two objects, or an object
+with braces in the prose, still refuse as nil. The author prompt (`full_loop_runtime.clj` 149)
+asks for "one JSON object" and the seat answers with a sentence first; the contract's own note
+records the fence rule being relaxed for the same reason. -/
+def decodesF44a : AnswerShape → Bool
+  | .proseThenBareObject => true
+  | s => decodesToday s
+
+/-- F44b (`open-cascade-resume-handler`): a nil author answer is its own kind,
+`:open-cascade-author-answer-invalid`, with the author's job id beside it; the review kind is
+kept for a nil reviewer answer. -/
+inductive ResumeKindF44b where
+  | authorAnswerInvalid
+  | reviewAnswerInvalid
+  | handled
+  deriving DecidableEq, Repr
+
+def ResumeStep.kindF44b : ResumeStep → ResumeKindF44b
+  | .authorRefused => .authorAnswerInvalid
+  | .reviewerRefused => .reviewAnswerInvalid
+  | .reviewed => .handled
+
+/-- Prediction for the first click after F44a: the same answer shape reaches the reviewer.
+What the reviewer answers, and what `(O handle-error!)` then does with it, this revision has not
+read; the model predicts nothing past the contact. Under F44b without F44a the click closes
+`:open-cascade-author-answer-invalid` instead, and the ledger's new injury names the author. -/
+theorem f44a_reachesReviewer (r : AnswerShape) :
+    (resumeStep decodesF44a .proseThenBareObject r).reviewerContacted = true := by
+  cases r <;> decide
+
+theorem f44b_namesTheAuthor (r : AnswerShape) :
+    (resumeStep decodesToday .proseThenBareObject r).kindF44b = .authorAnswerInvalid := by
+  cases r <;> decide
+
+
 end DarkTower.WarMachine.SelfHealRoute
