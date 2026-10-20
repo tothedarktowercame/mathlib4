@@ -162,6 +162,25 @@ not in it: rev 5's `ClosingStatus` names its outcomes, and no state is added for
 **Run-time witness leg (rev 7).** None: there is no `wm-retry-*` click-state under
 `futon3c/data/wm-click-acceptances/`.
 
+Revision 8 (claude-2, 2026-10-20, packet M10L from claude-5): the closing law for a
+retry click. A retry discharges the injury only when it ran the injured work and came
+out successful. An abstention or a no-work outcome is inconclusive: it neither
+discharges nor reopens. Today's discharge-on-abstention is the violation witness
+`retryClose_todayDischargesAbstention`, and it is the reason for M10a. T = futon2
+`343b60ef3` `src/futon2/aif/meta_terminal_injury.clj`, L = the same commit,
+`meta_injury_ledger.clj`.
+
+**Holes (rev 8, not decided).**
+* Finding 2 of rev 7 is not modelled. A retry that writes no run record leaves the entry
+  `:enacted`; the next click resumes `transaction.edn`, `coordinate` replays the
+  `:queued` receipt and ends `:awaiting-retry`, and no child is queued again. The table
+  would need a re-queue edge, from `retryInconclusive` (and from a missing record) back
+  to a queued retry. It is not added here.
+* `otherInjury` (see `RetryClickOutcome`): a retry that fails with a different cause
+  opens a new injury and leaves the enacted one untouched. The law calls that
+  inconclusive for the enacted injury. That is a modelling decision, and whoever rules
+  on M10a should confirm it.
+
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
 until one is named.
@@ -202,7 +221,11 @@ inductive RouteState where
   and `production-readiness` (P:797) decide from it, before any injury is known.
   Order error 3: `route!` reads the ledger a second time (P:923-925), and that read has no
   state here. A runtime that reads twice conforms only while the two reads agree. M6a is
-  to make `route!` use the context's read. -/
+  to make `route!` use the context's read.
+  Rev 8 note: with one read, a stale context overwrites a ledger file that changed
+  between the read and coordination's persist. That is the one-read design taken
+  literally, and it is pinned by `route-decides-from-the-context-read-not-a-second-read`
+  (futon2 `6dd147e6a`). -/
   | ledgerRead
   | noActiveInjury
   | activeInjury
@@ -531,9 +554,11 @@ inductive AdmissionDefect where
   /-- `:acceptance-test-passes-before-repair` (P:622, F16): refused before any reviewer
   invoke. Unwitnessed on a click (off-click replay 5 only). -/
   | passesBeforeRepair
-  /-- `:acceptance-review-refused` (P:628) with `:review-status :failed`: the review
-  invoke failed in transport (`:producer-invoke-failed`, A:233), so there is no reviewer
-  answer. Witnesses: clicks `36b47627`, `fdc08aea`, `78180753` (429). -/
+  /-- `:acceptance-review-refused` (P:628) with `:review-status :failed`: there is no
+  reviewer answer that could be read. That covers a transport or seat failure (A:227,
+  A:233), a malformed answer (A:237), or the review port throwing (P:613); widened in
+  rev 8 to match the checker and refusal-totality #48b (M8R). Witnesses: clicks
+  `36b47627`, `fdc08aea`, `78180753` (429). -/
   | noReviewerAnswer
   /-- `:acceptance-review-refused` (P:628) with `:review-status :refused`: the reviewer
   answered on the merits. Witnesses: click `1a6de51f`
@@ -740,6 +765,10 @@ inductive ClosingStatus where
   retry port only persists and enqueues, so this is the closing status a production
   click is expected to reach. The M4a shape does not name it (finding). -/
   | awaitingRetry
+  /-- Rev 8: the retry click ran but did not test the repair (`RetryClickOutcome.closing`).
+  The injury is neither discharged nor reopened, and the transaction stays `:enacted`
+  and active. -/
+  | retryInconclusive
   deriving DecidableEq, Repr
 
 /-- Why the route ended inside, or at the end of, the transaction. -/
@@ -916,5 +945,78 @@ theorem retryRefused_terminates :
 theorem retryPaths_conform :
     conformsPath [retryClick, retryReady, ordinarySelection, terminalRecord] = true ∧
       conformsPath [retryClick, retryRefused, terminalRecord] = true := by decide
+
+/-! ## Rev 8: the closing law for a retry click -/
+
+/-- What `classify` (T:111-167) says of the retry click's terminal record, as `integrate`
+(T:185-275) receives it. -/
+inductive RetryClickOutcome where
+  /-- `:successful-task-outcome` (T:126-128): no failure kind, and an outcome in
+  `successful-outcomes` (T:15). The only outcome that tests the repair and passes. -/
+  | successfulTaskOutcome
+  /-- `:injury` with the enacted entry's injury id: `append-retry-result` (T:244, L:299-317).
+  The retry failed for the same cause. -/
+  | sameInjury
+  /-- `:injury` with a different injury id: `latest-injury` is nil, so `integrate` opens a
+  new injury (T:229-239) and does not touch the enacted one. This constructor is not in
+  the packet; it is added here (finding). -/
+  | otherInjury
+  /-- `:ordinary-selection-abstention` (T:82): an abstention. -/
+  | ordinarySelectionAbstention
+  /-- `:evaluated-no-action` (T:81, T:66-70): scored, and no action chosen. -/
+  | evaluatedNoAction
+  /-- `:partial-frontier-continuation` (T:80, T:71-76). -/
+  | partialFrontierContinuation
+  /-- `:operator-cancelled` (T:12). -/
+  | operatorCancelled
+  /-- `:declared-no-work` (T:13). -/
+  | declaredNoWork
+  /-- `:diagnostic-only` (T:14). -/
+  | diagnosticOnly
+  /-- `:absent-terminal-failure` (T:129-130): no failure kind and no outcome. -/
+  | absentTerminalFailure
+  deriving DecidableEq, Repr
+
+/-- The closing law. Only a successful task outcome discharges. The same injury reopens,
+or is abandoned when the next attempt would exceed `:attempt-limit` (L:308-314; this is
+the `budgetSpent` parameter). Everything else is inconclusive for the enacted injury. -/
+def RetryClickOutcome.closing (budgetSpent : Bool) : RetryClickOutcome → ClosingStatus
+  | .successfulTaskOutcome => .discharged
+  | .sameInjury => if budgetSpent then .abandoned else .reopened
+  | _ => .retryInconclusive
+
+/-- Today's `integrate`. Every `:non-injury` classification of the retry click appends
+`:discharged :outcome :success` (T:202-224). The same injury goes through
+`append-retry-result`; another injury leaves the enacted entry as it is, which by its
+effect is `retryInconclusive`. -/
+def RetryClickOutcome.closingToday (budgetSpent : Bool) : RetryClickOutcome → ClosingStatus
+  | .sameInjury => if budgetSpent then .abandoned else .reopened
+  | .otherInjury => .retryInconclusive
+  | _ => .discharged
+
+/-- Only a successful task outcome discharges, under either budget. -/
+theorem closing_dischargesOnlyOnSuccess (b : Bool) (o : RetryClickOutcome) :
+    o.closing b = .discharged ↔ o = .successfulTaskOutcome := by
+  cases b <;> cases o <;> decide
+
+/-- **The reason M10a exists.** Today's `integrate` (T:202-224), given `classify`'s
+abstention (T:111-167, T:77-82), records an abstained retry as `:discharged`; the law
+records it as `retryInconclusive`. The two differ, so the repair is recorded as healed
+without having been tested. -/
+theorem retryClose_todayDischargesAbstention :
+    RetryClickOutcome.ordinarySelectionAbstention.closingToday false = .discharged ∧
+      RetryClickOutcome.ordinarySelectionAbstention.closing false = .retryInconclusive ∧
+      ClosingStatus.discharged ≠ ClosingStatus.retryInconclusive := by decide
+
+/-- The law and today's code disagree on exactly the seven no-work outcomes. -/
+theorem retryClose_disagreement (b : Bool) (o : RetryClickOutcome) :
+    o.closingToday b ≠ o.closing b ↔
+      o ∈ [.ordinarySelectionAbstention, .evaluatedNoAction, .partialFrontierContinuation,
+           .operatorCancelled, .declaredNoWork, .diagnosticOnly, .absentTerminalFailure] := by
+  cases b <;> cases o <;> decide
+
+/-- An inconclusive close is placed at `enacted`, like the other closings. -/
+theorem retryInconclusive_placedAtEnacted :
+    (CoordinationOutcome.closed .retryInconclusive).state = enacted := by decide
 
 end DarkTower.WarMachine.SelfHealRoute
