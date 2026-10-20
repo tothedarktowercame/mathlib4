@@ -283,9 +283,9 @@ inductive RouteTerm where
 carried are record detail for the certificate producer, not part of the
 state. -/
 inductive RouteState where
-  /-- Rev 6: the one ledger read, `diagnosis-context` (P:807). `prepare-diagnosis` (P:821)
-  and `production-readiness` (P:853) decide from it, before any injury is known.
-  Order error 3: `route!` reads the ledger a second time (P lines 979-981), and that read has no
+  /-- Rev 6: the one ledger read, `diagnosis-context` (P:845). `prepare-diagnosis` (P:859)
+  and `production-readiness` (P:891) decide from it, before any injury is known.
+  Order error 3: `route!` reads the ledger a second time (P lines 1017-1019), and that read has no
   state here. A runtime that reads twice conforms only while the two reads agree. M6a is
   to make `route!` use the context's read.
   Rev 8 note: with one read, a stale context overwrites a ledger file that changed
@@ -327,7 +327,7 @@ inductive RouteState where
   `(R run-opportunity! retry)`, and its one site is the observation
   `(R run-opportunity! {:status :not-required :reason :meta-self-heal/acceptance-retry-not-prepared})`. -/
   | retryClick
-  /-- Rev 7: `attributable-retry-readiness` (P:952-972) returns `:ready` with the
+  /-- Rev 7: `attributable-retry-readiness` (P:990-1010) returns `:ready` with the
   attribution. The retry then runs ordinary work (R lines 511-513), and `route!` is not
   called.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P attributable-retry-readiness {:status :ready :attribution})`,
@@ -724,43 +724,50 @@ theorem preparationRefused_terminates :
 at `proposalRefused`. -/
 inductive ProposalDefect where
   /-- Transport or seat failure on the author's proposal invoke:
-  `:producer-invoke-failed` (A:347) or `:producer-seat-unavailable` (A:342),
-  carried as `:acceptance-reason` of `:acceptance-unavailable` (P:485).
+  `:producer-invoke-failed` (A:455) or `:producer-seat-unavailable` (A:450),
+  carried as `:acceptance-reason` of `:acceptance-unavailable` (P:508).
   Unwitnessed at proposal on disk. -/
   | transport
   /-- The author answered, but not with one EDN map: `:producer-response-malformed`
-  (A:355) as `:acceptance-reason` of `:acceptance-unavailable` (P:485).
-  Witness: click `8df4e8d2`. -/
+  (A:466) as `:acceptance-reason` of `:acceptance-unavailable` (P:508).
+  Witness: click `8df4e8d2`.
+  Note (futon3c `33f7fc241`): a map whose test source does not read is not this
+  constructor. A removes the one surplus delimiter the reader names (F23, `:repaired`)
+  or re-asks once (F22); a source that still does not read is returned as the
+  proposal with `:source-read-error`, not as `:producer-response-malformed`. -/
   | unreadableAnswer
   /-- The author's own typed refusal: `:acceptance-status :refused` under
-  `:acceptance-unavailable` (P:485). Witness: click `fca1c921`. -/
+  `:acceptance-unavailable` (P:508). Witness: click `fca1c921`. -/
   | authorRefused
-  /-- `:acceptance-prose-or-malformed` (P:497): the answer is not a concrete test.
+  /-- `:acceptance-prose-or-malformed` (P:520): the answer is not a concrete test.
   Unwitnessed. -/
   | prose
-  /-- `:acceptance-proposal-source-mismatch` (P:493): the test source's namespace or
+  /-- `:acceptance-proposal-source-mismatch` (P:516): the test source's namespace or
   path disagree. Unwitnessed. -/
   | sourceMismatch
-  /-- `:acceptance-request-function-unresolvable` (P:556): a function the diagnosis
+  /-- `:acceptance-request-function-unresolvable` (P:579): a function the diagnosis
   names does not resolve in the serving JVM. Unwitnessed. -/
   | unresolvableFunction
   deriving DecidableEq, Repr
 
 /-- Why `admit-acceptance!` did not return `:accepted`. -/
 inductive AdmissionDefect where
-  /-- `:acceptance-run-refused` (P:648): the bounded run did not return a valid `:ran`
-  result (it covers A:485, A:516-525 and the un-namespaced A:519). Unwitnessed. -/
+  /-- `:acceptance-run-refused` (P:686): the bounded run did not return a valid `:ran`
+  result. It covers `:acceptance-unit-launch-failed` (A:602),
+  `:acceptance-source-path-refused` and `:acceptance-command-not-admissible` (A:633-642),
+  the un-namespaced `:acceptance-test-id-invalid` (A:636), and the run port throwing,
+  `:acceptance-run-threw` (P:656). Unwitnessed. -/
   | runRefused
-  /-- `:acceptance-test-passes-before-repair` (P:652, F16): refused before any reviewer
+  /-- `:acceptance-test-passes-before-repair` (P:690, F16): refused before any reviewer
   invoke. Unwitnessed on a click (off-click replay 5 only). -/
   | passesBeforeRepair
-  /-- `:acceptance-review-refused` (P:658) with `:review-status :failed`: there is no
-  reviewer answer that could be read. That covers a transport or seat failure (A:342,
-  A:347), a malformed answer (A:355), or the review port throwing (P:642); widened in
+  /-- `:acceptance-review-refused` (P:696) with `:review-status :failed`: there is no
+  reviewer answer that could be read. That covers a transport or seat failure (A:450,
+  A:455), a malformed answer (A:466), or the review port throwing (P:680); widened in
   rev 8 to match the checker and refusal-totality #48b (M8R). Witnesses: clicks
   `36b47627`, `fdc08aea`, `78180753` (429). -/
   | noReviewerAnswer
-  /-- `:acceptance-review-refused` (P:658) with `:review-status :refused`: the reviewer
+  /-- `:acceptance-review-refused` (P:696) with `:review-status :refused`: the reviewer
   answered on the merits. Witnesses: click `1a6de51f`
   (`:acceptance-test-did-not-fail-for-injury-reason`) and click `6cdf2a7c` (reason not
   recorded, under the pre-run contract). -/
