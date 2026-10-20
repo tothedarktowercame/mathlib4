@@ -180,11 +180,15 @@ discharges nor reopens. Today's discharge-on-abstention is the violation witness
   `coordinate` alone. Receipts are append-only and `invoke-once` replays a recorded one
   (C:177-179). The retry click id is named from the repair id and attempt
   (futon3c `meta_self_heal_adapters.clj` A:432), so a re-queue at the same attempt
-  would reuse the id, and the idempotency key `meta-retry/<retry-click>` (S:991) would
-  refuse the child. The ledger's `:enacted` rule requires an `:approved` predecessor
-  (L:136-143), so a second enacted-stage entry is invalid. M10b therefore touches the
-  ledger, the adapter's id, the coordinator and the runner. The table is the law; it is
-  not weakened to fit.
+  would reuse the id. The runner keys the child by `meta-retry/<retry-click>` (S:991);
+  a reused key with the same payload returns the earlier click's status and runs
+  nothing (S:1119-1121), and with a different payload refuses with 409 (S:1122-1124).
+  Either way no fresh retry runs. The ledger's `:enacted` rule requires an `:approved`
+  predecessor (L:136-143), so a second enacted-stage entry is invalid, and
+  `:abandoned` validates only with `attempt = :attempt-limit` and reason
+  `:attempt-limit-exhausted` (L:158-161), so `retryBudgetSpent` cannot be recorded
+  today. M10b therefore touches the ledger, the adapter's id, the coordinator and the
+  runner. The table is the law; it is not weakened to fit.
 * Rev 9: `successfulTaskOutcome` is the only discharge, but `:successful-task-outcome`
   (T:126-128) means the ordinary task succeeded, not that it exercised the injured work.
   Whether a successful retry of different work tests the repair is not decided here.
