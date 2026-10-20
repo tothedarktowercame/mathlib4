@@ -2407,11 +2407,14 @@ inductive CloseAppend where
   | refused
   deriving DecidableEq, Repr
 
-/-- What the catch does with a throw raised while closing. Today
-(`(R run-opportunity-core!)`, the `@closing?` branch): it calls `(C close-attempt!)` without
-first writing the required sorries the rethrow skipped, so the cohort refuses
-`:required-checkpoints-missing`, and that second throw escapes to `(R run-opportunity!)`,
-which answers with an empty checkpoint map. -/
+/-- What the catch does with a throw raised while closing. Before F41: `(R close!)`'s
+fallback catch called `(C close-attempt!)` without first writing the required sorries the
+rethrow skipped, so the cohort refused `:required-checkpoints-missing`, and that second
+throw escaped to `(R run-opportunity!)`, which answers with an empty checkpoint map.
+(Rev 30 placed this in the `@closing?` branch of `(R run-opportunity-core!)`'s catch, and
+the F41 packet sent codex-1 there; codex-1's own test showed that branch is never reached
+on this path, since `(R close!)` is called from inside that catch's handler and a throw
+from a handler leaves the whole form. Rev 32 corrects the place; the shape is unchanged.) -/
 inductive CloseBoundary where
   | closedBuildFailed
   | initializationIdentity
@@ -2439,9 +2442,13 @@ theorem click13_recordErased :
     (retainedSourceAtClose true .refused).carriesAction = false ∧
       retainedSourceAtClose true .accepted = .judgment := by decide
 
-/-- F41: the closing branch writes the missing required sorries before the cohort close and,
-if the close is still refused, returns the `:build-failed` result with its checkpoints and
-the refusal typed, instead of letting the throw escape. -/
+/-- F41: `(R close!)`'s fallback writes the required sorries the cohort does not yet hold
+(keyed on the durable event set, not the in-memory keys) before the cohort close and, if the
+close is still refused, returns the `:build-failed` result with its checkpoints and the
+refusal typed as `:close-refusal`, instead of letting the throw escape. Landed on futon2
+main as `11c14d081` (2026-10-20 22:27Z; codex-1's test, the fix moved by claude-5), runner
+reloaded 22:29Z; test `f41_close_refusal_retention_test`, 20 assertions, including the bad
+case with `(C close-attempt!)` made to throw. -/
 def closeBoundaryF41 : CloseAppend → CloseBoundary
   | _ => .closedBuildFailed
 
@@ -2450,7 +2457,7 @@ def retainedSourceF41 (judgmentRetained : Bool) (a : CloseAppend) : RecordDecisi
   | .closedBuildFailed => retainedSourceF40b judgmentRetained
   | .initializationIdentity => .erased
 
-/-- Prediction for the next click after F41 lands, before F42 shrinks the cell: the sealed
+/-- Prediction for click 14, the first click after F41 landed, before F42 shrinks the cell: the sealed
 route's cell is refused again, the attempt closes `:build-failed` with
 `:cohort-checkpoint-oversized`, and the record keeps the action whichever cell exists. Not
 a heal: the close is still a refusal, which F42 removes. The model predicts nothing past
