@@ -971,8 +971,8 @@ inductive ClosingStatus where
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the same
   computed status (C:426 at this HEAD), `:abandoned` when
   `(L append-retry-result :attempt-limit-exhausted)` takes its first arm. A second
-  `:abandoned` literal exists, `(C coordinate-queued-retry :retry-budget-spent)` (C:261);
-  that one is `RetryNext.abandoned .retryBudgetSpent`, not this constructor. -/
+  abandoned literal exists at C:261; it is `RetryNext.abandoned .retryBudgetSpent`, not
+  this constructor: `(not C coordinate-queued-retry :retry-budget-spent)`. -/
   | abandoned
   /-- `:awaiting-retry` (C:349): the retry port queued the retry click. The production
   retry port only persists and enqueues, so this is the closing status a production
@@ -986,7 +986,8 @@ inductive ClosingStatus where
   and active.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): not a `coordinate` status. It is the retry
   click's `(T integrate :retry-inconclusive)` observation: the non-injury arm for every
-  reason but `:successful-task-outcome` (T:236), and
+  reason except a successful task outcome (T:236), `(not T classify :successful-task-outcome)`,
+  and
   `(T append-other-injury-retry-observation :retry-inconclusive)` (T:189). -/
   | retryInconclusive
   deriving DecidableEq, Repr
@@ -1330,10 +1331,20 @@ theorem closingToday_eq_closing (b : Bool) (o : RetryClickOutcome) :
 
 /-- Why an injury was abandoned. -/
 inductive AbandonReason where
-  /-- `:attempt-limit-exhausted` (L:314): the next authoring would exceed `:attempt-limit`. -/
+  /-- `:attempt-limit-exhausted` (L:314): the next authoring would exceed `:attempt-limit`.
+  Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(L append-retry-result :attempt-limit-exhausted)`
+  (L:360 at this HEAD; the L:314 cite is from before L moved), reached through
+  `(C coordinate ledger/append-retry-result)`. `validate-ledger`'s abandonment check
+  (L:173) accepts it only at `attempt = limit`. -/
   | attemptLimitExhausted
   /-- Rev 9 (new, M10b): the re-queue budget for inconclusive retries is spent. A re-queue
-  authors nothing, so it does not count against `:attempt-limit`. -/
+  authors nothing, so it does not count against `:attempt-limit`.
+  Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(L append-requeue :retry-budget-spent)` (L:397), the
+  arm where the entry's requeue count has reached the ledger's retry limit (L:394), with
+  the attempt carried over unchanged. `(C coordinate-queued-retry :retry-budget-spent)`
+  (C:261) returns it, after reading the appended entry's state (C:260), before any
+  retry port call. `validate-ledger` accepts it only when the requeue count equals the
+  retry limit (L:174-176). -/
   | retryBudgetSpent
   deriving DecidableEq, Repr
 
@@ -1346,12 +1357,30 @@ structure RetryEntry where
 
 /-- What the injury does after a retry click closes. -/
 inductive RetryNext where
-  /-- A fresh retry click is queued for the same enacted entry. -/
+  /-- A fresh retry click is queued for the same enacted entry.
+  Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(C coordinate-queued-retry ledger/append-requeue)`
+  (C:258), on the arm where `ledger/pending-requeue` (C:247, L:331) finds the attributed
+  observation, and then `(L append-requeue :enacted)` (L:402), a new enacted entry with a
+  new retry click. The entry's fields: `attempt` is the ledger's attempt, copied from the
+  previous entry (L:392); `requeues` is the ledger's requeue count, read at L:390 and
+  written incremented at L:404. On the `recur` (C:267), C reads that count back (C:232)
+  and, being positive, calls the retry port with the requeue ordinal (C:233-238). The
+  queued click then ends the same way as `awaitingNothingQueued`: the new entry has no
+  observation yet, so `coordinate` returns the awaiting-retry status. In the code the
+  two constructors differ by the appended entry and the port call, not by the status. -/
   | queued (entry : RetryEntry)
-  /-- The transaction ends `:awaiting-retry`, and nothing is queued. -/
+  /-- The transaction ends `:awaiting-retry`, and nothing is queued.
+  Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): `(C coordinate-queued-retry :awaiting-retry)`
+  (C:248), the arm where `ledger/pending-requeue` (C:247) returns nil. -/
   | awaitingNothingQueued
+  /-- Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): no producing site of its own; see
+  `ClosingStatus.discharged`, which `next` passes through. -/
   | discharged
+  /-- Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): no producing site of its own; see
+  `ClosingStatus.reopened`, which `next` passes through. -/
   | reopened
+  /-- Rev 15 anchor (futon2 `5a066d9ab`; C and L unchanged since `aa3ec313b`): no producing site of its own; see the
+  two `AbandonReason` constructors, which carry the sites. -/
   | abandoned (reason : AbandonReason)
   deriving DecidableEq, Repr
 
