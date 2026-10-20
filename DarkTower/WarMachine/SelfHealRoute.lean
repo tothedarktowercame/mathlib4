@@ -1152,10 +1152,17 @@ theorem retryPaths_conform :
 (T:185-275) receives it. -/
 inductive RetryClickOutcome where
   /-- `:successful-task-outcome` (T:126-128): no failure kind, and an outcome in
-  `successful-outcomes` (T:15). The only outcome that tests the repair and passes. -/
+  `successful-outcomes` (T:15). The only outcome that tests the repair and passes.
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T classify :successful-task-outcome)`, the `non-injury-reason` arm for a nil
+  failure kind and an outcome in `successful-outcomes`; `integrate` then appends
+  `(T integrate :discharged)` for the enacted entry. -/
   | successfulTaskOutcome
   /-- `:injury` with the enacted entry's injury id: `append-retry-result` (T:244, L:299-317).
-  The retry failed for the same cause. -/
+  The retry failed for the same cause.
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T integrate ledger/append-retry-result)`, the arm
+  `(= :enacted (:state previous))` with `(= (:retry-click previous) (:click-id classification))`;
+  the transition is the computed `(get-in appended [:entry :state])`, so there is no
+  keyword literal. -/
   | sameInjury
   /-- `:injury` with a different injury id, and the record is ingested. Cited at futon2
   `b5dd9269c` (M10b-4). `integrate` binds `other-injury-retry?` (T:247-251). If the
@@ -1164,7 +1171,10 @@ inductive RetryClickOutcome where
   attributed `:retry-inconclusive` observation for the enacted entry through
   `append-other-injury-retry-observation` (T:185-196). The enacted entry's state is
   untouched. Added in rev 8 (finding) and widened by the rev 8 review. Rev 11 split off
-  the refused arms as `otherInjuryRefused`. -/
+  the refused arms as `otherInjuryRefused`.
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T append-other-injury-retry-observation :retry-inconclusive)`,
+  called from `(T integrate)` on the `(nil? previous)` arm with transition `:open` and on
+  the `ledger/active-states` arm with transition `:active-injury-retained`. -/
   | otherInjury
   /-- Rev 11: `:injury` with a different injury id, and the record is refused, not
   ingested (at `b5dd9269c`). This happens when the different id is itself `:enacted` and
@@ -1174,26 +1184,51 @@ inductive RetryClickOutcome where
   written and the pin stays un-ingested. It is a separate constructor, not an
   unobserved `otherInjury`, because the coordinator receives a refusal rather than an
   ingested record without an observation. Under the law it is still inconclusive for the
-  enacted injury. -/
+  enacted injury.
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T integrate :injury/retry-click-mismatch)`,
+  `(T integrate :injury/terminal-history-requires-new-transaction)`. -/
   | otherInjuryRefused
-  /-- `:ordinary-selection-abstention` (T:82): an abstention. -/
+  /-- `:ordinary-selection-abstention` (T:82): an abstention.
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T abstention-reason :ordinary-selection-abstention)`, the `:else`
+  arm, reached from `classify` when the failure kind is `:abstained` and the route is
+  configured. The `{:abstained :ordinary-selection-abstention}` entry of
+  `explicit-non-injury-kinds` is never read for it: `classify` takes the `:abstained`
+  branch first. -/
   | ordinarySelectionAbstention
-  /-- `:evaluated-no-action` (T:81, T:66-70): scored, and no action chosen. -/
+  /-- `:evaluated-no-action` (T:81, T:66-70): scored, and no action chosen.
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T abstention-reason :evaluated-no-action)`, guarded by
+  `evaluated-no-action?` (`:policy-nondiscrimination` among the causes). -/
   | evaluatedNoAction
-  /-- `:partial-frontier-continuation` (T:80, T:71-76). -/
+  /-- `:partial-frontier-continuation` (T:80, T:71-76).
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T abstention-reason :partial-frontier-continuation)`, guarded by
+  `partial-frontier-continuation?`. -/
   | partialFrontierContinuation
-  /-- `:operator-cancelled` (T:12). -/
+  /-- `:operator-cancelled` (T:12).
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T explicit-non-injury-kinds :operator-cancelled)`, read in
+  `classify`'s `non-injury-reason`. -/
   | operatorCancelled
-  /-- `:declared-no-work` (T:13). -/
+  /-- `:declared-no-work` (T:13).
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T explicit-non-injury-kinds :declared-no-work)`, read in
+  `classify`'s `non-injury-reason`. -/
   | declaredNoWork
-  /-- `:diagnostic-only` (T:14). -/
+  /-- `:diagnostic-only` (T:14).
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T explicit-non-injury-kinds :diagnostic-only)`, read in
+  `classify`'s `non-injury-reason`. -/
   | diagnosticOnly
-  /-- `:absent-terminal-failure` (T:129-130): no failure kind and no outcome. -/
+  /-- `:absent-terminal-failure` (T:129-130): no failure kind and no outcome.
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T classify :absent-terminal-failure)`, the `non-injury-reason` arm for a nil
+  failure kind and a nil outcome. -/
   | absentTerminalFailure
   /-- Rev 9: the retry click left no record that can be read. Then nothing reaches
   `integrate`, and the entry stays `:enacted`. Absence is evidence of neither success nor
   failure, so this is inconclusive (the 2026-09-24 rule that absence must not read as a
-  value). -/
+  value).
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): no producing site in T for a retry that wrote no record:
+  nothing is ingested. A record that exists but cannot be ingested stops before
+  `integrate` at `(meta-injury-store ingest-record-file! :store/record-ingest-failed)` or at
+  `read-one-form`'s non-`:read` result (that file has no tag), and a record that does not
+  classify stops at `(T classify :terminal-record/malformed)`. Reading those as this
+  constructor is my reading, not something the Lean states. -/
   | recordUnreadable
   deriving DecidableEq, Repr
 
