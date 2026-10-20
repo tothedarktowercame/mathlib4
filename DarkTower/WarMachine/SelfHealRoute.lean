@@ -554,9 +554,12 @@ theorem witnesses_reachReadiness :
 /-! ## Rev 5: coordination outcomes -/
 
 /-- Where the checkpoint loop stopped (`checkpoints`, P:12), or `final` for the
-`coordinate` call after the loop, which runs without `:stop-after`. -/
+`coordinate` call after the loop, which runs without `:stop-after`. The record's
+`:phase` is the coordinator's own when it gives one (`:port-receipt-refused` C:188 and
+`:port-threw` C:194 carry the port's phase), else the loop's; so `retry` can appear: the
+retry port (C:337) runs inside the final call. Rev 5 review (claude-5, 2026-10-20). -/
 inductive CoordinationPhase where
-  | claim | author | review | enact | final
+  | claim | author | review | enact | retry | final
   deriving DecidableEq, Repr
 
 /-- `:held` reasons (`held!`, C:208). The port answered and the transaction waits. -/
