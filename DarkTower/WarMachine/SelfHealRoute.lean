@@ -2238,4 +2238,127 @@ theorem d755c886_requeueBudget :
     RetryClickOutcome.otherInjury.nextToday false true ⟨4, 3⟩ = .abandoned .retryBudgetSpent := by
   decide
 
+/-! ## Rev 28: the retry child's `:no-selection` read at its source; F40 named -/
+
+/-- The route by which a judge's decision becomes the runner's selected entry,
+`(R selected-entry)`: the posterior law `(R selected-entry :cascade-selection-posterior)`, the
+META algorithm law `(R selected-entry :meta-algorithm-selection)`, or the sealed outer-policy
+handoff of 2026-10-19 (futon2 `9946f92c1`, activated by `926429651`):
+`(W cascade-decision :selected-outer-cascade-policy)` projects the verified carrier through
+`selected-outer-cascade-policy/decision` into a decision with `:status :selected`, the sealed
+entry's `:action`, and `:selection-certificate {:selection-route
+:wm/selected-outer-cascade-policy-v1 …}`, and no `:selection-law`. The retry child's judge
+decision in the daily trace (`wm-trace-2026-10-20.edn`, run `881a8839`) is exactly that:
+status selected, action `M-formal-war-machine/policy-95a29538723f94edfa51`, route set, law nil.
+The outer receipt on the run record agrees (`:chosen` M-formal-war-machine, the sealed menu of
+seven, objective `:selected`). -/
+inductive SelectionRoute where
+  | posteriorLaw
+  | metaAlgorithm
+  | sealedOuterPolicy
+  deriving DecidableEq, Repr
+
+/-- `(R selected-entry)` at futon2 `aba9749d6`: a `cond` with an arm for each law and
+`:else nil`. Nothing in the runner or the runtime reads `:selection-route`, so a sealed outer
+policy yields no entry, the runner throws "selected no addressable action", and the click
+closes `:no-selection` (`(R no-entry-failure-data)`: the decision's status is not
+`:abstained`) with a chosen target on its outer receipt. The child was the first ordinary
+run to take the sealed route; the run before it on the same branch (`08771834`, 10-19
+17:40Z) had an outer selector that chose nothing and abstained typed. -/
+def SelectionRoute.entryBeforeF40 : SelectionRoute → Bool
+  | .posteriorLaw => true
+  | .metaAlgorithm => true
+  | .sealedOuterPolicy => false
+
+/-- F40a: `(R selected-entry)` admits the sealed route. A decision whose certificate names
+`:wm/selected-outer-cascade-policy-v1` and carries a map action and the selected canonical
+cascade is the entry, with the sealed entry's own scores. -/
+def SelectionRoute.entryF40 : SelectionRoute → Bool
+  | _ => true
+
+theorem sealedOuterPolicy_needsF40 :
+    SelectionRoute.sealedOuterPolicy.entryBeforeF40 = false ∧
+      SelectionRoute.sealedOuterPolicy.entryF40 = true := by decide
+
+/-- Where the run record's `:decision` comes from (`(R persist-run-record!)`,
+`retained-decision`): the selection checkpoint's judgment cell, else the `:no-selection`
+sorry cell's decision when it has an action. A judgment cell is written only for a selected
+entry (`(R retain-selection!)`), but `(R reconcile-selection-publication)` writes the
+accumulation receipt into `[:judgment :controller-decision :accumulation]` of whatever cell
+is there, and on a sorry cell that creates a judgment cell holding the two receipts and
+nothing else. The `or` takes that stub before the sorry's decision. -/
+inductive RecordDecisionSource where
+  | judgment
+  | accumulationStub
+  | sorryDecision
+  deriving DecidableEq, Repr
+
+def RecordDecisionSource.carriesAction : RecordDecisionSource → Bool
+  | .judgment => true
+  | .accumulationStub => false
+  | .sorryDecision => true
+
+/-- The source retained today, given whether a selected judgment cell exists and whether
+the close wrote the accumulation stub onto a sorry cell. -/
+def retainedSourceBeforeF40b (judgmentRetained stubWritten : Bool) : RecordDecisionSource :=
+  if judgmentRetained then .judgment
+  else if stubWritten then .accumulationStub
+  else .sorryDecision
+
+/-- F40b: the stub is never a decision; without a selected judgment the sorry cell's decision
+is the record's decision, receipts and all. -/
+def retainedSourceF40b (judgmentRetained : Bool) : RecordDecisionSource :=
+  if judgmentRetained then .judgment else .sorryDecision
+
+/-- **The retry child's record misreports its own cause.** No judgment cell (no entry); the
+stub was written at close (`:accumulation` with this run's tick id is the only decision key
+the record kept besides the carriers computed at persist); so the record says no chosen
+action (`:chosen {:status :absent :reason :no-chosen-action}`, `:selection-event
+:selection-abstained`, `:abstention :not-abstained`, four loop nodes `:refused …-not-retained`)
+while the trace holds the action. Injury `821c15d0`'s evidence pin is this record, so a
+diagnosis read from the pin alone would repair the wrong thing. -/
+theorem click11Retry_recordShadowed :
+    (retainedSourceBeforeF40b false true).carriesAction = false ∧
+      (retainedSourceF40b false).carriesAction = true := by decide
+
+/-- Whether an abandonment carries a `:port-receipt-pin`.
+`(L append-retry-result :attempt-limit-exhausted)` keeps the proposed entry's pin (the
+author-failed path supplies one; ordinal 11 of the live ledger has it).
+`(L append-requeue :retry-budget-spent)` builds its entry from the injury id, attempt and
+repair id alone: no pin, ever. -/
+def AbandonReason.pinned : AbandonReason → Bool → Bool
+  | .attemptLimitExhausted, proposedPin => proposedPin
+  | .retryBudgetSpent, _ => false
+
+/-- F35's corrected reopen may cite only this injury's refused receipt pins
+(`(L refused-receipt-pins)`: the `:author-failed` reopens and the abandonment, each once,
+`(L state-defects :reopen/correction-pins-unknown)`), so a reopen from an abandonment is
+reachable only when the abandonment, or an unspent earlier author failure, left a pin. -/
+def correctedReopenReachable (r : AbandonReason) (proposedPin unspentRefusalPin : Bool) : Bool :=
+  r.pinned proposedPin || unspentRefusalPin
+
+/-- **Law gap (rev 28).** An injury abandoned `retryBudgetSpent` has no pin of its own to
+cite, and no other transition leaves `abandoned`. For `d755c886` the two F33 refusals
+(ordinals 9 and 11) were spent by ordinal 12's correction, so a third inconclusive child
+closes it for good. The next law after F40: a budget-spent abandonment must name what the
+inconclusive children refused on, or the re-queue must not count children that failed on
+another open injury. -/
+theorem budgetSpent_noReopen (p : Bool) :
+    correctedReopenReachable .retryBudgetSpent p false = false := by
+  cases p <;> rfl
+
+/-- **The three re-queue clicks, predicted before any runs.** Without F40 a child whose outer
+selector seals a policy again closes `:no-selection` again, repeats or reopens `821c15d0`,
+and leaves another `:retry-inconclusive` observation; the third such child abandons
+`d755c886` `retryBudgetSpent` with no pin to reopen from. Whether the outer selector seals a
+policy again is not proved from the record (the `:selection-input-digest` is one input of
+several); what is proved is that if it does, the child cannot reach the loop node. So the
+clicks wait on F40, and the child is predicted after F40 lands. -/
+theorem requeuedChildren_beforeF40 (p : Bool) :
+    SelectionRoute.sealedOuterPolicy.entryBeforeF40 = false ∧
+      RetryClickOutcome.otherInjury.nextToday false true ⟨4, 3⟩ = .abandoned .retryBudgetSpent ∧
+      correctedReopenReachable .retryBudgetSpent p false = false := by
+  refine ⟨by decide, by decide, ?_⟩
+  cases p <;> rfl
+
 end DarkTower.WarMachine.SelfHealRoute
