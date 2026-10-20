@@ -52,7 +52,7 @@ A = futon3c `840251d7c` `src/futon3c/wm/meta_self_heal_adapters.clj`.
 
 **Hole (not decided).** Should a bounded run whose test does not compile refuse at
 admission, before a reviewer invoke, as F16 does for passes-before-repair? Today the
-runner records it as `:failed` exit 1 (A:373, click `1a6de51f`), so nothing before
+runner records it as `:failed` exit 1 (A:617-620, click `1a6de51f`), so nothing before
 review can tell it from a test that fails for the injury.
 
 Revision 5 (claude-2, 2026-10-20, packet M4L from claude-5): the coordination stage
@@ -75,7 +75,7 @@ on 2026-10-19 stopped at the author/reviewer boundary or earlier. The first clic
 reaches coordination after M4a is live is the witness for a later revision.
 
 **Holes (rev 5, not decided).**
-* #54: an admission receipt can fail to persist after an accepted review (P:650), and
+* #54: an admission receipt can fail to persist after an accepted review (P:730-744), and
   there is no edge from `reviewAccepted` to a refusal.
 * The attributable retry path (class 5) is still not transcribed.
 * #5: `route!` returns nil when the active set is not computed, so the click runs ordinary
@@ -93,7 +93,7 @@ corrected: `ledgerUnreadable` is reachable from the start without `activeInjury`
 
 The table elides the acceptance observation that the runtime makes after a decision taken
 at the read. `run-opportunity!` always calls `prepare-acceptance`, and a diagnosis that is
-not `:available` gives `:acceptance-diagnosis-unavailable` (P:685). So a runtime conforms
+not `:available` gives `:acceptance-diagnosis-unavailable` (P:765). So a runtime conforms
 to `(ledgerRead, ledgerUnreadable)` and `(activeSetUnavailable, terminalRecord)` only if
 it ends the click before that observation, or if the observation is dropped from the
 record. `fallthrough_5_today` keeps the observation, because it describes today's code.
@@ -111,7 +111,7 @@ clicks all had a computed active set.
   futon2 `05e71feb9`: `meta_injury_store.clj` L36-49 `load-ledger` refuses
   `:store/tampered-ledger` unless `validate-ledger` is `:valid`, and
   `meta_injury_ledger.clj` L284-288 `active-injuries` runs the same `validate-ledger`
-  on the same in-memory value (`diagnosis-context`, P:761-764). `validate-ledger`
+  on the same in-memory value (`diagnosis-context`, P:865-866). `validate-ledger`
   (L231) reads no clock and does no IO, so the second check cannot disagree with the
   first. A throw inside `transitions` would escape as an exception rather than give
   `:unavailable`. The state is reachable only by construction, like
@@ -127,7 +127,7 @@ T = `meta_terminal_injury.clj`, I = `meta_injury_store.clj`; A and S = futon3c `
 `wm/meta_self_heal_adapters.clj` and `wm/runner_service.clj`.
 
 **How the retry closes the injury** (packet question, settled by reading). The retry
-port never answers anything except `:queued` (A:480-495). The injury is closed by the
+port never answers anything except `:queued` (A:742-758). The injury is closed by the
 child click's own terminal record: the ordinary runner's `:meta-terminal-injury-ingest`
 sink (futon2 `full_loop_runner.clj` L8256-8266) calls `ingest-record-file!` (I:136),
 which calls `transact-classification!` (I:111), which calls `terminal/integrate`. When
@@ -149,7 +149,7 @@ not in it: rev 5's `ClosingStatus` names its outcomes, and no state is added for
   code, not a modelling choice.
 * A retry click that writes no run record leaves the injury `:enacted`, which is still
   an active state. The next click routes it again: `route!` resumes `transaction.edn`
-  (P:705-710), and `coordinate` replays the recorded `:queued` retry receipt (C:178,
+  (P:1053-1056), and `coordinate` replays the recorded `:queued` retry receipt (C:178,
   `invoke-once`) and ends `:awaiting-retry`. The retry port is not called again, so no
   child is queued. By reading, every later click then ends `:awaiting-retry` with no
   retry. Not run.
@@ -179,7 +179,7 @@ discharges nor reopens. Today's discharge-on-abstention is the violation witness
 * Rev 9 said (2026-10-20, M11L), with the commit that answered each sentence
   (rev 10, read at futon2 `493388b7b` and futon3c `7efc13bd8`):
   - "a re-queue at the same attempt would reuse the id": answered by futon3c
-    `e4f58cfc4`. `retry-click-id` mints by ordinal (A:414-426); ordinal 0 keeps
+    `e4f58cfc4`. `retry-click-id` mints by ordinal (A:660-672); ordinal 0 keeps
     `wm-retry-...`, and positive ordinals give the disjoint `wm-requeue-<n>-...`.
   - "either way no fresh retry runs": answered by futon3c `f2e5a9fa6` and `7efc13bd8`.
     The child is keyed `meta-retry/<retry-click>` (S:997), and a re-queue carries a fresh
@@ -283,9 +283,9 @@ inductive RouteTerm where
 carried are record detail for the certificate producer, not part of the
 state. -/
 inductive RouteState where
-  /-- Rev 6: the one ledger read, `diagnosis-context` (P:845). `prepare-diagnosis` (P:859)
-  and `production-readiness` (P:891) decide from it, before any injury is known.
-  Order error 3: `route!` reads the ledger a second time (P lines 1017-1019), and that read has no
+  /-- Rev 6: the one ledger read, `diagnosis-context` (P:857). `prepare-diagnosis` (P:871)
+  and `production-readiness` (P:903) decide from it, before any injury is known.
+  Order error 3: `route!` reads the ledger a second time (P lines 1029-1031), and that read has no
   state here. A runtime that reads twice conforms only while the two reads agree. M6a is
   to make `route!` use the context's read.
   Rev 8 note: with one read, a stale context overwrites a ledger file that changed
@@ -327,7 +327,7 @@ inductive RouteState where
   `(R run-opportunity! retry)`, and its one site is the observation
   `(R run-opportunity! {:status :not-required :reason :meta-self-heal/acceptance-retry-not-prepared})`. -/
   | retryClick
-  /-- Rev 7: `attributable-retry-readiness` (P:990-1010) returns `:ready` with the
+  /-- Rev 7: `attributable-retry-readiness` (P:1002-1022) returns `:ready` with the
   attribution. The retry then runs ordinary work (R lines 511-513), and `route!` is not
   called.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P attributable-retry-readiness {:status :ready :attribution})`,
@@ -483,14 +483,14 @@ prepare acceptance (propose, run, review), readiness, route, enact. Every
 acceptance observation, refused or not, is followed by readiness; typed
 refusal dispositions end at `terminalRecord`, never at ordinary selection. -/
 def transitions : List (RouteState × RouteState) :=
-  [ -- rev 6: the ledger read decides #3/#6 (P:780, P:789), #4 (P:783; P:831 at
-    -- readiness is the same fact), #5 (P:780), or an active injury.
+  [ -- rev 6: the ledger read decides #3/#6 (P:888, P:894), #4 (P:891; P:937 at
+    -- readiness is the same fact), #5 (P:880), or an active injury.
     (ledgerRead, noActiveInjury),
     (ledgerRead, activeInjury),
     (ledgerRead, ledgerUnreadable),
     (ledgerRead, activeSetUnavailable),
     (activeSetUnavailable, terminalRecord),
-    -- rev 7: the retry click, a separate start (S:983-996, R:473-505, P:896-915).
+    -- rev 7: the retry click, a separate start (S:983-996, R:473-505, P:1002-1022).
     (retryClick, retryReady),
     (retryClick, retryRefused),
     (retryRefused, terminalRecord),
@@ -724,12 +724,12 @@ theorem preparationRefused_terminates :
 at `proposalRefused`. -/
 inductive ProposalDefect where
   /-- Transport or seat failure on the author's proposal invoke:
-  `:producer-invoke-failed` (A:455) or `:producer-seat-unavailable` (A:450),
+  `:producer-invoke-failed` (A:458) or `:producer-seat-unavailable` (A:453),
   carried as `:acceptance-reason` of `:acceptance-unavailable` (P:508).
   Unwitnessed at proposal on disk. -/
   | transport
   /-- The author answered, but not with one EDN map: `:producer-response-malformed`
-  (A:466) as `:acceptance-reason` of `:acceptance-unavailable` (P:508).
+  (A:469) as `:acceptance-reason` of `:acceptance-unavailable` (P:508).
   Witness: click `8df4e8d2`.
   Note (futon3c `33f7fc241`): a map whose test source does not read is not this
   constructor. A removes the one surplus delimiter the reader names (F23, `:repaired`)
@@ -750,24 +750,31 @@ inductive ProposalDefect where
   | unresolvableFunction
   deriving DecidableEq, Repr
 
-/-- Why `admit-acceptance!` did not return `:accepted`. -/
+/-- Why `admit-acceptance!` did not return `:accepted`.
+Note (futon2 `ef89bd061`): two refusals after the review have no constructor here.
+`:acceptance-review-malformed` (P:700) is a review port that returned no map.
+`:acceptance-review-identity-mismatch` (P:710-718, F24) is an accepted review whose
+identity differs from the request's: `:injury-id`, `:source-record-pin`,
+`:diagnosis-evidence-pin`, `:proposal-evidence-pin`, and the acceptance test's `:id`,
+`:command` and `:expected` (P:682-689); a `:source` echo is ignored. That refusal
+carries `:review-identity {:differs … :response-keys …}`. -/
 inductive AdmissionDefect where
-  /-- `:acceptance-run-refused` (P:686): the bounded run did not return a valid `:ran`
-  result. It covers `:acceptance-unit-launch-failed` (A:602),
-  `:acceptance-source-path-refused` and `:acceptance-command-not-admissible` (A:633-642),
-  the un-namespaced `:acceptance-test-id-invalid` (A:636), and the run port throwing,
+  /-- `:acceptance-run-refused` (P:692): the bounded run did not return a valid `:ran`
+  result. It covers `:acceptance-unit-launch-failed` (A:605),
+  `:acceptance-source-path-refused` and `:acceptance-command-not-admissible` (A:636-645),
+  the un-namespaced `:acceptance-test-id-invalid` (A:639), and the run port throwing,
   `:acceptance-run-threw` (P:656). Unwitnessed. -/
   | runRefused
-  /-- `:acceptance-test-passes-before-repair` (P:690, F16): refused before any reviewer
+  /-- `:acceptance-test-passes-before-repair` (P:696, F16): refused before any reviewer
   invoke. Unwitnessed on a click (off-click replay 5 only). -/
   | passesBeforeRepair
-  /-- `:acceptance-review-refused` (P:696) with `:review-status :failed`: there is no
-  reviewer answer that could be read. That covers a transport or seat failure (A:450,
-  A:455), a malformed answer (A:466), or the review port throwing (P:680); widened in
+  /-- `:acceptance-review-refused` (P:702) with `:review-status :failed`: there is no
+  reviewer answer that could be read. That covers a transport or seat failure (A:453,
+  A:458), a malformed answer (A:469), or the review port throwing (P:680); widened in
   rev 8 to match the checker and refusal-totality #48b (M8R). Witnesses: clicks
   `36b47627`, `fdc08aea`, `78180753` (429). -/
   | noReviewerAnswer
-  /-- `:acceptance-review-refused` (P:696) with `:review-status :refused`: the reviewer
+  /-- `:acceptance-review-refused` (P:702) with `:review-status :refused`: the reviewer
   answered on the merits. Witnesses: click `1a6de51f`
   (`:acceptance-test-did-not-fail-for-injury-reason`) and click `6cdf2a7c` (reason not
   recorded, under the pre-run contract). -/
@@ -790,7 +797,7 @@ def BoundaryDefect.state : BoundaryDefect → RouteState
   | .admission .noReviewerAnswer => admissionRefused
   | .admission .reviewerRefused => reviewRefused
 
-/-- What a bounded run recorded (A:498-499). A test that does not compile is recorded
+/-- What a bounded run recorded (A:617-620, A:626). A test that does not compile is recorded
 `failed` (see the module hole). -/
 inductive RunOutcome where
   | passed | failed | errored
@@ -955,7 +962,7 @@ inductive CoordinatorRefusal where
   deriving DecidableEq, Repr
 
 /-- The two writes after a `:checkpoint` result (`:meta-self-heal/checkpoint-persist-failed`,
-P:990). -/
+P:1118). -/
 inductive PersistWrite where
   | ledgerWrite | transactionWrite
   deriving DecidableEq, Repr
@@ -1057,7 +1064,7 @@ theorem outcomes_reachable (o : CoordinationOutcome) : reaches routeEnacted o.st
 /-- Row #66: what today's `route!` records when `coordinate` refuses with no ledger
 (`:coordinator/input-refused`, at the claim checkpoint). `store/persist-ledger!` refuses
 the missing ledger, and the loop reports `:meta-self-heal/checkpoint-persist-failed`
-(P:990). -/
+(P:1118). -/
 def coordination_66_reportedToday : CoordinationObservation :=
   { state := persistRefused, phase := .claim, outcome := .persistFailed .ledgerWrite }
 
@@ -1097,11 +1104,11 @@ theorem ledgerUnreadable_withoutInjury :
     conformsPath [ledgerRead, ledgerUnreadable, terminalRecord] = true := by decide
 
 /-- Row #5 as today's runtime runs it:
-* `ledgerRead → activeSetUnavailable`: `prepare-diagnosis` (P:780);
-* `→ acceptanceUnavailable`: `prepare-acceptance`'s `:else` (P:685);
+* `ledgerRead → activeSetUnavailable`: `prepare-diagnosis` (P:880-882);
+* `→ acceptanceUnavailable`: `prepare-acceptance`'s `:else` (P:764-767);
 * `→ readinessReady`: `production-readiness` `:else` with `:active-injury? false`
-  (P:846), since `(seq (:injuries active))` is nil and no port term is required;
-* `→ ordinarySelection`: `route!` reads again and returns nil (P:923-926), and
+  (P:952), since `(seq (:injuries active))` is nil and no port term is required;
+* `→ ordinarySelection`: `route!` reads again and returns nil (P:1029-1039), and
   `(or routed (run-ordinary-opportunity! …))` runs ordinary work (S:502-503).
 
 The packet's version omitted the acceptance observation. -/
@@ -1126,14 +1133,14 @@ theorem fallthrough_5_elided_isViolation :
 
 /-! ## Rev 7: the retry click -/
 
-/-- The four fields `attributable-retry-readiness` compares (P:909-913): the supplied
+/-- The four fields `attributable-retry-readiness` compares (P:1015-1018): the supplied
 retry against the last `:enacted` entry, and the patch sha against its `:authored`
 entry. -/
 inductive RetryField where
   | injuryId | repairId | retryClick | patchSha
   deriving DecidableEq, Repr
 
-/-- Why the attribution refused (P:905-914). Every constructor is placed at
+/-- Why the attribution refused (P:1017-1022). Every constructor is placed at
 `retryRefused`. -/
 inductive RetryAttributionDefect where
   /-- The ledger did not load (`(= :loaded (:status durable))` fails). -/
@@ -1409,7 +1416,7 @@ def RetryClickOutcome.next (budgetSpent retriesSpent : Bool) (o : RetryClickOutc
 
 /-- The next step before futon2 `aa3ec313b` (M10b-3b), at `11fe9094a`. Kept as the record
 of the disagreement that M10b removed. After an inconclusive close the entry stayed
-`:enacted`. The next click resumed `transaction.edn` (P:705-710). `coordinate` reaches the retry phase, `invoke-once` finds
+`:enacted`. The next click resumed `transaction.edn` (P:1053-1056). `coordinate` reaches the retry phase, `invoke-once` finds
 the recorded `:queued` receipt and returns it without calling the port (C:177-179). The
 `:queued` branch then ends `:awaiting-retry` (C:348-352), and no child is queued. -/
 def RetryClickOutcome.nextBeforeAa3ec313b (budgetSpent : Bool) (o : RetryClickOutcome)
@@ -1475,7 +1482,7 @@ def RetryClickOutcome.observedInconclusive : RetryClickOutcome → Bool
 /-- The next step today (futon2 `aa3ec313b`, wired by futon3c `7efc13bd8` and futon2
 `493388b7b`). The `:queued` branch of the retry phase enters `coordinate-queued-retry`
 (C:401-402, C:227-267). When `pending-requeue` finds the observation (C:247), it mints
-`(retry-click-id repair-id attempt (inc n))` (C:252-257, A:414-426) and calls
+`(retry-click-id repair-id attempt (inc n))` (C:252-257, A:660-672) and calls
 `append-requeue` (C:258). With `requeues >= retry-limit` (L:394) that appends `:abandoned
 :retry-budget-spent` (L:397-398), and the coordinator returns with no port call (C:261).
 Otherwise it appends a new enacted-stage entry with the same `:attempt` and
