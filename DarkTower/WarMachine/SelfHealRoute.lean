@@ -133,7 +133,7 @@ sink (futon2 `full_loop_runner.clj` L8256-8266) calls `ingest-record-file!` (I:1
 which calls `transact-classification!` (I:111), which calls `terminal/integrate`. When
 the classification's click id equals the `:enacted` entry's `:retry-click`, `integrate`
 does one of two things:
-* a `:non-injury` record appends `:discharged` with `:outcome :success` (T:195-211);
+* a `:non-injury` record appends `:discharged` with `:outcome :success` (T:202-224; rev 8 review corrected the line);
 * an `:injury` record calls `append-retry-result`, giving `:reopened` or `:abandoned`
   (T:241-256).
 The close happens after `ordinarySelection → terminalRecord`, so it is beside the path,
@@ -218,7 +218,7 @@ carried are record detail for the certificate producer, not part of the
 state. -/
 inductive RouteState where
   /-- Rev 6: the one ledger read, `diagnosis-context` (P:755). `prepare-diagnosis` (P:769)
-  and `production-readiness` (P:797) decide from it, before any injury is known.
+  and `production-readiness` (P:801) decide from it, before any injury is known.
   Order error 3: `route!` reads the ledger a second time (P:923-925), and that read has no
   state here. A runtime that reads twice conforms only while the two reads agree. M6a is
   to make `route!` use the context's read.
@@ -230,7 +230,7 @@ inductive RouteState where
   | noActiveInjury
   | activeInjury
   /-- Rev 6, row #5: the ledger loaded, but `ledger/active-injuries` did not return
-  `:computed` (P:786, `:diagnosis-active-set-unavailable`). A terminal refusal. -/
+  `:computed` (P:780, `:diagnosis-active-set-unavailable`). A terminal refusal. -/
   | activeSetUnavailable
   /-- Rev 7: the start of a retry click. Its options carry `:meta-repair-retry`
   (S:989-995): the child of a parent that ended `:awaiting-retry`, launched only after
@@ -242,7 +242,7 @@ inductive RouteState where
   attribution. The retry then runs ordinary work (R:500-502), and `route!` is not
   called. -/
   | retryReady
-  /-- Rev 7, #57: `:meta-self-heal/retry-attribution-refused` (P:914), with `:expected`
+  /-- Rev 7, #57: `:meta-self-heal/retry-attribution-refused` (P:918), with `:expected`
   and `:supplied`. -/
   | retryRefused
   -- diagnosis stage (`prepare-diagnosis`)
@@ -284,7 +284,7 @@ acceptance observation, refused or not, is followed by readiness; typed
 refusal dispositions end at `terminalRecord`, never at ordinary selection. -/
 def transitions : List (RouteState × RouteState) :=
   [ -- rev 6: the ledger read decides #3/#6 (P:780, P:789), #4 (P:783; P:831 at
-    -- readiness is the same fact), #5 (P:786), or an active injury.
+    -- readiness is the same fact), #5 (P:780), or an active injury.
     (ledgerRead, noActiveInjury),
     (ledgerRead, activeInjury),
     (ledgerRead, ledgerUnreadable),
@@ -870,7 +870,7 @@ theorem ledgerUnreadable_withoutInjury :
     conformsPath [ledgerRead, ledgerUnreadable, terminalRecord] = true := by decide
 
 /-- Row #5 as today's runtime runs it:
-* `ledgerRead → activeSetUnavailable`: `prepare-diagnosis` (P:786);
+* `ledgerRead → activeSetUnavailable`: `prepare-diagnosis` (P:780);
 * `→ acceptanceUnavailable`: `prepare-acceptance`'s `:else` (P:685);
 * `→ readinessReady`: `production-readiness` `:else` with `:active-injury? false`
   (P:846), since `(seq (:injuries active))` is nil and no port term is required;
@@ -957,9 +957,11 @@ inductive RetryClickOutcome where
   /-- `:injury` with the enacted entry's injury id: `append-retry-result` (T:244, L:299-317).
   The retry failed for the same cause. -/
   | sameInjury
-  /-- `:injury` with a different injury id: `latest-injury` is nil, so `integrate` opens a
-  new injury (T:229-239) and does not touch the enacted one. This constructor is not in
-  the packet; it is added here (finding). -/
+  /-- `:injury` with a different injury id. `integrate` looks that id up on its own
+  (T:227): unknown, it opens a new injury (T:229-239); active, it appends a repeat
+  observation (T:261-266); terminal, it refuses (T:268-270). In every case the enacted
+  entry is untouched. This constructor is not in the packet; it is added here (finding).
+  Rev 8 review (claude-5) widened the docstring from the unknown case alone. -/
   | otherInjury
   /-- `:ordinary-selection-abstention` (T:82): an abstention. -/
   | ordinarySelectionAbstention
