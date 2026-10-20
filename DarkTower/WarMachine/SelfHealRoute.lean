@@ -2468,6 +2468,65 @@ theorem f41_recordKeepsAction :
   intro j a; cases j <;> cases a <;> rfl
 
 
+/-! ## Rev 33: the cell under the bound (F42 landed; prediction for click 14) -/
+
+/-- Bytes read on click 13's trace form (`data/wm-trace/wm-trace-2026-10-20.edn`, the form
+with run `531f4c1f`; `~/notes/wm-contract/measure-sealed-menu.clj` and
+`measure-carrier-keys.clj`): the whole form, the sealed menu (seven entries), the verified
+carrier at `[:outer-task-selection :policy :selected-outer-cascade-policy]`, that carrier's
+`:selected-entry`, and the cohort's cell bound (32 MiB; the refused cell measured
+33,554,433, so the cell is smaller than the form and the form is the safe upper figure). -/
+def click13FormBytes : Nat := 38008389
+def sealedMenuBytes : Nat := 8335696
+def carrierBytes : Nat := 11772456
+def selectedEntryBytes : Nat := 2497478
+def cohortCellBound : Nat := 33554432
+
+/-- Before F42 the menu sat in the form three times: bare on the outer receipt at
+`[:policy :sealed-menu]`, inside the receipt's carrier, and inside the certificate's copy of
+the carrier at `[:decision :selection-certificate :selected-outer-cascade-policy]`.
+F42a (futon2 `2868f7b0a`, codex-1, `meta_live_outer_selector.clj` 779): when a verified
+carrier was activated the receipt's bare copy becomes the typed pointer
+`{:status :carried-on-carrier :menu-pin … :at [:selected-outer-cascade-policy :sealed-menu]}`;
+with no activated carrier the menu stays whole there, since it is then the only copy
+(`f42a_receipt_menu_once_test`, both arms). F42b (futon2 `1fce9a214`, codex-3, committed
+by claude-5, `selected_outer_cascade_policy.clj` `decision`): the certificate's copy becomes
+the carrier's identity keys plus `:selected-entry`, `:carried-at`, and a `:sealed-menu`
+pointer carrying the menu pin; `(R selected-outer-policy/verify)` refuses the projection, so
+nothing can take it for the carrier (`f42b_certificate_carrier_identity_test`, bad case).
+The receipt's whole carrier, which `(R selected-target-reading)` 227 verifies, is now the one
+copy of the menu. The certificate's size after F42b: the selected entry plus the identity
+keys and two pointers, under a kilobyte together. -/
+def certificateBytesF42b : Nat := selectedEntryBytes + 1024
+
+/-- The form after both, from click 13's numbers: one bare menu gone (F42a), the
+certificate's carrier replaced by its projection (F42b); the receipt's carrier, menu inside,
+stays. About 20.4 MB. -/
+def formBytesF42 : Nat :=
+  click13FormBytes - sealedMenuBytes - (carrierBytes - certificateBytesF42b)
+
+theorem formBytesF42_underBound : formBytesF42 < cohortCellBound := by decide
+
+/-- The close append as a function of the cell's size; `(C append-checkpoint!)` refuses
+`:cohort-checkpoint-oversized` at the bound and accepts below it. -/
+def closeAppendBySize (cellBytes : Nat) : CloseAppend :=
+  if cellBytes < cohortCellBound then .accepted else .refused
+
+/-- **Prediction for click 14** (the first click after F41, F42a and F42b, runner reloaded
+22:41Z), for a child whose outer selector seals a menu of click 13's size: the selection
+cell's append at close is accepted, the record keeps the action whichever cell exists
+(judgment or sorry), and the close carries no `:close-refusal`. Beyond the close the model
+predicts nothing: the attempt's status follows the enactment, and
+`:open-cascade-review-answer-invalid` at cascade-resume (click 13, 326 s) is the stretch no
+revision has read. A refused append on click 14 is one finding against `formBytesF42`: a
+copy these measurements did not count, or a menu larger than seven entries. -/
+theorem f42_closeAccepted :
+    closeAppendBySize formBytesF42 = .accepted ∧
+      ∀ j : Bool, (retainedSourceF41 j (closeAppendBySize formBytesF42)).carriesAction = true := by
+  refine ⟨by decide, fun j => ?_⟩
+  cases j <;> rfl
+
+
 /-! ## Rev 31: what spends the re-queue budget (the law after `budgetSpent_noReopen`) -/
 
 /-- Why a retry child was inconclusive. The ledger already tells the two apart: the
