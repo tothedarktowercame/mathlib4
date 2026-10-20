@@ -2109,4 +2109,77 @@ theorem d755c886_repairIntegration :
       ({ onBranch := false, commitsAfter := 0 } : PatchPlacement).integratedF37 = false := by
   decide
 
+/-! ## Rev 26: click 11 read against its prediction; click 12 predicted -/
+
+/-- **Click 11 as it ran**, `wm-click-96850427` (2026-10-20 19:35:43-19:37:03Z), read against
+`click11PredictedPath` after the click. The record and the ledger agree with the prediction
+through `routeEnacted`: the attempt-3 transaction was retired at resume time, attempt 4 was
+prepared (F38) and claimed (ordinal 13), zai-2 authored with the repair's own sha
+`b463d85cc` (ordinal 14; the F33 port read the answer), zai-3 reviewed under the F36 contract
+(ordinal 15, `:approved`, `:reviewer-sha` = main's HEAD). Then `(A enact!)` returned
+`:succeeded` with the F37 payload, and sealing the port receipt threw:
+`load-file-recorded!` in futon3c `code_identity.clj` returned the value of `load-file`, the
+file's last Var, `enact!` put the two Vars in `:reload-receipts`, and `identity/digest`
+refuses a Var (`(C invoke-once :coordinator/port-threw)` at `:enact`). The click ended
+`coordinationRefused`; no run record, outcome `:unknown`. -/
+def click11ObservedPath : List RouteState :=
+  [ ledgerRead, activeInjury, diagnosisPrepared, admissionRun, reviewAccepted,
+    readinessReady, routeEnacted, coordinationRefused, terminalRecord ]
+
+def click11ObservedObservation : CoordinationObservation :=
+  { state := coordinationRefused, phase := .enact, outcome := .refused .portThrew }
+
+/-- The ledger entries click 11 wrote: ordinals 13, 14, 15. -/
+def click11ObservedLedgerWrites : List LedgerState := [.claimed, .authored, .reviewed]
+
+theorem click11_observedConforms :
+    conformsPath click11ObservedPath = true ∧ click11ObservedObservation.placed = true := by
+  decide
+
+/-- **The one finding.** Observed and predicted agree on the first seven states and differ at
+the eighth; the ledger writes are the predicted ones short of `:enacted`. -/
+theorem click11_oneFinding :
+    click11ObservedPath.take 7 = click11PredictedPath.take 7 ∧
+      click11ObservedPath[7]? = some coordinationRefused ∧
+      click11PredictedPath[7]? = some enacted ∧
+      click11ObservedLedgerWrites ++ [.enacted] = click11LedgerWrites := by
+  decide
+
+/-- What the reload function returns to `(A enact!)`. Before F39, the loaded value (a Var);
+after, the reload record (path, git head, tree sha, content sha, stability, time, pid). The
+port receipt is sealed by `identity/digest`, which accepts data and refuses a Var. F39
+(futon3c, claude-5) returns the record; no caller used the value. -/
+inductive ReloadReturn where
+  | loadedValue
+  | reloadRecord
+  deriving DecidableEq, Repr
+
+def ReloadReturn.sealable : ReloadReturn → Bool
+  | .loadedValue => false
+  | .reloadRecord => true
+
+theorem enactReceipt_needsF39 :
+    ReloadReturn.loadedValue.sealable = false ∧ ReloadReturn.reloadRecord.sealable = true := by
+  decide
+
+/-- **Click 12 predicted**, written before it runs. The transaction on disk is attempt 4 with
+the author and review receipts recorded, and the ledger's active entry is `:reviewed`
+(ordinal 15): no resume-time retirement (the attempt matches), `(C coordinate)` resumes from
+`:reviewed` (admitted by `(C coordinate :coordinator/resume-state-refused)`'s set),
+`(C invoke-once)` returns the two recorded receipts without calling a seat, enact runs under
+F37 and F39 and appends `:enacted` (ordinal 16), the retry port queues, and the click closes
+`:awaiting-retry`. The route path and observation are those of click 11's prediction; the
+ledger write is the one click 11 did not make. -/
+def click12PredictedPath : List RouteState := click11PredictedPath
+
+def click12PredictedObservation : CoordinationObservation := click11PredictedObservation
+
+def click12LedgerWrites : List LedgerState := [.enacted]
+
+theorem click12_predicted :
+    conformsPath click12PredictedPath = true ∧ click12PredictedObservation.placed = true ∧
+      [LedgerState.abandoned] ++ f35LedgerWrite ++ click11ObservedLedgerWrites ++
+          click12LedgerWrites ++ click11RetryLedgerWrites = d755c886PredictedLedgerPath := by
+  decide
+
 end DarkTower.WarMachine.SelfHealRoute
