@@ -176,10 +176,29 @@ discharges nor reopens. Today's discharge-on-abstention is the violation witness
   `:queued` receipt and ends `:awaiting-retry`, and no child is queued again. The table
   would need a re-queue edge, from `retryInconclusive` (and from a missing record) back
   to a queued retry. It is not added here.
+* Rev 9: the re-queue edge (`RetryClickOutcome.next`) is not realisable inside
+  `coordinate` alone. Receipts are append-only and `invoke-once` replays a recorded one
+  (C:177-179). The retry click id is named from the repair id and attempt
+  (futon3c `meta_self_heal_adapters.clj` A:432), so a re-queue at the same attempt
+  would reuse the id, and the idempotency key `meta-retry/<retry-click>` (S:991) would
+  refuse the child. The ledger's `:enacted` rule requires an `:approved` predecessor
+  (L:136-143), so a second enacted-stage entry is invalid. M10b therefore touches the
+  ledger, the adapter's id, the coordinator and the runner. The table is the law; it is
+  not weakened to fit.
+* Rev 9: `successfulTaskOutcome` is the only discharge, but `:successful-task-outcome`
+  (T:126-128) means the ordinary task succeeded, not that it exercised the injured work.
+  Whether a successful retry of different work tests the repair is not decided here.
 * `otherInjury` (see `RetryClickOutcome`): a retry that fails with a different cause
   opens a new injury and leaves the enacted one untouched. The law calls that
   inconclusive for the enacted injury. That is a modelling decision, and whoever rules
   on M10a should confirm it.
+
+Revision 9 (claude-2, 2026-10-20, packet M11L from claude-5): the code meets the closing
+law (`closingToday_eq_closing`, futon2 `11fe9094a`). The law adds the re-queue edge,
+`RetryClickOutcome.next`: an inconclusive close queues a fresh retry under a re-queue
+budget kept separate from `:attempt-limit`. `requeue_todayAwaitsForever` is the reason for
+M10b. The rev 8 code is kept as `closingBefore83f72ba1e`. T and L are cited at futon2
+`11fe9094a`, C at the same commit (`meta_repair_coordinator.clj`).
 
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
@@ -977,6 +996,11 @@ inductive RetryClickOutcome where
   | diagnosticOnly
   /-- `:absent-terminal-failure` (T:129-130): no failure kind and no outcome. -/
   | absentTerminalFailure
+  /-- Rev 9: the retry click left no record that can be read. Then nothing reaches
+  `integrate`, and the entry stays `:enacted`. Absence is evidence of neither success nor
+  failure, so this is inconclusive (the 2026-09-24 rule that absence must not read as a
+  value). -/
+  | recordUnreadable
   deriving DecidableEq, Repr
 
 /-- The closing law. Only a successful task outcome discharges. The same injury reopens,
@@ -987,13 +1011,16 @@ def RetryClickOutcome.closing (budgetSpent : Bool) : RetryClickOutcome → Closi
   | .sameInjury => if budgetSpent then .abandoned else .reopened
   | _ => .retryInconclusive
 
-/-- Today's `integrate`. Every `:non-injury` classification of the retry click appends
-`:discharged :outcome :success` (T:202-224). The same injury goes through
-`append-retry-result`; another injury leaves the enacted entry as it is, which by its
-effect is `retryInconclusive`. -/
-def RetryClickOutcome.closingToday (budgetSpent : Bool) : RetryClickOutcome → ClosingStatus
+/-- `integrate` before futon2 `83f72ba1e` (M10a), at `343b60ef3`. Kept as the record of
+the disagreement that M10a removed. Every `:non-injury` classification of the retry click
+appended `:discharged :outcome :success` (T:202-224 at `343b60ef3`). The same injury went
+through `append-retry-result`; another injury, or no record at all, left the enacted
+entry as it was, which by its effect is `retryInconclusive`. -/
+def RetryClickOutcome.closingBefore83f72ba1e (budgetSpent : Bool) :
+    RetryClickOutcome → ClosingStatus
   | .sameInjury => if budgetSpent then .abandoned else .reopened
   | .otherInjury => .retryInconclusive
+  | .recordUnreadable => .retryInconclusive
   | _ => .discharged
 
 /-- Only a successful task outcome discharges, under either budget. -/
@@ -1001,18 +1028,19 @@ theorem closing_dischargesOnlyOnSuccess (b : Bool) (o : RetryClickOutcome) :
     o.closing b = .discharged ↔ o = .successfulTaskOutcome := by
   cases b <;> cases o <;> decide
 
-/-- **The reason M10a exists.** Today's `integrate` (T:202-224), given `classify`'s
-abstention (T:111-167, T:77-82), records an abstained retry as `:discharged`; the law
-records it as `retryInconclusive`. The two differ, so the repair is recorded as healed
+/-- **The reason M10a existed.** `integrate` at `343b60ef3` (T:202-224), given `classify`'s
+abstention (T:111-167, T:77-82), recorded an abstained retry as `:discharged`; the law
+records it as `retryInconclusive`. The two differed, so the repair was recorded as healed
 without having been tested. -/
 theorem retryClose_todayDischargesAbstention :
-    RetryClickOutcome.ordinarySelectionAbstention.closingToday false = .discharged ∧
+    RetryClickOutcome.ordinarySelectionAbstention.closingBefore83f72ba1e false = .discharged ∧
       RetryClickOutcome.ordinarySelectionAbstention.closing false = .retryInconclusive ∧
       ClosingStatus.discharged ≠ ClosingStatus.retryInconclusive := by decide
 
-/-- The law and today's code disagree on exactly the seven no-work outcomes. -/
+/-- The law and the code before `83f72ba1e` disagreed on exactly the seven no-work
+outcomes. -/
 theorem retryClose_disagreement (b : Bool) (o : RetryClickOutcome) :
-    o.closingToday b ≠ o.closing b ↔
+    o.closingBefore83f72ba1e b ≠ o.closing b ↔
       o ∈ [.ordinarySelectionAbstention, .evaluatedNoAction, .partialFrontierContinuation,
            .operatorCancelled, .declaredNoWork, .diagnosticOnly, .absentTerminalFailure] := by
   cases b <;> cases o <;> decide
@@ -1020,5 +1048,122 @@ theorem retryClose_disagreement (b : Bool) (o : RetryClickOutcome) :
 /-- An inconclusive close is placed at `enacted`, like the other closings. -/
 theorem retryInconclusive_placedAtEnacted :
     (CoordinationOutcome.closed .retryInconclusive).state = enacted := by decide
+
+/-! ## Rev 9: the law is met; the re-queue edge -/
+
+/-- `integrate` today (futon2 `11fe9094a`, after M10a `83f72ba1e`), case by case:
+* on the retry click, `:successful-task-outcome` appends `:discharged` (T:204-221);
+* every other `:non-injury-reason` on the retry click appends an observation
+  `:retry-inconclusive` and leaves the entry `:enacted` (T:222-225);
+* the same injury calls `append-retry-result` (T:241-256 region, from T:231), giving
+  `:reopened`, or `:abandoned` past `:attempt-limit` (L:308-314);
+* another injury does not touch the enacted entry (T:227-239);
+* no record reaches `integrate` at all. -/
+def RetryClickOutcome.closingToday (budgetSpent : Bool) : RetryClickOutcome → ClosingStatus
+  | .successfulTaskOutcome => .discharged
+  | .sameInjury => if budgetSpent then .abandoned else .reopened
+  | .otherInjury => .retryInconclusive
+  | .recordUnreadable => .retryInconclusive
+  | .ordinarySelectionAbstention => .retryInconclusive
+  | .evaluatedNoAction => .retryInconclusive
+  | .partialFrontierContinuation => .retryInconclusive
+  | .operatorCancelled => .retryInconclusive
+  | .declaredNoWork => .retryInconclusive
+  | .diagnosticOnly => .retryInconclusive
+  | .absentTerminalFailure => .retryInconclusive
+
+/-- The code now meets the closing law, case by case. -/
+theorem closingToday_eq_closing (b : Bool) (o : RetryClickOutcome) :
+    o.closingToday b = o.closing b := by
+  cases b <;> cases o <;> decide
+
+/-- Why an injury was abandoned. -/
+inductive AbandonReason where
+  /-- `:attempt-limit-exhausted` (L:314): the next authoring would exceed `:attempt-limit`. -/
+  | attemptLimitExhausted
+  /-- Rev 9 (new, M10b): the re-queue budget for inconclusive retries is spent. A re-queue
+  authors nothing, so it does not count against `:attempt-limit`. -/
+  | retryBudgetSpent
+  deriving DecidableEq, Repr
+
+/-- The enacted entry a retry belongs to: its attempt (authorings) and the re-queues so
+far. -/
+structure RetryEntry where
+  attempt : Nat
+  requeues : Nat
+  deriving DecidableEq, Repr
+
+/-- What the injury does after a retry click closes. -/
+inductive RetryNext where
+  /-- A fresh retry click is queued for the same enacted entry. -/
+  | queued (entry : RetryEntry)
+  /-- The transaction ends `:awaiting-retry`, and nothing is queued. -/
+  | awaitingNothingQueued
+  | discharged
+  | reopened
+  | abandoned (reason : AbandonReason)
+  deriving DecidableEq, Repr
+
+/-- The law for the next step. An inconclusive close re-queues a retry without using an
+attempt, unless the re-queue budget (`retriesSpent`) is spent, in which case the injury is
+abandoned with `retryBudgetSpent`. The across-click edge is: a queued retry is the next
+click's `retryClick` start (rev 7). -/
+def RetryClickOutcome.next (budgetSpent retriesSpent : Bool) (o : RetryClickOutcome)
+    (e : RetryEntry) : RetryNext :=
+  match o.closing budgetSpent with
+  | .discharged => .discharged
+  | .reopened => .reopened
+  | .abandoned => .abandoned .attemptLimitExhausted
+  | .retryInconclusive =>
+      if retriesSpent then .abandoned .retryBudgetSpent
+      else .queued { e with requeues := e.requeues + 1 }
+  | .awaitingRetry => .awaitingNothingQueued
+
+/-- Today, after an inconclusive close: the entry stays `:enacted`. The next click resumes
+`transaction.edn` (P:705-710). `coordinate` reaches the retry phase, `invoke-once` finds
+the recorded `:queued` receipt and returns it without calling the port (C:177-179). The
+`:queued` branch then ends `:awaiting-retry` (C:348-352), and no child is queued. -/
+def RetryClickOutcome.nextToday (budgetSpent : Bool) (o : RetryClickOutcome)
+    (_e : RetryEntry) : RetryNext :=
+  match o.closingToday budgetSpent with
+  | .discharged => .discharged
+  | .reopened => .reopened
+  | .abandoned => .abandoned .attemptLimitExhausted
+  | _ => .awaitingNothingQueued
+
+/-- Today's resume of an `:awaiting-retry` transaction: the same replay, the same end. -/
+def resumeToday : RetryNext → RetryNext
+  | .awaitingNothingQueued => .awaitingNothingQueued
+  | n => n
+
+/-- An inconclusive close with retries unspent queues a fresh retry. -/
+theorem inconclusive_requeues (b : Bool) (o : RetryClickOutcome) (e : RetryEntry)
+    (h : o.closing b = .retryInconclusive) :
+    o.next b false e = .queued { e with requeues := e.requeues + 1 } := by
+  simp [RetryClickOutcome.next, h]
+
+/-- With retries spent, an inconclusive close abandons the injury. -/
+theorem inconclusive_abandonsWhenSpent (b : Bool) (o : RetryClickOutcome) (e : RetryEntry)
+    (h : o.closing b = .retryInconclusive) :
+    o.next b true e = .abandoned .retryBudgetSpent := by
+  simp [RetryClickOutcome.next, h]
+
+/-- A re-queued retry keeps the enacted entry's attempt. -/
+theorem requeue_consumesNoAttempt (b r : Bool) (o : RetryClickOutcome) (e e' : RetryEntry)
+    (h : o.next b r e = .queued e') : e'.attempt = e.attempt := by
+  cases r <;> cases hc : o.closing b <;> simp [RetryClickOutcome.next, hc] at h
+  all_goals (subst h; rfl)
+
+/-- **The reason M10b exists.** Under the abstention regime every retry is inconclusive.
+Today the next step is then `awaitingNothingQueued`, and resuming it gives the same step
+again, while the law queues a fresh retry. -/
+theorem requeue_todayAwaitsForever (b : Bool) (e : RetryEntry) :
+    RetryClickOutcome.ordinarySelectionAbstention.nextToday b e = .awaitingNothingQueued ∧
+      resumeToday .awaitingNothingQueued = .awaitingNothingQueued ∧
+      RetryClickOutcome.ordinarySelectionAbstention.next b false e =
+        .queued { e with requeues := e.requeues + 1 } ∧
+      RetryNext.awaitingNothingQueued ≠ .queued { e with requeues := e.requeues + 1 } := by
+  cases b <;> simp [RetryClickOutcome.nextToday, RetryClickOutcome.next,
+    RetryClickOutcome.closingToday, RetryClickOutcome.closing, resumeToday]
 
 end DarkTower.WarMachine.SelfHealRoute
