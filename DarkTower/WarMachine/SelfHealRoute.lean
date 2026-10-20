@@ -117,12 +117,61 @@ clicks all had a computed active set.
   `:unavailable`. The state is reachable only by construction, like
   `:acceptance-review-malformed` (refusal-totality #52).
 
+Revision 7 (claude-2, 2026-10-20, packet M9L from claude-5): the retry click, refusal
+class 5. It is a separate start, `retryClick`, which is not reachable from `ledgerRead`.
+It has one decision, the attribution (`retryReady` or `retryRefused`), and one edge into
+ordinary work, `retryReady → ordinarySelection`. Ordinary work therefore has exactly
+two doors (`ordinaryWork_twoDoors`). `RouteState` has 28 states. Citations: R = futon2
+`b2c2d9941` `full_loop_runtime.clj`, P = `meta_self_heal_production.clj`,
+T = `meta_terminal_injury.clj`, I = `meta_injury_store.clj`; A and S = futon3c `80516025d`
+`wm/meta_self_heal_adapters.clj` and `wm/runner_service.clj`.
+
+**How the retry closes the injury** (packet question, settled by reading). The retry
+port never answers anything except `:queued` (A:480-495). The injury is closed by the
+child click's own terminal record: the ordinary runner's `:meta-terminal-injury-ingest`
+sink (futon2 `full_loop_runner.clj` L8256-8266) calls `ingest-record-file!` (I:136),
+which calls `transact-classification!` (I:111), which calls `terminal/integrate`. When
+the classification's click id equals the `:enacted` entry's `:retry-click`, `integrate`
+does one of two things:
+* a `:non-injury` record appends `:discharged` with `:outcome :success` (T:195-211);
+* an `:injury` record calls `append-retry-result`, giving `:reopened` or `:abandoned`
+  (T:241-256).
+The close happens after `ordinarySelection → terminalRecord`, so it is beside the path,
+not in it: rev 5's `ClosingStatus` names its outcomes, and no state is added for it.
+
+**Holes (rev 7, not decided).**
+* An abstained retry discharges the injury as a success. `classify` (T:111-150) makes
+  every abstention `:non-injury` unless its cause is
+  `:outer-policy-evidence-provider-required` (T:63-65, T:77-82). The same holds for
+  `:operator-cancelled`, `:declared-no-work`, `:diagnostic-only`, and a record with no
+  failure kind and no outcome (`:absent-terminal-failure`). A retry that does no work
+  can therefore discharge the repair it was meant to test. This is a finding about the
+  code, not a modelling choice.
+* A retry click that writes no run record leaves the injury `:enacted`, which is still
+  an active state. The next click routes it again: `route!` resumes `transaction.edn`
+  (P:705-710), and `coordinate` replays the recorded `:queued` retry receipt (C:178,
+  `invoke-once`) and ends `:awaiting-retry`. The retry port is not called again, so no
+  child is queued. By reading, every later click then ends `:awaiting-retry` with no
+  retry. Not run.
+* Duplicate launch: the idempotency key `meta-retry/<retry-click>` (S:991) is the only
+  thing that stops a second child click for the same retry. The table models one child
+  and does not need the key; a record with two would show it.
+* `#22` (`:acceptance-retry-not-prepared`) is the typed acceptance observation of every
+  retry click, not a state.
+
+**Run-time witness leg (rev 7).** None: there is no `wm-retry-*` click-state under
+`futon3c/data/wm-click-acceptances/`.
+
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
 until one is named.
 -/
 
 namespace DarkTower.WarMachine.SelfHealRoute
+
+-- Rev 7: with 28 states the bounded `reaches` unfolds deeper than the default limit
+-- allows `decide` to evaluate.
+set_option maxRecDepth 8192
 
 /-- Absence terms a readiness refusal can carry
 (`meta_self_heal_production.clj`, `production-readiness`, futon2 `e4e53617a`).
@@ -160,6 +209,19 @@ inductive RouteState where
   /-- Rev 6, row #5: the ledger loaded, but `ledger/active-injuries` did not return
   `:computed` (P:786, `:diagnosis-active-set-unavailable`). A terminal refusal. -/
   | activeSetUnavailable
+  /-- Rev 7: the start of a retry click. Its options carry `:meta-repair-retry`
+  (S:989-995): the child of a parent that ended `:awaiting-retry`, launched only after
+  the parent click is durably complete. It makes no ledger read of its own and no
+  diagnosis (R:473-477). It carries the acceptance observation
+  `:acceptance-retry-not-prepared` (#22), which is typed, not a state. -/
+  | retryClick
+  /-- Rev 7: `attributable-retry-readiness` (P:896-915) returns `:ready` with the
+  attribution. The retry then runs ordinary work (R:500-502), and `route!` is not
+  called. -/
+  | retryReady
+  /-- Rev 7, #57: `:meta-self-heal/retry-attribution-refused` (P:914), with `:expected`
+  and `:supplied`. -/
+  | retryRefused
   -- diagnosis stage (`prepare-diagnosis`)
   | diagnosisPrepared
   | diagnosisRefused
@@ -205,6 +267,11 @@ def transitions : List (RouteState × RouteState) :=
     (ledgerRead, ledgerUnreadable),
     (ledgerRead, activeSetUnavailable),
     (activeSetUnavailable, terminalRecord),
+    -- rev 7: the retry click, a separate start (S:983-996, R:473-505, P:896-915).
+    (retryClick, retryReady),
+    (retryClick, retryRefused),
+    (retryRefused, terminalRecord),
+    (retryReady, ordinarySelection),
     -- `phases.md`, "Injury vs ordinary, level 1": ordinary is only no-active-injury.
     (noActiveInjury, ordinarySelection),
     (ordinarySelection, terminalRecord),
@@ -255,7 +322,7 @@ def transitions : List (RouteState × RouteState) :=
 
 /-- Every state of the (now finite) vocabulary; the fuel bound for `reaches`. -/
 def allStates : List RouteState :=
-  [ ledgerRead, activeSetUnavailable, noActiveInjury, activeInjury, diagnosisPrepared, diagnosisRefused,
+  [ ledgerRead, activeSetUnavailable, retryClick, retryReady, retryRefused, noActiveInjury, activeInjury, diagnosisPrepared, diagnosisRefused,
     acceptanceUnavailable, proposalRefused, admissionRun, admissionRefused,
     reviewAccepted, reviewRefused, readinessReady, readinessRefused, ledgerUnreadable,
     routeEnacted, routeRefused, preparationRefused, bindingRefused, enacted,
@@ -298,6 +365,7 @@ def endsTerminal (path : List RouteState) : Bool :=
 def conformsPath (path : List RouteState) : Bool :=
   match path with
   | ledgerRead :: _ => conforms path && endsTerminal path
+  | retryClick :: _ => conforms path && endsTerminal path
   | noActiveInjury :: _ => conforms path && endsTerminal path
   | activeInjury :: _ => conforms path && endsTerminal path
   | _ => false
@@ -799,5 +867,54 @@ theorem fallthrough_5_elided_isViolation :
     conformsPath [ledgerRead, activeSetUnavailable, readinessReady, ordinarySelection,
       terminalRecord] = false ∧
       edge activeSetUnavailable readinessReady = false := by decide
+
+/-! ## Rev 7: the retry click -/
+
+/-- The four fields `attributable-retry-readiness` compares (P:909-913): the supplied
+retry against the last `:enacted` entry, and the patch sha against its `:authored`
+entry. -/
+inductive RetryField where
+  | injuryId | repairId | retryClick | patchSha
+  deriving DecidableEq, Repr
+
+/-- Why the attribution refused (P:905-914). Every constructor is placed at
+`retryRefused`. -/
+inductive RetryAttributionDefect where
+  /-- The ledger did not load (`(= :loaded (:status durable))` fails). -/
+  | ledgerNotLoaded
+  /-- No `:enacted` entry in the ledger. -/
+  | noEnactedEntry
+  /-- No `:authored` entry for the enacted injury and repair. -/
+  | noAuthoredEntry
+  /-- One field of `:supplied` differs from `:expected`. -/
+  | fieldDiffers (field : RetryField)
+  deriving DecidableEq, Repr
+
+/-- The placement law for the retry attribution. -/
+def RetryAttributionDefect.state : RetryAttributionDefect → RouteState
+  | _ => retryRefused
+
+/-- Ordinary work has exactly two doors: no active injury, and an attributed retry. -/
+theorem ordinaryWork_twoDoors :
+    (transitions.filter (fun pair => stateEq pair.2 ordinarySelection)).map Prod.fst =
+      [retryReady, noActiveInjury] := by decide
+
+/-- The retry start cannot be reached from the ordinary start, so rev 7 opens no path
+from an injury to ordinary work. -/
+theorem retryClick_separateStart :
+    reaches ledgerRead retryClick = false ∧ reaches activeInjury retryReady = false ∧
+      reaches activeSetUnavailable ordinarySelection = false ∧
+      reaches activeInjury ordinarySelection = false := by
+  refine ⟨?_, ?_, ?_, ?_⟩ <;> decide
+
+/-- A refused attribution ends the click; it never reaches ordinary work. -/
+theorem retryRefused_terminates :
+    reaches retryRefused terminalRecord = true ∧
+      reaches retryRefused ordinarySelection = false := by decide
+
+/-- Both retry paths are complete table paths. -/
+theorem retryPaths_conform :
+    conformsPath [retryClick, retryReady, ordinarySelection, terminalRecord] = true ∧
+      conformsPath [retryClick, retryRefused, terminalRecord] = true := by decide
 
 end DarkTower.WarMachine.SelfHealRoute
