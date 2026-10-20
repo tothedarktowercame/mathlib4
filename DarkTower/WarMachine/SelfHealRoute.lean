@@ -81,6 +81,33 @@ reaches coordination after M4a is live is the witness for a later revision.
 * #5: `route!` returns nil when the active set is not computed, so the click runs ordinary
   work, and there is no edge for it.
 
+Revision 6 (claude-2, 2026-10-20, packet M6L from claude-5): the route now begins at
+the ledger read. `ledgerRead` is the start state. Every row decided at that read has its
+own state there: #3 and #6 go to `noActiveInjury`, #4 to `ledgerUnreadable`, #5 to
+`activeSetUnavailable`. The uncomputable active set is a terminal refusal with no edge to
+ordinary work, per Joe's ruling of 2026-10-19: a refusal inside the self-heal route is a
+symptom to investigate, never a reason to route the click around it. Order error 1 is
+corrected: `ledgerUnreadable` is reachable from the start without `activeInjury`
+(`ledgerUnreadable_withoutInjury`). `RouteState` has 25 states. P = futon2 `c0b9a794b`
+`src/futon2/aif/meta_self_heal_production.clj`, S = the same commit, `full_loop_runtime.clj`.
+
+The table elides the acceptance observation that the runtime makes after a decision taken
+at the read. `run-opportunity!` always calls `prepare-acceptance`, and a diagnosis that is
+not `:available` gives `:acceptance-diagnosis-unavailable` (P:685). So a runtime conforms
+to `(ledgerRead, ledgerUnreadable)` and `(activeSetUnavailable, terminalRecord)` only if
+it ends the click before that observation, or if the observation is dropped from the
+record. `fallthrough_5_today` keeps the observation, because it describes today's code.
+
+**Run-time witness leg (rev 6).** None. No click has reached #5: the five 2026-10-19
+clicks all had a computed active set.
+
+**Holes (rev 6, not decided).**
+* Order error 2: readiness runs twice (the click preflight with `:readiness-route
+  :ordinary`, then `run-opportunity!`), and rev 6 models only the second run.
+* Which conformance M6a chooses, given the elision above: end the click before the
+  acceptance observation, or extend the table with
+  `(activeSetUnavailable, acceptanceUnavailable)` and a `route!`-level refusal.
+
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
 until one is named.
@@ -113,8 +140,17 @@ inductive RouteTerm where
 carried are record detail for the certificate producer, not part of the
 state. -/
 inductive RouteState where
+  /-- Rev 6: the one ledger read, `diagnosis-context` (P:755). `prepare-diagnosis` (P:769)
+  and `production-readiness` (P:797) decide from it, before any injury is known.
+  Order error 3: `route!` reads the ledger a second time (P:923-925), and that read has no
+  state here. A runtime that reads twice conforms only while the two reads agree. M6a is
+  to make `route!` use the context's read. -/
+  | ledgerRead
   | noActiveInjury
   | activeInjury
+  /-- Rev 6, row #5: the ledger loaded, but `ledger/active-injuries` did not return
+  `:computed` (P:786, `:diagnosis-active-set-unavailable`). A terminal refusal. -/
+  | activeSetUnavailable
   -- diagnosis stage (`prepare-diagnosis`)
   | diagnosisPrepared
   | diagnosisRefused
@@ -153,7 +189,14 @@ prepare acceptance (propose, run, review), readiness, route, enact. Every
 acceptance observation, refused or not, is followed by readiness; typed
 refusal dispositions end at `terminalRecord`, never at ordinary selection. -/
 def transitions : List (RouteState × RouteState) :=
-  [ -- `phases.md`, "Injury vs ordinary, level 1": ordinary is only no-active-injury.
+  [ -- rev 6: the ledger read decides #3/#6 (P:780, P:789), #4 (P:783; P:831 at
+    -- readiness is the same fact), #5 (P:786), or an active injury.
+    (ledgerRead, noActiveInjury),
+    (ledgerRead, activeInjury),
+    (ledgerRead, ledgerUnreadable),
+    (ledgerRead, activeSetUnavailable),
+    (activeSetUnavailable, terminalRecord),
+    -- `phases.md`, "Injury vs ordinary, level 1": ordinary is only no-active-injury.
     (noActiveInjury, ordinarySelection),
     (ordinarySelection, terminalRecord),
     -- `full_loop_runtime.clj:475-477`: prepare diagnosis.
@@ -203,7 +246,7 @@ def transitions : List (RouteState × RouteState) :=
 
 /-- Every state of the (now finite) vocabulary; the fuel bound for `reaches`. -/
 def allStates : List RouteState :=
-  [ noActiveInjury, activeInjury, diagnosisPrepared, diagnosisRefused,
+  [ ledgerRead, activeSetUnavailable, noActiveInjury, activeInjury, diagnosisPrepared, diagnosisRefused,
     acceptanceUnavailable, proposalRefused, admissionRun, admissionRefused,
     reviewAccepted, reviewRefused, readinessReady, readinessRefused, ledgerUnreadable,
     routeEnacted, routeRefused, preparationRefused, bindingRefused, enacted,
@@ -245,6 +288,7 @@ def endsTerminal (path : List RouteState) : Bool :=
 `terminalRecord`, and every step is a table edge. -/
 def conformsPath (path : List RouteState) : Bool :=
   match path with
+  | ledgerRead :: _ => conforms path && endsTerminal path
   | noActiveInjury :: _ => conforms path && endsTerminal path
   | activeInjury :: _ => conforms path && endsTerminal path
   | _ => false
@@ -696,5 +740,52 @@ theorem coordination_66_masked :
       persistRefused ≠ coordinationRefused ∧
       coordination_66_reportedToday.state ≠ coordination_66_afterM4a.state ∧
       coordination_66_afterM4a.placed = true := by decide
+
+/-! ## Rev 6: the start of the route -/
+
+/-- An uncomputable active set never reaches ordinary work, and rev 6 opens no path
+from an active injury to it. -/
+theorem noFallback_rev6 :
+    reaches activeSetUnavailable ordinarySelection = false ∧
+      reaches activeInjury ordinarySelection = false := by decide
+
+/-- The read decides each of the four. -/
+theorem ledgerRead_decides :
+    reaches ledgerRead noActiveInjury = true ∧ reaches ledgerRead activeInjury = true ∧
+      reaches ledgerRead ledgerUnreadable = true ∧
+      reaches ledgerRead activeSetUnavailable = true := by decide
+
+/-- Order error 1, corrected: an unreadable ledger is a complete path that asserts no
+injury. -/
+theorem ledgerUnreadable_withoutInjury :
+    conformsPath [ledgerRead, ledgerUnreadable, terminalRecord] = true := by decide
+
+/-- Row #5 as today's runtime runs it:
+* `ledgerRead → activeSetUnavailable`: `prepare-diagnosis` (P:786);
+* `→ acceptanceUnavailable`: `prepare-acceptance`'s `:else` (P:685);
+* `→ readinessReady`: `production-readiness` `:else` with `:active-injury? false`
+  (P:846), since `(seq (:injuries active))` is nil and no port term is required;
+* `→ ordinarySelection`: `route!` reads again and returns nil (P:923-926), and
+  `(or routed (run-ordinary-opportunity! …))` runs ordinary work (S:502-503).
+
+The packet's version omitted the acceptance observation. -/
+def fallthrough_5_today : List RouteState :=
+  [ ledgerRead, activeSetUnavailable, acceptanceUnavailable, readinessReady,
+    ordinarySelection, terminalRecord ]
+
+/-- **The reason M6a exists.** Today's path for #5 is not a table path. Its first
+missing edge is the step out of `activeSetUnavailable`, which by the table ends the
+click. -/
+theorem fallthrough_5_isViolation :
+    conformsPath fallthrough_5_today = false ∧
+      edge ledgerRead activeSetUnavailable = true ∧
+      edge activeSetUnavailable acceptanceUnavailable = false := by decide
+
+/-- Without the acceptance observation (the packet's form), the first missing edge is
+`(activeSetUnavailable, readinessReady)`. Either way the path does not conform. -/
+theorem fallthrough_5_elided_isViolation :
+    conformsPath [ledgerRead, activeSetUnavailable, readinessReady, ordinarySelection,
+      terminalRecord] = false ∧
+      edge activeSetUnavailable readinessReady = false := by decide
 
 end DarkTower.WarMachine.SelfHealRoute
