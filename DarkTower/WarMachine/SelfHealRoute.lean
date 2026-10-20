@@ -2460,4 +2460,56 @@ theorem f41_recordKeepsAction :
     ∀ (j : Bool) (a : CloseAppend), (retainedSourceF41 j a).carriesAction = true := by
   intro j a; cases j <;> cases a <;> rfl
 
+
+/-! ## Rev 31: what spends the re-queue budget (the law after `budgetSpent_noReopen`) -/
+
+/-- Why a retry child was inconclusive. The ledger already tells the two apart: the
+`:retry-inconclusive` observation written by `(T append-other-injury-retry-observation)`
+carries the record pin that is also the other injury's `:cause-record-pin` (ordinal 18's pin
+is ordinal 17's, injury `821c15d0`; ordinal 21's is ordinal 20's, injury `75747f06`), while
+the no-work arm `(T integrate :retry-inconclusive)` writes a pin no injury names. -/
+inductive InconclusiveCause where
+  | otherOpenInjury
+  | noInjury
+  deriving DecidableEq, Repr
+
+/-- Today `(L append-requeue "inc requeues")` increments on every pending observation, and
+`(L state-defects :requeue/evidence)` refuses a requeue that does not. -/
+def spendsBudgetToday : InconclusiveCause → Bool := fun _ => true
+
+/-- The law, F43 (not yet dispatched; after F41 and F42): a child that died on another open
+injury is evidence about that injury, not about this repair, so it re-queues without
+spending the budget. The budget then bounds only children that ran and tested nothing, and
+`retryBudgetSpent` becomes a verdict on the patch, which no correction can reopen, as
+`budgetSpent_noReopen` says and then rightly says. The bound on other-injury children is
+the ordinary click budget the operator grants. The alternative, holding the requeue until
+the other injury is discharged, needs a trigger no code has, and is not modelled. -/
+def spendsBudgetF43 : InconclusiveCause → Bool
+  | .otherOpenInjury => false
+  | .noInjury => true
+
+def requeuesAfter (spends : InconclusiveCause → Bool) : List InconclusiveCause → Nat
+  | [] => 0
+  | c :: cs => (if spends c then 1 else 0) + requeuesAfter spends cs
+
+def noInjuryCount : List InconclusiveCause → Nat
+  | [] => 0
+  | .noInjury :: cs => noInjuryCount cs + 1
+  | .otherOpenInjury :: cs => noInjuryCount cs
+
+/-- `d755c886` so far: ordinal 18 (on `821c15d0`) and ordinal 21 (on `75747f06`). Today the
+entry stands at ⟨4, 1⟩ with ordinal 21 pending; the next click makes 2, and a third
+other-injury child abandons `retryBudgetSpent` with nothing to reopen from. Under F43 the
+count is 0 after both. -/
+theorem d755c886_otherInjuryChildren :
+    requeuesAfter spendsBudgetToday [.otherOpenInjury, .otherOpenInjury] = 2 ∧
+      requeuesAfter spendsBudgetF43 [.otherOpenInjury, .otherOpenInjury] = 0 := by decide
+
+/-- Under F43 the budget counts only the children that tested nothing. -/
+theorem f43_budgetCountsNoInjuryOnly (cs : List InconclusiveCause) :
+    requeuesAfter spendsBudgetF43 cs = noInjuryCount cs := by
+  induction cs with
+  | nil => rfl
+  | cons c cs ih => cases c <;> simp [requeuesAfter, spendsBudgetF43, noInjuryCount, ih, Nat.add_comm]
+
 end DarkTower.WarMachine.SelfHealRoute
