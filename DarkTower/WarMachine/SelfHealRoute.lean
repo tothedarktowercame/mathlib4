@@ -724,43 +724,43 @@ theorem preparationRefused_terminates :
 at `proposalRefused`. -/
 inductive ProposalDefect where
   /-- Transport or seat failure on the author's proposal invoke:
-  `:producer-invoke-failed` (A:233) or `:producer-seat-unavailable` (A:227),
-  carried as `:acceptance-reason` of `:acceptance-unavailable` (P:460).
+  `:producer-invoke-failed` (A:347) or `:producer-seat-unavailable` (A:342),
+  carried as `:acceptance-reason` of `:acceptance-unavailable` (P:485).
   Unwitnessed at proposal on disk. -/
   | transport
   /-- The author answered, but not with one EDN map: `:producer-response-malformed`
-  (A:237) as `:acceptance-reason` of `:acceptance-unavailable` (P:460).
+  (A:355) as `:acceptance-reason` of `:acceptance-unavailable` (P:485).
   Witness: click `8df4e8d2`. -/
   | unreadableAnswer
   /-- The author's own typed refusal: `:acceptance-status :refused` under
-  `:acceptance-unavailable` (P:460). Witness: click `fca1c921`. -/
+  `:acceptance-unavailable` (P:485). Witness: click `fca1c921`. -/
   | authorRefused
-  /-- `:acceptance-prose-or-malformed` (P:470): the answer is not a concrete test.
+  /-- `:acceptance-prose-or-malformed` (P:497): the answer is not a concrete test.
   Unwitnessed. -/
   | prose
-  /-- `:acceptance-proposal-source-mismatch` (P:467): the test source's namespace or
+  /-- `:acceptance-proposal-source-mismatch` (P:493): the test source's namespace or
   path disagree. Unwitnessed. -/
   | sourceMismatch
-  /-- `:acceptance-request-function-unresolvable` (P:526): a function the diagnosis
+  /-- `:acceptance-request-function-unresolvable` (P:556): a function the diagnosis
   names does not resolve in the serving JVM. Unwitnessed. -/
   | unresolvableFunction
   deriving DecidableEq, Repr
 
 /-- Why `admit-acceptance!` did not return `:accepted`. -/
 inductive AdmissionDefect where
-  /-- `:acceptance-run-refused` (P:618): the bounded run did not return a valid `:ran`
-  result (it covers A:359, A:390-398 and the un-namespaced A:393). Unwitnessed. -/
+  /-- `:acceptance-run-refused` (P:648): the bounded run did not return a valid `:ran`
+  result (it covers A:485, A:516-525 and the un-namespaced A:519). Unwitnessed. -/
   | runRefused
-  /-- `:acceptance-test-passes-before-repair` (P:622, F16): refused before any reviewer
+  /-- `:acceptance-test-passes-before-repair` (P:652, F16): refused before any reviewer
   invoke. Unwitnessed on a click (off-click replay 5 only). -/
   | passesBeforeRepair
-  /-- `:acceptance-review-refused` (P:628) with `:review-status :failed`: there is no
-  reviewer answer that could be read. That covers a transport or seat failure (A:227,
-  A:233), a malformed answer (A:237), or the review port throwing (P:613); widened in
+  /-- `:acceptance-review-refused` (P:658) with `:review-status :failed`: there is no
+  reviewer answer that could be read. That covers a transport or seat failure (A:342,
+  A:347), a malformed answer (A:355), or the review port throwing (P:642); widened in
   rev 8 to match the checker and refusal-totality #48b (M8R). Witnesses: clicks
   `36b47627`, `fdc08aea`, `78180753` (429). -/
   | noReviewerAnswer
-  /-- `:acceptance-review-refused` (P:628) with `:review-status :refused`: the reviewer
+  /-- `:acceptance-review-refused` (P:658) with `:review-status :refused`: the reviewer
   answered on the merits. Witnesses: click `1a6de51f`
   (`:acceptance-test-did-not-fail-for-injury-reason`) and click `6cdf2a7c` (reason not
   recorded, under the pre-run contract). -/
@@ -783,7 +783,7 @@ def BoundaryDefect.state : BoundaryDefect → RouteState
   | .admission .noReviewerAnswer => admissionRefused
   | .admission .reviewerRefused => reviewRefused
 
-/-- What a bounded run recorded (A:372-373). A test that does not compile is recorded
+/-- What a bounded run recorded (A:498-499). A test that does not compile is recorded
 `failed` (see the module hole). -/
 inductive RunOutcome where
   | passed | failed | errored
@@ -971,7 +971,7 @@ inductive ClosingStatus where
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the same
   computed status (C:426 at this HEAD), `:abandoned` when
   `(L append-retry-result :attempt-limit-exhausted)` takes its first arm. A second
-  abandoned literal exists at C:261; it is `RetryNext.abandoned .retryBudgetSpent`, not
+  abandoned literal exists; it is `RetryNext.abandoned .retryBudgetSpent`, not
   this constructor: `(not C coordinate-queued-retry :retry-budget-spent)`. -/
   | abandoned
   /-- `:awaiting-retry` (C:349): the retry port queued the retry click. The production
@@ -1193,8 +1193,10 @@ inductive RetryClickOutcome where
   `append-other-injury-retry-observation` (T:185-196). The enacted entry's state is
   untouched. Added in rev 8 (finding) and widened by the rev 8 review. Rev 11 split off
   the refused arms as `otherInjuryRefused`.
-  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T append-other-injury-retry-observation :retry-inconclusive)`,
-  called from `(T integrate)` on the `(nil? previous)` arm with transition `:open` and on
+  Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`), re-anchored in rev 16
+  to the call the function makes: `(T append-other-injury-retry-observation ledger/append-observation)`
+  which appends the retry-inconclusive observation for the enacted entry. The
+  function is called from `(T integrate)` on the `(nil? previous)` arm with transition `:open` and on
   the `ledger/active-states` arm with transition `:active-injury-retained`. -/
   | otherInjury
   /-- Rev 11: `:injury` with a different injury id, and the record is refused, not
