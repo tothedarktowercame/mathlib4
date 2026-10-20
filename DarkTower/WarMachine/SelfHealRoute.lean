@@ -41,7 +41,7 @@ vocabulary for the author/reviewer boundary, the class-1 rows of
 (futon2 `315425cbd`). Five clicks on 2026-10-19 all stopped at
 `routeRefused [:acceptance-test]`, and the route alone cannot tell them apart. Their
 causes sit in the acceptance observation, so they are given as `ProposalDefect` and
-`AdmissionDefect` *beside* the path. `RouteState` is unchanged (22 states): this is
+`AdmissionDefect` *beside* the path. `RouteState` is unchanged (20 states; rev 4 said 22, corrected in rev 5): this is
 the rev 2 principle, terms beside the state rather than in it. `BoundaryDefect.state`
 places each defect by the state docstrings. A transport failure at review has no
 reviewer answer, so it is `admissionRefused`, not `reviewRefused`.
@@ -54,6 +54,32 @@ A = futon3c `840251d7c` `src/futon3c/wm/meta_self_heal_adapters.clj`.
 admission, before a reviewer invoke, as F16 does for passes-before-repair? Today the
 runner records it as `:failed` exit 1 (A:373, click `1a6de51f`), so nothing before
 review can tell it from a test that fails for the injury.
+
+Revision 5 (claude-2, 2026-10-20, packet M4L from claude-5): the coordination stage
+after `routeEnacted`, refusal class 3 of `refusal-totality-2026-10-19.md`. Three new
+states, `coordinationHeld`, `coordinationRefused` and `persistRefused`, each ending at
+`terminalRecord`, so `RouteState` has 23 states. Why a click stopped inside the
+transaction is given beside the path, as `CoordinationOutcome`, in the same way as
+`BoundaryDefect`. The table is written against the record shape of packet M4a
+(codex-3, `~/notes/packet-codex-route-coordinator-result-2026-10-20.md`), not against
+today's code. Today the checkpoint loop in `route!` persists every result and carries a
+held or refused result on through the remaining phases (order error 4), and it reports a
+coordinator refusal that has no ledger as `:checkpoint-persist-failed` (row #66,
+`coordination_66_masked`). After M4a, a held or refused result ends the route, as these
+edges say. Line citations C = futon2 `1b923e904`
+`src/futon2/aif/meta_repair_coordinator.clj`; P = the same commit,
+`meta_self_heal_production.clj`.
+
+**Run-time witness leg (rev 5).** None. No click has reached coordination: every click
+on 2026-10-19 stopped at the author/reviewer boundary or earlier. The first click that
+reaches coordination after M4a is live is the witness for a later revision.
+
+**Holes (rev 5, not decided).**
+* #54: an admission receipt can fail to persist after an accepted review (P:650), and
+  there is no edge from `reviewAccepted` to a refusal.
+* The attributable retry path (class 5) is still not transcribed.
+* #5: `route!` returns nil when the active set is not computed, so the click runs ordinary
+  work, and there is no edge for it.
 
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
@@ -109,6 +135,9 @@ inductive RouteState where
   | preparationRefused      -- `:preparation-refused`: `coordinator/prepare` returned no transaction
   | bindingRefused          -- `:diagnosis-transaction-mismatch` / `:acceptance-transaction-mismatch`
   | enacted
+  | coordinationHeld        -- rev 5: a port answered and the transaction waits (`:held`)
+  | coordinationRefused     -- rev 5: `coordinator/coordinate` refused, with or without a ledger
+  | persistRefused          -- rev 5: a `:checkpoint` result's ledger or transaction write failed
   | ordinarySelection
   | terminalRecord
   deriving DecidableEq, Repr
@@ -156,12 +185,20 @@ def transitions : List (RouteState × RouteState) :=
     (readinessReady, preparationRefused),
     (readinessReady, bindingRefused),
     (routeEnacted, enacted),
+    -- rev 5: the coordination stage (after M4a, futon2 `route!` ends on any
+    -- non-checkpoint result).
+    (routeEnacted, coordinationHeld),
+    (routeEnacted, coordinationRefused),
+    (routeEnacted, persistRefused),
     -- `phases.md`, ruling: typed refusals terminate and do not fall back.
     (readinessRefused, terminalRecord),
     (ledgerUnreadable, terminalRecord),
     (routeRefused, terminalRecord),
     (preparationRefused, terminalRecord),
     (bindingRefused, terminalRecord),
+    (coordinationHeld, terminalRecord),
+    (coordinationRefused, terminalRecord),
+    (persistRefused, terminalRecord),
     (enacted, terminalRecord) ]
 
 /-- Every state of the (now finite) vocabulary; the fuel bound for `reaches`. -/
@@ -170,6 +207,7 @@ def allStates : List RouteState :=
     acceptanceUnavailable, proposalRefused, admissionRun, admissionRefused,
     reviewAccepted, reviewRefused, readinessReady, readinessRefused, ledgerUnreadable,
     routeEnacted, routeRefused, preparationRefused, bindingRefused, enacted,
+    coordinationHeld, coordinationRefused, persistRefused,
     ordinarySelection, terminalRecord ]
 
 /-- Boolean equality for the route-state vocabulary. -/
@@ -512,5 +550,148 @@ theorem witnesses_reachReadiness :
     edge click8df4e8d2.state readinessReady = true ∧
       edge click1a6de51f.state readinessReady = true ∧
       edge click36b47627.state readinessReady = true := by decide
+
+/-! ## Rev 5: coordination outcomes -/
+
+/-- Where the checkpoint loop stopped (`checkpoints`, P:12), or `final` for the
+`coordinate` call after the loop, which runs without `:stop-after`. -/
+inductive CoordinationPhase where
+  | claim | author | review | enact | final
+  deriving DecidableEq, Repr
+
+/-- `:held` reasons (`held!`, C:208). The port answered and the transaction waits. -/
+inductive HeldReason where
+  /-- `:author-failed` (C:268). -/
+  | authorFailed
+  /-- `:review-rejected` (C:290). -/
+  | reviewRejected
+  /-- `:enact-failed` (C:313). -/
+  | enactFailed
+  deriving DecidableEq, Repr
+
+/-- `:refused` reasons of `coordinate` (C:216). Those marked *no ledger* return a map
+without `:ledger`, and today `store/persist-ledger!` refuses it, so `route!` reports
+`:checkpoint-persist-failed` instead (row #66). -/
+inductive CoordinatorRefusal where
+  /-- `:coordinator/input-refused` (C:237); no ledger. -/
+  | inputRefused
+  /-- `:coordinator/resume-state-refused` (C:257); no ledger. -/
+  | resumeStateRefused
+  /-- `:coordinator/port-receipt-refused` (C:188); carries `:phase`, no ledger. -/
+  | portReceiptRefused
+  /-- `:coordinator/port-threw` (C:194); carries `:phase`, no ledger. -/
+  | portThrew
+  /-- `:coordinator/author-payload-refused` (C:272); carries a ledger. -/
+  | authorPayloadRefused
+  /-- `:coordinator/review-patch-substitution` (C:292); carries a ledger. -/
+  | reviewPatchSubstitution
+  /-- `:coordinator/enact-payload-refused` (C:318); carries a ledger. -/
+  | enactPayloadRefused
+  /-- `:coordinator/retry-attribution-refused` (C:345); carries a ledger. -/
+  | retryAttributionRefused
+  /-- `:coordinator/ledger-transition-refused` (C:201); carries the ledger it refused. -/
+  | ledgerTransitionRefused
+  /-- `:coordinator/malformed` (C:379, C:381); no ledger. -/
+  | malformed
+  deriving DecidableEq, Repr
+
+/-- The two writes after a `:checkpoint` result (`:meta-self-heal/checkpoint-persist-failed`,
+P:990). -/
+inductive PersistWrite where
+  | ledgerWrite | transactionWrite
+  deriving DecidableEq, Repr
+
+/-- How a transaction closed after enactment: the final `coordinate` result's `:status`. -/
+inductive ClosingStatus where
+  /-- `:discharged` (C:357, C:364): the retry succeeded. -/
+  | discharged
+  /-- `:reopened` (C:375, via `ledger/append-retry-result`): the retry did not discharge. -/
+  | reopened
+  /-- `:abandoned` (C:375): the attempt after this one would exceed the budget. -/
+  | abandoned
+  /-- `:awaiting-retry` (C:349): the retry port queued the retry click. The production
+  retry port only persists and enqueues, so this is the closing status a production
+  click is expected to reach. The M4a shape does not name it (finding). -/
+  | awaitingRetry
+  deriving DecidableEq, Repr
+
+/-- Why the route ended inside, or at the end of, the transaction. -/
+inductive CoordinationOutcome where
+  | held (reason : HeldReason)
+  | refused (reason : CoordinatorRefusal)
+  | persistFailed (write : PersistWrite)
+  | closed (status : ClosingStatus)
+  deriving DecidableEq, Repr
+
+/-- The placement law for the coordination stage. -/
+def CoordinationOutcome.state : CoordinationOutcome → RouteState
+  | .held _ => coordinationHeld
+  | .refused _ => coordinationRefused
+  | .persistFailed _ => persistRefused
+  | .closed _ => enacted
+
+/-- A coordination result as a route check reports it, after M4a: its state, the loop
+phase (`:phase`), and the outcome. -/
+structure CoordinationObservation where
+  state : RouteState
+  phase : CoordinationPhase
+  outcome : CoordinationOutcome
+  deriving DecidableEq, Repr
+
+/-- An observation obeys the placement law. -/
+def CoordinationObservation.placed (o : CoordinationObservation) : Bool :=
+  stateEq o.outcome.state o.state
+
+/-- Every new state ends the route. -/
+theorem coordinationStates_terminate :
+    reaches coordinationHeld terminalRecord = true ∧
+      reaches coordinationRefused terminalRecord = true ∧
+      reaches persistRefused terminalRecord = true := by decide
+
+/-- A held, refused or persist-failed transaction never goes on to enactment or to
+ordinary work (order error 4: true of the runtime only after M4a). -/
+theorem coordinationStops_beforeEnactment :
+    reaches coordinationHeld enacted = false ∧ reaches coordinationRefused enacted = false ∧
+      reaches persistRefused enacted = false ∧
+      reaches coordinationHeld ordinarySelection = false ∧
+      reaches coordinationRefused ordinarySelection = false ∧
+      reaches persistRefused ordinarySelection = false := by decide
+
+/-- `routeEnacted` reaches each coordination outcome's state. -/
+theorem routeEnacted_reachesOutcomes :
+    reaches routeEnacted coordinationHeld = true ∧
+      reaches routeEnacted coordinationRefused = true ∧
+      reaches routeEnacted persistRefused = true ∧ reaches routeEnacted enacted = true := by
+  decide
+
+/-- Rev 5 adds no path from an active injury to ordinary work. -/
+theorem noFallback_rev5 : reaches activeInjury ordinarySelection = false := by decide
+
+/-- Every outcome is placed at a state `routeEnacted` reaches. -/
+theorem outcomes_reachable (o : CoordinationOutcome) : reaches routeEnacted o.state = true := by
+  cases o <;> rename_i x <;> cases x <;> decide
+
+/-- Row #66: what today's `route!` records when `coordinate` refuses with no ledger
+(`:coordinator/input-refused`, at the claim checkpoint). `store/persist-ledger!` refuses
+the missing ledger, and the loop reports `:meta-self-heal/checkpoint-persist-failed`
+(P:990). -/
+def coordination_66_reportedToday : CoordinationObservation :=
+  { state := persistRefused, phase := .claim, outcome := .persistFailed .ledgerWrite }
+
+/-- The same result as M4a records it: the coordinator's own refusal. -/
+def coordination_66_afterM4a : CoordinationObservation :=
+  { state := coordinationRefused, phase := .claim, outcome := .refused .inputRefused }
+
+/-- **The reason M4a exists.** Today's record places a coordinator refusal at
+`persistRefused`, but by the law the outcome's own state is `coordinationRefused`, and the
+two differ. Each record is internally placed, so `placed` alone cannot catch the mask. The
+mask is that the outcome is replaced: a route check over today's records would certify a
+persist failure that never happened. -/
+theorem coordination_66_masked :
+    coordination_66_reportedToday.outcome.state = persistRefused ∧
+      (CoordinationOutcome.refused .inputRefused).state = coordinationRefused ∧
+      persistRefused ≠ coordinationRefused ∧
+      coordination_66_reportedToday.state ≠ coordination_66_afterM4a.state ∧
+      coordination_66_afterM4a.placed = true := by decide
 
 end DarkTower.WarMachine.SelfHealRoute
