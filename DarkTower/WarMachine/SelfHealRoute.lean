@@ -2291,12 +2291,17 @@ inductive RecordDecisionSource where
   | judgment
   | accumulationStub
   | sorryDecision
+  /-- Rev 30: no cell at all. A throw while closing escaped `(R run-opportunity-core!)`
+  and `(R run-opportunity!)` answered with an empty checkpoint map under a synthetic
+  initialization identity. -/
+  | erased
   deriving DecidableEq, Repr
 
 def RecordDecisionSource.carriesAction : RecordDecisionSource → Bool
   | .judgment => true
   | .accumulationStub => false
   | .sorryDecision => true
+  | .erased => false
 
 /-- The source retained today, given whether a selected judgment cell exists and whether
 the close wrote the accumulation stub onto a sorry cell. -/
@@ -2386,5 +2391,73 @@ theorem requeuedChild_F40 :
       (∀ j : Bool, (retainedSourceF40b j).carriesAction = true) ∧
       RetryClickOutcome.otherInjury.nextToday false false ⟨4, 3⟩ = .queued ⟨4, 4⟩ := by
   refine ⟨fun r => by cases r <;> rfl, fun j => by cases j <;> rfl, by decide⟩
+
+
+/-! ## Rev 30: the close can be refused (read from click 13) -/
+
+/-- The durable append of the selection cell at close, `(R persist-selection!)` through
+`(C append-checkpoint!)`. Rev 29 modelled no refusal after the judgment. Click 13's child
+(run `531f4c1f`, attempt-002 of cohort `:wm-contract-machinery-143-v1`) had its cell refused
+`:cohort-checkpoint-oversized`: 33,554,433 bytes against the 32 MiB bound, the sealed menu of
+8.3 MB carried three times (in the decision's certificate and twice inside
+`:outer-task-selection`). The typed sorry was appended (`002-selection.edn`, 21:59:12Z) and
+the refusal rethrown, as `(R append-checkpoint-or-refusal-sorry!)` promises. -/
+inductive CloseAppend where
+  | accepted
+  | refused
+  deriving DecidableEq, Repr
+
+/-- What the catch does with a throw raised while closing. Today
+(`(R run-opportunity-core!)`, the `@closing?` branch): it calls `(C close-attempt!)` without
+first writing the required sorries the rethrow skipped, so the cohort refuses
+`:required-checkpoints-missing`, and that second throw escapes to `(R run-opportunity!)`,
+which answers with an empty checkpoint map. -/
+inductive CloseBoundary where
+  | closedBuildFailed
+  | initializationIdentity
+  deriving DecidableEq, Repr
+
+def closeBoundaryToday : CloseAppend → CloseBoundary
+  | .accepted => .closedBuildFailed
+  | .refused => .initializationIdentity
+
+/-- The record's decision source once the close is reached, after F40b, as a function of
+whether the close's append was accepted. -/
+def retainedSourceAtClose (judgmentRetained : Bool) (a : CloseAppend) : RecordDecisionSource :=
+  match closeBoundaryToday a with
+  | .closedBuildFailed => retainedSourceF40b judgmentRetained
+  | .initializationIdentity => .erased
+
+/-- **Click 13 witness.** The judgment was retained (the trace holds it; `entryF40` held:
+the run went past selection into cascade-resume, 326 s, ending
+`:open-cascade-review-answer-invalid`), the close's append was refused, and the record
+carries no action. `requeuedChild_F40`'s second conjunct assumed the append accepted; this
+is the case it did not name. The third conjunct is consistent so far: ledger ordinals 20 and
+21 open injury `75747f06` and observe `:retry-inconclusive` for `d755c886`; no abandonment;
+the re-queue entry ⟨4, 4⟩ is expected on the next click, as ordinal 19 followed click 12. -/
+theorem click13_recordErased :
+    (retainedSourceAtClose true .refused).carriesAction = false ∧
+      retainedSourceAtClose true .accepted = .judgment := by decide
+
+/-- F41: the closing branch writes the missing required sorries before the cohort close and,
+if the close is still refused, returns the `:build-failed` result with its checkpoints and
+the refusal typed, instead of letting the throw escape. -/
+def closeBoundaryF41 : CloseAppend → CloseBoundary
+  | _ => .closedBuildFailed
+
+def retainedSourceF41 (judgmentRetained : Bool) (a : CloseAppend) : RecordDecisionSource :=
+  match closeBoundaryF41 a with
+  | .closedBuildFailed => retainedSourceF40b judgmentRetained
+  | .initializationIdentity => .erased
+
+/-- Prediction for the next click after F41 lands, before F42 shrinks the cell: the sealed
+route's cell is refused again, the attempt closes `:build-failed` with
+`:cohort-checkpoint-oversized`, and the record keeps the action whichever cell exists. Not
+a heal: the close is still a refusal, which F42 removes. The model predicts nothing past
+the loop node; `:open-cascade-review-answer-invalid` at cascade-resume is the enactment
+stretch no revision has read. -/
+theorem f41_recordKeepsAction :
+    ∀ (j : Bool) (a : CloseAppend), (retainedSourceF41 j a).carriesAction = true := by
+  intro j a; cases j <;> cases a <;> rfl
 
 end DarkTower.WarMachine.SelfHealRoute
