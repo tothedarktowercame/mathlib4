@@ -955,19 +955,39 @@ inductive PersistWrite where
 
 /-- How a transaction closed after enactment: the final `coordinate` result's `:status`. -/
 inductive ClosingStatus where
-  /-- `:discharged` (C:357, C:364): the retry succeeded. -/
+  /-- `:discharged` (C:357, C:364): the retry succeeded.
+  Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate :discharged)`,
+  the arm `(= :succeeded (:status retry-receipt))`, after
+  `append-transition!` of `:state :discharged`. The C cites above are from before C moved;
+  at this HEAD the literal is C:415. -/
   | discharged
-  /-- `:reopened` (C:375, via `ledger/append-retry-result`): the retry did not discharge. -/
+  /-- `:reopened` (C:375, via `ledger/append-retry-result`): the retry did not discharge.
+  Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the `:else`
+  arm of the retry receipt. The status is computed, `(get-in reopened [:entry :state])`
+  (C:426 at this HEAD), and is `:reopened` when `(L append-retry-result :reopened)` takes
+  its second arm. -/
   | reopened
-  /-- `:abandoned` (C:375): the attempt after this one would exceed the budget. -/
+  /-- `:abandoned` (C:375): the attempt after this one would exceed the budget.
+  Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the same
+  computed status (C:426 at this HEAD), `:abandoned` when
+  `(L append-retry-result :attempt-limit-exhausted)` takes its first arm. A second
+  `:abandoned` literal exists, `(C coordinate-queued-retry :retry-budget-spent)` (C:261);
+  that one is `RetryNext.abandoned .retryBudgetSpent`, not this constructor. -/
   | abandoned
   /-- `:awaiting-retry` (C:349): the retry port queued the retry click. The production
   retry port only persists and enqueues, so this is the closing status a production
-  click is expected to reach. The M4a shape does not name it (finding). -/
+  click is expected to reach. The M4a shape does not name it (finding).
+  Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate-queued-retry :awaiting-retry)` (C:248 at
+  this HEAD), returned by `coordinate` through its `(= :queued (:status retry-receipt))`
+  arm, when `ledger/pending-requeue` finds nothing. -/
   | awaitingRetry
   /-- Rev 8: the retry click ran but did not test the repair (`RetryClickOutcome.closing`).
   The injury is neither discharged nor reopened, and the transaction stays `:enacted`
-  and active. -/
+  and active.
+  Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): not a `coordinate` status. It is the retry
+  click's `(T integrate :retry-inconclusive)` observation: the non-injury arm for every
+  reason but `:successful-task-outcome` (T:236), and
+  `(T append-other-injury-retry-observation :retry-inconclusive)` (T:189). -/
   | retryInconclusive
   deriving DecidableEq, Repr
 
