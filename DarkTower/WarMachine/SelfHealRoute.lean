@@ -60,7 +60,8 @@ after `routeEnacted`, refusal class 3 of `refusal-totality-2026-10-19.md`. Three
 states, `coordinationHeld`, `coordinationRefused` and `persistRefused`, each ending at
 `terminalRecord`, so `RouteState` has 23 states. (Rev 23, F31: one click may now run
 several author attempts, so `coordinationHeld` may stand for several attempts of one
-click; see `HeldReason.authorFailed`.) Why a click stopped inside the
+click; see `HeldReason.authorFailed`. Rev 24 puts that loop in the table as the cycle
+through `transactionRetired`.) Why a click stopped inside the
 transaction is given beside the path, as `CoordinationOutcome`, in the same way as
 `BoundaryDefect`. The table is written against the record shape of packet M4a
 (codex-3, `~/notes/packet-codex-route-coordinator-result-2026-10-20.md`), not against
@@ -249,6 +250,18 @@ joins `recordUnreadable` in the disagreement.
 * The rev 9 question whether a successful retry of different work tests the repair still
   stands.
 
+Revision 24 (claude-2, 2026-10-20, packet M23L from claude-5; P = futon2 `b463d85cc`,
+A = futon3c `fe7d3d28e`): the in-click author loop of F31 is in the table. Two new states,
+`transactionRetired` and `transactionRetireFailed`, so `RouteState` has 30 states. The
+continuation is the cycle `coordinationHeld → transactionRetired → routeEnacted`, and its
+refusals are placed by `ContinuationRefusal.state`. `reaches coordinationHeld enacted` is
+now true, so `coordinationStops_beforeEnactment` loses that conjunct
+(`heldReachesEnactment_onlyByRetirement` says how it is reached). The table does not bound
+the cycle; the ledger does, and `retiredVisits_le_attemptBudget` proves the count over an
+`AttemptPath` whose passes obey it. `ContinuationOutcome` and `ContinuedAttempt` are on the
+held observation, beside the path. `CarriedBindings` gives F32's carried-bindings
+observation its own vocabulary.
+
 **AIF leg.** None. No module under `DarkTower/AIF` or `DarkTower/WarMachine`
 models injury, repair or route arbitration (claude-2, 2026-10-19). Typed none
 until one is named.
@@ -256,7 +269,7 @@ until one is named.
 
 namespace DarkTower.WarMachine.SelfHealRoute
 
--- Rev 7: with 28 states the bounded `reaches` unfolds deeper than the default limit
+-- Rev 7: with 28 states (30 since rev 24) the bounded `reaches` unfolds deeper than the default limit
 -- allows `decide` to evaluate.
 set_option maxRecDepth 8192
 
@@ -466,6 +479,29 @@ inductive RouteState where
   /-- Rev 5: a `:checkpoint` result's ledger or transaction write failed.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(P route! :meta-self-heal/checkpoint-persist-failed)`. -/
   | persistRefused
+  /-- Rev 24 (futon2 `b463d85cc`, F31; packet M23L): the click's continuation after an
+  author failure. The edge from `coordinationHeld` is taken only when every part of the
+  guard in `(P route! run-attempt)`'s loop holds: the attempt is held, its reason is
+  `:author-failed`, its ledger and transaction writes are both `:persisted`, the reload
+  `store/load-durable-ledger` is `:loaded`, and the injury's active entry is `:reopened`
+  (at attempt n+1, from the authored attempt n). The producing site is
+  `(P retire-stale-transaction! :retired)`, called as `(P route! retire-stale-transaction!)`
+  on the attempt-n transaction. Then `coordinator/prepare` builds attempt n+1 with
+  `(P continued-work-order-options)` and the two bindings re-run: a transaction with both
+  bindings valid is `routeEnacted` again (there is no separate prepared state; on the first
+  pass `readinessReady` goes to `routeEnacted` the same way), no transaction is
+  `preparationRefused`, and a binding that is not valid is `bindingRefused`. Both refusals
+  carry `(P route! :continued-from)`. The pass is bounded by the ledger, not by the table
+  (`retiredVisits_le_attemptBudget`). -/
+  | transactionRetired
+  /-- Rev 24 (F31): the retirement was refused,
+  `(P retire-stale-transaction! :meta-self-heal/transaction-retire-failed)`, returned by
+  `(P route! retire-stale-transaction!)` in two places: before the first prepare, when a
+  resumed transaction belongs to an earlier attempt than the ledger's (from
+  `readinessReady`), and in the continuation (from `coordinationHeld`, the refusal sibling
+  of `transactionRetired`). The second carries `(P route! :continued-from)`, with the
+  refused retirement's status and reason in its last entry. A terminal refusal. -/
+  | transactionRetireFailed
   /-- Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): no status literal. `(R run-opportunity! run-ordinary-opportunity!)`,
   from two branches: `retry` after `retryReady`, and `(or routed ...)` when `route!`
   returned nil. -/
@@ -535,6 +571,17 @@ def transitions : List (RouteState × RouteState) :=
     (routeEnacted, coordinationHeld),
     (routeEnacted, coordinationRefused),
     (routeEnacted, persistRefused),
+    -- rev 24 (F31): a resumed transaction from an earlier attempt is retired before the
+    -- first prepare; a refused retirement ends the click.
+    (readinessReady, transactionRetireFailed),
+    -- rev 24 (F31): the in-click continuation after a persisted `:author-failed` hold
+    -- (`(P route! run-attempt)`): retire, prepare attempt n+1, bind, run it again.
+    (coordinationHeld, transactionRetired),
+    (coordinationHeld, transactionRetireFailed),
+    (transactionRetired, routeEnacted),
+    (transactionRetired, preparationRefused),
+    (transactionRetired, bindingRefused),
+    (transactionRetireFailed, terminalRecord),
     -- `phases.md`, ruling: typed refusals terminate and do not fall back.
     (readinessRefused, terminalRecord),
     (ledgerUnreadable, terminalRecord),
@@ -553,6 +600,7 @@ def allStates : List RouteState :=
     reviewAccepted, reviewRefused, readinessReady, readinessRefused, ledgerUnreadable,
     routeEnacted, routeRefused, preparationRefused, bindingRefused, enacted,
     coordinationHeld, coordinationRefused, persistRefused,
+    transactionRetired, transactionRetireFailed,
     ordinarySelection, terminalRecord ]
 
 /-- Boolean equality for the route-state vocabulary. -/
@@ -925,7 +973,11 @@ theorem witnesses_reachReadiness :
 `(C invoke-once :coordinator/port-threw)` carry the port's phase), else the loop's; so `retry` can appear: the
 retry port (`(C coordinate :retry)`) runs inside the final call. Rev 5 review (claude-5, 2026-10-20). -/
 inductive CoordinationPhase where
-  | claim | author | review | enact | retry | final
+  | claim | author | review | enact
+  /-- The retry port's phase, `(C coordinate :retry)`. Not the carried-bindings absence on a
+  retry click, `(not R run-opportunity! :retry)`, which is `CarriedBindings.retryClick`. -/
+  | retry
+  | final
   deriving DecidableEq, Repr
 
 /-- `:held` reasons (`(C held!)`). The port answered and the transaction waits. -/
@@ -952,8 +1004,12 @@ inductive HeldReason where
   active entry is `:abandoned`; the ledger's `:attempt-limit` bounds it. `coordinationHeld`
   is where the click ends only when the last attempt of the loop is held; the attempts it
   moved past are listed in order in the disposition's `(P route! :continued-from)`, each with
-  its attempt, reason and retired transaction. This in-click loop is not in the state graph
-  (see the note on `ClosingStatus.reopened`). -/
+  its attempt, reason and retired transaction. Rev 24 (packet M23L): the loop is in the
+  state graph as the cycle `coordinationHeld → transactionRetired → routeEnacted`, with the
+  refusals `transactionRetireFailed`, `preparationRefused` and `bindingRefused` reached from
+  it (`ContinuationRefusal`); the attempts moved past are `ContinuedAttempt`s on the
+  observation, and when both writes persisted but the loop did not go on, the held result
+  says why (`ContinuationOutcome`). -/
   | authorFailed
   /-- `(C coordinate :review-rejected)`. -/
   | reviewRejected
@@ -1015,7 +1071,7 @@ inductive ClosingStatus where
   `:enacted`, so the two paths cannot be confused in a valid ledger.
   Rev 23 (F31): the author arm's `:reopened` entry is consumed by the same click, whose
   continuation (`(P route! run-attempt)`) retires the attempt-n transaction and authors
-  attempt n+1; the in-click loop is not in the state graph. -/
+  attempt n+1. Rev 24: that is the edge `coordinationHeld → transactionRetired`. -/
   | reopened
   /-- `:abandoned`: the attempt after this one would exceed the budget.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the same
@@ -1061,13 +1117,85 @@ def CoordinationOutcome.state : CoordinationOutcome → RouteState
   | .persistFailed _ => persistRefused
   | .closed _ => enacted
 
+/-- Rev 24 (futon2 `16be63148`, F32): why the loop did not go on after an attempt held
+`:author-failed` with both writes `:persisted`. P puts it on the held result as
+`(P route! :continuation)`; it is beside the path, like `CoordinationOutcome`, and the click
+ends at `coordinationHeld`. -/
+inductive ContinuationOutcome where
+  /-- The reload did not return `:loaded`:
+  `(P route! :meta-self-heal/reload-unavailable)`, with the durable's status beside it. Any
+  reopened entry waits for a later click. -/
+  | reloadUnavailable
+  /-- The injury is active but its entry is not `:reopened`:
+  `(P route! :entry-not-reopened)`, status `:not-continued`, with the entry. -/
+  | entryNotReopened
+  /-- The injury is no longer active, for instance its last entry is `:abandoned` with
+  `(L append-retry-result :attempt-limit-exhausted)`: `(P route! :injury-not-active)`,
+  status `:not-continued`, with that last entry. -/
+  | injuryNotActive
+  deriving DecidableEq, Repr
+
+/-- Rev 24 (F31/F32): one attempt the click moved past, an entry of
+`(P route! :continued-from)`: its attempt, its reason (always `:author-failed` today, the
+only reason the loop continues on), and whether its transaction was retired (`false` is a
+refused retirement, whose status and reason the entry keeps). A list of these is data
+beside the path, not a state. -/
+structure ContinuedAttempt where
+  attempt : Nat
+  reason : HeldReason
+  retired : Bool
+  deriving DecidableEq, Repr
+
+/-- Rev 24: the refusals the continuation can end in, each placed at its state. All three
+carry `(P route! :continued-from)` since futon2 `16be63148`. -/
+inductive ContinuationRefusal where
+  /-- `(P retire-stale-transaction! :meta-self-heal/transaction-retire-failed)` in the
+  continuation. -/
+  | transactionRetireFailed
+  /-- `coordinator/prepare` gave no transaction for attempt n+1:
+  `(P route! :meta-self-heal/preparation-refused)`, keeping the coordinator's result under
+  `:prepare`: `(C prepare :coordinator/preparation-refused)` with its defects, or
+  `(C prepare :coordinator/preparation-malformed)`. -/
+  | preparationRefused
+  /-- A re-run binding was not valid, returned through `(P route! "if-not (= :valid (:status next-binding))")`;
+  the reasons are those of `bindingRefused`:
+  `(P diagnosis-transaction-binding :meta-self-heal/diagnosis-transaction-mismatch)`,
+  `(P acceptance-transaction-binding :meta-self-heal/acceptance-transaction-mismatch)`,
+  `(P acceptance-transaction-binding :meta-self-heal/acceptance-transaction-unadmitted)`. -/
+  | bindingRefused
+  deriving DecidableEq, Repr
+
+/-- The placement law for the continuation's refusals. -/
+def ContinuationRefusal.state : ContinuationRefusal → RouteState
+  | .transactionRetireFailed => RouteState.transactionRetireFailed
+  | .preparationRefused => RouteState.preparationRefused
+  | .bindingRefused => RouteState.bindingRefused
+
+/-- Each continuation refusal is a step out of the cycle and ends the click. -/
+theorem continuationRefusals_placed (r : ContinuationRefusal) :
+    (edge coordinationHeld r.state || edge transactionRetired r.state) = true ∧
+      edge r.state terminalRecord = true ∧ reaches r.state enacted = false := by
+  cases r <;> decide
+
 /-- A coordination result as a route check reports it, after M4a: its state, the loop
-phase (`:phase`), and the outcome. -/
+phase (`:phase`), and the outcome. Rev 24 adds the continuation's two fields.
+-/
 structure CoordinationObservation where
   state : RouteState
   phase : CoordinationPhase
   outcome : CoordinationOutcome
+  /-- Rev 24: `(P route! :continuation)`, when the loop stopped after a persisted
+  author failure. -/
+  continuation : Option ContinuationOutcome := none
+  /-- Rev 24: `(P route! :continued-from)`, the attempts the click moved past, in order. -/
+  continuedFrom : List ContinuedAttempt := []
   deriving DecidableEq, Repr
+
+/-- Rev 24: a `:continuation` appears only on an `:author-failed` hold. -/
+def CoordinationObservation.continuationPlaced (o : CoordinationObservation) : Bool :=
+  match o.continuation with
+  | none => true
+  | some _ => decide (o.outcome = .held .authorFailed)
 
 /-- An observation obeys the placement law. -/
 def CoordinationObservation.placed (o : CoordinationObservation) : Bool :=
@@ -1080,13 +1208,33 @@ theorem coordinationStates_terminate :
       reaches persistRefused terminalRecord = true := by decide
 
 /-- A held, refused or persist-failed transaction never goes on to enactment or to
-ordinary work (order error 4: true of the runtime only after M4a). -/
+ordinary work (order error 4: true of the runtime only after M4a).
+Rev 24 (F31, packet M23L): restated. A held attempt now reaches enactment through the
+continuation (`coordinationHeld → transactionRetired → routeEnacted → enacted`), so the
+conjunct `reaches coordinationHeld enacted = false` of rev 5 to rev 23 is false of the
+table and is replaced by `heldReachesEnactment_onlyByRetirement`. The other five
+conjuncts are unchanged. -/
 theorem coordinationStops_beforeEnactment :
-    reaches coordinationHeld enacted = false ∧ reaches coordinationRefused enacted = false ∧
+    reaches coordinationRefused enacted = false ∧
       reaches persistRefused enacted = false ∧
       reaches coordinationHeld ordinarySelection = false ∧
       reaches coordinationRefused ordinarySelection = false ∧
       reaches persistRefused ordinarySelection = false := by decide
+
+/-- Rev 24: out of `coordinationHeld` there are exactly three steps: the click's end, the
+continuation's retirement, and its refusal. A held attempt goes on to enactment only by
+retiring its transaction first, and a refused retirement goes on to neither. -/
+theorem heldReachesEnactment_onlyByRetirement :
+    allStates.filter (edge coordinationHeld) =
+        [transactionRetired, transactionRetireFailed, terminalRecord] ∧
+      reaches coordinationHeld enacted = true ∧
+      reaches transactionRetireFailed enacted = false ∧
+      reaches transactionRetireFailed ordinarySelection = false := by decide
+
+/-- Rev 24: the continuation is a cycle in the table. -/
+theorem continuation_isCycle :
+    conforms [coordinationHeld, transactionRetired, routeEnacted, coordinationHeld] = true ∧
+      reaches coordinationHeld terminalRecord = true := by decide
 
 /-- `routeEnacted` reaches each coordination outcome's state. -/
 theorem routeEnacted_reachesOutcomes :
@@ -1587,5 +1735,117 @@ theorem requeue_abstentionMet (b r : Bool) (e : RetryEntry) :
 theorem requeue_otherInjuryMet (b r : Bool) (e : RetryEntry) :
     RetryClickOutcome.otherInjury.nextToday b r e = RetryClickOutcome.otherInjury.next b r e :=
   nextToday_eq_next_ofObserved b r _ e rfl
+
+/-! ## Rev 24: the continuation's bound, and the carried bindings -/
+
+/-- A path that carries an attempt number at each state. `List RouteState` cannot express
+the bound on the continuation: the cycle through `transactionRetired` is a table cycle, and
+what stops it is the ledger's attempt count, which is data. -/
+abbrev AttemptPath := List (RouteState × Nat)
+
+/-- The attempts at which a path enters `transactionRetired`: the reopened entry's attempt
+n+1 that the pass goes on to author. -/
+def AttemptPath.retiredAttempts (p : AttemptPath) : List Nat :=
+  (p.filter fun v => stateEq v.1 transactionRetired).map Prod.snd
+
+/-- What the ledger guarantees of the continuation's passes, given the attempt `attempt0`
+the click first authored and the ledger's `:attempt-limit`. Each pass needs the injury's
+active entry `:reopened` at the attempt after the one just authored, so the attempts
+strictly increase and each is above `attempt0`; and `(L append-retry-result :attempt-limit-exhausted)`
+appends `:abandoned` instead of `:reopened` when that attempt would exceed the limit, which
+the loop leaves as `ContinuationOutcome.injuryNotActive`, so no pass enters above it. -/
+structure AttemptPath.ledgerBounded (attemptLimit attempt0 : Nat) (p : AttemptPath) : Prop where
+  increasing : p.retiredAttempts.Pairwise (· < ·)
+  above : ∀ a ∈ p.retiredAttempts, attempt0 < a
+  within : ∀ a ∈ p.retiredAttempts, a ≤ attemptLimit
+
+/-- A strictly increasing list of naturals inside `(lo, hi]` has at most `hi - lo` entries. -/
+theorem length_le_of_pairwise_lt_Ioc :
+    ∀ (l : List Nat) (lo hi : Nat), l.Pairwise (· < ·) → (∀ a ∈ l, lo < a) →
+      (∀ a ∈ l, a ≤ hi) → l.length ≤ hi - lo
+  | [], _, _, _, _, _ => Nat.zero_le _
+  | a :: rest, lo, hi, hpair, habove, hwithin => by
+      rw [List.pairwise_cons] at hpair
+      have hlo : lo < a := habove a (List.mem_cons_self ..)
+      have hhi : a ≤ hi := hwithin a (List.mem_cons_self ..)
+      have ih := length_le_of_pairwise_lt_Ioc rest a hi hpair.2 hpair.1
+        (fun b hb => hwithin b (List.mem_cons_of_mem _ hb))
+      simp only [List.length_cons]
+      omega
+
+/-- **The bound.** A click whose passes obey the ledger visits `transactionRetired` at most
+`attemptLimit - attempt0` times, however the table's cycle is unrolled. -/
+theorem retiredVisits_le_attemptBudget (attemptLimit attempt0 : Nat) (p : AttemptPath)
+    (h : p.ledgerBounded attemptLimit attempt0) :
+    (p.filter fun v => stateEq v.1 transactionRetired).length ≤ attemptLimit - attempt0 := by
+  have hlen : (p.filter fun v => stateEq v.1 transactionRetired).length =
+      p.retiredAttempts.length := by
+    simp [AttemptPath.retiredAttempts]
+  rw [hlen]
+  exact length_le_of_pairwise_lt_Ioc _ _ _ h.increasing h.above h.within
+
+/-- The hypothesis is not vacuous: a fourth attempt under `:attempt-limit 3`, and a
+repeated attempt, are each refused by it. -/
+theorem ledgerBounded_refusesOverrun :
+    ¬ AttemptPath.ledgerBounded 3 2 [(transactionRetired, 3), (transactionRetired, 4)] ∧
+      ¬ AttemptPath.ledgerBounded 3 1 [(transactionRetired, 3), (transactionRetired, 3)] := by
+  refine ⟨fun h => ?_, fun h => ?_⟩
+  · have := h.within 4 (by decide)
+    omega
+  · have := h.increasing
+    revert this
+    decide
+
+/-- Click 10, `wm-click-dfc7501c` (2026-10-20 17:03:02-17:04:02Z), from readiness on.
+Attempt 1's resumed transaction was retired before the first prepare
+(`data/wm-meta-injuries/transaction.edn.attempt-1.retired.edn`, futon2), attempt 2 was
+authored and held `:author-failed`, the continuation retired it
+(`transaction.edn.attempt-2.retired.edn`) and authored attempt 3, which was held; the
+ledger then has `:abandoned :attempt-limit-exhausted` at attempt 3 under
+`:attempt-limit 3`, and the loop's exit is `injuryNotActive`. The click record lacks
+`:continued-from` and `:continuation` (futon3c `runner_service.clj` keeps only selected
+keys, F34), so the observation below is taken from P's result shape and the ledger, not
+from the record. The prefix before readiness is not established here. -/
+def click10AttemptSuffix : AttemptPath :=
+  [ (readinessReady, 2), (routeEnacted, 2), (coordinationHeld, 2), (transactionRetired, 3),
+    (routeEnacted, 3), (coordinationHeld, 3), (terminalRecord, 3) ]
+
+def click10Observation : CoordinationObservation :=
+  { state := coordinationHeld, phase := .author, outcome := .held .authorFailed,
+    continuation := some .injuryNotActive,
+    continuedFrom := [{ attempt := 2, reason := .authorFailed, retired := true }] }
+
+theorem click10_conforms :
+    conformsSuffix (click10AttemptSuffix.map Prod.fst) = true ∧
+      click10Observation.placed = true ∧ click10Observation.continuationPlaced = true ∧
+      click10AttemptSuffix.retiredAttempts = [3] := by decide
+
+theorem click10_ledgerBounded : click10AttemptSuffix.ledgerBounded 3 2 := by
+  refine ⟨by decide, ?_, ?_⟩ <;> intro a ha <;>
+    simp [click10AttemptSuffix, AttemptPath.retiredAttempts, stateEq] at ha <;> omega
+
+/-- Click 10 used its whole budget: one pass, `3 - 2`. -/
+theorem click10_usedBudget :
+    (click10AttemptSuffix.filter fun v => stateEq v.1 transactionRetired).length = 3 - 2 := by
+  decide
+
+/-- What `(R run-opportunity!)` observes of the bindings carried by a resumed transaction,
+`(P carried-bindings-observation)`, before diagnosis. Rev 24 (F32). -/
+inductive CarriedBindings where
+  /-- `(P carried-bindings-observation :carried-transaction)`: the transaction's work order
+  names an active injury; its pins fill the options the caller did not supply. The map has
+  no `:status`, so it is no site; the call is
+  `(R run-opportunity! meta-self-heal/carried-bindings-observation)`. -/
+  | carriedTransaction
+  /-- `(P carried-bindings-observation {:status :absent :reason :no-active-injury})`. -/
+  | noActiveInjury
+  /-- `(P carried-bindings-observation {:status :absent :reason :transaction-injury-not-active})`. -/
+  | transactionInjuryNotActive
+  /-- `(P carried-bindings-observation {:status :absent :reason :no-transaction})`. -/
+  | noTransaction
+  /-- A retry click reads no context and carries nothing:
+  `(R run-opportunity! {:status :absent :reason :retry})`. Not `CoordinationPhase.retry`. -/
+  | retryClick
+  deriving DecidableEq, Repr
 
 end DarkTower.WarMachine.SelfHealRoute
