@@ -927,7 +927,19 @@ inductive CoordinationPhase where
 
 /-- `:held` reasons (`(C held!)`). The port answered and the transaction waits. -/
 inductive HeldReason where
-  /-- `(C coordinate :author-failed)`. -/
+  /-- `(C coordinate :author-failed)`. Rev 21 (futon2 `4e7b31cdc`, F26): the hold is the
+  click's disposition (`coordinationHeld`, then `terminalRecord`), but it is no longer the
+  injury's end. Before holding, the author arm calls `(C coordinate ledger/append-retry-result)`
+  with `:reason :author-failed` and the sealed failed receipt's pin as `:port-receipt-pin`, and
+  `held!` carries that ledger. The ledger's latest entry is then `:reopened` at attempt n+1
+  from `:claimed`, or `:abandoned` with `(L append-retry-result :attempt-limit-exhausted)`
+  (the same pin) when n+1 would exceed `:attempt-limit`; `(L allowed-predecessors :claimed)`
+  admits both, and `(L state-defects :reopen/author-failure-evidence)` and
+  `(L state-defects :abandonment/author-failure-evidence)` refuse them without the pin. On a
+  later click `(P route! retire-stale-transaction!)` retires the attempt-n transaction, whose
+  `:work-order :attempt` is below the ledger's, and `prepare` builds attempt n+1; the author
+  is dispatched afresh on that click, not on the click that reopened. This across-click edge
+  is not in the state graph (see the note on `ClosingStatus.reopened`). -/
   | authorFailed
   /-- `(C coordinate :review-rejected)`. -/
   | reviewRejected
@@ -978,14 +990,25 @@ inductive ClosingStatus where
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the `:else`
   arm of the retry receipt. The status is computed, `(get-in reopened [:entry :state])`
   (`(C coordinate "get-in reopened")`), and is `:reopened` when `(L append-retry-result :reopened)` takes
-  its second arm. -/
+  its second arm.
+  Rev 21 (futon2 `4e7b31cdc`, F26): this is the enacted path only, with predecessor
+  `:enacted` and the retry's reason. The author arm of `coordinate` also appends a
+  `:reopened` (or `:abandoned`) ledger entry, with predecessor `:claimed` and
+  `:reason :author-failed` (`HeldReason.authorFailed`), but `coordinate` returns `:held`
+  there, so it does not produce this closing status. `(L allowed-predecessors :claimed)`
+  lists `:reopened` and `:abandoned` from both `:enacted` and `:claimed`, and
+  `(L state-defects :reopen/reason-unexpected)` refuses an `:author-failed` reopen from
+  `:enacted`, so the two paths cannot be confused in a valid ledger. -/
   | reopened
   /-- `:abandoned`: the attempt after this one would exceed the budget.
   Rev 14 anchor (futon2 `43bb57fc7`; C, T and L unchanged since `d0a890f22`): `(C coordinate ledger/append-retry-result)`, the same
   computed status (`(C coordinate "get-in reopened")`), `:abandoned` when
   `(L append-retry-result :attempt-limit-exhausted)` takes its first arm. A second
   abandoned literal exists; it is `RetryNext.abandoned .retryBudgetSpent`, not
-  this constructor: `(not C coordinate-queued-retry :retry-budget-spent)`. -/
+  this constructor: `(not C coordinate-queued-retry :retry-budget-spent)`.
+  Rev 21: as for `reopened`, the author arm's `:abandoned :attempt-limit-exhausted` entry
+  (predecessor `:claimed`, carrying `:port-receipt-pin`) is returned under `:held`, not as
+  this closing status. -/
   | abandoned
   /-- `:awaiting-retry`: the retry port queued the retry click. The production
   retry port only persists and enqueues, so this is the closing status a production
