@@ -1948,6 +1948,19 @@ def effectiveAttemptLimit (attemptLimit : Nat) (correctedReceipts : List Nat) : 
 theorem d755c886_attemptBudget :
     effectiveAttemptLimit 3 [2] = 5 ∧ effectiveAttemptLimit 3 [] = 3 := by decide
 
+/-- `(C verify-work-order :attempt/exceeds-limit)`: the work order's attempt must not exceed
+the limit the order carries. -/
+def workOrderAdmitsAttempt (attempt limit : Nat) : Bool := attempt ≤ limit
+
+/-- **Why F38 exists** (rev 25a, found by codex-1's answer to the F35 packet's question, not by
+a click). `(C prepare)` copied the ledger's raw `:attempt-limit` onto the work order, so the
+corrected injury's attempt 4 was refused at prepare (`preparationRefused`, before any port) and
+the predicted path could not leave `readinessReady`. F38 puts `(L effective-attempt-limit)` on
+the order. -/
+theorem d755c886_prepareNeedsF38 :
+    workOrderAdmitsAttempt 4 3 = false ∧
+      workOrderAdmitsAttempt 4 (effectiveAttemptLimit 3 [2]) = true := by decide
+
 /-- **The predicted self-heal click**, `(S click!)` on injury `d755c886` after F35, F36 and
 F37 are reviewed and reloaded. From the ledger read: the active set is the corrected
 `:reopened` at attempt 4; diagnosis and acceptance are supplied from the carried attempt-3
