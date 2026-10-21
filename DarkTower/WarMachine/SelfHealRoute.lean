@@ -3145,4 +3145,78 @@ theorem click18_predicted :
       requeueNext (causeF46 .firstOccurrence) 3 = .enacted 3 ∧
       requeueNext (causeF46 .none) 3 = .abandonedBudgetSpent := by decide
 
+/-! ### Rev 40: the resume has a precondition the model did not carry; click 17's child -/
+
+/-- What `:cascade-execution` hands the runner (`full_loop_runner.clj` 6928-6957): a held
+open-cascade condition (`:kind :wm/open-cascade-execution-error`, Packet D3: incomplete authoring
+holds the phase), an exception caught by `run-phase!`, or an execution that ran. The resume
+handler is called only on the held kind:
+`(and (= :wm/open-cascade-execution-error (:kind cascade-execution0)) (:open-cascade-resume-fn opts))`.
+Revs 29 to 39 modelled the resume from the handler inward and assumed the child reached it;
+which of the three the child gets depends on what `:selection` chose, which the model does not
+carry. -/
+inductive CascadeExecutionResult where
+  | openCascadeHeld
+  | thrown
+  | ran
+  deriving DecidableEq, Repr
+
+def resumes : CascadeExecutionResult → Bool
+  | .openCascadeHeld => true
+  | .thrown => false
+  | .ran => false
+
+/-- **Click 17 child witness** (claude-5, 2026-10-21 01:24Z, from claude-2's reading of job
+`invoke-1792544628953-219-e6eaa5bf` and my own of the phases log 16153-16183, the record
+`tick-run-record-2026-10-21-35176c9e-…` sha `c048a606…`, and ledger ordinals 29 and 30). The
+child ran `:selection` (01:05:52Z to 01:08:38Z) and chose `M-stack-geometry` with
+`:cascade-id nil` (click 16 chose `M-digital-nomad-patterns` and held); `:cascade-execution`
+ended `:outcome :error`, `journal recorded time must increase` (`execution_journal.clj` 161),
+after 86 ms; no `:cascade-resume` phase; no `wm-full-loop` job after click 16's two, so neither
+zai-2 nor zai-3 was contacted and `(O handle-error!)` did not run. The record's failure is
+`:untyped-failure` at `:cascade-execution`, `invalid checkpoint cell` (`:checkpoint :selection`,
+four `:missing-judgment-key` errors: `:ranked-candidates`, `:selected-action`,
+`:selected-mission`, `:selection-reasons`); `refusal-causes` lists both exceptions. `integrate`
+opened `injury/a173047e…` at ordinal 29 (`:open`, attempt 1, `:injury-predecessor nil`,
+`:cause-record-pin` the record) and wrote `:retry-inconclusive` for `d755c886` at ordinal 30
+with the same `:record-pin`: the outcome is `otherInjury`, a first occurrence, and the closing
+is inconclusive. The park payload expected a repeat of `42fd2c21`; that expectation was mine,
+not the model's, since `click18_predicted` carried the first-occurrence arm. No opportunity
+`:end` line was written for the child (click 16 had one at 16146); the log ends at
+`:outer-learning-publication :end`, 01:08:54Z. -/
+theorem click17_childWitness :
+    resumes .thrown = false ∧
+      RetryClickOutcome.otherInjury.closing false = .retryInconclusive ∧
+      causeF46 .firstOccurrence = .otherOpenInjury := by decide
+
+/-- Prediction for click 18, refined from `click18_predicted` by what the child did.
+`(P route!)` (`meta_self_heal_production.clj` 1075) loads the live transaction, whose work order
+is `d755c886` at attempt 4; the ledger attempt is 4, nothing retires it, so the transaction is
+resumed and `a173047e` stays `:open` and unprepared through this click (`coordinator/prepare`
+runs only when nothing resumed). `coordinate-queued-retry` (`meta_repair_coordinator.clj`
+238-283) reads `n = 4`, finds the `:retry-requeue-4` receipt `:queued` with the latest entry's
+click, then `(L pending-requeue-entry)` returns ordinal 30 and `(L other-open-injury)`'s first
+branch returns ordinal 29 (`:open`, another id, `:cause-record-pin` equal to ordinal 30's
+`:record-pin`): `(L append-requeue)` appends ordinal 31, `:enacted`, `:attempt 4`,
+`:requeues 3`, `:retry-click "wm-requeue-5-4-repair/239cf988…"`,
+`:requeue-cause {:kind :other-open-injury :injury-id "injury/a173047e…" :record-pin …}`. The
+recur reads `(L requeue-ordinal)` as 5 (six `:enacted` entries at attempt 4: 16, 19, 22, 25,
+28, 31), names `:retry-requeue-5`, calls the retry port once (`transaction.edn` gains a
+`:retry-requeue-5` receipt, `:queued`, predecessor `retry-requeue-4`), and with no pending
+observation left closes `:awaiting-retry`. The child's route is open: a held open cascade
+resumes and reaches zai-2 then zai-3 (`serving_reachesReviewer`); a thrown execution dies on its
+own cause, and a repeat of `a173047e` is written with its id under F46, so click 19 keeps 3
+(`click18_predicted`'s repeat arm, one click later). -/
+def d755c886ReceiptsAfter17 : Nat → Option Nat
+  | 1 => some 1
+  | 2 => some 2
+  | 3 => some 3
+  | 4 => some 4
+  | _ => none
+
+theorem click18_predictedRefined :
+    requeueNext (causeF46 .firstOccurrence) 3 = .enacted 3 ∧
+      recurF45 5 d755c886ReceiptsAfter17 = .queued ∧
+      requeueNext (causeF46 .repeat) 3 = .enacted 3 := by decide
+
 end DarkTower.WarMachine.SelfHealRoute
