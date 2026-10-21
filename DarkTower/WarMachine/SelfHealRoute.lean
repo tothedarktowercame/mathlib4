@@ -3026,6 +3026,8 @@ as a `:repeated-active-injury` observation with no injury id and no pin (every l
 inductive OtherInjuryMark where
   | firstOccurrence
   | repeat
+  /-- A repeat written before F46: no `:injury-id`, as ordinal 26 is, and sealed so. -/
+  | repeatUnattributed
   | none
   deriving DecidableEq, Repr
 
@@ -3034,14 +3036,17 @@ the `:open` transition's `:cause-record-pin` and nothing else. -/
 def causeReadToday : OtherInjuryMark → InconclusiveCause
   | .firstOccurrence => .otherOpenInjury
   | .repeat => .noInjury
+  | .repeatUnattributed => .noInjury
   | .none => .noInjury
 
 /-- F46: the repeat observation names the injury it repeats (T writes `:injury-id` on
 `:repeated-active-injury`, as it does on `:retry-inconclusive`), and L reads the other injury from
-either mark. -/
+either mark. A sealed repeat with no injury id cannot be re-attributed and still reads as no
+injury. -/
 def causeF46 : OtherInjuryMark → InconclusiveCause
   | .firstOccurrence => .otherOpenInjury
   | .repeat => .otherOpenInjury
+  | .repeatUnattributed => .noInjury
   | .none => .noInjury
 
 /-- `(L append-requeue)` under F43 on an entry with `:requeues k`
@@ -3068,20 +3073,24 @@ theorem click16_reviewerRefused :
       servingKind .reviewerRefused = .reviewAnswerInvalid := by decide
 
 /-- `d755c886`'s four children: ordinals 18 and 21 and 24 on first occurrences (`821c15d0`,
-`75747f06`, `42fd2c21`), ordinal 27 on `42fd2c21` again. Read today the budget after click 17
-is 3; under F46 it is 2, as F43 meant. -/
-def d755c886Marks : List OtherInjuryMark := [.firstOccurrence, .firstOccurrence, .firstOccurrence, .repeat]
+`75747f06`, `42fd2c21`), ordinal 27 on `42fd2c21` again, its mark sealed without an injury id.
+Read today the budget after click 17 is 3, and F46 cannot change that; had ordinal 26 carried the
+injury id, F46 would read 2, as F43 meant. -/
+def d755c886Marks : List OtherInjuryMark :=
+  [.firstOccurrence, .firstOccurrence, .firstOccurrence, .repeatUnattributed]
 
 theorem click16_repeatReadsAsNoInjury :
     requeuesAfter spendsBudgetF43 (d755c886Marks.map causeReadToday) = 1 ∧
-      requeuesAfter spendsBudgetF43 (d755c886Marks.map causeF46) = 0 := by decide
+      requeuesAfter spendsBudgetF43 (d755c886Marks.map causeF46) = 1 ∧
+      requeuesAfter spendsBudgetF43
+        ([.firstOccurrence, .firstOccurrence, .firstOccurrence, .repeat].map causeF46) = 0 := by
+  decide
 
-/-- Prediction for click 17 under the serving code: `(L append-requeue)` reads ordinal 27 with no
-other injury and appends ordinal 28 `:enacted`, `:requeues 3`, no `:requeue-cause`; F45 counts
-five `:enacted` entries at attempt 4 (16, 19, 22, 25, 28), so the phase is `:retry-requeue-4`, the
-click `wm-requeue-4-4-repair/239cf988…`, and the recur queues it. Under F46 ordinal 28 has
-`:requeues 2` and `:requeue-cause {:kind :other-open-injury :injury-id "injury/42fd2c21…"}`; the
-phase and click are the same. -/
+/-- Prediction for click 17, with or without F46: `(L append-requeue)` reads ordinal 27 with no
+other injury (ordinal 26 names none) and appends ordinal 28 `:enacted`, `:requeues 3`, no
+`:requeue-cause`; F45 counts five `:enacted` entries at attempt 4 (16, 19, 22, 25, 28), so the
+phase is `:retry-requeue-4`, the click `wm-requeue-4-4-repair/239cf988…`, and the recur queues
+it. -/
 def d755c886ReceiptsAfter16 : Nat → Option Nat
   | 1 => some 1
   | 2 => some 2
@@ -3089,27 +3098,29 @@ def d755c886ReceiptsAfter16 : Nat → Option Nat
   | _ => none
 
 theorem click17_predicted :
-    requeueNext (causeReadToday .repeat) 2 = .enacted 3 ∧
-      requeueNext (causeF46 .repeat) 2 = .enacted 2 ∧
+    requeueNext (causeReadToday .repeatUnattributed) 2 = .enacted 3 ∧
+      requeueNext (causeF46 .repeatUnattributed) 2 = .enacted 3 ∧
       recurF45 4 d755c886ReceiptsAfter16 = .queued := by decide
 
 /-- If click 17's child dies on `42fd2c21` again (zai-3 has now refused the same way twice),
 click 18 reads another repeat on `:requeues 3` and abandons `:retry-budget-spent`: the verdict
 `budgetSpent_noReopen` says no correction reopens, issued on a patch no child has tested. Under
-F46 the entry stays `:enacted` at 2. This is why F46 lands before click 17. -/
+F46 that repeat is written with its injury id and the entry stays `:enacted` at 3. Click 17 reads
+the same either way, so it runs now; F46 lands before click 18. -/
 theorem click18_wouldAbandonToday :
     requeueNext (causeReadToday .repeat) 3 = .abandonedBudgetSpent ∧
       requeueNext (causeF46 .repeat) 3 = .enacted 3 := by decide
 
-/-- Under F46 no run of other-injury children, first occurrences or repeats, spends the budget. -/
+/-- Under F46 no run of other-injury children written after it, first occurrences or repeats,
+spends the budget. -/
 theorem f46_repeatsSpendNothing (ms : List OtherInjuryMark)
-    (h : ∀ m ∈ ms, m ≠ .none) :
+    (h : ∀ m ∈ ms, m = .firstOccurrence ∨ m = .repeat) :
     requeuesAfter spendsBudgetF43 (ms.map causeF46) = 0 := by
   induction ms with
   | nil => rfl
   | cons m ms ih =>
-    have hm : m ≠ .none := h m (List.mem_cons_self ..)
+    have hm := h m (List.mem_cons_self ..)
     have ih' := ih (fun x hx => h x (List.mem_cons_of_mem _ hx))
-    cases m <;> simp_all [requeuesAfter, causeF46, spendsBudgetF43]
+    rcases hm with rfl | rfl <;> simp [requeuesAfter, causeF46, spendsBudgetF43, ih']
 
 end DarkTower.WarMachine.SelfHealRoute
