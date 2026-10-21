@@ -2803,4 +2803,70 @@ theorem serving_d755c886_nextRequeueUnchanged :
   decide
 
 
+/-! ## Rev 36: F44b is the serving kind (2026-10-21 00:17Z)
+
+F44b landed at futon2 `ed3c3dc59` (codex-3's draft, job `invoke-1792539905090-194-2a6ab815`,
+finished by claude-5; receipt `~/notes/test-receipts/F44b.json`, 87 tests, 558 assertions;
+`full-loop-runtime` and `handoff-contract` reloaded 00:16Z, runner source check `:current`).
+The handler's `cond` now closes a nil author answer `:open-cascade-author-answer-invalid` with
+`:author` and `:author-job`, and a nil reviewer answer `:open-cascade-review-answer-invalid`
+with `:reviewer` and `:reviewer-job`: `ResumeStep.kindF44b` is the serving kind. One finding
+against the packet, not the draft: the packet's job field read `{:status :absent :reason
+:direct-answer}` for every missing job id, but `designated-agent-answer-fn` answers
+`{:state :not-contacted …}` for a seat that is not invoke-ready and `agency-answer-fn` answers
+`:state :not-dispatched` when the bell produced no job; both decode to nil like a refused
+answer, so an author that was never asked would have closed as a direct answer. The landed
+`contact-job` names the contact state instead. Found in the gate, not in the handler: five
+production-composition tests in `full_loop_runtime_test` read the live injury ledger (red since
+the ledger carried an active injury with a transaction) and one shelled out with the `:test`
+alias, which since `b463d85cc` (zai-2, 2026-10-20 17:03Z) carries `:main-opts` and so ran the
+whole suite inside the test without end; both fixed in the same commit. Prediction for click 15
+is unchanged: `serving_reachesReviewer`; if the reviewer's answer then fails to decode, the
+close carries the zai-3 job id. -/
+
+/-- What a contact's response says about its Agency job: a done job, a seat that was not
+invoke-ready (`designated-agent-answer-fn`, `:state :not-contacted`), a bell that produced no
+job (`agency-answer-fn`, `:state :not-dispatched`), or an injected answer with no state. -/
+inductive ContactState where
+  | done
+  | notContacted
+  | notDispatched
+  | direct
+  deriving DecidableEq, Repr
+
+/-- The typed absence written beside the kind when there is no job id. -/
+inductive JobAbsence where
+  | notContacted
+  | notDispatched
+  | directAnswer
+  deriving DecidableEq, Repr
+
+/-- The packet's rule: every missing job id reads `:direct-answer`. -/
+def jobAbsencePacket : ContactState → Option JobAbsence
+  | .done => none
+  | _ => some .directAnswer
+
+/-- F44b as landed (`contact-job`): the absence names the contact state. -/
+def jobAbsenceF44b : ContactState → Option JobAbsence
+  | .done => none
+  | .notContacted => some .notContacted
+  | .notDispatched => some .notDispatched
+  | .direct => some .directAnswer
+
+theorem packet_readsUncontactedAsDirect :
+    jobAbsencePacket .notContacted = some .directAnswer := by decide
+
+theorem f44b_namesTheAbsence :
+    jobAbsenceF44b .notContacted = some .notContacted ∧
+      jobAbsenceF44b .notDispatched = some .notDispatched ∧
+      jobAbsenceF44b .direct = some .directAnswer := by decide
+
+/-- The kind the serving JVM writes since 00:16Z. -/
+def servingKind : ResumeStep → ResumeKindF44b := ResumeStep.kindF44b
+
+theorem serving_kindNamesTheRefusedSide :
+    servingKind .authorRefused = .authorAnswerInvalid ∧
+      servingKind .reviewerRefused = .reviewAnswerInvalid ∧
+      servingKind .authorRefused ≠ servingKind .reviewerRefused := by decide
+
 end DarkTower.WarMachine.SelfHealRoute
