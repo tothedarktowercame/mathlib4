@@ -135,7 +135,10 @@ def near (radius : ℚ) (distance : TargetDistance) (focus target : Target) : Bo
     | some d => decide (d ≤ radius)
 
 /-- The injury condition: no candidate near the focus can be finished. Under
-it, ordinary dispatch is blocked and repair begins. -/
+it, ordinary dispatch is blocked and repair begins. Read it over the ordinary
+candidates only: a finishable repair of the focus is itself near the focus
+and makes the condition false (`R15InjuryTier.finishable_repair_cancels_gate`).
+`R15InjuryTier` replaces this switch with one comparison of G. -/
 def injuryDeclared (radius : ℚ) (distance : TargetDistance)
     (finishable : Target → Bool) (focus : Target) (candidates : List Target) : Bool :=
   !candidates.any fun target => near radius distance focus target && finishable target
