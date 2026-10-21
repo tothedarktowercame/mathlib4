@@ -2869,4 +2869,115 @@ theorem serving_kindNamesTheRefusedSide :
       servingKind .reviewerRefused = .reviewAnswerInvalid ∧
       servingKind .authorRefused ≠ servingKind .reviewerRefused := by decide
 
+/-! ## Rev 37: click 15 refused before the resume; the re-queue phase is named by the budget count (2026-10-21 00:36Z)
+
+Click 15 (claude-2, job `invoke-1792542003079-203-12f8c577`; parent click `wm-click-f22cb676`,
+driver 00:20:15Z to 00:21:48Z) closed `:status :refused`, `:reason
+:coordinator/retry-attribution-refused`, route `:dedicated-meta-self-heal`, `:binding-status
+:absent`, `:run-id-observation :runner-did-not-return-run-id` (the binding file, 00:21:21.68Z).
+No child ran: the phases log is still 16,118 lines, no Agency job for zai-2 or zai-3 in the
+window, no new `wm-runs/` directory, no run record at the path `wm_click.sh` alerted on. So
+`serving_reachesReviewer` was not tested; its antecedent, a child reaching `:cascade-resume`,
+did not hold. The ledger conjunct held and is the cause: ordinal 25 is `:enacted` attempt 4,
+`:requeues 2`, `:retry-click "wm-requeue-3-4-repair/239cf988…"`, `:requeue-cause
+{:kind :other-open-injury :injury-id "injury/42fd2c21…"}` (F43, as `f43_budgetCountsNoInjuryOnly`
+said); `transaction.edn` holds receipts `:retry-requeue-1` (click `wm-requeue-1-4`) and
+`:retry-requeue-2` (click `wm-requeue-2-4`) and no third.
+
+Read from `(C coordinate-queued-retry)` (`meta_repair_coordinator.clj` 239-258) and
+`(C invoke-once)` (190): on the recur C reads `n = (:requeues latest)` and calls
+`(invoke-once transaction (requeue-phase n) …)`, which returns the receipt already recorded
+under that phase without calling the port (`(C receipt-for)`); the attribution check then
+requires that receipt's `:retry-click` to equal the latest entry's, and stops with the refusal
+when it does not. The click was minted before the append at `next-n = (inc n)`
+(`wm-requeue-3-4`), the F43 append kept `:requeues` at 2, and the recur named phase
+`:retry-requeue-2`, whose receipt names `wm-requeue-2-4`. Before F43 the append incremented,
+so the phase ordinal and the click ordinal were the same number. F43's packet (claude-5) kept
+the budget count and the phase count as one field, and rev 35 noted that C was the only reader
+of `:requeues` outside L "(naming)" without changing it. Every later click on `d755c886` refuses
+the same way until the phase is named by a count that steps on every re-queue. -/
+
+/-- What the recur does with the latest enacted entry's phase: a phase with no receipt calls the
+retry port (the normal re-queue); a receipt naming the entry's own click is a resume
+(`:awaiting-retry`, no port call); a receipt naming another click is the refusal. -/
+inductive RecurOutcome where
+  | queued
+  | resumed
+  | attributionRefused
+  deriving DecidableEq, Repr
+
+/-- C mints the click at `k + 1` before the append (`(C coordinate-queued-retry "next-n")`),
+where `k` is the latest entry's `:requeues`; the appended entry's `:requeues` is `k + 1` when the
+cause spends the budget and `k` when it does not (`(L append-requeue "if other")`), and the recur
+names the phase by that count (`(C coordinate-queued-retry "requeue-phase")`). -/
+def clickOrdinal (k : Nat) : Nat := k + 1
+
+def phaseOrdinal (spends : InconclusiveCause → Bool) (c : InconclusiveCause) (k : Nat) : Nat :=
+  if spends c then k + 1 else k
+
+/-- The transaction's re-queue receipts: `recorded p = some q` when phase `:retry-requeue-p`
+holds a receipt whose `:retry-click` is `wm-requeue-q-…`. -/
+def recur (spends : InconclusiveCause → Bool) (c : InconclusiveCause) (k : Nat)
+    (recorded : Nat → Option Nat) : RecurOutcome :=
+  match recorded (phaseOrdinal spends c k) with
+  | none => .queued
+  | some q => if q = clickOrdinal k then .resumed else .attributionRefused
+
+/-- `transaction.edn` for `d755c886` attempt 4 (`:retry-requeue-1` ↔ `wm-requeue-1-4`,
+`:retry-requeue-2` ↔ `wm-requeue-2-4`), both written before F43. -/
+def d755c886Receipts : Nat → Option Nat
+  | 1 => some 1
+  | 2 => some 2
+  | _ => none
+
+/-- **Click 15 witness.** The re-queue after ordinal 24 (`otherOpenInjury`, `:requeues` 2) is
+refused under F43 and would have queued `wm-requeue-3-4` under the rule before it. -/
+theorem click15_attributionRefused :
+    recur spendsBudgetF43 .otherOpenInjury 2 d755c886Receipts = .attributionRefused ∧
+      recur spendsBudgetToday .otherOpenInjury 2 d755c886Receipts = .queued := by decide
+
+/-- Any re-queue that does not spend the budget, on an entry whose count already names a recorded
+phase, is refused: the click was minted one past the count, and the phase was not. -/
+theorem frozenCount_refusesTheRequeue (spends : InconclusiveCause → Bool)
+    (c : InconclusiveCause) (k : Nat) (recorded : Nat → Option Nat)
+    (h : spends c = false) (hr : recorded k = some k) :
+    recur spends c k recorded = .attributionRefused := by
+  simp [recur, phaseOrdinal, clickOrdinal, h, hr]
+
+/-- The ledger's two counts for `d755c886` attempt 4 after click 15: the `:enacted` entries are
+ordinals 16 (`wm-retry-…`), 19, 22 and 25, so three re-queues have been appended, while the
+budget count stands at 2. The click ordinal in `wm-requeue-3-4` is the first; the phase ordinal
+C used is the second. -/
+def d755c886Enacted : List Nat := [16, 19, 22, 25]
+def d755c886Requeues : Nat := 2
+
+theorem d755c886_countsDiverged :
+    d755c886Enacted.length - 1 = 3 ∧ d755c886Requeues = 2 ∧
+      d755c886Enacted.length - 1 ≠ d755c886Requeues := by decide
+
+/-- F45 (packet `logic-model/packets/F45.md`): the re-queue ordinal is the number of `:enacted`
+entries for the injury at the attempt after the first (`(L requeue-ordinal)`, pure, no new key);
+C names the phase and mints the click from it, and `:requeues` is read by L alone, for the
+budget. On the recur the latest entry's ordinal `o` names both the phase and the click. -/
+def recurF45 (o : Nat) (recorded : Nat → Option Nat) : RecurOutcome :=
+  match recorded o with
+  | none => .queued
+  | some q => if q = o then .resumed else .attributionRefused
+
+/-- Under F45 a receipt can only refuse the re-queue by naming a click other than its own phase's,
+which is the forgery the check exists for; the count can no longer do it. -/
+theorem f45_refusesOnlyForgedReceipts (o : Nat) (recorded : Nat → Option Nat)
+    (h : ∀ p, recorded p = none ∨ recorded p = some p) :
+    recurF45 o recorded ≠ .attributionRefused := by
+  rcases h o with h' | h' <;> simp [recurF45, h']
+
+/-- Prediction for click 16 (after F45 lands): ordinal 25 is the latest entry and its ordinal is 3;
+`:retry-requeue-3` has no receipt, so the recur queues `wm-requeue-3-4-repair/239cf988…` and the
+child runs (a `:retry-requeue-3` receipt naming that click in `transaction.edn`, a non-nil
+`:attempt/id` in the binding). No ledger entry is appended for it (the pending re-queue is
+ordinal 25 itself), so `:requeues` stays 2 and the latest ordinal stays 25. Then
+`serving_reachesReviewer` is tested at the child's `:cascade-resume`, as rev 36 predicted for
+click 15. -/
+theorem f45_click16_queues : recurF45 3 d755c886Receipts = .queued := by decide
+
 end DarkTower.WarMachine.SelfHealRoute
