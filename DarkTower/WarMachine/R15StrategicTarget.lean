@@ -41,13 +41,23 @@ prior E (`R15HabitPrior`), not through this C schedule.
 Joe confirmed this reading on 2026-10-21, against the alternative that focus
 only picks the target upstream of G. The class preference rewards staying on
 task and penalises drifting from it. It does not forbid an off-focus choice:
-another term can outweigh it, as a large repair preference must outweigh the
-off-focus penalty when self-heal picks a target that repairs the machine. The
+another term can outweigh it. The
 class is read from the focus in force, which persists between rounds, and is
 not set to focused because the target was selected. So the class term belongs
 where targets of different classes compete, the outer selection over targets,
 and not in the reading policies for one already-selected target, where every
 policy has the same class and the term changes no ranking.
+
+Joe added, the same day, that the focus is declared separately and gives the
+target space a geometry: work next to the focus is adjacent, not off-focus.
+Repairing an injury is adjacent when the repair is what lets the focused work
+continue, in the same way that working in Lean is adjacent to building the
+Clojure it specifies. So a repair does not need a large preference to beat an
+off-focus penalty; it is scored `related` (35/100), not `unrelated` (5/100),
+and only because of what it unblocks under the focus in force
+(`withRepairs`). It stays below `focused` (55/100): a repair wins when the
+injury has made the focused targets unlikely to be reached, which is the
+predicted-outcome side of the comparison, not this C schedule.
 
 No runtime record joins, for every candidate and every tau, focus,
 relation, scored class, and the full preference vector.
@@ -235,5 +245,37 @@ theorem earlyTerminalTick_rejected : ¬ StrategicTickConforms earlyTerminalTick 
   have schedule := conforms.2 1 (by norm_num) (by norm_num [earlyTerminalTick])
   have focused := congrFun schedule EndingClass.focused
   norm_num [earlyTerminalTick, classPreference, terminalPreference, waitingPreference] at focused
+
+/-- Joe's 2026-10-21 adjacency reading for repairs. `unblocks target` names
+the target whose work a repair target lets continue, or `none` when `target`
+is not a repair. A repair of the focused work is `associated` (adjacent);
+every other target keeps the base relation. -/
+def withRepairs (unblocks : Target → Option Target)
+    (base : Target → Target → TargetRelation) (focus target : Target) :
+    TargetRelation :=
+  match unblocks target with
+  | some unblocked => if unblocked = focus then .associated else base focus target
+  | none => base focus target
+
+/-- A repair that lets the focused work continue is scored `related`, at
+35/100 terminal mass, whatever the base relation would have said. -/
+theorem repair_of_focused_work_is_related
+    (unblocks : Target → Option Target) (base : Target → Target → TargetRelation)
+    (focus repair horizon : Nat) (h : unblocks repair = some focus) :
+    outcomeClass focus (withRepairs unblocks base) (some repair) = some .related ∧
+    tacticalPreference focus (withRepairs unblocks base) horizon horizon (some repair) =
+      some (35 / 100) := by
+  simp [tacticalPreference, outcomeClass, withRepairs, h, scorerClass,
+    classPreference, terminalPreference]
+
+/-- Adjacency is relative to the focus in force: the same repair of target 7
+is 35/100 under focus 7 and 5/100 under focus 8. -/
+theorem repair_adjacency_depends_on_focus :
+    tacticalPreference 7 (withRepairs (fun _ => some 7) focusOrElsewhere) 2 2 (some 3) =
+      some (35 / 100) ∧
+    tacticalPreference 8 (withRepairs (fun _ => some 7) focusOrElsewhere) 2 2 (some 3) =
+      some (5 / 100) := by
+  norm_num [tacticalPreference, outcomeClass, withRepairs, focusOrElsewhere,
+    scorerClass, classPreference, terminalPreference]
 
 end DarkTower.WarMachine.R15StrategicTarget
