@@ -3219,4 +3219,88 @@ theorem click18_predictedRefined :
       recurF45 5 d755c886ReceiptsAfter17 = .queued ∧
       requeueNext (causeF46 .repeat) 3 = .enacted 3 := by decide
 
+
+/-! ### Rev 41: click 18; the reviewer prompt is EDN; the other-injury re-queue is unbounded -/
+
+/-- **Click 18 witness** (claude-2, 2026-10-21 01:50Z, taking over from claude-5; from claude-2's
+own reading of job `invoke-1792545943115-228-d5d0ee7f` and ledger ordinals 20 to 33 by EDN reader).
+Parent: ordinal 31 `:enacted`, attempt 4, `:requeues 3`, `:retry-click "wm-requeue-5-4-…"`,
+`:requeue-cause {:kind :other-open-injury :injury-id "injury/a173047e…"}` at click 17's record pin
+(`c048a606…`); the `:retry-requeue-5` receipt is `:queued` behind `retry-requeue-4`; the binding
+is `:awaiting-retry` at attempt 4: every conjunct of `click18_predictedRefined` held. Child
+(`wm-requeue-5-4-…`, record `tick-run-record-2026-10-21-fcf06c3f-…` sha `b4759d2b…`):
+`:selection` chose `M-self-improvement-loop` (a third target in three clicks), `:cascade-execution`
+handed back the held kind (`:wm/open-cascade-execution-error`, digest `c9352719…`), the resume ran;
+zai-2 answered prose then one bare object (`invoke-1792546261190-229-185468ac`), zai-3 one fence
+whose JSON fails at character 202 on a vector key (`invoke-1792546287457-231-8759da42`), and the
+close is `:open-cascade-review-answer-invalid`, the cause of `injury/42fd2c21…` (`:open` at
+ordinal 23). F46 wrote ordinal 32 as `:repeated-active-injury` carrying `:injury-id 42fd2c21`;
+ordinal 33 is `d755c886`'s `:retry-inconclusive` at the same pin. -/
+theorem click18_held :
+    requeueNext (causeF46 .firstOccurrence) 3 = .enacted 3 ∧
+      recurF45 5 d755c886ReceiptsAfter17 = .queued := by decide
+
+theorem click18_childWitness :
+    resumes .openCascadeHeld = true ∧
+      resumeStep servingDecodes .proseThenBareObject .other = .reviewerRefused ∧
+      (resumeStep servingDecodes .proseThenBareObject .other).kindF44b = .reviewAnswerInvalid ∧
+      causeF46 .repeat = .otherOpenInjury := by decide
+
+/-- How `open-cascade-review-prompt` (`full_loop_runtime.clj` 156-161) shows the reviewer the
+author's answer. Today it is `(pr-str author-answer)`, the answer after `(H response-json-object)`
+decoded it with keyword keys (`json/parse-string s true`), so zai-2's JSON key
+`"[\"agent/eat-your-own-tail\" 0]"` reaches zai-3 as the EDN keyword
+`:["agent/eat-your-own-tail" 0]`. On clicks 16 and 18 zai-3 asked for "one JSON object containing
+the author's … decisions" copied that key without the colon, a bare vector, and the answer fails
+to parse at character 202 both times. F47 renders the answer as JSON, where the key is a string. -/
+inductive ReviewPromptRendering where
+  | edn
+  | json
+  deriving DecidableEq, Repr
+
+/-- The shape a reviewer gets by copying the decisions keys exactly as its prompt shows them. A
+hypothesis about the seat taken from two witnesses, not a property of the code: the JSON arm
+says only that verbatim copying no longer breaks the parse. -/
+def copiedKeysShape : ReviewPromptRendering → AnswerShape
+  | .edn => .other
+  | .json => .oneFencedObject
+
+theorem f47_copiedKeysDecode :
+    resumeStep servingDecodes .proseThenBareObject (copiedKeysShape .edn) = .reviewerRefused ∧
+      resumeStep servingDecodes .proseThenBareObject (copiedKeysShape .json) = .reviewed := by
+  decide
+
+/-- Prediction for click 19's parent, F47 or not. `(L pending-requeue-entry)` returns ordinal 33;
+`(L other-open-injury)`'s first branch finds no `:open` transition at `b4759d2b…`, its second
+branch finds ordinal 32 (nonblank `:injury-id 42fd2c21`, not `d755c886`, and `latest` of
+`42fd2c21`, which reads transitions only, is ordinal 23 `:open`, in `active-states`). So
+`(L append-requeue)` appends ordinal 34, `:enacted`, `:requeues 3`,
+`:retry-click "wm-requeue-6-4-repair/239cf988…"`,
+`:requeue-cause {:kind :other-open-injury :injury-id "injury/42fd2c21…" :record-pin b4759d2b…}`;
+seven `:enacted` at attempt 4 make `(L requeue-ordinal)` 6, the phase `:retry-requeue-6`, its
+receipt `:queued` behind `retry-requeue-5`, and the binding `:awaiting-retry`. This is the first
+live use of the second branch. -/
+def d755c886ReceiptsAfter18 : Nat → Option Nat
+  | 1 => some 1
+  | 2 => some 2
+  | 3 => some 3
+  | 4 => some 4
+  | 5 => some 5
+  | _ => none
+
+theorem click19_predicted :
+    causeF46 .repeat = .otherOpenInjury ∧
+      requeueNext (causeF46 .repeat) 3 = .enacted 3 ∧
+      recurF45 6 d755c886ReceiptsAfter18 = .queued := by decide
+
+/-- Nothing bounds the re-queues of children that die on other open injuries: under F46 any number
+of them spends no budget, so `d755c886` never abandons on them, and its transaction, live, keeps
+`coordinator/prepare` from preparing `42fd2c21` or `a173047e`. Clicks 16, 17 and 18 are three such
+children; the patch `b463d85c` has not been tested. The route makes progress only when a child
+tests the patch or reaches a reviewed resume, and for the children that took the held cascade
+(16, 18) F47 is what makes the second possible. -/
+theorem f46_otherInjuryRequeuesUnbounded (n : Nat) :
+    requeuesAfter spendsBudgetF43 ((List.replicate n OtherInjuryMark.repeat).map causeF46) = 0 :=
+  f46_repeatsSpendNothing _ (fun _ hm => Or.inr (List.eq_of_mem_replicate hm))
+
 end DarkTower.WarMachine.SelfHealRoute
