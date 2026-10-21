@@ -330,13 +330,17 @@ def RowsCertified (certificate : Certificate) : Prop :=
 
 /-- The consumer rows were judged on the values in their ports.  `Wired`
 relates the ports to each other; this ties the precision row's E, G and F, and
-the class-preference row's predicted distribution, to those ports, so a row
+the class-preference row's prediction and preference, to those ports, so a row
 judged on some other F is not certified. -/
 def RowsReadPorts (records : Records) (ports : R20Graph.Ports Policy) : Prop :=
   (∀ r, records .precision = some r →
     r.E = ports.precisionHabit.value ∧ r.G = ports.precisionG.value ∧
       r.F = ports.precisionF.value) ∧
-  (∀ r, records .classPreference = some r → r.predicted = ports.classPredicted.value)
+  (∀ r, records .classPreference = some r →
+    r.predicted = ports.classPredicted.value ∧
+      CTauClassPreference.classPreference r.horizon r.tau = ports.classPreference.value) ∧
+  (∀ s r, records .strategicFocus = some s → records .classPreference = some r →
+    s.tick.preferenceAt r.tau = ports.strategicPreference.value)
 
 /-- A click is certified only when every row agrees, its shared quantities
 are the exact artifacts declared by the R20 graph, and the consumer rows were
@@ -372,24 +376,23 @@ theorem certified_iff (records : Records) (ports : R20Graph.Ports Policy) :
         R20Graph.Wired records ports ∧ RowsReadPorts records ports := by
   rw [Certified, rowsCertified_iff]
 
-/-- The precision row of a certified click was judged on the scorer's F from
-this run. -/
-theorem certified_precision_reads_scorer_F (records : Records) (c : Certificate)
+/-- The precision row reads this run's post-observation inference F, whose
+value is defined from its tick inputs by H1. -/
+theorem certified_precision_reads_inference_F (records : Records) (c : Certificate)
     (ports : R20Graph.Ports Policy) (certified : Certified records c ports)
     (r : PrecisionFromObservation.TickRecord Policy) (hr : records .precision = some r) :
-    r.F = ports.scorerF.value ∧ ports.scorerF.producer = .policyFreeEnergyScorer ∧
-      ports.scorerF.runId = ports.runId := by
+    r.F = ports.inferenceF.value ∧ ports.inferenceF.producer = .postObservationInference ∧
+      ports.inferenceF.runId = ports.runId := by
   rcases certified with ⟨_, wired, reads⟩
-  rcases wired with ⟨_, _, _, _, _, _, _, _, _, _, hprod, hrun, hF, _, _⟩
-  exact ⟨(reads.1 r hr).2.2.trans (by rw [hF]), hprod, hrun⟩
+  exact ⟨(reads.1 r hr).2.2.trans (by rw [wired.fRead]), wired.fProducer, wired.fRun⟩
 
 /-- The wrong-F control at the certificate: a precision row judged on an F
-other than the scorer's is not certified, whatever the sidecar says. -/
+other than post-observation inference's defined F is not certified. K5. -/
 theorem wrongF_not_certified (records : Records) (c : Certificate)
     (ports : R20Graph.Ports Policy)
     (r : PrecisionFromObservation.TickRecord Policy) (hr : records .precision = some r)
-    (wrong : r.F ≠ ports.scorerF.value) : ¬ Certified records c ports :=
-  fun certified => wrong (certified_precision_reads_scorer_F records c ports certified r hr).1
+    (wrong : r.F ≠ ports.inferenceF.value) : ¬ Certified records c ports :=
+  fun certified => wrong (certified_precision_reads_inference_F records c ports certified r hr).1
 
 theorem missing_not_certified (records : Records) (node : Node)
     (ports : R20Graph.Ports Policy) (missing : records node = none) :
@@ -528,6 +531,10 @@ def nodeOrder : List Node :=
 
 def summary (certificate : Certificate) : List (Node × RowVerdict) :=
   nodeOrder.map fun node => (node, certificate node)
+
+#print axioms certified_iff
+#print axioms wrongF_not_certified
+#print axioms certified_precision_reads_inference_F
 
 end
 end DarkTower.WarMachine.R20Certificate

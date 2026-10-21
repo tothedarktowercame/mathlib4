@@ -1,219 +1,231 @@
-import DarkTower.WarMachine.PrecisionFromObservation
+import DarkTower.WarMachine.PolicyFreeEnergy
 import DarkTower.WarMachine.CTauClassPreference
 
 /-!
-# R20 certificate wiring
+# R20 wiring from the publications
 
-The R20 rows are checked separately.  This module names the small graph that
-connects the quantities shared by those rows and retains their run and producer
-identity.  The wiring is a sidecar to the dependent row family: it does not
-change any `NodeRecord` constructor.
+Selection emits the E and G used in the policy prior and its observation
+model's predicted class probabilities. Post-observation inference emits F
+defined from its frozen-policy tick inputs by H1, not a free score.
+See S2-authority-ledger.md, "Settlement from the publications" (2026-10-21).
+
+Habit row → selection's E is NOT declared: no cited publication supplies a map
+from class-grain habit counts to policy-indexed E. Class-preference risk →
+selection's G is deferred to H3 (G = risk + ambiguity).
+
+Preference is at the class grain because the existing risk row consumes CTau's
+class distribution. R15StrategicTarget.tacticalPreference pulls this C back
+along the focus-dependent classification; it is not a predicted distribution.
+Wiring checks artifact identity, not normalization, exact inference, positive
+likelihoods or support: those are separate mathematical properties of a run.
 -/
 
 namespace DarkTower.WarMachine.R20Graph
-
 noncomputable section
 
-/-- The nine rows of the R20 certificate. -/
+/-- The nine rows are unchanged. -/
 inductive Node
   | precision | evidence | habit | classPreference
   | strategicFocus | liveness | independence | jointAction | cost
   deriving DecidableEq, Repr, Fintype
 
-/-- A producer is either one of the nine rows or the scorer outside R20. -/
 inductive Producer
   | node (node : Node)
-  | policyFreeEnergyScorer
+  | selection
+  | postObservationInference
   deriving DecidableEq, Repr
 
 abbrev RunId := Nat
 
-/-- The policy habit prior E, with its producing row and run. -/
 structure HabitPrior (Policy : Type) where
   value : Policy → ℝ
   producer : Producer
   runId : RunId
 
-/-- A predicted class distribution, distinct from preferences and scalar risk. -/
 structure PredictedClassDistribution where
   value : CTauClassPreference.Distribution
   producer : Producer
   runId : RunId
 
-/-- Policy expected free energy G.  It is deliberately not definitionally F. -/
+/-- C over classes, distinct from predicted probabilities over those classes. -/
+structure Preference where
+  value : CTauClassPreference.Distribution
+  producer : Producer
+  runId : RunId
+
 structure PolicyExpectedFreeEnergy (Policy : Type) where
   value : Policy → ℝ
   producer : Producer
   runId : RunId
 
-/-- Policy free energy F.  It is deliberately not definitionally G. -/
+/-- Finite state/tick inputs; no independently editable F value. -/
 structure PolicyFreeEnergy (Policy : Type) where
-  value : Policy → ℝ
+  stateCount : Nat
+  ticks : Nat
+  q : Policy → Fin ticks → Fin stateCount → ℝ
+  prior : Policy → Fin ticks → Fin stateCount → ℝ
+  likelihood : Policy → Fin ticks → Fin stateCount → ℝ
   producer : Producer
   runId : RunId
 
-/-- Policy temperature/precision beta emitted by the precision row. -/
+def PolicyFreeEnergy.value {Policy : Type} (f : PolicyFreeEnergy Policy) : Policy → ℝ :=
+  DarkTower.WarMachine.PolicyFreeEnergy.policyFreeEnergy f.q f.prior f.likelihood
+
 structure PolicyTemperature where
   value : ℝ
   producer : Producer
   runId : RunId
 
-/-- The semantic kind carried by a declared edge. -/
 inductive QuantityKind
-  | habitPrior | predictedClassDistribution | policyExpectedFreeEnergy
+  | habitPrior | preference | predictedClassDistribution | policyExpectedFreeEnergy
   | policyFreeEnergy
   deriving DecidableEq, Repr
 
-/-- The endpoint of an edge, including the external F scorer. -/
 inductive Endpoint
   | row (node : Node)
-  | policyFreeEnergyScorer
+  | selection
+  | postObservationInference
   deriving DecidableEq, Repr
 
-/--
-The conservative graph declared by PL1.  Every constructor corresponds to one
-read/write join in `PL1-lean-graph.edn`; no module-dependency-only edge is added.
--/
 inductive Edge
-  /-- Inferred from the prose role of `(TAG classHabitPrior)` in
-  `R15HabitPrior.lean` and the E field of `(TAG TickRecord)` in
-  `PrecisionFromObservation.lean`. -/
-  | habitPriorToPrecision
-  /-- Inferred from `(TAG inducedClassDistribution)` in
-  `R15StrategicTarget.lean`. -/
+  /-- Parr B.7 :12636-12646; Friston eq.2.7 :660-685: the same E
+  enters the selection prior and posterior inference. -/
+  | selectionToPrecisionHabit
+  /-- Friston eq.2.7 :660-685 and eq.2.6 :600-620: the same evaluated
+  G enters both policy beliefs. -/
+  | selectionToPrecisionG
+  /-- Friston :1604-1609, :780; Parr B.4 :12560, :12631-12634:
+  state inference after observations produces per-policy F. -/
+  | inferenceToPrecisionF
+  /-- Parr :10430-10433, :5282-5284: higher levels set C; Friston
+  eq.2.6 :600-620 uses U = ln P(o), not predicted probabilities. -/
   | strategicFocusToClassPreference
-  /-- Inferred from `(TAG classPreference)`, `(TAG classRisk)` in
-  `CTauClassPreference.lean`, and `(TAG ClassPreferenceConforms)` in
-  `R20Certificate.lean`. -/
-  | classPreferenceToPrecision
-  /-- PL1 marks the producer missing outside R20; the consumer field is exposed
-  by `(TAG TickRecord)` in `PrecisionFromObservation.lean`. -/
-  | policyFreeEnergyScorerToPrecision
+  /-- Friston eq.2.6 :600-620: predicted outcomes are A times the
+  policy-conditioned states, from selection's observation model. -/
+  | selectionToClassPreference
   deriving DecidableEq, Repr, Fintype
 
 def Edge.source : Edge → Endpoint
-  | .habitPriorToPrecision => .row .habit
+  | .selectionToPrecisionHabit | .selectionToPrecisionG | .selectionToClassPreference =>
+    .selection
+  | .inferenceToPrecisionF => .postObservationInference
   | .strategicFocusToClassPreference => .row .strategicFocus
-  | .classPreferenceToPrecision => .row .classPreference
-  | .policyFreeEnergyScorerToPrecision => .policyFreeEnergyScorer
 
 def Edge.target : Edge → Node
-  | .habitPriorToPrecision => .precision
-  | .strategicFocusToClassPreference => .classPreference
-  | .classPreferenceToPrecision => .precision
-  | .policyFreeEnergyScorerToPrecision => .precision
+  | .selectionToPrecisionHabit | .selectionToPrecisionG | .inferenceToPrecisionF => .precision
+  | .strategicFocusToClassPreference | .selectionToClassPreference => .classPreference
 
 def Edge.quantity : Edge → QuantityKind
-  | .habitPriorToPrecision => .habitPrior
-  | .strategicFocusToClassPreference => .predictedClassDistribution
-  | .classPreferenceToPrecision => .policyExpectedFreeEnergy
-  | .policyFreeEnergyScorerToPrecision => .policyFreeEnergy
+  | .selectionToPrecisionHabit => .habitPrior
+  | .selectionToPrecisionG => .policyExpectedFreeEnergy
+  | .inferenceToPrecisionF => .policyFreeEnergy
+  | .strategicFocusToClassPreference => .preference
+  | .selectionToClassPreference => .predictedClassDistribution
 
-/-- Sidecar ports for the quantities the current row records do not brand. -/
 structure Ports (Policy : Type) where
   runId : RunId
-  habitEmitted : HabitPrior Policy
+  selectionHabit : HabitPrior Policy
   precisionHabit : HabitPrior Policy
-  strategicPredicted : PredictedClassDistribution
-  classPredicted : PredictedClassDistribution
-  classG : PolicyExpectedFreeEnergy Policy
+  selectionG : PolicyExpectedFreeEnergy Policy
   precisionG : PolicyExpectedFreeEnergy Policy
-  scorerF : PolicyFreeEnergy Policy
+  inferenceF : PolicyFreeEnergy Policy
   precisionF : PolicyFreeEnergy Policy
+  strategicPreference : Preference
+  classPreference : Preference
+  selectionPredicted : PredictedClassDistribution
+  classPredicted : PredictedClassDistribution
   precisionBeta : PolicyTemperature
 
-/-- Every declared row endpoint is present, and every consumer port is the
-producer's exact artifact from this run.  `Row` keeps this module independent
-of the concrete `NodeRecord` family and avoids an import cycle. -/
-def Wired {Policy : Type} {Row : Node → Type}
-    (records : (n : Node) → Option (Row n)) (ports : Ports Policy) : Prop :=
-  (∀ n, n = .habit ∨ n = .strategicFocus ∨ n = .classPreference ∨ n = .precision →
-    records n ≠ none) ∧
-  ports.habitEmitted.producer = .node .habit ∧
-  ports.habitEmitted.runId = ports.runId ∧
-  ports.precisionHabit = ports.habitEmitted ∧
-  ports.strategicPredicted.producer = .node .strategicFocus ∧
-  ports.strategicPredicted.runId = ports.runId ∧
-  ports.classPredicted = ports.strategicPredicted ∧
-  ports.classG.producer = .node .classPreference ∧
-  ports.classG.runId = ports.runId ∧
-  ports.precisionG = ports.classG ∧
-  ports.scorerF.producer = .policyFreeEnergyScorer ∧
-  ports.scorerF.runId = ports.runId ∧
-  ports.precisionF = ports.scorerF ∧
-  ports.precisionBeta.producer = .node .precision ∧
-  ports.precisionBeta.runId = ports.runId
+/-- Each consumer receives the producer's entire artifact from this run. -/
+structure Wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy) : Prop where
+  present : ∀ n, n = .strategicFocus ∨ n = .classPreference ∨ n = .precision → records n ≠ none
+  habitProducer : ports.selectionHabit.producer = .selection
+  habitRun : ports.selectionHabit.runId = ports.runId
+  habitRead : ports.precisionHabit = ports.selectionHabit
+  gProducer : ports.selectionG.producer = .selection
+  gRun : ports.selectionG.runId = ports.runId
+  gRead : ports.precisionG = ports.selectionG
+  fProducer : ports.inferenceF.producer = .postObservationInference
+  fRun : ports.inferenceF.runId = ports.runId
+  fRead : ports.precisionF = ports.inferenceF
+  preferenceProducer : ports.strategicPreference.producer = .node .strategicFocus
+  preferenceRun : ports.strategicPreference.runId = ports.runId
+  preferenceRead : ports.classPreference = ports.strategicPreference
+  predictedProducer : ports.selectionPredicted.producer = .selection
+  predictedRun : ports.selectionPredicted.runId = ports.runId
+  predictedRead : ports.classPredicted = ports.selectionPredicted
+  betaProducer : ports.precisionBeta.producer = .node .precision
+  betaRun : ports.precisionBeta.runId = ports.runId
+
+/-- K1: class risk is not the producer of the policy G used by precision. -/
+theorem k1_class_G_not_wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
+    (wrong : ports.precisionG.producer = .node .classPreference) : ¬ Wired records ports := by
+  intro h
+  rw [h.gRead, h.gProducer] at wrong
+  contradiction
+
+/-- K2: selection's G cannot be substituted from another run/menu. -/
+theorem k2_other_run_G_not_wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
+    (_producer : ports.precisionG.producer = .selection)
+    (wrong : ports.precisionG.runId ≠ ports.runId) : ¬ Wired records ports := by
+  intro h
+  exact wrong ((congrArg PolicyExpectedFreeEnergy.runId h.gRead).trans h.gRun)
+
+/-- K3: a selection-time F is not post-observation inference's F. -/
+theorem k3_selection_F_not_wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
+    (wrong : ports.precisionF.producer = .selection) : ¬ Wired records ports := by
+  intro h
+  rw [h.fRead, h.fProducer] at wrong
+  contradiction
 
 abbrev TestPolicy := PrecisionFromObservation.TwoPolicy
 
-def zeroE (run : RunId) : HabitPrior TestPolicy :=
-  ⟨fun _ => 0, .node .habit, run⟩
+/-- One tick, one state, normalized exact posterior and likelihood one. -/
+def exampleF (run : RunId) : PolicyFreeEnergy TestPolicy :=
+  ⟨1, 1, fun _ _ _ => 1, fun _ _ _ => 1, fun _ _ _ => 1, .postObservationInference, run⟩
 
-def zeroPrediction (run : RunId) : PredictedClassDistribution :=
-  ⟨fun _ => 0, .node .strategicFocus, run⟩
-
-def zeroG (run : RunId) : PolicyExpectedFreeEnergy TestPolicy :=
-  ⟨fun _ => 0, .node .classPreference, run⟩
-
-def zeroF (run : RunId) : PolicyFreeEnergy TestPolicy :=
-  ⟨fun _ => 0, .policyFreeEnergyScorer, run⟩
+def examplePrediction (run : RunId) : PredictedClassDistribution :=
+  ⟨CTauClassPreference.waitingPreference, .selection, run⟩
 
 def goodPorts (run : RunId) : Ports TestPolicy :=
   { runId := run
-    habitEmitted := zeroE run, precisionHabit := zeroE run
-    strategicPredicted := zeroPrediction run, classPredicted := zeroPrediction run
-    classG := zeroG run, precisionG := zeroG run
-    scorerF := zeroF run, precisionF := zeroF run
+    selectionHabit := ⟨fun _ => 1 / 2, .selection, run⟩
+    precisionHabit := ⟨fun _ => 1 / 2, .selection, run⟩
+    selectionG := ⟨fun _ => 0, .selection, run⟩
+    precisionG := ⟨fun _ => 0, .selection, run⟩
+    inferenceF := exampleF run, precisionF := exampleF run
+    strategicPreference := ⟨CTauClassPreference.waitingPreference, .node .strategicFocus, run⟩
+    classPreference := ⟨CTauClassPreference.waitingPreference, .node .strategicFocus, run⟩
+    selectionPredicted := examplePrediction run, classPredicted := examplePrediction run
     precisionBeta := ⟨1, .node .precision, run⟩ }
 
 abbrev TestRow : Node → Type := fun _ => Unit
-
 def goodRecords : (n : Node) → Option (TestRow n) := fun _ => some ()
 
-/-- C4: the wiring predicate has a concrete positive inhabitant. -/
-theorem c4_goodPorts_wired (run : RunId) : Wired goodRecords (goodPorts run) := by
-  classical
+/-- K4: all five edges can be wired simultaneously, with actual tick inputs. -/
+theorem k4_goodPorts_wired (run : RunId) : Wired goodRecords (goodPorts run) := by
   constructor
-  · intro n hn
-    simp [goodRecords]
-  · simp [goodPorts, zeroE, zeroPrediction, zeroG, zeroF]
+  · intro n _; simp [goodRecords]
+  all_goals rfl
 
-def wrongProducerPorts : Ports TestPolicy :=
-  { goodPorts 7 with
-    precisionF := ⟨fun _ => 0, .node .evidence, 7⟩ }
-
-/-- C1: an F of the right semantic type but from another producer is rejected. -/
-theorem c1_wrong_producer_not_wired : ¬ Wired goodRecords wrongProducerPorts := by
-  classical
-  simp [Wired, wrongProducerPorts, goodPorts, zeroF]
-
-def wrongRunPorts : Ports TestPolicy :=
-  { goodPorts 7 with
-    precisionF := zeroF 8 }
-
-/-- C2: an F from the scorer but from another run is rejected. -/
-theorem c2_wrong_run_not_wired : ¬ Wired goodRecords wrongRunPorts := by
-  classical
-  simp [Wired, wrongRunPorts, goodPorts, zeroF]
-
-/-- C5 (wiring form): an unrelated row-wise proposition supplies no wiring;
-the explicit wrong-producer sidecar remains rejected. -/
-theorem c5_rows_property_does_not_supply_wiring (RowsCertified : Prop)
-    (_ : RowsCertified) : ¬ Wired goodRecords wrongProducerPorts :=
-  c1_wrong_producer_not_wired
-
-/- C3: this does not typecheck; `PolicyExpectedFreeEnergy` cannot fill an F port.
-
-example : PolicyFreeEnergy TestPolicy := zeroG 0
-
-Lean reports:
-  application type mismatch
-    zeroG 0
-  argument has type
-    PolicyExpectedFreeEnergy TestPolicy : Type
-  but is expected to have type
-    PolicyFreeEnergy TestPolicy : Type
+/- K6 negative type control (checked separately):
+example : Preference := examplePrediction 0
+Lean: Type mismatch
+  examplePrediction 0
+has type
+  PredictedClassDistribution
+but is expected to have type
+  Preference
 -/
+
+#print axioms k1_class_G_not_wired
+#print axioms k2_other_run_G_not_wired
+#print axioms k3_selection_F_not_wired
+#print axioms k4_goodPorts_wired
 
 end
 end DarkTower.WarMachine.R20Graph
