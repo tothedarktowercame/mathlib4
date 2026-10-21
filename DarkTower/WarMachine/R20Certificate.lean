@@ -328,11 +328,22 @@ noncomputable def certify (records : Records) : Certificate := fun n =>
 def RowsCertified (certificate : Certificate) : Prop :=
   ∀ node, ∃ c, certificate node = .agrees c
 
-/-- A click is certified only when every row agrees and its shared quantities
-are the exact artifacts declared by the R20 graph. -/
+/-- The consumer rows were judged on the values in their ports.  `Wired`
+relates the ports to each other; this ties the precision row's E, G and F, and
+the class-preference row's predicted distribution, to those ports, so a row
+judged on some other F is not certified. -/
+def RowsReadPorts (records : Records) (ports : R20Graph.Ports Policy) : Prop :=
+  (∀ r, records .precision = some r →
+    r.E = ports.precisionHabit.value ∧ r.G = ports.precisionG.value ∧
+      r.F = ports.precisionF.value) ∧
+  (∀ r, records .classPreference = some r → r.predicted = ports.classPredicted.value)
+
+/-- A click is certified only when every row agrees, its shared quantities
+are the exact artifacts declared by the R20 graph, and the consumer rows were
+judged on those artifacts. -/
 def Certified (records : Records) (certificate : Certificate)
     (ports : R20Graph.Ports Policy) : Prop :=
-  RowsCertified certificate ∧ R20Graph.Wired records ports
+  RowsCertified certificate ∧ R20Graph.Wired records ports ∧ RowsReadPorts records ports
 
 theorem rowsCertified_iff (records : Records) :
     RowsCertified (certify records) ↔
@@ -358,8 +369,27 @@ theorem rowsCertified_iff (records : Records) :
 theorem certified_iff (records : Records) (ports : R20Graph.Ports Policy) :
     Certified records (certify records) ports ↔
       (∀ node, ∃ r, records node = some r ∧ conforms node r) ∧
-        R20Graph.Wired records ports := by
+        R20Graph.Wired records ports ∧ RowsReadPorts records ports := by
   rw [Certified, rowsCertified_iff]
+
+/-- The precision row of a certified click was judged on the scorer's F from
+this run. -/
+theorem certified_precision_reads_scorer_F (records : Records) (c : Certificate)
+    (ports : R20Graph.Ports Policy) (certified : Certified records c ports)
+    (r : PrecisionFromObservation.TickRecord Policy) (hr : records .precision = some r) :
+    r.F = ports.scorerF.value ∧ ports.scorerF.producer = .policyFreeEnergyScorer ∧
+      ports.scorerF.runId = ports.runId := by
+  rcases certified with ⟨_, wired, reads⟩
+  rcases wired with ⟨_, _, _, _, _, _, _, _, _, _, hprod, hrun, hF, _, _⟩
+  exact ⟨(reads.1 r hr).2.2.trans (by rw [hF]), hprod, hrun⟩
+
+/-- The wrong-F control at the certificate: a precision row judged on an F
+other than the scorer's is not certified, whatever the sidecar says. -/
+theorem wrongF_not_certified (records : Records) (c : Certificate)
+    (ports : R20Graph.Ports Policy)
+    (r : PrecisionFromObservation.TickRecord Policy) (hr : records .precision = some r)
+    (wrong : r.F ≠ ports.scorerF.value) : ¬ Certified records c ports :=
+  fun certified => wrong (certified_precision_reads_scorer_F records c ports certified r hr).1
 
 theorem missing_not_certified (records : Records) (node : Node)
     (ports : R20Graph.Ports Policy) (missing : records node = none) :
