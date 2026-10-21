@@ -331,10 +331,12 @@ def RowsCertified (certificate : Certificate) : Prop :=
 /-- The consumer rows were judged on the values in their ports.  `Wired`
 relates the ports to each other; this ties the precision row's E, G and F, and
 the class-preference row's prediction and preference, to those ports, so a row
-judged on some other F is not certified. -/
+judged on some other F is not certified. G is compared after embedding the
+row's real value in EReal: an infinite G port cannot certify this real-valued
+precision row, and no toReal conversion drops infinity. -/
 def RowsReadPorts (records : Records) (ports : R20Graph.Ports Policy) : Prop :=
   (∀ r, records .precision = some r →
-    r.E = ports.precisionHabit.value ∧ r.G = ports.precisionG.value ∧
+    r.E = ports.precisionHabit.value ∧ (fun π => (r.G π : EReal)) = ports.precisionG.value ∧
       r.F = ports.precisionF.value) ∧
   (∀ r, records .classPreference = some r →
     r.predicted = ports.classPredicted.value ∧
