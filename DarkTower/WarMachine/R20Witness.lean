@@ -46,6 +46,7 @@ def carryClj : String := "futon2/src/futon2/aif/policy_precision_carry.clj"
 def certClj : String := "futon2/src/futon2/aif/wm/apparatus_certificates.clj"
 def shapeGClj : String := "futon2/src/futon2/aif/cascade_shape_g.clj"
 def observationClj : String := "futon2/src/futon2/aif/observation_model.clj"
+def focusClj : String := "futon2/src/futon2/aif/focus_receipt.clj"
 
 def site (file var : String) : Site := file ++ "#" ++ var
 
@@ -58,7 +59,12 @@ eq.2.6, friston2017.txt:600-620). Class preference has two sites: C is set
 in the generative model by `class-emission-model` (prior preferences are a
 model parameter), and `class-preference-row` audits C against predictions
 after G is computed. The row writes only a verdict, so it cannot be the
-source of C (S5a, 2026-10-21). -/
+source of C (S5a, 2026-10-21). For the same reason the strategic focus is
+sourced where focus is produced, `discover`, and where it is retained at
+decision time, `decision-focus`; `strategic-focus-row` only compares the
+focus receipt with the scored class after the fact (S8a, 2026-10-21). At the
+pin, `class-emission-model` assigns `:target-class {target :focused}` without
+reading focus, so no chain exists and the edge fails. -/
 def endpointSites : Endpoint → List Site
   | .selection =>
     [site policyClj "selection-candidate", site policyClj "selection-certificate",
@@ -67,7 +73,7 @@ def endpointSites : Endpoint → List Site
   | .row .precision => [site carryClj "advance"]
   | .row .classPreference =>
     [site shapeGClj "class-emission-model", site certClj "class-preference-row"]
-  | .row .strategicFocus => [site certClj "strategic-focus-row"]
+  | .row .strategicFocus => [site focusClj "discover", site focusClj "decision-focus"]
   | .row _ => []
 
 /-- Field types, as `:r20/field-types` writes them without the colon. -/
@@ -216,7 +222,7 @@ def synthetic : Witness :=
        ⟨.selectionToPrecisionG, gHops true⟩,
        ⟨.selectionToPrecisionHabit, eHops⟩,
        ⟨.strategicFocusToClassPreference,
-        [hop (site certClj "strategic-focus-row") ":tactical-preference" ":focus"
+        [hop (site focusClj "decision-focus") ":tactical-preference" ":focus"
           "quantity/preference" (site certClj "class-preference-row")]⟩,
        ⟨.selectionToClassPreference,
         [hop (site policyClj "selection-certificate") ":predicted" ":selection-certificate"
@@ -308,6 +314,23 @@ theorem w11_c_not_carried_by_g :
         "quantity/expected-free-energy" (site policyClj "selection-candidate")])
       .classPreferenceToSelectionG = false := by decide
 
+/-- W12: focus retained at decision time and read by the generative model's
+class assignment witnesses the strategic edge in one hop. This is the hop
+futon2 does not have at the pin. -/
+theorem w12_decision_focus_to_model_ok :
+    edgeOK (replaceEdge synthetic .strategicFocusToClassPreference
+      [hop (site focusClj "decision-focus") ":tactical-preference" ":focus"
+        "quantity/preference" (site shapeGClj "class-emission-model")])
+      .strategicFocusToClassPreference = true := by decide
+
+/-- W13: the strategic-focus certificate row cannot source the edge; it reads
+the focus receipt and writes only a verdict. -/
+theorem w13_audit_row_is_not_focus :
+    edgeOK (replaceEdge synthetic .strategicFocusToClassPreference
+      [hop (site certClj "strategic-focus-row") ":tactical-preference" ":focus"
+        "quantity/preference" (site shapeGClj "class-emission-model")])
+      .strategicFocusToClassPreference = false := by decide
+
 #print axioms edgeOK_sound
 #print axioms witnessOK_covers
 #print axioms w0_synthetic_ok
@@ -322,5 +345,7 @@ theorem w11_c_not_carried_by_g :
 #print axioms w9_carrier_does_not_carry_F
 #print axioms w10_model_c_to_selection_ok
 #print axioms w11_c_not_carried_by_g
+#print axioms w12_decision_focus_to_model_ok
+#print axioms w13_audit_row_is_not_focus
 
 end DarkTower.WarMachine.R20Witness

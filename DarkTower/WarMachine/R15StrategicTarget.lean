@@ -15,14 +15,22 @@ levels (p. 102), while high-level expected observations can separately form
 empirical priors E over lower-level policies (pp. 94, 148–149).
 
 Our reading is therefore: the strategic focus sets the tactical preference C,
-not the tactical action. At Futon2 commit
-`0f9587532031beb50a21091cc41cd10f4a16ff63`, `focus_receipt.clj/classify-target`
-classifies a target relative to the retained focus; `cascade_decision.clj`
-lines 896–904 maps focus, associated, and useful-elsewhere relations to focused,
-related, and unrelated classes; and `class-observation-model` lines 502–530
-scores those classes against terminal C = 55/35/5/5. A failure to reach a
-target emits stop-the-line. Unknown relations remain unscored; the runtime
-refuses them rather than inventing a class.
+not the tactical action. The focus acts on C by fixing each reached target's
+class (focused, related, unrelated); C over classes is the terminal
+55/35/5/5 schedule. A failure to reach a target emits stop-the-line. Unknown
+relations remain unscored rather than receiving an invented class.
+
+Futon2 does not implement this at commit
+`270bebc27965b31f1d33012e68b4d1f512eca3f9` (S8a, 2026-10-21). The earlier
+route at `0f9587532031beb50a21091cc41cd10f4a16ff63`, in which
+`classify-target`'s relation chose the scored class, is recorded as retired
+in `cascade_decision.clj`. Today `cascade_shape_g.clj/class-emission-model`
+assigns `:target-class {target :focused}` to the selected target without
+reading focus. Focus is still discovered and retained (`focus_receipt.clj`
+`discover`, `decision-focus`), filters which interpretation request is
+asked, and is compared with the scored class by `strategic-focus-row`, a
+check that writes only a verdict. This module is the published model, not a
+description of that code; `R20Witness` marks the edge unwitnessed.
 
 Thus “fixes” is a preference, not a constraint: terminal related and unrelated
 outcomes retain positive mass. This module says neither how the strategic focus
@@ -30,14 +38,10 @@ is inferred nor how its own inference is scored. The counts of what worked
 are not an argument of `tacticalPreference`: they enter selection as the habit
 prior E (`R15HabitPrior`), not through this C schedule.
 
-The runtime decision retains `:focus-status` with focus and per-target
-classifications (`cascade_decision.clj` lines 1139–1155), the terminal
-`:preference-schedule` (`lines 1178–1182`), and the class observation model
-used by scoring. It does not currently retain one compact independently
-verified record containing, for every candidate and every tau, focus, relation,
-scored class, and the full preference vector. `StrategicTickConforms` states
-the contract such a record must satisfy; it does not claim that today's receipt
-already satisfies it.
+No runtime record joins, for every candidate and every tau, focus,
+relation, scored class, and the full preference vector.
+`StrategicTickConforms` states the contract such a record must satisfy; it
+does not claim that any current receipt satisfies it.
 -/
 
 namespace DarkTower.WarMachine.R15StrategicTarget
