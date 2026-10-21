@@ -38,6 +38,17 @@ is inferred nor how its own inference is scored. The counts of what worked
 are not an argument of `tacticalPreference`: they enter selection as the habit
 prior E (`R15HabitPrior`), not through this C schedule.
 
+Joe confirmed this reading on 2026-10-21, against the alternative that focus
+only picks the target upstream of G. The class preference rewards staying on
+task and penalises drifting from it. It does not forbid an off-focus choice:
+another term can outweigh it, as a large repair preference must outweigh the
+off-focus penalty when self-heal picks a target that repairs the machine. The
+class is read from the focus in force, which persists between rounds, and is
+not set to focused because the target was selected. So the class term belongs
+where targets of different classes compete, the outer selection over targets,
+and not in the reading policies for one already-selected target, where every
+policy has the same class and the term changes no ranking.
+
 No runtime record joins, for every candidate and every tau, focus,
 relation, scored class, and the full preference vector.
 `StrategicTickConforms` states the contract such a record must satisfy; it
