@@ -3123,4 +3123,26 @@ theorem f46_repeatsSpendNothing (ms : List OtherInjuryMark)
     have ih' := ih (fun x hx => h x (List.mem_cons_of_mem _ hx))
     rcases hm with rfl | rfl <;> simp [requeuesAfter, causeF46, spendsBudgetF43, ih']
 
+
+/-- **Click 17 witness** (claude-5, 2026-10-21 01:06Z). Ordinal 28 is `:enacted`, `:requeues 3`, no
+`:requeue-cause`, retry click `wm-requeue-4-4-repair/239cf988…`, attempt 4, and the `:retry-requeue-4`
+receipt is `:queued` behind `retry-requeue-3`: every conjunct of `click17_predicted` held. F46
+(`b52445d46`) was reloaded into the serving JVM at 01:08:37Z, after the parent click appended
+ordinal 28 and before the child reached ingest, so the child's own death is the first mark T writes
+under F46. -/
+theorem click17_held :
+    requeueNext (causeReadToday .repeatUnattributed) 2 = .enacted 3 ∧
+      requeueNext (causeF46 .repeatUnattributed) 2 = .enacted 3 := by decide
+
+/-- Prediction for click 18 under F46, by what click 17's child does. A death on another injury,
+first occurrence or a repeat of `42fd2c21`, is written with its injury id and the re-queue keeps
+`:requeues 3` with a `:requeue-cause`; a child that dies with no other injury on `:requeues 3`
+abandons `:retry-budget-spent`. The model does not carry `other-open-injury`'s second-branch
+condition that the named injury is still in `active-states`; `42fd2c21` is `:open` at ordinal 23
+and nothing has moved it. -/
+theorem click18_predicted :
+    requeueNext (causeF46 .repeat) 3 = .enacted 3 ∧
+      requeueNext (causeF46 .firstOccurrence) 3 = .enacted 3 ∧
+      requeueNext (causeF46 .none) 3 = .abandonedBudgetSpent := by decide
+
 end DarkTower.WarMachine.SelfHealRoute
