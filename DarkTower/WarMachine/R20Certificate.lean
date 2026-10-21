@@ -328,6 +328,17 @@ noncomputable def certify (records : Records) : Certificate := fun n =>
 def RowsCertified (certificate : Certificate) : Prop :=
   ∀ node, ∃ c, certificate node = .agrees c
 
+/-- Selection's G schedule is the class-preference row's C at every tick.
+The runtime builds `:class-preference` only for tau in `1 .. H`
+(`CTauClassPreference.classPreference`), so G has H ticks and its tick `t`
+(0-based) is runtime step `t + 1`. Without this, the schedule's provenance is
+a producer label only and a schedule with any values passes (H4 review). -/
+def ScheduleIsRows {Policy : Type} (r : ClassPreferenceRow)
+    (g : R20Graph.PolicyExpectedFreeEnergy Policy) : Prop :=
+  g.ticks = r.horizon ∧
+    ∀ t : Fin g.ticks,
+      g.schedule.value t = CTauClassPreference.classPreference r.horizon (t.val + 1)
+
 /-- The consumer rows were judged on the values in their ports.  `Wired`
 relates the ports to each other; this ties the precision row's E, G and F, and
 the class-preference row's prediction and preference, to those ports, so a row
@@ -340,7 +351,8 @@ def RowsReadPorts (records : Records) (ports : R20Graph.Ports Policy) : Prop :=
       r.F = ports.precisionF.value) ∧
   (∀ r, records .classPreference = some r →
     r.predicted = ports.classPredicted.value ∧
-      CTauClassPreference.classPreference r.horizon r.tau = ports.classPreference.value) ∧
+      CTauClassPreference.classPreference r.horizon r.tau = ports.classPreference.value ∧
+      ScheduleIsRows r ports.selectionG) ∧
   (∀ s r, records .strategicFocus = some s → records .classPreference = some r →
     s.tick.preferenceAt r.tau = ports.strategicPreference.value)
 
@@ -395,6 +407,26 @@ theorem wrongF_not_certified (records : Records) (c : Certificate)
     (r : PrecisionFromObservation.TickRecord Policy) (hr : records .precision = some r)
     (wrong : r.F ≠ ports.inferenceF.value) : ¬ Certified records c ports :=
   fun certified => wrong (certified_precision_reads_inference_F records c ports certified r hr).1
+
+/-- K11: a schedule labelled as the class-preference row's but holding other
+values at some tick is not certified. -/
+theorem wrongSchedule_not_certified (records : Records) (c : Certificate)
+    (ports : R20Graph.Ports Policy) (r : ClassPreferenceRow)
+    (hr : records .classPreference = some r) (t : Fin ports.selectionG.ticks)
+    (wrong : ports.selectionG.schedule.value t ≠
+      CTauClassPreference.classPreference r.horizon (t.val + 1)) :
+    ¬ Certified records c ports := by
+  rintro ⟨_, _, reads⟩
+  exact wrong ((reads.2.1 r hr).2.2.2 t)
+
+/-- K11b: G over a different number of ticks than the row's horizon is not
+certified. -/
+theorem wrongTicks_not_certified (records : Records) (c : Certificate)
+    (ports : R20Graph.Ports Policy) (r : ClassPreferenceRow)
+    (hr : records .classPreference = some r) (wrong : ports.selectionG.ticks ≠ r.horizon) :
+    ¬ Certified records c ports := by
+  rintro ⟨_, _, reads⟩
+  exact wrong (reads.2.1 r hr).2.2.1
 
 theorem missing_not_certified (records : Records) (node : Node)
     (ports : R20Graph.Ports Policy) (missing : records node = none) :
@@ -537,6 +569,8 @@ def summary (certificate : Certificate) : List (Node × RowVerdict) :=
 #print axioms certified_iff
 #print axioms wrongF_not_certified
 #print axioms certified_precision_reads_inference_F
+#print axioms wrongSchedule_not_certified
+#print axioms wrongTicks_not_certified
 
 end
 end DarkTower.WarMachine.R20Certificate
