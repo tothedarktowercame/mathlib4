@@ -63,6 +63,10 @@ Where the comparison and the branch disagree (controls below):
 * when the focus is stuck and the repair is for the focus, the two agree
   (`stuck_focus_agrees`).
 
+Joe decided the first disagreement on 2026-10-21: G's answer stands. An open
+repair of the focus does not pre-empt focused work that can still be
+finished; it wins once the injury has lowered the focused work's reach.
+
 The gate in `R15FocusDistance`. `injuryDeclared` says that no candidate near
 the focus can be finished. A repair of the focus is near it
 (`repairDistance` puts it at the radius). So a finishable repair among the
