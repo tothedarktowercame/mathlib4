@@ -5,6 +5,7 @@ import DarkTower.WarMachine.CTauClassPreference
 import DarkTower.WarMachine.R15StrategicTarget
 import DarkTower.WarMachine.R10ScheduledEntrypoint
 import DarkTower.WarMachine.R11JointAction
+import DarkTower.WarMachine.R20Graph
 import Mathlib.Tactic
 
 /-!
@@ -55,14 +56,11 @@ boundary required by this certificate.  Neither adapter adds theory.
 
 namespace DarkTower.WarMachine.R20Certificate
 
+open DarkTower.WarMachine.R20Graph
+
 open scoped BigOperators
 noncomputable section
 attribute [local instance] Classical.propDecidable
-
-inductive Node
-  | precision | evidence | habit | classPreference
-  | strategicFocus | liveness | independence | jointAction | cost
-  deriving DecidableEq, Repr, Fintype
 
 inductive PrecisionCase | unchanged | moreDecisive | lessDecisive deriving DecidableEq, Repr
 inductive EvidenceCase | beliefUnchanged | beliefMoved deriving DecidableEq, Repr
@@ -327,11 +325,17 @@ noncomputable def certify (records : Records) : Certificate := fun n =>
   | none => .notRecorded
   | some r => if conforms n r then .agrees (caseOf n r) else .disagrees (caseOf n r)
 
-def Certified (certificate : Certificate) : Prop :=
+def RowsCertified (certificate : Certificate) : Prop :=
   ∀ node, ∃ c, certificate node = .agrees c
 
-theorem certified_iff (records : Records) :
-    Certified (certify records) ↔
+/-- A click is certified only when every row agrees and its shared quantities
+are the exact artifacts declared by the R20 graph. -/
+def Certified (records : Records) (certificate : Certificate)
+    (ports : R20Graph.Ports Policy) : Prop :=
+  RowsCertified certificate ∧ R20Graph.Wired records ports
+
+theorem rowsCertified_iff (records : Records) :
+    RowsCertified (certify records) ↔
       ∀ node, ∃ r, records node = some r ∧ conforms node r := by
   classical
   constructor
@@ -351,10 +355,17 @@ theorem certified_iff (records : Records) :
     cases node <;> simp only [certify] at row ⊢ <;>
       rcases row with ⟨r, hr, good⟩ <;> simp [hr, good]
 
+theorem certified_iff (records : Records) (ports : R20Graph.Ports Policy) :
+    Certified records (certify records) ports ↔
+      (∀ node, ∃ r, records node = some r ∧ conforms node r) ∧
+        R20Graph.Wired records ports := by
+  rw [Certified, rowsCertified_iff]
+
 theorem missing_not_certified (records : Records) (node : Node)
-    (missing : records node = none) : ¬ Certified (certify records) := by
+    (ports : R20Graph.Ports Policy) (missing : records node = none) :
+    ¬ Certified records (certify records) ports := by
   intro certified
-  rcases certified node with ⟨c, hc⟩
+  rcases certified.1 node with ⟨c, hc⟩
   simp [certify, missing] at hc
 
 theorem refused_row_disagrees (records : Records) (node : Node) (r : NodeRecord node)
@@ -397,9 +408,10 @@ theorem badIndependence_refused : ¬ IndependenceConforms badIndependence := by
 
 /-- A certified click had a reviewer who was not its author. -/
 theorem certified_author_is_not_reviewer (records : Records)
-    (certified : Certified (certify records)) :
+    (ports : R20Graph.Ports Policy)
+    (certified : Certified records (certify records) ports) :
     ∃ r : IndependenceRow, records .independence = some r ∧ r.author ≠ r.reviewer :=
-  (certified_iff records).mp certified .independence
+  ((certified_iff records ports).mp certified).1 .independence
 
 /-- The precision control: a record whose temperature did not move although F
 differed between two policies that G ranks differently prints "unchanged" and
