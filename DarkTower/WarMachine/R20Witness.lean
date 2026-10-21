@@ -68,10 +68,12 @@ def quantityTag : QuantityKind → String
 
 /-- Container types a quantity may pass through after its first hop. The
 frozen family is `family`'s `(select-keys % [:id :g :habit])`. -/
+def carrierTags : QuantityKind → List String
+  | .habitPrior | .policyExpectedFreeEnergy => ["receipt/frozen-policy-family"]
+  | _ => []
+
 def carries (tag : String) (q : QuantityKind) : Bool :=
-  tag == quantityTag q ||
-    (tag == "receipt/frozen-policy-family" &&
-      (q == .habitPrior || q == .policyExpectedFreeEnergy))
+  tag == quantityTag q || (carrierTags q).contains tag
 
 structure Hop where
   writer : Site
