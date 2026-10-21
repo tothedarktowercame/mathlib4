@@ -44,16 +44,29 @@ abbrev Site := String
 def policyClj : String := "futon2/src/futon2/aif/policy.clj"
 def carryClj : String := "futon2/src/futon2/aif/policy_precision_carry.clj"
 def certClj : String := "futon2/src/futon2/aif/wm/apparatus_certificates.clj"
+def shapeGClj : String := "futon2/src/futon2/aif/cascade_shape_g.clj"
+def observationClj : String := "futon2/src/futon2/aif/observation_model.clj"
 
 def site (file var : String) : Site := file ++ "#" ++ var
 
 /-- The Lean↔Clojure identification of endpoints. Rows without a settled
-Clojure site are empty, so any edge touching them cannot be witnessed. -/
+Clojure site are empty, so any edge touching them cannot be witnessed.
+
+Selection includes `evaluate`, the per-tick observation-model step that
+forms the predicted class distribution and H3's risk against C (Friston
+eq.2.6, friston2017.txt:600-620). Class preference has two sites: C is set
+in the generative model by `class-emission-model` (prior preferences are a
+model parameter), and `class-preference-row` audits C against predictions
+after G is computed. The row writes only a verdict, so it cannot be the
+source of C (S5a, 2026-10-21). -/
 def endpointSites : Endpoint → List Site
-  | .selection => [site policyClj "selection-candidate", site policyClj "selection-certificate"]
+  | .selection =>
+    [site policyClj "selection-candidate", site policyClj "selection-certificate",
+     site observationClj "evaluate"]
   | .postObservationInference => [site carryClj "retrospective-f"]
   | .row .precision => [site carryClj "advance"]
-  | .row .classPreference => [site certClj "class-preference-row"]
+  | .row .classPreference =>
+    [site shapeGClj "class-emission-model", site certClj "class-preference-row"]
   | .row .strategicFocus => [site certClj "strategic-focus-row"]
   | .row _ => []
 
@@ -277,6 +290,24 @@ theorem w9_carrier_does_not_carry_F :
          "receipt/frozen-policy-family" (site carryClj "advance")])
       .inferenceToPrecisionF = false := by decide
 
+/-- W10: C written by the generative model and read by selection's risk
+step witnesses the C edge in one hop. -/
+theorem w10_model_c_to_selection_ok :
+    edgeOK (replaceEdge synthetic .classPreferenceToSelectionG
+      [hop (site shapeGClj "class-emission-model") ":class-preference" ":class-model"
+        "quantity/preference-schedule" (site observationClj "evaluate")])
+      .classPreferenceToSelectionG = true := by decide
+
+/-- W11: C cannot reach selection laundered as G; the risk and score fields
+do not carry the preference schedule. -/
+theorem w11_c_not_carried_by_g :
+    edgeOK (replaceEdge synthetic .classPreferenceToSelectionG
+      [hop (site shapeGClj "class-emission-model") ":class-preference" ":class-model"
+        "quantity/preference-schedule" (site certClj "class-preference-row"),
+       hop (site certClj "class-preference-row") ":controller-score" ":ranked-candidate"
+        "quantity/expected-free-energy" (site policyClj "selection-candidate")])
+      .classPreferenceToSelectionG = false := by decide
+
 #print axioms edgeOK_sound
 #print axioms witnessOK_covers
 #print axioms w0_synthetic_ok
@@ -289,5 +320,7 @@ theorem w9_carrier_does_not_carry_F :
 #print axioms w7_ambiguous
 #print axioms w8_extra_carrier_ok
 #print axioms w9_carrier_does_not_carry_F
+#print axioms w10_model_c_to_selection_ok
+#print axioms w11_c_not_carried_by_g
 
 end DarkTower.WarMachine.R20Witness
