@@ -2980,4 +2980,136 @@ ordinal 25 itself), so `:requeues` stays 2 and the latest ordinal stays 25. Then
 click 15. -/
 theorem f45_click16_queues : recurF45 3 d755c886Receipts = .queued := by decide
 
+/-! ## Rev 38: click 16 queued and reached the reviewer; the other-injury rule sees an injury's first occurrence only (2026-10-21 00:58Z)
+
+Click 16 (claude-2, job `invoke-1792543504039-211-030aa8d4`; parent click `wm-click-243f02f1`,
+driver 00:45:23Z to 00:47:03Z; child `wm-requeue-3-4-repair/239cf988…`, run `fdbf2abb`,
+opportunity `bd03fbb1` 00:46:43Z to 00:53:17Z). `f45_click16_queues` held: `transaction.edn` has
+one `:retry-requeue-3` receipt, `:status :queued`, `:attempt 4`, `:retry-click
+"wm-requeue-3-4-repair/239cf988…"`, predecessor pin `…/4/retry-requeue-2.edn`; the parent binding
+closed `:status :awaiting-retry`, `:reason nil`, `:binding-status :absent`, `:run-id-observation
+:runner-did-not-return-run-id`; the ledger's latest ordinal stayed 25 through the coordination.
+`serving_reachesReviewer` held: zai-2's answer (job `invoke-1792543929228-213-a02a2332`,
+00:52:09Z to 00:52:36Z) is prose and then one unfenced object and decoded; zai-3 was contacted
+(job `invoke-1792543957507-215-6ae49317`, 00:52:37Z to 00:53:04Z). zai-3's answer is one fence
+whose object has bare vectors as keys (`{["agent/handoff-preserves-context" 0]: {…}`, zai-2's
+string keys re-typed without their quotes; a JSON parse fails at character 202), so it is
+`.other` and the close is `:kind :open-cascade-review-answer-invalid` with `:reviewer "zai-3"` and
+the job id, at the record's `[:failure :detail :failure-detail]` (phases log line 16145, the
+`:cascade-resume` end, 00:53:05.70Z): `serving_kindNamesTheRefusedSide`'s second conjunct, in
+production. `(O handle-error!)` did not run (`full_loop_runtime.clj` 262-266 returns first).
+
+Two conjuncts of the click packet did not hold, and neither is the model's. The packet read the
+reviewer's job id from the close line's `:tripwire/snapshot :reviewer-job`, which is T5's
+mission reviewer (`tripwire.clj` 271-278) and is nil here; rev 36's sentence, "the close carries
+the zai-3 job id", is true of the failure detail. And the packet expected the ledger to re-queue
+at the child's observation; the ledger's own history (ordinals 17 to 19, 20 to 22, 23 to 25) shows
+the two-click shape: the child's observation is ingested by `(T integrate)` as a pair, the other
+injury's entry and then `:retry-inconclusive` for `d755c886`, and the `:enacted` re-queue is
+appended by `(C coordinate-queued-retry)` on the next parent click, when `(L pending-requeue)`
+finds the observation newer than the latest enacted entry. Click 16's pair is ordinals 26 and 27.
+
+What the pair says is the finding. The child died on injury `42fd2c21` (cause key
+`[:open-cascade-review-answer-invalid stage target]`, the same key as ordinal 23), whose latest
+state is `:open`, an active state; so `(T integrate "contains? active-states")` wrote ordinal 26 as
+a `:repeated-active-injury` observation, with no `:injury-id` and no `:cause-record-pin` (its pin
+is `meta-injury-ledger/external/26.edn`), and ordinal 27's `:retry-inconclusive` names the record
+pin `eb4547d9…`. `(L other-open-injury)` (103-108) reads only `:open` transitions whose
+`:cause-record-pin` is that pin, so on click 17 `(L append-requeue)` finds no other injury: the
+F43 law in rev 31 is implemented by a lookup that sees an injury's first occurrence only. The
+second time the same other injury kills a child, the re-queue spends the budget. -/
+
+/-- How the ledger marks that a retry child died on another open injury: as an `:open` transition
+carrying the child's record pin (the injury's first occurrence, `(T integrate "nil? previous")`),
+as a `:repeated-active-injury` observation with no injury id and no pin (every later occurrence,
+`(T integrate "contains? active-states")`), or not at all (the child tested nothing). -/
+inductive OtherInjuryMark where
+  | firstOccurrence
+  | repeat
+  | none
+  deriving DecidableEq, Repr
+
+/-- What `(L append-requeue "other")` reads from the mark today: `(L other-open-injury)` matches
+the `:open` transition's `:cause-record-pin` and nothing else. -/
+def causeReadToday : OtherInjuryMark → InconclusiveCause
+  | .firstOccurrence => .otherOpenInjury
+  | .repeat => .noInjury
+  | .none => .noInjury
+
+/-- F46: the repeat observation names the injury it repeats (T writes `:injury-id` on
+`:repeated-active-injury`, as it does on `:retry-inconclusive`), and L reads the other injury from
+either mark. -/
+def causeF46 : OtherInjuryMark → InconclusiveCause
+  | .firstOccurrence => .otherOpenInjury
+  | .repeat => .otherOpenInjury
+  | .none => .noInjury
+
+/-- `(L append-requeue)` under F43 on an entry with `:requeues k`
+(`data/wm-meta-injuries/ledger.edn` `:retry-limit 3`): no other injury and `k ≥ 3` abandons
+`:retry-budget-spent`; otherwise the entry is `:enacted` with `k` when another injury is read and
+`k + 1` when not. -/
+def retryLimit : Nat := 3
+
+inductive RequeueNext where
+  | enacted (requeues : Nat)
+  | abandonedBudgetSpent
+  deriving DecidableEq, Repr
+
+def requeueNext (c : InconclusiveCause) (k : Nat) : RequeueNext :=
+  match c with
+  | .otherOpenInjury => .enacted k
+  | .noInjury => if retryLimit ≤ k then .abandonedBudgetSpent else .enacted (k + 1)
+
+/-- **Click 16 witness.** The author's prose-then-object answer reaches the reviewer and the
+reviewer's malformed fence closes the review-invalid kind. -/
+theorem click16_reviewerRefused :
+    resumeStep servingDecodes .proseThenBareObject .other = .reviewerRefused ∧
+      (resumeStep servingDecodes .proseThenBareObject .other).reviewerContacted = true ∧
+      servingKind .reviewerRefused = .reviewAnswerInvalid := by decide
+
+/-- `d755c886`'s four children: ordinals 18 and 21 and 24 on first occurrences (`821c15d0`,
+`75747f06`, `42fd2c21`), ordinal 27 on `42fd2c21` again. Read today the budget after click 17
+is 3; under F46 it is 2, as F43 meant. -/
+def d755c886Marks : List OtherInjuryMark := [.firstOccurrence, .firstOccurrence, .firstOccurrence, .repeat]
+
+theorem click16_repeatReadsAsNoInjury :
+    requeuesAfter spendsBudgetF43 (d755c886Marks.map causeReadToday) = 1 ∧
+      requeuesAfter spendsBudgetF43 (d755c886Marks.map causeF46) = 0 := by decide
+
+/-- Prediction for click 17 under the serving code: `(L append-requeue)` reads ordinal 27 with no
+other injury and appends ordinal 28 `:enacted`, `:requeues 3`, no `:requeue-cause`; F45 counts
+five `:enacted` entries at attempt 4 (16, 19, 22, 25, 28), so the phase is `:retry-requeue-4`, the
+click `wm-requeue-4-4-repair/239cf988…`, and the recur queues it. Under F46 ordinal 28 has
+`:requeues 2` and `:requeue-cause {:kind :other-open-injury :injury-id "injury/42fd2c21…"}`; the
+phase and click are the same. -/
+def d755c886ReceiptsAfter16 : Nat → Option Nat
+  | 1 => some 1
+  | 2 => some 2
+  | 3 => some 3
+  | _ => none
+
+theorem click17_predicted :
+    requeueNext (causeReadToday .repeat) 2 = .enacted 3 ∧
+      requeueNext (causeF46 .repeat) 2 = .enacted 2 ∧
+      recurF45 4 d755c886ReceiptsAfter16 = .queued := by decide
+
+/-- If click 17's child dies on `42fd2c21` again (zai-3 has now refused the same way twice),
+click 18 reads another repeat on `:requeues 3` and abandons `:retry-budget-spent`: the verdict
+`budgetSpent_noReopen` says no correction reopens, issued on a patch no child has tested. Under
+F46 the entry stays `:enacted` at 2. This is why F46 lands before click 17. -/
+theorem click18_wouldAbandonToday :
+    requeueNext (causeReadToday .repeat) 3 = .abandonedBudgetSpent ∧
+      requeueNext (causeF46 .repeat) 3 = .enacted 3 := by decide
+
+/-- Under F46 no run of other-injury children, first occurrences or repeats, spends the budget. -/
+theorem f46_repeatsSpendNothing (ms : List OtherInjuryMark)
+    (h : ∀ m ∈ ms, m ≠ .none) :
+    requeuesAfter spendsBudgetF43 (ms.map causeF46) = 0 := by
+  induction ms with
+  | nil => rfl
+  | cons m ms ih =>
+    have hm : m ≠ .none := h m (List.mem_cons_self ..)
+    have ih' := ih (fun x hx => h x (List.mem_cons_of_mem _ hx))
+    cases m <;> simp_all [requeuesAfter, causeF46, spendsBudgetF43]
+
 end DarkTower.WarMachine.SelfHealRoute
