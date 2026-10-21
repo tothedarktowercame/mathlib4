@@ -351,6 +351,14 @@ theorem k10_zero_column_not_admissible :
   have := h 0
   norm_num at this
 
+/-- K10, port form: every admissible G port has no all-zero column of A, so the
+H3 zero-column case (G = 0, the best score) cannot reach selection. -/
+theorem k10_port_has_no_zero_column {Policy : Type} (g : PolicyExpectedFreeEnergy Policy)
+    (x : Fin g.stateCount) : ¬ ∀ o, g.A o x = 0 := by
+  intro h
+  have := g.aNormalized x
+  simp [h] at this
+
 /- K6 negative type control (checked separately):
 example : Preference := examplePrediction 0
 Lean: Type mismatch
@@ -369,6 +377,7 @@ but is expected to have type
 #print axioms k8_waiting_G_top
 #print axioms k9_terminal_G_finite_and_sensitive
 #print axioms k10_zero_column_not_admissible
+#print axioms k10_port_has_no_zero_column
 
 end
 end DarkTower.WarMachine.R20Graph
