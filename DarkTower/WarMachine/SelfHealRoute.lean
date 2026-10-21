@@ -3222,7 +3222,7 @@ theorem click18_predictedRefined :
 
 /-! ### Rev 41: click 18; the reviewer prompt is EDN; the other-injury re-queue is unbounded -/
 
-/-- **Click 18 witness** (claude-2, 2026-10-21 01:50Z, taking over from claude-5; from claude-2's
+/-- **Click 18 witness** (claude-2, 2026-10-21 02:25Z, taking over from claude-5; from claude-2's
 own reading of job `invoke-1792545943115-228-d5d0ee7f` and ledger ordinals 20 to 33 by EDN reader).
 Parent: ordinal 31 `:enacted`, attempt 4, `:requeues 3`, `:retry-click "wm-requeue-5-4-…"`,
 `:requeue-cause {:kind :other-open-injury :injury-id "injury/a173047e…"}` at click 17's record pin
