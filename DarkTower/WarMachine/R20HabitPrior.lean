@@ -145,7 +145,7 @@ omit [Nonempty Policy] in
 /-- Over a carried run, click `i + 1`'s E
 is the habit prior of the counts after click `i`'s outcome. -/
 theorem run_E_reads_previous_outcome {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
+    {L : AffectiveLevel} {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified L relation c n)
     (hab : ℕ → TwoTickRecord Policy) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
     (hp : ∀ i ≤ n, (c i).records .precision = some (pr i))
@@ -163,7 +163,7 @@ omit [Nonempty Policy] in
 /-- A witnessed success of policy `π` at click `i` raises `π`'s E at click
 `i + 1`, whenever another policy holds positive count. -/
 theorem success_raises_next_E {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
+    {L : AffectiveLevel} {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified L relation c n)
     (hab : ℕ → TwoTickRecord Policy) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
     (hp : ∀ i ≤ n, (c i).records .precision = some (pr i))
@@ -181,7 +181,7 @@ omit [Nonempty Policy] in
 /-- A witnessed failure at click `i` leaves every policy's E at click `i + 1`
 where it was. -/
 theorem failure_keeps_next_E {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
+    {L : AffectiveLevel} {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified L relation c n)
     (hab : ℕ → TwoTickRecord Policy) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
     (hp : ∀ i ≤ n, (c i).records .precision = some (pr i))

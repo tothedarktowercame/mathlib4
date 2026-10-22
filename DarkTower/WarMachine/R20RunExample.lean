@@ -33,8 +33,10 @@ counts not updated (`countsNotUpdated_breaks_run`), a replayed run id
 (`replayedRun_breaks_run`).
 
 Not exercised here (claude-7's review): β never moves, since F is equal
-across policies, so the β carry is a constant matching a constant
-(`R20Run.posteriorBetaCarried_refused` covers carrying a moved β); the focus
+across policies, so the affective charge is zero and the valence belief stays
+`(1/2, 1/2)` under the flat level (rates 1, 1), with prior `β = 1` at both
+clicks; a valence that moves is `R20Run.example_valence_moves`, and carrying a
+moved β is refused by `R20Run.posteriorBetaCarried_refused`; the focus
 is kept in both clicks, so the `focusChanged` case is not reached; and the
 habit row only records a success, so a failure is never carried across a run.
 
@@ -197,7 +199,7 @@ def ports (run : RunId) (before : SlowState TwoPolicy) : Ports TwoPolicy :=
 /-- The click that starts from run id `run`, habit counts `before` and
 initial-state counts `d`. -/
 def clickAt (run : RunId) (before : SlowState TwoPolicy) (d : Hidden → ℝ) : Click TwoPolicy :=
-  ⟨records run before d, ports run before, selection, d⟩
+  ⟨records run before d, ports run before, selection, d, half⟩
 
 theorem clickAt_certified (run : RunId) (before : SlowState TwoPolicy) (d : Hidden → ℝ)
     (positive : ∀ π, 0 < habitE before π) :
@@ -263,6 +265,14 @@ theorem clickAt_prior (run : RunId) (before : SlowState TwoPolicy) (d : Hidden �
     (pos : ∀ s, 0 < d s) : PriorFromCounts (clickAt run before d) :=
   ⟨pos, fun r hr => by simp only [clickAt, records, Option.some.injEq] at hr; subst hr; rfl⟩
 
+/-- The prior `β = 1` is the flat level's rate, averaged over the even valence. -/
+theorem clickAt_beta (run : RunId) (before : SlowState TwoPolicy) (d : Hidden → ℝ) :
+    BetaFromValence flatLevel (clickAt run before d) := by
+  intro r hr
+  simp only [clickAt, records, Option.some.injEq] at hr
+  subst hr
+  norm_num [clickAt, precisionRow, descend, card_valence, flatLevel, half]
+
 /-! ## The two clicks -/
 
 def d0 : Hidden → ℝ := fun _ => 1
@@ -313,7 +323,7 @@ theorem positive0 (π : TwoPolicy) : 0 < habitE before0 π := by
 theorem positive1 (π : TwoPolicy) : 0 < habitE before1 π := by
   rw [habitE1]; cases π <;> norm_num
 
-theorem example_carries : Carries click0 click1 := by
+theorem example_carries : Carries flatLevel click0 click1 := by
   refine ⟨by decide, ?_, ?_, ?_, ?_⟩
   · intro ra rb ha hb
     simp only [click0, click1, clickAt, records, Option.some.injEq] at ha hb
@@ -321,21 +331,24 @@ theorem example_carries : Carries click0 click1 := by
   · intro ra ha
     simp only [click0, clickAt, records, Option.some.injEq] at ha
     subst ha; rfl
-  · intro ra rb ha hb
-    simp only [click0, click1, clickAt, records, Option.some.injEq] at ha hb
-    subst ha hb; rfl
+  · intro ra ha
+    simp only [click0, clickAt, records, Option.some.injEq] at ha
+    subst ha
+    exact (carried_half_flat
+      (by norm_num [affectiveEvidence, charge, flatLevel, precisionRow])).symm
   · intro sa sb ha hb
     simp only [click0, click1, clickAt, records, Option.some.injEq] at ha hb
     subst ha hb; rfl
 
 /-- Two clicks, each focus-certified with its prior read from its counts, the
 first carried into the second. -/
-theorem example_runCertified : RunCertified relationExample (clicks click1) 1 := by
+theorem example_runCertified : RunCertified flatLevel relationExample (clicks click1) 1 := by
   refine ⟨fun i hi => ?_, fun i hi => ?_⟩
   · rcases (by omega : i = 0 ∨ i = 1) with rfl | rfl
     · exact ⟨clickAt_focusCertified 0 before0 d0 positive0,
-        clickAt_prior 0 before0 d0 (fun _ => one_pos)⟩
-    · refine ⟨clickAt_focusCertified 1 before1 d1 positive1, clickAt_prior 1 before1 d1 ?_⟩
+        clickAt_prior 0 before0 d0 (fun _ => one_pos), clickAt_beta 0 before0 d0⟩
+    · refine ⟨clickAt_focusCertified 1 before1 d1 positive1, clickAt_prior 1 before1 d1 ?_,
+        clickAt_beta 1 before1 d1⟩
       intro s; rw [d1_eq]; dsimp only; split_ifs <;> norm_num
   · obtain rfl : i = 0 := by omega
     exact example_carries
@@ -376,14 +389,14 @@ the hand-over from click 0 is wrong. -/
 
 /-- Click 1 starts again from fresh habit counts. -/
 theorem habitReset_breaks_run :
-    ¬ RunCertified relationExample (clicks (clickAt 1 before0 d1)) 1 := by
+    ¬ RunCertified flatLevel relationExample (clicks (clickAt 1 before0 d1)) 1 := by
   intro run
   have := (run.2 0 (by omega)).habit _ _ rfl rfl
   exact habitRowOf_moves before0 .a this.symm
 
 /-- Click 1 starts from click 0's d. -/
 theorem countsNotUpdated_breaks_run :
-    ¬ RunCertified relationExample (clicks (clickAt 1 before1 d0)) 1 := by
+    ¬ RunCertified flatLevel relationExample (clicks (clickAt 1 before1 d0)) 1 := by
   intro run
   have := congrFun ((run.2 0 (by omega)).counts _ rfl) 0
   have p := congrFun posterior0 0
@@ -392,7 +405,7 @@ theorem countsNotUpdated_breaks_run :
 
 /-- Click 1 replays click 0's run id. -/
 theorem replayedRun_breaks_run :
-    ¬ RunCertified relationExample (clicks (clickAt 0 before1 d1)) 1 := by
+    ¬ RunCertified flatLevel relationExample (clicks (clickAt 0 before1 d1)) 1 := by
   intro run
   exact absurd (run.2 0 (by omega)).runAdvances (by decide)
 
