@@ -3,8 +3,8 @@ import Mathlib.Tactic
 /-!
 # Counts of what worked, carried from one tick to the next
 
-In plain terms: the agent keeps, for each class of action, a count of the times
-that class of action worked. A count changes only when an outcome was actually
+In plain terms: the agent keeps, for each policy, a count of the times that
+policy worked. A count changes only when an outcome was actually
 witnessed, it changes by exactly one, and the next decision is made with the
 updated counts, not the old ones.
 
@@ -19,7 +19,7 @@ This module is a specification. `advance` is the count update, and
 `TwoTickFeedback` is what a record of two consecutive ticks must satisfy: the
 outcome was witnessed, the counts after are exactly the update of the counts
 before, and the second tick used the counts after. It proves that an accepted
-record always changes the counts, changes no other class, and that no
+record always changes the counts, changes no other policy's, and that no
 unwitnessed outcome is ever accepted.
 
 Two things here are not from the cited sources. The requirement that the
@@ -28,10 +28,18 @@ happened and not to the model's own forecast. The second count, of failures,
 is carried in `BetaCounts.beta` and updated by a failure; the habit prior does
 not read it.
 
-Counts are natural numbers and an unlisted class starts at (1, 1). A state is
+Counts are kept per policy, as in the sources: Parr p. 209 caches "which
+policies are successful", and Friston et al. (2016) :675-678 count how often
+each policy was encountered. The key type is any type with decidable
+equality; `R20HabitPrior` keys the counts by the menu's `Policy`. (Until
+2026-10-22 the counts were keyed by an "action class", transcribed from the
+earlier implementation's per-class slow state; no cited source keeps habit
+counts by class, and Joe ruled the class layer out on 2026-10-22.)
+
+Counts are natural numbers and an unlisted policy starts at (1, 1). A state is
 a list of entries, and `TwoTickFeedback` compares lists, so two states holding
 the same entries in different orders are different here. Restating the clauses
-through `countsFor`, class by class, would remove that; it is not done.
+through `countsFor`, policy by policy, would remove that; it is not done.
 
 Nothing in the rebuilt decision code (futon2 `src/futon2/aif/wm/` and the
 namespaces it requires, read at `0f9587532`) computes or consumes these
@@ -40,7 +48,7 @@ counts. Code written for this must satisfy `TwoTickFeedback`.
 
 namespace DarkTower.WarMachine.R15TemporalHierarchy
 
-/-- The two counts kept for one class of action. -/
+/-- The two counts kept for one policy. -/
 structure BetaCounts where
   /-- One plus the number of witnessed successes. -/
   alpha : Nat
@@ -48,56 +56,58 @@ structure BetaCounts where
   beta : Nat
   deriving DecidableEq, Repr
 
-/-- The counts for finitely many classes of action, as class/count pairs. -/
-abbrev SlowState := List (Nat × BetaCounts)
+/-- The counts for finitely many policies, as policy/count pairs. -/
+abbrev SlowState (Key : Type) := List (Key × BetaCounts)
 
-/-- The counts of a class with no witnessed outcome yet: (1, 1). -/
+/-- The counts of a policy with no witnessed outcome yet: (1, 1). -/
 def freshCounts : BetaCounts := { alpha := 1, beta := 1 }
 
-/-- The counts of one class; an unlisted class has the fresh counts. -/
-def countsFor : SlowState → Nat → BetaCounts
+variable {Key : Type} [DecidableEq Key]
+
+/-- The counts of one policy; an unlisted policy has the fresh counts. -/
+def countsFor : SlowState Key → Key → BetaCounts
   | [], _ => freshCounts
-  | (key, counts) :: rest, actionClass =>
-      if key = actionClass then counts else countsFor rest actionClass
+  | (key, counts) :: rest, policy =>
+      if key = policy then counts else countsFor rest policy
 
-/-- Replace the counts of one class, appending the class if unlisted. -/
-def setCounts : SlowState → Nat → BetaCounts → SlowState
-  | [], actionClass, counts => [(actionClass, counts)]
-  | (key, prior) :: rest, actionClass, counts =>
-      if key = actionClass then (key, counts) :: rest
-      else (key, prior) :: setCounts rest actionClass counts
+/-- Replace the counts of one policy, appending the policy if unlisted. -/
+def setCounts : SlowState Key → Key → BetaCounts → SlowState Key
+  | [], policy, counts => [(policy, counts)]
+  | (key, prior) :: rest, policy, counts =>
+      if key = policy then (key, counts) :: rest
+      else (key, prior) :: setCounts rest policy counts
 
-theorem countsFor_setCounts_same (state : SlowState) (actionClass : Nat)
+theorem countsFor_setCounts_same (state : SlowState Key) (policy : Key)
     (counts : BetaCounts) :
-    countsFor (setCounts state actionClass counts) actionClass = counts := by
+    countsFor (setCounts state policy counts) policy = counts := by
   induction state with
   | nil => simp [setCounts, countsFor]
   | cons entry rest ih =>
       rcases entry with ⟨key, prior⟩
-      by_cases key = actionClass <;> simp [setCounts, countsFor, *]
+      by_cases key = policy <;> simp [setCounts, countsFor, *]
 
-theorem countsFor_setCounts_other (state : SlowState) (actionClass other : Nat)
-    (counts : BetaCounts) (different : other ≠ actionClass) :
-    countsFor (setCounts state actionClass counts) other = countsFor state other := by
+theorem countsFor_setCounts_other (state : SlowState Key) (policy other : Key)
+    (counts : BetaCounts) (different : other ≠ policy) :
+    countsFor (setCounts state policy counts) other = countsFor state other := by
   induction state with
   | nil =>
-      have reverse : actionClass ≠ other := Ne.symm different
+      have reverse : policy ≠ other := Ne.symm different
       simp [setCounts, countsFor, reverse]
   | cons entry rest ih =>
       rcases entry with ⟨key, prior⟩
-      by_cases target : key = actionClass
+      by_cases target : key = policy
       · subst key
-        have reverse : actionClass ≠ other := Ne.symm different
+        have reverse : policy ≠ other := Ne.symm different
         simp [setCounts, countsFor, reverse]
       · by_cases observed : key = other
         · subst key
           simp [setCounts, countsFor, target]
         · simp [setCounts, countsFor, target, observed, ih]
 
-/-- One outcome of the fast loop: the class of action taken, whether the
-outcome was witnessed, and whether it succeeded. -/
-structure FastOutcome where
-  actionClass : Nat
+/-- One outcome of the fast loop: the policy taken, whether the outcome was
+witnessed, and whether it succeeded. -/
+structure FastOutcome (Key : Type) where
+  policy : Key
   witnessed : Bool
   succeeded : Bool
   deriving DecidableEq, Repr
@@ -107,39 +117,39 @@ def updatedCounts (prior : BetaCounts) (succeeded : Bool) : BetaCounts :=
   if succeeded then { prior with alpha := prior.alpha + 1 }
   else { prior with beta := prior.beta + 1 }
 
-/-- Fold one fast outcome into its action class. Witness admission is kept in
+/-- Fold one fast outcome into its policy's counts. Witness admission is kept in
 `TwoTickFeedback`; the arithmetic function is total so rejected controls can
 still state what their untrusted payload claimed. -/
-def advance (before : SlowState) (outcome : FastOutcome) : SlowState :=
-  setCounts before outcome.actionClass
-    (updatedCounts (countsFor before outcome.actionClass) outcome.succeeded)
+def advance (before : SlowState Key) (outcome : FastOutcome Key) : SlowState Key :=
+  setCounts before outcome.policy
+    (updatedCounts (countsFor before outcome.policy) outcome.succeeded)
 
 /-- The retained two-tick carrier. `before` and `after` stand for
 `:slow-state-before` and `:slow-state-after`; `outcome` for the independently
 witnessed fast result; and `nextConsumed` for
 `:next-tick-consumed-slow-state`. -/
-structure TwoTickRecord where
-  before : SlowState
-  outcome : FastOutcome
-  after : SlowState
-  nextConsumed : SlowState
+structure TwoTickRecord (Key : Type) where
+  before : SlowState Key
+  outcome : FastOutcome Key
+  after : SlowState Key
+  nextConsumed : SlowState Key
   deriving DecidableEq, Repr
 
 /-- R15's role, stated without the checker: only a witnessed fast outcome may
 update the slow state, the retained after-state is the exact update, and the
 next fast tick consumes that updated slow state. -/
-def TwoTickFeedback (record : TwoTickRecord) : Prop :=
+def TwoTickFeedback (record : TwoTickRecord Key) : Prop :=
   record.outcome.witnessed = true ∧
   record.after = advance record.before record.outcome ∧
   record.nextConsumed = record.after
 
 /-- Executable checker for the retained two-tick correspondence. -/
-def checkTwoTickFeedback (record : TwoTickRecord) : Bool :=
+def checkTwoTickFeedback (record : TwoTickRecord Key) : Bool :=
   record.outcome.witnessed &&
   decide (record.after = advance record.before record.outcome) &&
   decide (record.nextConsumed = record.after)
 
-theorem checkTwoTickFeedback_eq_true_iff (record : TwoTickRecord) :
+theorem checkTwoTickFeedback_eq_true_iff (record : TwoTickRecord Key) :
     checkTwoTickFeedback record = true ↔ TwoTickFeedback record := by
   simp [checkTwoTickFeedback, TwoTickFeedback, and_assoc]
 
@@ -152,32 +162,32 @@ theorem updatedCounts_ne (prior : BetaCounts) (succeeded : Bool) :
   · have counts := congrArg BetaCounts.alpha unchanged
     simp [updatedCounts] at counts
 
-theorem advance_ne_before (before : SlowState) (outcome : FastOutcome) :
+theorem advance_ne_before (before : SlowState Key) (outcome : FastOutcome Key) :
     advance before outcome ≠ before := by
   intro unchanged
-  have observed := congrArg (fun state => countsFor state outcome.actionClass) unchanged
+  have observed := congrArg (fun state => countsFor state outcome.policy) unchanged
   unfold advance at observed
   rw [countsFor_setCounts_same] at observed
-  exact updatedCounts_ne (countsFor before outcome.actionClass) outcome.succeeded observed
+  exact updatedCounts_ne (countsFor before outcome.policy) outcome.succeeded observed
 
 /-- Every accepted record changes the slow state; the certificate's inequality
 is derived from the one-count update rather than trusted as an extra flag. -/
-theorem accepted_before_ne_after (record : TwoTickRecord)
+theorem accepted_before_ne_after (record : TwoTickRecord Key)
     (accepted : TwoTickFeedback record) : record.before ≠ record.after := by
   rw [accepted.2.1]
   exact (advance_ne_before record.before record.outcome).symm
 
-/-- Updating one class leaves the Beta counts of every other class unchanged. -/
-theorem accepted_other_class_unchanged (record : TwoTickRecord)
-    (accepted : TwoTickFeedback record) (other : Nat)
-    (different : other ≠ record.outcome.actionClass) :
+/-- Updating one policy leaves the Beta counts of every other policy unchanged. -/
+theorem accepted_other_policy_unchanged (record : TwoTickRecord Key)
+    (accepted : TwoTickFeedback record) (other : Key)
+    (different : other ≠ record.outcome.policy) :
     countsFor record.after other = countsFor record.before other := by
   rw [accepted.2.1]
   exact countsFor_setCounts_other _ _ _ _ different
 
 /-- Universally, no unwitnessed outcome is accepted, regardless of any of the
 three supplied slow states. -/
-theorem unwitnessed_never_accepted (record : TwoTickRecord)
+theorem unwitnessed_never_accepted (record : TwoTickRecord Key)
     (unwitnessed : record.outcome.witnessed = false) :
     ¬ TwoTickFeedback record := by
   intro accepted
@@ -185,12 +195,14 @@ theorem unwitnessed_never_accepted (record : TwoTickRecord)
   rw [unwitnessed] at witnessed
   exact Bool.noConfusion witnessed
 
-def initialState : SlowState := [(10, { alpha := 2, beta := 3 }), (20, { alpha := 4, beta := 5 })]
-def successOutcome : FastOutcome := { actionClass := 10, witnessed := true, succeeded := true }
-def failureOutcome : FastOutcome := { actionClass := 20, witnessed := true, succeeded := false }
+/-! Examples with policies numbered 10 and 20. -/
+
+def initialState : SlowState Nat := [(10, { alpha := 2, beta := 3 }), (20, { alpha := 4, beta := 5 })]
+def successOutcome : FastOutcome Nat := { policy := 10, witnessed := true, succeeded := true }
+def failureOutcome : FastOutcome Nat := { policy := 20, witnessed := true, succeeded := false }
 
 /-- Positive witnessed-success record. -/
-def successRecord : TwoTickRecord :=
+def successRecord : TwoTickRecord Nat :=
   { before := initialState
     outcome := successOutcome
     after := advance initialState successOutcome
@@ -201,7 +213,7 @@ theorem successRecord_is_feedback : TwoTickFeedback successRecord := by
   decide
 
 /-- Positive witnessed-failure record. -/
-def failureRecord : TwoTickRecord :=
+def failureRecord : TwoTickRecord Nat :=
   { before := initialState
     outcome := failureOutcome
     after := advance initialState failureOutcome
@@ -213,7 +225,7 @@ theorem failureRecord_is_feedback : TwoTickFeedback failureRecord := by
 
 /-- Control A: arithmetic and consumption agree, but the outcome was not
 witnessed. -/
-def unwitnessedRecord : TwoTickRecord :=
+def unwitnessedRecord : TwoTickRecord Nat :=
   let outcome := { successOutcome with witnessed := false }
   { before := initialState, outcome := outcome,
     after := advance initialState outcome, nextConsumed := advance initialState outcome }
@@ -222,7 +234,7 @@ theorem unwitnessedRecord_is_rejected : ¬ TwoTickFeedback unwitnessedRecord :=
   unwitnessed_never_accepted unwitnessedRecord (by decide)
 
 /-- Control B: the update is correct, but the next tick consumed stale state. -/
-def staleConsumptionRecord : TwoTickRecord :=
+def staleConsumptionRecord : TwoTickRecord Nat :=
   { successRecord with nextConsumed := initialState }
 
 theorem staleConsumptionRecord_is_rejected : ¬ TwoTickFeedback staleConsumptionRecord := by
@@ -232,14 +244,14 @@ theorem staleConsumptionRecord_is_rejected : ¬ TwoTickFeedback staleConsumption
   change staleConsumptionRecord.before = staleConsumptionRecord.after at consumed
   exact changed consumed
 
-/-- Control C: after-state changed, but by updating another class rather than
-the witnessed outcome's class. Consumption faithfully carries that wrong state. -/
-def wrongClassState : SlowState :=
+/-- Control C: after-state changed, but by updating another policy rather than
+the witnessed outcome's policy. Consumption faithfully carries that wrong state. -/
+def wrongPolicyState : SlowState Nat :=
   setCounts initialState 20 (updatedCounts (countsFor initialState 20) true)
 
-def wrongUpdateRecord : TwoTickRecord :=
+def wrongUpdateRecord : TwoTickRecord Nat :=
   { before := initialState, outcome := successOutcome,
-    after := wrongClassState, nextConsumed := wrongClassState }
+    after := wrongPolicyState, nextConsumed := wrongPolicyState }
 
 theorem wrongUpdateRecord_after_changed : wrongUpdateRecord.after ≠ wrongUpdateRecord.before := by
   decide
@@ -247,7 +259,7 @@ theorem wrongUpdateRecord_after_changed : wrongUpdateRecord.after ≠ wrongUpdat
 theorem wrongUpdateRecord_is_rejected : ¬ TwoTickFeedback wrongUpdateRecord := by
   intro accepted
   have arithmetic := accepted.2.1
-  norm_num [wrongUpdateRecord, wrongClassState, advance, initialState, successOutcome,
+  norm_num [wrongUpdateRecord, wrongPolicyState, advance, initialState, successOutcome,
     setCounts, countsFor, updatedCounts] at arithmetic
 
 end DarkTower.WarMachine.R15TemporalHierarchy

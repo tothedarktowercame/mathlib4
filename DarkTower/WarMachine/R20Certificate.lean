@@ -205,7 +205,7 @@ def InteroceptionConforms (r : InteroceptionRow) : Prop :=
 def NodeRecord (Policy : Type) : Node → Type
   | .precision => PrecisionFromObservation.TickRecord Policy
   | .evidence => EvidenceRow
-  | .habit => R15TemporalHierarchy.TwoTickRecord
+  | .habit => R15TemporalHierarchy.TwoTickRecord Policy
   | .classPreference => ClassPreferenceRow
   | .strategicFocus => StrategicFocusRow
   | .liveness => LiveRow
@@ -351,7 +351,7 @@ theorem evidence_state_independent_is_unchanged (r : EvidenceRow)
   simp [caseOf, h.trans unchanged]
 
 omit [Fintype Policy] [Nonempty Policy] in
-theorem failed_habit_is_unchanged (r : R15TemporalHierarchy.TwoTickRecord)
+theorem failed_habit_is_unchanged (r : R15TemporalHierarchy.TwoTickRecord Policy)
     (failed : r.outcome.succeeded = false) :
     caseOf (Policy := Policy) .habit r = .habit .unchanged := by
   simp [caseOf, failed]
@@ -604,11 +604,14 @@ theorem evidence_control_disagrees (records : Records Policy)
   refused_row_disagrees records .evidence badEvidence present badEvidence_refused
 
 omit [Nonempty Policy] in
+/-- The habit control: a row whose outcome was not witnessed disagrees, whatever
+its counts. -/
 theorem habit_control_disagrees (records : Records Policy)
-    (present : records .habit = some R15TemporalHierarchy.unwitnessedRecord) :
-    certify records .habit =
-      .disagrees (caseOf (Policy := Policy) .habit R15TemporalHierarchy.unwitnessedRecord) :=
-  refused_row_disagrees records .habit _ present R15TemporalHierarchy.unwitnessedRecord_is_rejected
+    (r : R15TemporalHierarchy.TwoTickRecord Policy) (present : records .habit = some r)
+    (unwitnessed : r.outcome.witnessed = false) :
+    certify records .habit = .disagrees (caseOf .habit r) :=
+  refused_row_disagrees records .habit r present
+    (R15TemporalHierarchy.unwitnessed_never_accepted r unwitnessed)
 
 omit [Nonempty Policy] in
 theorem class_control_disagrees (records : Records Policy)

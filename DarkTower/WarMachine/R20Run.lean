@@ -110,10 +110,11 @@ theorem row_of_certified {relation : Target → Target → TargetRelation} {c : 
 
 /-! ## Habit counts -/
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- The fold, stated on the rows: if each row is R15 feedback and each click
 consumes the previous click's slow state, the last after-state is every
 outcome folded into the first before-state. -/
-theorem habit_fold (hab : ℕ → TwoTickRecord) (n : ℕ)
+theorem habit_fold (hab : ℕ → TwoTickRecord Policy) (n : ℕ)
     (feedback : ∀ i ≤ n, TwoTickFeedback (hab i))
     (carried : ∀ i < n, (hab (i + 1)).before = (hab i).nextConsumed) :
     (hab n).after =
@@ -130,7 +131,7 @@ theorem habit_fold (hab : ℕ → TwoTickRecord) (n : ℕ)
 omit [Nonempty Policy] in
 theorem run_habit_accumulates {relation : Target → Target → TargetRelation}
     {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
-    (hab : ℕ → TwoTickRecord) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i)) :
+    (hab : ℕ → TwoTickRecord Policy) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i)) :
     (hab n).after =
       ((List.range (n + 1)).map fun i => (hab i).outcome).foldl advance (hab 0).before := by
   apply habit_fold hab n
@@ -258,7 +259,7 @@ Two clicks with the habit, evidence, precision and strategic rows present.
 The other rows are absent: `Carries` is about the four rows that cross the
 boundary, and a certified run supplies all of them (`row_of_certified`). -/
 
-def rows (h : TwoTickRecord) (e : EvidenceRow)
+def rows (h : TwoTickRecord Policy) (e : EvidenceRow)
     (p : PrecisionFromObservation.TickRecord Policy) (s : StrategicFocusRow) : Records Policy
   | .habit => some h
   | .evidence => some e
@@ -276,23 +277,35 @@ def selection0 : OuterSelection := ⟨[⟨7, 1⟩], ⟨7, 1⟩⟩
 
 def counts0 : Hidden → ℝ := fun _ => 1
 
+open PrecisionFromObservation (TwoPolicy)
+
+/-- Habit counts before click 0: policy `a` (2, 3), policy `b` (4, 5). -/
+def habitStart : SlowState TwoPolicy := [(.a, ⟨2, 3⟩), (.b, ⟨4, 5⟩)]
+def successA : FastOutcome TwoPolicy := ⟨.a, true, true⟩
+def failureB : FastOutcome TwoPolicy := ⟨.b, true, false⟩
+
+/-- Click 0's habit row: a witnessed success of policy `a`. -/
+def habit0 : TwoTickRecord TwoPolicy :=
+  { before := habitStart, outcome := successA
+    after := advance habitStart successA, nextConsumed := advance habitStart successA }
+
 /-- Click 0: focus 7, posterior certain of state 0, `β` moved from 1 to 1/2. -/
-def click0 : Click PrecisionFromObservation.TwoPolicy :=
-  ⟨rows successRecord (evidenceAt (fun _ => 1 / 2) (pointMass 0)) (precisionAt 1 (1 / 2))
+def click0 : Click TwoPolicy :=
+  ⟨rows habit0 (evidenceAt (fun _ => 1 / 2) (pointMass 0)) (precisionAt 1 (1 / 2))
     ⟨7, tickAt 7 [7]⟩, R20Graph.goodPorts 0, selection0, counts0⟩
 
 /-- The successor that click 0 hands on. -/
-def nextHabit : TwoTickRecord :=
-  { before := successRecord.nextConsumed, outcome := failureOutcome
-    after := advance successRecord.nextConsumed failureOutcome
-    nextConsumed := advance successRecord.nextConsumed failureOutcome }
+def nextHabit : TwoTickRecord TwoPolicy :=
+  { before := habit0.nextConsumed, outcome := failureB
+    after := advance habit0.nextConsumed failureB
+    nextConsumed := advance habit0.nextConsumed failureB }
 
-def click1With (h : TwoTickRecord) (d : Hidden → ℝ) (betaPrior : ℝ) (previousFocus : Target)
-    (run : R20Graph.RunId) : Click PrecisionFromObservation.TwoPolicy :=
+def click1With (h : TwoTickRecord TwoPolicy) (d : Hidden → ℝ) (betaPrior : ℝ)
+    (previousFocus : Target) (run : R20Graph.RunId) : Click TwoPolicy :=
   ⟨rows h (evidenceAt (fun s => d s / ∑ x, d x) (pointMass 0)) (precisionAt betaPrior 1)
     ⟨previousFocus, tickAt 3 [3]⟩, R20Graph.goodPorts run, selection0, d⟩
 
-def click1 : Click PrecisionFromObservation.TwoPolicy :=
+def click1 : Click TwoPolicy :=
   click1With nextHabit (counts0 + pointMass 0) 1 7 1
 
 theorem example_carries : Carries click0 click1 := by
@@ -321,12 +334,12 @@ theorem click1_prior : PriorFromCounts click1 := by
 
 /-- Habit counts reset to the first click's before-state. -/
 theorem habitReset_refused :
-    ¬ Carries click0 (click1With { nextHabit with before := initialState }
+    ¬ Carries click0 (click1With { nextHabit with before := habitStart }
       (counts0 + pointMass 0) 1 7 1) := by
   intro h
   have := h.habit _ _ rfl rfl
-  simp only [successRecord] at this
-  exact advance_ne_before initialState successOutcome this.symm
+  simp only [habit0] at this
+  exact advance_ne_before habitStart successA this.symm
 
 /-- The counts not updated: click 1 starts from click 0's d. -/
 theorem countsNotUpdated_refused : ¬ Carries click0 (click1With nextHabit counts0 1 7 1) := by

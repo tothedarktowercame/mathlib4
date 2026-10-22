@@ -142,18 +142,18 @@ theorem process_evidence_can_move_belief :
 /-! ## One observation-free step changes nothing -/
 
 /-- What a tick can change: the belief over hidden states, the policy
-temperature, and the counts of what worked. -/
-structure EpistemicState (State Class : Type*) where
+temperature, and the counts of what worked, per policy. -/
+structure EpistemicState (State Policy : Type*) where
   belief : Belief State
   temperature : ℝ
-  counts : Class → R15TemporalHierarchy.BetaCounts
+  counts : Policy → R15TemporalHierarchy.BetaCounts
 
 /-- The state after one tick that conditions the belief on `o`, applies the
 precision update with per-policy free energy `F`, and admits no outcome into
 the counts. -/
-def afterTick {Class Policy : Type*} [Fintype Policy] [Nonempty Policy]
-    (before : EpistemicState State Class) (A : Likelihood State Observation)
-    (o : Observation) (beta : ℝ) (G F : Policy → ℝ) : EpistemicState State Class :=
+def afterTick {Policy : Type*} [Fintype Policy] [Nonempty Policy]
+    (before : EpistemicState State Policy) (A : Likelihood State Observation)
+    (o : Observation) (beta : ℝ) (G F : Policy → ℝ) : EpistemicState State Policy :=
   { belief := posterior before.belief A o
     temperature := beta
     counts := before.counts }
@@ -162,8 +162,8 @@ def afterTick {Class Policy : Type*} [Fintype Policy] [Nonempty Policy]
 same in every state and the per-policy free energy is the same for every
 policy, the tick leaves the whole state exactly where it was. -/
 theorem uninformative_tick_changes_nothing
-    {Class Policy : Type*} [Fintype Policy] [Nonempty Policy]
-    (before : EpistemicState State Class) (A : Likelihood State Observation)
+    {Policy : Type*} [Fintype Policy] [Nonempty Policy]
+    (before : EpistemicState State Policy) (A : Likelihood State Observation)
     (o : Observation) (normal : ∑ s, before.belief s = 1)
     (c : ℝ) (hc : 0 < c) (constantA : ∀ s, A s o = c)
     (E G : Policy → ℝ) (f beta : ℝ) (hprior : 0 < before.temperature)
@@ -178,7 +178,7 @@ theorem uninformative_tick_changes_nothing
 
 /-- An outcome that was not witnessed is never admitted into the counts. -/
 theorem unwitnessed_outcome_teaches_nothing
-    (slow : R15TemporalHierarchy.TwoTickRecord)
+    {Key : Type} [DecidableEq Key] (slow : R15TemporalHierarchy.TwoTickRecord Key)
     (unwitnessed : slow.outcome.witnessed = false) :
     ¬ R15TemporalHierarchy.TwoTickFeedback slow :=
   R15TemporalHierarchy.unwitnessed_never_accepted slow unwitnessed
@@ -187,9 +187,9 @@ open Classical in
 /-- Such a tick is not live in the sense of `R10ScheduledEntrypoint`, whatever
 label it was given: its state after is its state before. -/
 theorem uninformative_tick_is_not_live
-    {Class Policy : Type} {State : Type} [Fintype State] [Nonempty State]
+    {Policy : Type} {State : Type} [Fintype State] [Nonempty State]
     {Observation : Type} [Fintype Policy] [Nonempty Policy]
-    (before : EpistemicState State Class) (A : Likelihood State Observation)
+    (before : EpistemicState State Policy) (A : Likelihood State Observation)
     (o : Observation) (normal : ∑ s, before.belief s = 1)
     (c : ℝ) (hc : 0 < c) (constantA : ∀ s, A s o = c)
     (E G : Policy → ℝ) (f beta : ℝ) (hprior : 0 < before.temperature)
@@ -199,7 +199,7 @@ theorem uninformative_tick_is_not_live
       ({ beforeState := before
          afterState := afterTick before A o beta G (fun _ => f)
          reportedLive := label } :
-        R10ScheduledEntrypoint.TickOutcome (EpistemicState State Class)) := by
+        R10ScheduledEntrypoint.TickOutcome (EpistemicState State Policy)) := by
   simp only [R10ScheduledEntrypoint.LiveTick, R10ScheduledEntrypoint.ChangedState,
     uninformative_tick_changes_nothing before A o normal c hc constantA E G f beta hprior fixed]
   simp

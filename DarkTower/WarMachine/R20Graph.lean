@@ -10,10 +10,10 @@ model's predicted class probabilities. Post-observation inference emits F
 defined from its frozen-policy tick inputs by H1, not a free score.
 See S2-authority-ledger.md, "Settlement from the publications" (2026-10-21).
 
-Habit row → selection's E is NOT declared: no cited publication supplies a map
-from class-grain habit counts to policy-indexed E. `R20HabitPrior` ties the
-precision row's E to the habit row's counts as a condition on one click, for
-menus with one policy per class, where the two grains coincide. Class preference supplies
+Habit row → selection's E is not declared as an edge here. The habit counts
+are per policy (`R15TemporalHierarchy`), and `R20HabitPrior` ties the precision
+row's E to the habit row's counts as a condition on one click; declaring the
+edge (and its witness entry) is not done yet. Class preference supplies
 the tick schedule C to selection; selection computes H3's risk plus ambiguity.
 
 Preference is at the class grain because the existing risk row consumes CTau's
