@@ -132,6 +132,67 @@ theorem never_enabled_contributes_nothing {ι V : Type*} [Fintype ι] [Decidable
 
 /-! ### Positive-probability less-tried control -/
 
+/-! ## (b) in general: more evidence on a pattern never raises expected novelty -/
+
+private theorem novelty_le_of_total_le (a b c d : ℝ) (ha : 0 < a) (hb : 0 < b)
+    (hc : 0 < c) (hd : 0 < d) (h : a + b ≤ c + d) : novelty c d ≤ novelty a b := by
+  rw [novelty_eq a b ha hb, novelty_eq c d hc hd]
+  apply one_div_le_one_div_of_le
+  · positivity
+  · linarith
+
+/-- Pointwise larger total counts give no more expected novelty at any epoch. -/
+theorem expectedNovelty_antitone {ι V : Type*} [Fintype ι] [DecidableEq ι]
+    [Fintype V] [DecidableEq V] (pat : ι → InterpretedPattern V)
+    (c c' : ι → ℝ × ℝ) (hc : ∀ p, 0 < (c p).1 ∧ 0 < (c p).2)
+    (hc' : ∀ p, 0 < (c' p).1 ∧ 0 < (c' p).2)
+    (hle : ∀ p, (c p).1 + (c p).2 ≤ (c' p).1 + (c' p).2)
+    (initial : ProbabilityKernel Unit (Finset V)) (tau : ℕ) :
+    expectedNovelty pat c' initial tau ≤ expectedNovelty pat c initial tau := by
+  unfold expectedNovelty
+  apply Finset.sum_le_sum
+  intro s _
+  apply mul_le_mul_of_nonneg_left _ ((prediction initial (coKernel pat) tau).nonnegative () s)
+  apply Finset.sum_le_sum
+  intro p _
+  exact novelty_le_of_total_le _ _ _ _ (hc p).1 (hc p).2 (hc' p).1 (hc' p).2 (hle p)
+
+/-- The general form of (b). Two candidates share dynamics, and the second has
+pointwise no fewer counts. If, at some epoch, a state of positive predicted mass
+enables a pattern with strictly more counts, the first (less-tried) candidate has
+strictly larger total novelty, and so strictly lower `scoreCascadeCoN` at equal
+`scoreCascadeCo`. -/
+theorem totalNovelty_strict {ι V : Type*} [Fintype ι] [DecidableEq ι]
+    [Fintype V] [DecidableEq V] (pat : ι → InterpretedPattern V)
+    (c c' : ι → ℝ × ℝ) (hc : ∀ p, 0 < (c p).1 ∧ 0 < (c p).2)
+    (hc' : ∀ p, 0 < (c' p).1 ∧ 0 < (c' p).2)
+    (hle : ∀ p, (c p).1 + (c p).2 ≤ (c' p).1 + (c' p).2)
+    (initial : ProbabilityKernel Unit (Finset V)) (H : ℕ)
+    (t : Fin H) (s : Finset V) (p : ι)
+    (hmass : 0 < (prediction initial (coKernel pat) t.val).mass () s)
+    (hp : p ∈ enabledFrontier pat (containmentOrder pat) s)
+    (hlt : (c p).1 + (c p).2 < (c' p).1 + (c' p).2) :
+    totalNovelty pat c' initial H < totalNovelty pat c initial H := by
+  unfold totalNovelty
+  apply Finset.sum_lt_sum
+  · intro τ _
+    exact expectedNovelty_antitone pat c c' hc hc' hle initial τ.val
+  · refine ⟨t, Finset.mem_univ _, ?_⟩
+    unfold expectedNovelty
+    apply Finset.sum_lt_sum
+    · intro x _
+      apply mul_le_mul_of_nonneg_left _ ((prediction initial (coKernel pat) t.val).nonnegative () x)
+      apply Finset.sum_le_sum
+      intro q _
+      exact novelty_le_of_total_le _ _ _ _ (hc q).1 (hc q).2 (hc' q).1 (hc' q).2 (hle q)
+    · refine ⟨s, Finset.mem_univ _, ?_⟩
+      apply mul_lt_mul_of_pos_left _ hmass
+      apply Finset.sum_lt_sum
+      · intro q _
+        exact novelty_le_of_total_le _ _ _ _ (hc q).1 (hc q).2 (hc' q).1 (hc' q).2 (hle q)
+      · exact ⟨p, hp, novelty_lt_of_total_lt _ _ _ _ (hc p).1 (hc p).2 (hc' p).1 (hc' p).2 hlt⟩
+
+
 def onePattern : Unit → InterpretedPattern Bool := fun _ =>
   { consumes := ∅, produces := {false}, forbids := ∅, theta := 1
     theta_nonneg := by norm_num, theta_le_one := by norm_num }
@@ -214,6 +275,8 @@ theorem compareAtHorizonN_uses_H {ι V : Type*} [Fintype ι] [DecidableEq ι]
     compareAtHorizonN H cands =
       cands.map (fun candidate => scoreCascadeCoN candidate H (classKernel H)) := rfl
 
+#print axioms expectedNovelty_antitone
+#print axioms totalNovelty_strict
 #print axioms scoreCascadeCoN_le_scoreCascadeCo
 #print axioms less_tried_positive_fire_lower_G
 #print axioms never_enabled_contributes_nothing
