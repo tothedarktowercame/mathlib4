@@ -14,8 +14,9 @@ by `CascadeScoringExamples`.  The modelling choice is that the same
 `policyKernel` preserves the selected pattern's finite support; `listKernel`
 uses full finite support.  Thus the bridge proves equality of all transition
 masses, rather than a false structural equality of support representations.
-Lifting that mass relation through `prediction`, support-sensitive risk
-admission, and `CascadeEFE.scoreCascade` is intentionally not claimed here.
+The lift through `prediction`, risk admission and `CascadeEFE.scoreCascade` is
+`scoreCascadeCo_toOption_eq_scoreCascade_of_chain` below (added in claude-7's review):
+every quantity the score reads depends on the transition only through its masses.
 -/
 
 namespace DarkTower.WarMachine.CascadeCoApplyGBridge
@@ -108,6 +109,96 @@ theorem co_mass_eq_policyKernel_of_chain {ι V : Type} [Fintype ι] [DecidableEq
   rw [coKernel_eq_listKernel_of_chain pat precedence hchain]
   exact hmass.symm
 
+/-! ## Lifting the mass bridge to the score (claude-7, review)
+
+Everything `totalG` reads depends on the transition only through its masses:
+`push` and `prediction` (after epoch 0) are `finiteKernel`s built from masses,
+`risk` and `ambiguity` are mass sums, and the support that `riskAdmissible` reads
+is the support of a `push`. So equal transition masses give equal scores, whatever
+support lists the two transition kernels carry. -/
+
+theorem push_mass_congr {X Y : Type*} [Fintype X] [Fintype Y]
+    (q : ProbabilityKernel Unit X) (b b' : ProbabilityKernel X Y)
+    (h : ∀ x y, b.mass x y = b'.mass x y) : push q b = push q b' := by
+  have hf : (fun (_ : Unit) y => ∑ x, q.mass () x * b.mass x y) =
+      (fun (_ : Unit) y => ∑ x, q.mass () x * b'.mass x y) := by
+    funext _ y; simp [h]
+  unfold push
+  congr 1
+
+theorem prediction_mass_congr {X : Type*} [Fintype X]
+    (q : ProbabilityKernel Unit X) (b b' : ProbabilityKernel X X)
+    (h : ∀ x y, b.mass x y = b'.mass x y) : ∀ t, prediction q b t = prediction q b' t
+  | 0 => rfl
+  | t + 1 => by
+    show push (prediction q b t) b = push (prediction q b' t) b'
+    rw [prediction_mass_congr q b b' h t]
+    exact push_mass_congr _ b b' h
+
+/-- The legacy policy kernel does not read the observation channel, so the
+candidate's model and the token model give the same transition. -/
+theorem policyKernel_candidate_eq {ι V : Type} [Fintype ι] [DecidableEq ι]
+    [Fintype V] [DecidableEq V] (pat : ι → InterpretedPattern V) (candidate : Candidate ι V)
+    (start : Finset V) (goal : V) (pi : Policy ι) :
+    policyKernel (modelOfCandidate pat candidate) pi = policyKernel (modelOf pat start goal) pi := by
+  have hres : ∀ l, resolve (modelOfCandidate pat candidate) l = resolve (modelOf pat start goal) l := by
+    intro l
+    induction l with
+    | nil => rfl
+    | cons p ps ih => rw [resolve, resolve, ih]; rfl
+  have hch : ∀ bs (x : Finset V), choose (modelOfCandidate pat candidate) bs x =
+      choose (modelOf pat start goal) bs x := by
+    intro bs x
+    induction bs with
+    | nil => rfl
+    | cons pb rest ih =>
+      obtain ⟨p, b⟩ := pb
+      rw [choose, choose, ih]; rfl
+  unfold policyKernel
+  rw [hres]
+  cases resolve (modelOf pat start goal) (firing pi) with
+  | none => rfl
+  | some bs => simp only [hch]
+
+/-- **The bridge at the score.** On a chain, the co-application score and the real
+`CascadeEFE.scoreCascade` give the same value, and refuse together (on a chain, the
+only refusal either can make is inadmissible risk). -/
+theorem scoreCascadeCo_toOption_eq_scoreCascade_of_chain {ι V : Type} [Fintype ι]
+    [DecidableEq ι] [Fintype V] [DecidableEq V]
+    (candidate : Candidate ι V) (pat : ι → InterpretedPattern V)
+    (hp : candidate.patterns = some pat) (acyclic : acyclicDescent (containmentOrder pat))
+    (precedence : List ι)
+    (hchain : Proof2.CoApplicationKernel.chainCondition pat (containmentOrder pat)
+      (precedence.map pat)) (start : Finset V) (goal : V) (H : ℕ)
+    (c : Fin H → ProbabilityKernel Unit CTauClassPreference.EndingClass) :
+    (scoreCascadeCo candidate H c).toOption =
+      (CascadeEFE.scoreCascade (modelOfCandidate pat candidate)
+        (policyOf pat acyclic precedence) H c).toOption := by
+  classical
+  obtain ⟨b, hb, -⟩ := co_mass_eq_policyKernel_of_chain pat start goal acyclic precedence
+    hchain ∅ ∅
+  have hmass : ∀ x y, (coKernel pat).mass x y = b.mass x y := fun x y => by
+    obtain ⟨b', hb', hm⟩ := co_mass_eq_policyKernel_of_chain pat start goal acyclic precedence
+      hchain x y
+    rw [hb] at hb'; cases hb'; exact hm
+  have hpred := prediction_mass_congr candidate.initial (coKernel pat) b hmass
+  have hb2 : policyKernel (modelOfCandidate pat candidate) (policyOf pat acyclic precedence) =
+      some b := by rw [policyKernel_candidate_eq pat candidate start goal]; exact hb
+  unfold scoreCascadeCo CascadeEFE.scoreCascade scoreWithKernel
+  simp only [hp, acyclic, dite_true, hb2]
+  show (if h : ∀ t : Fin H, PreferenceRiskSeparation.riskAdmissible
+      (push (prediction candidate.initial (coKernel pat) (t.val + 1)) candidate.observation) (c t)
+      then Except.ok (totalG candidate.initial (coKernel pat) candidate.observation H c h)
+      else Except.error CascadeCoApplyG.Refusal.inadmissibleRisk).toOption =
+    (if h : ∀ t : Fin H, PreferenceRiskSeparation.riskAdmissible
+      (push (prediction candidate.initial b (t.val + 1)) candidate.observation) (c t)
+      then Except.ok (totalG candidate.initial b candidate.observation H c h)
+      else Except.error CascadeEFE.Refusal.inadmissibleRisk).toOption
+  have hfun : (fun t : ℕ => prediction candidate.initial (coKernel pat) t) =
+      (fun t => prediction candidate.initial b t) := funext hpred
+  simp only [CascadeEFE.totalG, CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity, hpred]
+  split_ifs <;> rfl
+
 /-! ## Reversed-precedence control
 
 Reversing a *chain* list does not break the mass bridge: at each state there
@@ -127,4 +218,6 @@ theorem reversed_chain_still_has_list_mass_bridge (s s' : Finset CascadeScoringE
     (acyclicDescent_of_stratification _ CascadeScoringExamples.s3) _ _ _
 
 end
+#print axioms scoreCascadeCo_toOption_eq_scoreCascade_of_chain
+
 end DarkTower.WarMachine.CascadeCoApplyGBridge
