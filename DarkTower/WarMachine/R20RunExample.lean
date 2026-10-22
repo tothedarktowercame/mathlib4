@@ -32,6 +32,12 @@ so the run is refused: habit counts reset (`habitReset_breaks_run`), the d
 counts not updated (`countsNotUpdated_breaks_run`), a replayed run id
 (`replayedRun_breaks_run`).
 
+Not exercised here (claude-7's review): β never moves, since F is equal
+across policies, so the β carry is a constant matching a constant
+(`R20Run.posteriorBetaCarried_refused` covers carrying a moved β); the focus
+is kept in both clicks, so the `focusChanged` case is not reached; and the
+habit row only records a success, so a failure is never carried across a run.
+
 As with `R20CertifiedExample`, this shows the conditions are jointly
 satisfiable. No value here comes from a recorded click.
 -/
