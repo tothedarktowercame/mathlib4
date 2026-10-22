@@ -314,5 +314,74 @@ theorem chain2_beats_chain3 :
   have : Real.log (10 / 9) < Real.log 10 := Real.log_lt_log (by norm_num) (by norm_num)
   linarith
 
+/-! ## Agent patterns, m40 G7
+
+Seven patterns from `futon3/library/agent`, interpreted for one step of the
+minus40 excursion `E-prove-memory-useful` (gap G7, memory derivation); the
+reading is `~/notes/lean-led/CASCADE-agent-patterns-m40-G7-2026-10-22.md`.
+Tokens: 0 scoped, 1 intentAgreed, 2 dispatched, 3 evidenced, 4 ledgered,
+5 trailed, 6 handedOff (the goal). -/
+
+abbrev AgentTok := Fin 7
+
+def apat (consumes produces : Finset AgentTok) : InterpretedPattern AgentTok :=
+  ⟨consumes, produces, ∅, 1, zero_le_one, le_rfl⟩
+
+/-- 0 scope-before-action, 1 intent-handshake-is-binding, 2 coordination-has-cost,
+3 evidence-over-assertion, 4 provisional-claims-ledger, 5 trail-enables-return,
+6 handoff-preserves-context. -/
+def agentPats : Fin 7 → InterpretedPattern AgentTok
+  | 0 => apat ∅ {0}
+  | 1 => apat {0} {1}
+  | 2 => apat {1} {2}
+  | 3 => apat {2} {3}
+  | 4 => apat {3} {4}
+  | 5 => apat {2} {5}
+  | 6 => apat {3, 4, 5} {6}
+
+def agentStrat : Stratification agentPats :=
+  ⟨fun v => v.val + 1, fun _ => Nat.succ_pos _, by decide⟩
+
+def agentC : ProbabilityKernel Unit Bool := prefK (9 / 10) (by norm_num) (by norm_num)
+
+def agentScore (ps : List (Fin 7)) : Except Refusal ℝ :=
+  scoreCascade (model agentPats ∅ 6) (cascadeOf agentPats agentStrat ps) 8 (fun _ => agentC)
+
+/-- All seven, handoff listed first: the goal is reached at epoch 7. -/
+def agentAll : List (Fin 7) := [6, 4, 5, 3, 2, 1, 0]
+
+/-- The same without trail-enables-return: handoff never becomes enabled. -/
+def agentNoTrail : List (Fin 7) := [6, 4, 3, 2, 1, 0]
+
+theorem agentAll_trajectory (k : Fin 8) :
+    decide ((6 : AgentTok) ∈ (next agentPats agentAll)^[k.val + 1] ∅) = decide (6 ≤ k.val) := by
+  revert k; decide
+
+theorem agentNoTrail_trajectory (k : Fin 8) :
+    decide ((6 : AgentTok) ∈ (next agentPats agentNoTrail)^[k.val + 1] ∅) = false := by
+  revert k; decide
+
+theorem agentAll_score :
+    agentScore agentAll = .ok (6 * Real.log 10 + 2 * Real.log (10 / 9)) := by
+  rw [agentScore, agentC, score_deterministic agentPats agentStrat ∅ 6
+    (fun i => by fin_cases i <;> rfl) agentAll (9 / 10) (by norm_num) (by norm_num) 8]
+  simp only [agentAll_trajectory]
+  simp [Fin.sum_univ_succ, prefK, finiteKernel, log_inv_1c]
+  rw [← log_inv_c]
+  ring
+
+theorem agentNoTrail_score : agentScore agentNoTrail = .ok (8 * Real.log 10) := by
+  rw [agentScore, agentC, score_deterministic agentPats agentStrat ∅ 6
+    (fun i => by fin_cases i <;> rfl) agentNoTrail (9 / 10) (by norm_num) (by norm_num) 8]
+  simp only [agentNoTrail_trajectory]
+  simp [prefK, finiteKernel, log_inv_1c]
+
+/-- Leaving out a pattern whose product the handoff needs is not refused: the
+cascade is still interpreted and scored, and scores worse. -/
+theorem agentAll_beats_noTrail :
+    6 * Real.log 10 + 2 * Real.log (10 / 9) < 8 * Real.log 10 := by
+  have : Real.log (10 / 9) < Real.log 10 := Real.log_lt_log (by norm_num) (by norm_num)
+  linarith
+
 end
 end DarkTower.WarMachine.CascadeScoringExamples
