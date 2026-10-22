@@ -433,10 +433,15 @@ def ScheduleIsRows {Policy : Type} (r : ClassPreferenceRow)
     ∀ t : Fin g.ticks,
       g.schedule.value t = CTauClassPreference.classPreference r.horizon (t.val + 1)
 
+/-- The menu: every policy, listed once. -/
+def menu (Policy : Type) [Fintype Policy] : List Policy := (Finset.univ : Finset Policy).toList
+
 /-- The consumer rows were judged on the values in their ports.  `Wired`
 relates the ports to each other; this ties the precision row's E, G and F, and
 the class-preference row's prediction and preference, to those ports, so a row
-judged on some other F is not certified. G is compared after embedding the
+judged on some other F is not certified. The habit row's port carries E as the
+normalised counts the click started from (`policyHabitPrior` of the row's
+`before`, never its `after`: E is fixed within a trial, Parr :12645). G is compared after embedding the
 row's real value in EReal: an infinite G port cannot certify this real-valued
 precision row, and no toReal conversion drops infinity. -/
 def RowsReadPorts (records : Records Policy) (ports : R20Graph.Ports Policy) : Prop :=
@@ -448,7 +453,9 @@ def RowsReadPorts (records : Records Policy) (ports : R20Graph.Ports Policy) : P
       CTauClassPreference.classPreference r.horizon r.tau = ports.classPreference.value ∧
       ScheduleIsRows r ports.selectionG) ∧
   (∀ s r, records .strategicFocus = some s → records .classPreference = some r →
-    s.tick.preferenceAt r.tau = ports.strategicPreference.value)
+    s.tick.preferenceAt r.tau = ports.strategicPreference.value) ∧
+  (∀ h, records .habit = some h → ∀ π,
+    ports.habitRowE.value π = (R15HabitPrior.policyHabitPrior h.before (menu Policy) π : ℝ))
 
 /-- A click is certified only when every row agrees, its shared quantities
 are the exact artifacts declared by the R20 graph, and the consumer rows were
@@ -486,7 +493,7 @@ theorem certified_iff (records : Records Policy) (ports : R20Graph.Ports Policy)
         R20Graph.Wired records ports ∧ RowsReadPorts records ports := by
   rw [Certified, rowsCertified_iff]
 
-omit [Fintype Policy] [Nonempty Policy] in
+omit [Nonempty Policy] in
 /-- The precision row reads this run's post-observation inference F, whose
 value is defined from its tick inputs by H1. -/
 theorem certified_precision_reads_inference_F (records : Records Policy) (c : Certificate)
@@ -497,7 +504,7 @@ theorem certified_precision_reads_inference_F (records : Records Policy) (c : Ce
   rcases certified with ⟨_, wired, reads⟩
   exact ⟨(reads.1 r hr).2.2.trans (by rw [wired.fRead]), wired.fProducer, wired.fRun⟩
 
-omit [Fintype Policy] [Nonempty Policy] in
+omit [Nonempty Policy] in
 /-- The wrong-F control at the certificate: a precision row judged on an F
 other than post-observation inference's defined F is not certified. K5. -/
 theorem wrongF_not_certified (records : Records Policy) (c : Certificate)
@@ -506,7 +513,7 @@ theorem wrongF_not_certified (records : Records Policy) (c : Certificate)
     (wrong : r.F ≠ ports.inferenceF.value) : ¬ Certified records c ports :=
   fun certified => wrong (certified_precision_reads_inference_F records c ports certified r hr).1
 
-omit [Fintype Policy] [Nonempty Policy] in
+omit [Nonempty Policy] in
 /-- K11: a schedule labelled as the class-preference row's but holding other
 values at some tick is not certified. -/
 theorem wrongSchedule_not_certified (records : Records Policy) (c : Certificate)
@@ -518,7 +525,7 @@ theorem wrongSchedule_not_certified (records : Records Policy) (c : Certificate)
   rintro ⟨_, _, reads⟩
   exact wrong ((reads.2.1 r hr).2.2.2 t)
 
-omit [Fintype Policy] [Nonempty Policy] in
+omit [Nonempty Policy] in
 /-- K11b: G over a different number of ticks than the row's horizon is not
 certified. -/
 theorem wrongTicks_not_certified (records : Records Policy) (c : Certificate)

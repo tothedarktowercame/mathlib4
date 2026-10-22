@@ -10,10 +10,9 @@ model's predicted class probabilities. Post-observation inference emits F
 defined from its frozen-policy tick inputs by H1, not a free score.
 See S2-authority-ledger.md, "Settlement from the publications" (2026-10-21).
 
-Habit row → selection's E is not declared as an edge here. The habit counts
-are per policy (`R15TemporalHierarchy`), and `R20HabitPrior` ties the precision
-row's E to the habit row's counts as a condition on one click; declaring the
-edge (and its witness entry) is not done yet. Class preference supplies
+The habit row supplies selection's E (`habitToSelectionHabit`): its counts are
+per policy (`R15TemporalHierarchy`), and E is their normalisation, which
+`R20Certificate.RowsReadPorts` checks and `R20HabitPrior` uses. Class preference supplies
 the tick schedule C to selection; selection computes H3's risk plus ambiguity.
 
 Preference is at the class grain because the existing risk row consumes CTau's
@@ -117,6 +116,11 @@ inductive Endpoint
   deriving DecidableEq, Repr
 
 inductive Edge
+  /-- Friston et al. 2016, friston2016.txt:436-442, :675-678: E is the mean of
+  Dir(e), counts of each policy; Parr, Pezzulo and Friston 2022,
+  parr2022.txt:10724-10727: cached results of which policies were successful
+  "can be incorporated as a prior value of policies". -/
+  | habitToSelectionHabit
   /-- Parr B.7 :12636-12646; Friston eq.2.7 :660-685: the same E
   enters the selection prior and posterior inference. -/
   | selectionToPrecisionHabit
@@ -138,6 +142,7 @@ inductive Edge
   deriving DecidableEq, Repr, Fintype
 
 def Edge.source : Edge → Endpoint
+  | .habitToSelectionHabit => .row .habit
   | .selectionToPrecisionHabit | .selectionToPrecisionG | .selectionToClassPreference =>
     .selection
   | .inferenceToPrecisionF => .postObservationInference
@@ -145,11 +150,13 @@ def Edge.source : Edge → Endpoint
   | .classPreferenceToSelectionG => .row .classPreference
 
 def Edge.target : Edge → Endpoint
+  | .habitToSelectionHabit => .selection
   | .selectionToPrecisionHabit | .selectionToPrecisionG | .inferenceToPrecisionF => .row .precision
   | .strategicFocusToClassPreference | .selectionToClassPreference => .row .classPreference
   | .classPreferenceToSelectionG => .selection
 
 def Edge.quantity : Edge → QuantityKind
+  | .habitToSelectionHabit => .habitPrior
   | .selectionToPrecisionHabit => .habitPrior
   | .selectionToPrecisionG => .policyExpectedFreeEnergy
   | .inferenceToPrecisionF => .policyFreeEnergy
@@ -159,6 +166,7 @@ def Edge.quantity : Edge → QuantityKind
 
 structure Ports (Policy : Type) where
   runId : RunId
+  habitRowE : HabitPrior Policy
   selectionHabit : HabitPrior Policy
   precisionHabit : HabitPrior Policy
   selectionG : PolicyExpectedFreeEnergy Policy
@@ -174,7 +182,11 @@ structure Ports (Policy : Type) where
 /-- Each consumer receives the producer's entire artifact from this run. -/
 structure Wired {Policy : Type} {Row : Node → Type}
     (records : (n : Node) → Option (Row n)) (ports : Ports Policy) : Prop where
-  present : ∀ n, n = .strategicFocus ∨ n = .classPreference ∨ n = .precision → records n ≠ none
+  present : ∀ n, n = .strategicFocus ∨ n = .classPreference ∨ n = .precision ∨ n = .habit →
+    records n ≠ none
+  habitRowProducer : ports.habitRowE.producer = .node .habit
+  habitRowRun : ports.habitRowE.runId = ports.runId
+  habitIntoSelection : ports.selectionHabit.value = ports.habitRowE.value
   habitProducer : ports.selectionHabit.producer = .selection
   habitRun : ports.selectionHabit.runId = ports.runId
   habitRead : ports.precisionHabit = ports.selectionHabit
@@ -210,6 +222,20 @@ theorem k2_other_run_G_not_wired {Policy : Type} {Row : Node → Type}
     (wrong : ports.precisionG.runId ≠ ports.runId) : ¬ Wired records ports := by
   intro h
   exact wrong ((congrArg PolicyExpectedFreeEnergy.runId h.gRead).trans h.gRun)
+
+/-- K9: an E in selection that is not the habit row's E is not wired. -/
+theorem k9_selection_E_not_habit_not_wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
+    (wrong : ports.selectionHabit.value ≠ ports.habitRowE.value) : ¬ Wired records ports :=
+  fun h => wrong h.habitIntoSelection
+
+/-- K10: a habit E produced anywhere but the habit row is not wired. -/
+theorem k10_habit_E_from_selection_not_wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
+    (wrong : ports.habitRowE.producer = .selection) : ¬ Wired records ports := by
+  intro h
+  rw [h.habitRowProducer] at wrong
+  contradiction
 
 /-- K3: a selection-time F is not post-observation inference's F. -/
 theorem k3_selection_F_not_wired {Policy : Type} {Row : Node → Type}
@@ -250,6 +276,7 @@ def waitingG (run : RunId) : PolicyExpectedFreeEnergy TestPolicy :=
 
 def goodPorts (run : RunId) : Ports TestPolicy :=
   { runId := run
+    habitRowE := ⟨fun _ => 1 / 2, .node .habit, run⟩
     selectionHabit := ⟨fun _ => 1 / 2, .selection, run⟩
     precisionHabit := ⟨fun _ => 1 / 2, .selection, run⟩
     selectionG := waitingG run
@@ -263,7 +290,7 @@ def goodPorts (run : RunId) : Ports TestPolicy :=
 abbrev TestRow : Node → Type := fun _ => Unit
 def goodRecords : (n : Node) → Option (TestRow n) := fun _ => some ()
 
-/-- K4: all six edges can be wired simultaneously, with actual tick inputs.
+/-- K4: all seven edges can be wired simultaneously, with actual tick inputs.
 This is wiring, not certification of a finite-G precision row. -/
 theorem k4_goodPorts_wired (run : RunId) : Wired goodRecords (goodPorts run) := by
   constructor

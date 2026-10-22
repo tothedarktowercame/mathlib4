@@ -34,10 +34,15 @@ What is counted follows Parr p. 209 (which policies were *successful*), as
 `R15HabitPrior` says; Friston et al. (2016) count how often a policy was
 selected. Both are cited active inference; this module follows Parr.
 
-Results, for a click that is certified and whose E is fed by its counts:
+The habit row supplies selection's E (`R20Graph.Edge.habitToSelectionHabit`),
+and the certificate checks the supplied value (`RowsReadPorts`), so a
+certified click's E is its counts' prior with no further hypothesis.
+
+Results, for a certified click:
 
 * `selection_E_is_habit`: selection's E port is the habit prior of the habit
-  row's before-state, since precision reads that port;
+  row's before-state;
+* `certified_habitFeedsE`: so the precision row's E is that prior too;
 * `fed_E_sums_to_one`: that E is a distribution over the menu's policies;
 * `run_E_reads_previous_outcome`: over a carried run, click `i + 1`'s E is
   the prior of the counts after click `i`'s outcome;
@@ -65,9 +70,6 @@ noncomputable section
 variable {Policy : Type} [Fintype Policy] [Nonempty Policy]
 attribute [local instance] Classical.propDecidable
 
-/-- The menu: every policy, listed once. -/
-def menu (Policy : Type) [Fintype Policy] : List Policy := (Finset.univ : Finset Policy).toList
-
 omit [Nonempty Policy] in
 theorem menu_nodup : (menu Policy).Nodup := Finset.nodup_toList _
 
@@ -90,17 +92,27 @@ def HabitFeedsE (records : Records Policy) : Prop :=
     ∀ π, p.E π = (policyHabitPrior h.before (menu Policy) π : ℝ)
 
 omit [Nonempty Policy] in
-/-- In a certified click fed by its counts, selection's E port, which
-enters the policy prior, is the habit prior: precision reads that port. -/
+/-- In a certified click, selection's E port, which enters the policy prior,
+is the habit prior of the counts the click started from: the habit row
+supplies it (`habitToSelectionHabit`). -/
 theorem selection_E_is_habit {records : Records Policy}
     {ports : R20Graph.Ports Policy} (certified : Certified records (certify records) ports)
-    (fed : HabitFeedsE records) {h : TwoTickRecord Policy}
-    {p : PrecisionFromObservation.TickRecord Policy}
-    (hh : records .habit = some h) (hp : records .precision = some p) (π : Policy) :
+    {h : TwoTickRecord Policy} (hh : records .habit = some h) (π : Policy) :
     ports.selectionHabit.value π = (policyHabitPrior h.before (menu Policy) π : ℝ) := by
   rcases certified with ⟨_, wired, reads⟩
-  rw [← wired.habitRead, ← (reads.1 p hp).1]
-  exact fed h p hh hp π
+  rw [wired.habitIntoSelection]
+  exact reads.2.2.2 h hh π
+
+omit [Nonempty Policy] in
+/-- A certified click's precision row reads the habit prior: certification
+implies `HabitFeedsE`. -/
+theorem certified_habitFeedsE {records : Records Policy}
+    {ports : R20Graph.Ports Policy} (certified : Certified records (certify records) ports) :
+    HabitFeedsE records := by
+  intro h p hh hp π
+  have reads := certified.2.2
+  rw [(reads.1 p hp).1, certified.2.1.habitRead]
+  exact selection_E_is_habit certified hh π
 
 /-- A positive quotient of a nonnegative numerator has a positive numerator. -/
 private theorem num_pos_of_div_pos {x y : ℚ} (hx : 0 ≤ x) (pos : 0 < x / y) : 0 < x := by
@@ -130,17 +142,17 @@ theorem fed_E_sums_to_one {records : Records Policy}
 /-! ## Over a run -/
 
 omit [Nonempty Policy] in
-/-- Over a carried run whose clicks are fed by their counts, click `i + 1`'s E
+/-- Over a carried run, click `i + 1`'s E
 is the habit prior of the counts after click `i`'s outcome. -/
 theorem run_E_reads_previous_outcome {relation : Target → Target → TargetRelation}
     {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
-    (fed : ∀ i ≤ n, HabitFeedsE (c i).records)
     (hab : ℕ → TwoTickRecord Policy) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
     (hp : ∀ i ≤ n, (c i).records .precision = some (pr i))
     {i : ℕ} (hi : i < n) (π : Policy) :
     (pr (i + 1)).E π =
       (policyHabitPrior (advance (hab i).before (hab i).outcome) (menu Policy) π : ℝ) := by
+  have fed := fun i (hi : i ≤ n) => certified_habitFeedsE (run.1 i hi).1.1
   obtain ⟨r, hr, good⟩ := row_of_certified (run.1 i (by omega)).1 .habit
   rw [hh i (by omega)] at hr
   cases hr
@@ -152,7 +164,6 @@ omit [Nonempty Policy] in
 `i + 1`, whenever another policy holds positive count. -/
 theorem success_raises_next_E {relation : Target → Target → TargetRelation}
     {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
-    (fed : ∀ i ≤ n, HabitFeedsE (c i).records)
     (hab : ℕ → TwoTickRecord Policy) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
     (hp : ∀ i ≤ n, (c i).records .precision = some (pr i))
@@ -161,7 +172,8 @@ theorem success_raises_next_E {relation : Target → Target → TargetRelation}
     (positiveTotal : 0 < totalAlpha (hab i).before (menu Policy))
     (outsideMass : policyAlpha (hab i).before π < totalAlpha (hab i).before (menu Policy)) :
     (pr i).E π < (pr (i + 1)).E π := by
-  rw [run_E_reads_previous_outcome run fed hab hh pr hp hi π, success,
+  have fed := fun i (hi : i ≤ n) => certified_habitFeedsE (run.1 i hi).1.1
+  rw [run_E_reads_previous_outcome run hab hh pr hp hi π, success,
     fed i (by omega) _ _ (hh i (by omega)) (hp i (by omega)) π]
   exact_mod_cast success_strictly_increases_habit menu_nodup (mem_menu π) positiveTotal outsideMass
 
@@ -170,13 +182,13 @@ omit [Nonempty Policy] in
 where it was. -/
 theorem failure_keeps_next_E {relation : Target → Target → TargetRelation}
     {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
-    (fed : ∀ i ≤ n, HabitFeedsE (c i).records)
     (hab : ℕ → TwoTickRecord Policy) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
     (hp : ∀ i ≤ n, (c i).records .precision = some (pr i))
     {i : ℕ} (hi : i < n) (k : Policy) (failure : (hab i).outcome = ⟨k, true, false⟩) (π : Policy) :
     (pr (i + 1)).E π = (pr i).E π := by
-  rw [run_E_reads_previous_outcome run fed hab hh pr hp hi π, failure,
+  have fed := fun i (hi : i ≤ n) => certified_habitFeedsE (run.1 i hi).1.1
+  rw [run_E_reads_previous_outcome run hab hh pr hp hi π, failure,
     fed i (by omega) _ _ (hh i (by omega)) (hp i (by omega)) π,
     failure_leaves_habit_unchanged]
 

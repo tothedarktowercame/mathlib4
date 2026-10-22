@@ -12,6 +12,7 @@ open DarkTower.WarMachine.R20Graph
 open DarkTower.WarMachine.R20Witness
 
 def edgeName : Edge → String
+  | .habitToSelectionHabit => "habitToSelectionHabit"
   | .selectionToPrecisionHabit => "selectionToPrecisionHabit"
   | .selectionToPrecisionG => "selectionToPrecisionG"
   | .inferenceToPrecisionF => "inferenceToPrecisionF"

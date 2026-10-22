@@ -3,7 +3,7 @@ import DarkTower.WarMachine.R20Graph
 /-!
 # Clojure field-flow witnesses for the R20 graph
 
-R20Graph declares six producer→consumer edges. This module says what a
+R20Graph declares seven producer→consumer edges. This module says what a
 Clojure field-flow path must show to stand for one of them, and decides it.
 
 A witness lists, per edge, a chain of hops. A hop is one field written by
@@ -47,6 +47,7 @@ def certClj : String := "futon2/src/futon2/aif/wm/apparatus_certificates.clj"
 def shapeGClj : String := "futon2/src/futon2/aif/cascade_shape_g.clj"
 def observationClj : String := "futon2/src/futon2/aif/observation_model.clj"
 def focusClj : String := "futon2/src/futon2/aif/focus_receipt.clj"
+def habitClj : String := "futon2/src/futon2/aif/enactment_habit.clj"
 
 def site (file var : String) : Site := file ++ "#" ++ var
 
@@ -64,7 +65,10 @@ sourced where focus is produced, `discover`, and where it is retained at
 decision time, `decision-focus`; `strategic-focus-row` only compares the
 focus receipt with the scored class after the fact (S8a, 2026-10-21). At the
 pin, `class-emission-model` assigns `:target-class {target :focused}` without
-reading focus, so no chain exists and the edge fails. -/
+reading focus, so no chain exists and the edge fails. The habit row is the
+per-policy enactment count, `fold`, and its normalisation, `masses`
+(NOTE-r20-habit-counts-2026-10-22: counts keyed by structural policy
+identity). -/
 def endpointSites : Endpoint → List Site
   | .selection =>
     [site policyClj "selection-candidate", site policyClj "selection-certificate",
@@ -74,6 +78,7 @@ def endpointSites : Endpoint → List Site
   | .row .classPreference =>
     [site shapeGClj "class-emission-model", site certClj "class-preference-row"]
   | .row .strategicFocus => [site focusClj "discover", site focusClj "decision-focus"]
+  | .row .habit => [site habitClj "fold", site habitClj "masses"]
   | .row _ => []
 
 /-- Field types, as `:r20/field-types` writes them without the colon. -/
@@ -116,7 +121,7 @@ structure Witness where
   deriving Repr
 
 def allEdges : List Edge :=
-  [.selectionToPrecisionHabit, .selectionToPrecisionG, .inferenceToPrecisionF,
+  [.habitToSelectionHabit, .selectionToPrecisionHabit, .selectionToPrecisionG, .inferenceToPrecisionF,
    .strategicFocusToClassPreference, .selectionToClassPreference, .classPreferenceToSelectionG]
 
 theorem mem_allEdges (e : Edge) : e ∈ allEdges := by
@@ -221,6 +226,9 @@ def synthetic : Witness :=
       [⟨.inferenceToPrecisionF, [fHop]⟩,
        ⟨.selectionToPrecisionG, gHops true⟩,
        ⟨.selectionToPrecisionHabit, eHops⟩,
+       ⟨.habitToSelectionHabit,
+        [hop (site habitClj "masses") ":habit-masses" ":enactment-habit"
+          "quantity/policy-prior" (site policyClj "selection-candidate")]⟩,
        ⟨.strategicFocusToClassPreference,
         [hop (site focusClj "decision-focus") ":tactical-preference" ":focus"
           "quantity/preference" (site certClj "class-preference-row")]⟩,
