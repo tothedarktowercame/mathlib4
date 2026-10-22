@@ -6,6 +6,7 @@ import DarkTower.WarMachine.R15StrategicTarget
 import DarkTower.WarMachine.R10ScheduledEntrypoint
 import DarkTower.WarMachine.R11JointAction
 import DarkTower.WarMachine.R20Graph
+import DarkTower.WarMachine.R20Interoception
 import Mathlib.Tactic
 
 /-!
@@ -37,6 +38,7 @@ whether the click was active inference.
 | independence | R9 adapter | author is not reviewer | same author and reviewer |
 | joint action | `R11JointAction.SharedState` | `OneWriter` | two writers |
 | cost | this module | `CostConforms` | total that is not the sum of its jobs |
+| interoception | `R20Interoception` | `InteroceptiveTickConforms` | reversed viable preference |
 
 The cost row says how many tokens and how much time the click spent up to and
 including its choice, and how many after it, and checks that the total is the
@@ -46,6 +48,14 @@ costs, effort, and timeliness of computation", and "What is costly during
 deliberation is decreasing the entropy (or complexity) of one's beliefs before
 a choice".  The row sets no limit on cost; it requires that the cost is fully
 accounted for and prints on which side of the choice it fell.
+
+The interoception row says whether the machine's own reading at this click was
+in its viable range, and checks that viable readings are preferred and that
+each candidate's reported risk is the ordinary KL risk of its prediction
+against that preference (`R20Interoception`; Parr, Pezzulo and Friston 2022,
+pp. 215-216). A reading modality is any finite type, carried here as `Fin size`.
+No edge to selection is declared for it yet, so a certified click's
+interoceptive risk is checked on the row but not yet shown to enter G.
 
 The evidence module supplies the posterior but no before/after receipt, so
 `EvidenceRow` is the minimal carrier for those existing quantities.  R9's
@@ -79,13 +89,14 @@ inductive LivenessCase | live | notLive deriving DecidableEq, Repr
 inductive IndependenceCase | authorIsNotReviewer | sameAgent deriving DecidableEq, Repr
 inductive JointActionCase | eachTookItsPart | takenTwice | dropped deriving DecidableEq, Repr
 inductive CostCase | mostlyChoosing | mostlyActing | even deriving DecidableEq, Repr
+inductive InteroceptionCase | inRange | outOfRange deriving DecidableEq, Repr
 
 inductive Case
   | precision (v : PrecisionCase) | evidence (v : EvidenceCase)
   | habit (v : HabitCase) | classPreference (v : ClassPreferenceCase)
   | strategicFocus (v : StrategicFocusCase) | liveness (v : LivenessCase)
   | independence (v : IndependenceCase) | jointAction (v : JointActionCase)
-  | cost (v : CostCase)
+  | cost (v : CostCase) | interoception (v : InteroceptionCase)
   deriving DecidableEq, Repr
 
 variable {Policy : Type} [Fintype Policy] [Nonempty Policy]
@@ -180,6 +191,17 @@ def costCase (r : CostRow) : CostCase :=
   else if r.msThroughSelection < r.msAfterSelection then .mostlyActing
   else .even
 
+/-- One interoceptive modality with `size` readings: what was expected to be
+viable, the preference and the candidates' reported risks, and the reading
+observed at this click. -/
+structure InteroceptionRow where
+  size : Nat
+  tick : R20Interoception.InteroceptiveTickRecord (Fin size)
+  observed : Fin size
+
+def InteroceptionConforms (r : InteroceptionRow) : Prop :=
+  R20Interoception.InteroceptiveTickConforms r.tick
+
 def NodeRecord (Policy : Type) : Node → Type
   | .precision => PrecisionFromObservation.TickRecord Policy
   | .evidence => EvidenceRow
@@ -190,6 +212,7 @@ def NodeRecord (Policy : Type) : Node → Type
   | .independence => IndependenceRow
   | .jointAction => JointRow
   | .cost => CostRow
+  | .interoception => InteroceptionRow
 
 def conforms : (n : Node) → NodeRecord Policy n → Prop
   | .precision, r => PrecisionFromObservation.Conforms r
@@ -201,6 +224,7 @@ def conforms : (n : Node) → NodeRecord Policy n → Prop
   | .independence, r => IndependenceConforms r
   | .jointAction, r => R11JointAction.OneWriter r
   | .cost, r => CostConforms r
+  | .interoception, r => InteroceptionConforms r
 
 def caseOf : (n : Node) → NodeRecord Policy n → Case
   | .precision, r => .precision <| if r.betaPosterior = r.betaPrior then .unchanged
@@ -217,6 +241,8 @@ def caseOf : (n : Node) → NodeRecord Policy n → Case
   | .jointAction, r => .jointAction <| match (R11JointAction.writers r ()).card with
       | 0 => .dropped | 1 => .eachTookItsPart | _ => .takenTwice
   | .cost, r => .cost (costCase r)
+  | .interoception, r => .interoception <|
+      if r.observed ∈ r.tick.viable then .inRange else .outOfRange
 
 /-- The precision row prints the fixed-point's qualitative direction. -/
 theorem precision_constant_F_is_unchanged
@@ -650,10 +676,82 @@ theorem cost_control_disagrees (records : Records Policy)
       .disagrees (caseOf (Policy := Policy) .cost badCost) :=
   refused_row_disagrees records .cost badCost present badCost_refused
 
+/-- A row whose preference ranks the alarm above the in-range reading. -/
+def badInteroception : InteroceptionRow :=
+  { size := 2
+    tick := { viable := ({0} : Finset (Fin 2))
+              preference := fun i : Fin 2 => if i = 0 then 1 / 10 else 9 / 10
+              candidates := [] }
+    observed := (1 : Fin 2) }
+
+theorem badInteroception_refused : ¬ InteroceptionConforms badInteroception := by
+  intro h
+  have wrong : (fun i : Fin 2 => if i = 0 then (1 : ℝ) / 10 else 9 / 10) 1 <
+      (fun i : Fin 2 => if i = 0 then (1 : ℝ) / 10 else 9 / 10) 0 :=
+    h.1 (0 : Fin 2) (Finset.mem_singleton_self _) (1 : Fin 2) (by decide)
+  norm_num at wrong
+
+omit [Nonempty Policy] in
+theorem interoception_control_disagrees (records : Records Policy)
+    (present : records .interoception = some badInteroception) :
+    certify records .interoception =
+      .disagrees (caseOf (Policy := Policy) .interoception badInteroception) :=
+  refused_row_disagrees records .interoception badInteroception present badInteroception_refused
+
+/-- The gauge preference of `R20Interoception` on `Fin 2`: reading 0 is in range. -/
+def gauge2 : R20Interoception.Distribution (Fin 2) := fun i => if i = 0 then 9 / 10 else 1 / 10
+
+/-- The gauge example of `R20Interoception`, observed in range, carried as a row. -/
+def goodInteroception : InteroceptionRow :=
+  { size := 2
+    tick := { viable := ({0} : Finset (Fin 2)), preference := gauge2
+              candidates :=
+                [⟨R20Interoception.pointMass (0 : Fin 2),
+                    R20Interoception.interoceptiveRisk (R20Interoception.pointMass 0) gauge2⟩,
+                 ⟨R20Interoception.pointMass (1 : Fin 2),
+                    R20Interoception.interoceptiveRisk (R20Interoception.pointMass 1) gauge2⟩] }
+    observed := (0 : Fin 2) }
+
+theorem goodInteroception_conforms : InteroceptionConforms goodInteroception := by
+  constructor
+  · show ∀ v ∈ ({0} : Finset (Fin 2)), ∀ n ∉ ({0} : Finset (Fin 2)), gauge2 n < gauge2 v
+    intro v hv n hn
+    rw [Finset.mem_singleton] at hv hn
+    subst hv
+    norm_num [gauge2, hn]
+  · intro c member
+    change c ∈ [_, _] at member
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl <;> rfl
+
+omit [Fintype Policy] [Nonempty Policy] in
+theorem goodInteroception_inRange :
+    caseOf (Policy := Policy) .interoception goodInteroception = .interoception .inRange := by
+  show Case.interoception (if (0 : Fin 2) ∈ ({0} : Finset (Fin 2)) then .inRange
+    else .outOfRange) = _
+  simp
+
+omit [Fintype Policy] [Nonempty Policy] in
+/-- In a conforming row, a candidate predicted to restore a viable reading with
+certainty reports lower risk than one predicted to leave it out of range. -/
+theorem interoception_restoring_lower_risk (r : InteroceptionRow) (h : InteroceptionConforms r)
+    {restored outside : Fin r.size} (restoredViable : restored ∈ r.tick.viable)
+    (notViable : outside ∉ r.tick.viable)
+    (restoredPositive : 0 < r.tick.preference restored)
+    (outsidePositive : 0 < r.tick.preference outside)
+    {p q : R20Interoception.PolicyReceipt (Fin r.size)}
+    (hp : p ∈ r.tick.candidates) (hq : q ∈ r.tick.candidates)
+    (pRestores : p.prediction = R20Interoception.pointMass restored)
+    (qLeaves : q.prediction = R20Interoception.pointMass outside) :
+    p.reportedRisk < q.reportedRisk := by
+  rw [h.2 p hp, h.2 q hq, pRestores, qLeaves]
+  exact R20Interoception.viable_point_has_lower_risk h.1 restoredViable notViable
+    restoredPositive outsidePositive
+
 /-- Fixed print order for the run's succinct certificate. -/
 def nodeOrder : List Node :=
   [.precision, .evidence, .habit, .classPreference, .strategicFocus,
-   .liveness, .independence, .jointAction, .cost]
+   .liveness, .independence, .jointAction, .cost, .interoception]
 
 def summary (certificate : Certificate) : List (Node × RowVerdict) :=
   nodeOrder.map fun node => (node, certificate node)

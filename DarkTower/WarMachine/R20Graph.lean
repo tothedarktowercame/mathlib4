@@ -30,10 +30,12 @@ noncomputable section
 open scoped BigOperators
 attribute [local instance] Classical.propDecidable
 
-/-- The nine rows are unchanged. -/
+/-- The certificate's ten rows. `interoception` has no edge yet: no runtime
+code treats machine-internal state as an observation modality, so nothing
+produces or consumes its quantities (see `R20Interoception`). -/
 inductive Node
   | precision | evidence | habit | classPreference
-  | strategicFocus | liveness | independence | jointAction | cost
+  | strategicFocus | liveness | independence | jointAction | cost | interoception
   deriving DecidableEq, Repr, Fintype
 
 inductive Producer
