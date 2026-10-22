@@ -1,4 +1,6 @@
 import DarkTower.WarMachine.CascadeEFEPolicies
+import DarkTower.WarMachine.CascadeCoApplyGNovelty
+import DarkTower.WarMachine.CascadeCoApplyGBridge
 
 /-!
 # G over cascades — the ratified policy grain
@@ -31,11 +33,19 @@ Sources (the intention, by record):
   core concepts, from the glossary, from the equations, and from the effort
   I put in to clarify what was meant by policy, G, cascades …").
 
-The canonical mathematical definition is now CascadeEFE.scoreCascade, built
-from filtered guarded transitions, finite predictions and their common joint.
-CascadeEFE derives ambiguity + risk = pragmatic cost - information gain.
-CascadeEFEPolicies supplies admissible candidate priors and model-derived
-composition controls. None of those results proves the F13 runtime seam.
+The canonical mathematical definition is CascadeCoApplyGNovelty.scoreCascadeCoN
+(2026-10-22). It has the three terms of expected free energy in da Costa et al. 2020
+eq. 42 (`refs/dacosta2020.txt:1403`): risk and ambiguity summed over the epochs of one
+common horizon, minus the expected novelty of the patterns that can fire. The
+transition is co-application of the enabled frontier over the containment order
+(PROOF-2a Clause 0; Proof2.CoApplicationKernel), not the first-enabled list.
+`CascadeCoApplyG.scoreCascadeCo` is the risk + ambiguity part.
+`CascadeCoApplyGBridge.scoreCascadeCo_toOption_eq_scoreCascade_of_chain` proves that on
+a chain it agrees with CascadeEFE.scoreCascade, the canonical definition until
+2026-10-22, and `CascadeCoApplyG.join3_co_differs_from_list` proves that they differ
+on a join. CascadeEFE derives ambiguity + risk = pragmatic cost - information gain.
+CascadeEFEPolicies supplies admissible candidate priors and model-derived composition
+controls. None of those results proves the F13 runtime seam.
 -/
 
 universe u
@@ -51,10 +61,19 @@ decidable node membership. Candidate admissibility is supplied separately by
 CascadeEFEPolicies.CandidateFamily. -/
 abbrev CascadePolicy (P : Type u) := CascadeEFE.Policy P
 
-/-- One canonical cascade G: the checked model-based scoring interface, including
-typed missing-interpretation and inadmissible-risk refusals. This is an alias,
-not another risk/eig functional. -/
-abbrev cascadeGrainG := @CascadeEFE.scoreCascade
+/-- One canonical cascade G: co-application, one horizon, risk + ambiguity −
+expected novelty, with typed missing-interpretation, inadmissible-risk and
+cyclic-containment refusals. This is an alias, not another functional. -/
+abbrev cascadeGrainG := @CascadeCoApplyGNovelty.scoreCascadeCoN
+
+/-- The risk + ambiguity part of `cascadeGrainG` (no parameter counts needed). -/
+abbrev cascadeGrainGRiskAmbiguity := @CascadeCoApplyG.scoreCascadeCo
+
+/-- The canonical definition until 2026-10-22: the first-enabled list kernel over the
+model interface. It agrees with `cascadeGrainGRiskAmbiguity` on chains
+(`CascadeCoApplyGBridge.scoreCascadeCo_toOption_eq_scoreCascade_of_chain`) and differs
+on joins. Kept for the modules that use the `Model`/`Policy` interface. -/
+abbrev cascadeGrainGListKernel := @CascadeEFE.scoreCascade
 
 /- The former cascadePolicyPosterior (arbitrary exp/log, risk/eig and F callbacks)
 is retired. CascadeEFEPolicies.family_priors proves the four stated policy
