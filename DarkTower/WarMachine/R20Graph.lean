@@ -230,16 +230,16 @@ interoceptive modality's risk. -/
 def selectionScore {Policy : Type} (ports : Ports Policy) (π : Policy) : EReal :=
   ports.selectionG.value π + ports.selectionInteroceptionRisk.value π
 
-/-- K11: an interoceptive risk produced by selection itself is not wired. -/
-theorem k11_interoception_from_selection_not_wired {Policy : Type} {Row : Node → Type}
+/-- K15: an interoceptive risk produced by selection itself is not wired. -/
+theorem k15_interoception_from_selection_not_wired {Policy : Type} {Row : Node → Type}
     (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
     (wrong : ports.selectionInteroceptionRisk.producer = .selection) : ¬ Wired records ports := by
   intro h
   rw [h.interoceptionRead, h.interoceptionProducer] at wrong
   contradiction
 
-/-- K12: selection scoring with another run's interoceptive risk is not wired. -/
-theorem k12_interoception_other_run_not_wired {Policy : Type} {Row : Node → Type}
+/-- K16: selection scoring with another run's interoceptive risk is not wired. -/
+theorem k16_interoception_other_run_not_wired {Policy : Type} {Row : Node → Type}
     (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
     (wrong : ports.selectionInteroceptionRisk.runId ≠ ports.runId) : ¬ Wired records ports :=
   fun h => wrong ((congrArg InteroceptiveRisk.runId h.interoceptionRead).trans h.interoceptionRun)
@@ -260,14 +260,14 @@ theorem k2_other_run_G_not_wired {Policy : Type} {Row : Node → Type}
   intro h
   exact wrong ((congrArg PolicyExpectedFreeEnergy.runId h.gRead).trans h.gRun)
 
-/-- K9: an E in selection that is not the habit row's E is not wired. -/
-theorem k9_selection_E_not_habit_not_wired {Policy : Type} {Row : Node → Type}
+/-- K13: an E in selection that is not the habit row's E is not wired. -/
+theorem k13_selection_E_not_habit_not_wired {Policy : Type} {Row : Node → Type}
     (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
     (wrong : ports.selectionHabit.value ≠ ports.habitRowE.value) : ¬ Wired records ports :=
   fun h => wrong h.habitIntoSelection
 
-/-- K10: a habit E produced anywhere but the habit row is not wired. -/
-theorem k10_habit_E_from_selection_not_wired {Policy : Type} {Row : Node → Type}
+/-- K14: a habit E produced anywhere but the habit row is not wired. -/
+theorem k14_habit_E_from_selection_not_wired {Policy : Type} {Row : Node → Type}
     (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
     (wrong : ports.habitRowE.producer = .selection) : ¬ Wired records ports := by
   intro h
