@@ -17,7 +17,10 @@ This module models one pass as select, act, observe, update, and records the sha
 observation as evidence under every menu policy. The following are explicit model
 arguments, not inferred here: `plan`, mapping a policy and epoch to its action;
 `key`, mapping the action-selection `PolicyIndex` grain to the cascade `PolicyKey`
-grain; occurrence identifiers; and measured supply. The main belief is the update
+grain; occurrence identifiers; and measured supply. Each policy's own state record
+`Q(s_τ | π)` is carried in `LoopState.policyBelief`, starting at `q₀` and advanced by
+`nextPolicyBelief` (claude-7's review change: the first version took it as an external
+argument for every epoch, so the loop did not itself chain it). The main belief is the update
 at the selected action. Relating it to a Bayesian model average of the per-policy
 beliefs (the source's statement at `refs/friston2017.txt:917-918`) requires weights
 and an equality hypothesis; it does not follow from the components alone.
@@ -171,8 +174,8 @@ def epoch [LinearOrder U] (FM : ForwardModel S O U)
     (inputsAt : ℕ → (S → ℝ) → PolicyInputs PolicyIndex U)
     (world : ℕ → S) (obs : ℕ → O) (key : PolicyIndex → PolicyKey M P)
     (plan : PolicyIndex → ℕ → U) (occurrence : ℕ → String × String)
-    (supply : PolicyIndex → ℕ → Supply) (policyPrior : ℕ → PolicyIndex → S → ℝ)
-    (t : ℕ) (μ : S → ℝ) :
+    (supply : PolicyIndex → ℕ → Supply)
+    (t : ℕ) (μ : S → ℝ) (pb : PolicyIndex → S → ℝ) :
     Except (StepAbsence PolicyIndex) (EpochResult M P S O U PolicyIndex) :=
   match machineObservationLaw FM (plannedInputs inputsAt plan t μ) (world t) with
   | .error a => .error (.noAction a)
@@ -183,11 +186,38 @@ def epoch [LinearOrder U] (FM : ForwardModel S O U)
       | some μ' => .ok {
           belief := μ', action := u,
           evidence := fun π => policyEpoch FM key plan occurrence supply (obs (t + 1)) t π
-            (policyPrior t π) }
+            (pb π) }
+
+/-- Each policy's belief after an epoch: the posterior of its admitted record. A
+contradicted policy keeps its prior. Its prefix has already ended at that record
+(`admitFrom` stops at the first refusal), so no later record of that policy is
+admitted, and the value is never read by `prefixF`. -/
+def nextPolicyBelief (e : PolicyIndex → PolicyEpoch M P S O) : PolicyIndex → S → ℝ :=
+  fun π => match e π with
+    | .admitted s => s.q
+    | .contradicted _ _ _ _ _ _ sPrev _ => sPrev
+
+/-- The record for `π` at an epoch starts from the belief the loop carried for `π`. -/
+theorem policyEpoch_sPrev (FM : ForwardModel S O U) (key : PolicyIndex → PolicyKey M P)
+    (plan : PolicyIndex → ℕ → U) (occurrence : ℕ → String × String)
+    (supply : PolicyIndex → ℕ → Supply) (o : O) (t : ℕ) (π : PolicyIndex) (prior : S → ℝ) :
+    (encodedEvidence (policyEpoch FM key plan occurrence supply o t π prior)).sPrev = prior := by
+  unfold policyEpoch
+  split <;> rfl
+
+/-- The next prior of `π` is the posterior of its admitted record: consecutive
+admitted records of one policy chain (`s_{τ+1}.sPrev = s_τ.q`) by construction, which is
+what W7's `chainBroken` check requires. -/
+theorem nextPolicyBelief_admitted (e : PolicyIndex → PolicyEpoch M P S O) (π : PolicyIndex)
+    (s : Step M P S O) (h : e π = .admitted s) : nextPolicyBelief e π = s.q := by
+  simp [nextPolicyBelief, h]
 
 /-- Accumulated successful loop state. -/
 structure LoopState (M P S O U PolicyIndex : Type*) [Fintype S] [DecidableEq S] where
   belief : S → ℝ
+  /-- Each policy's own record of the current state, `Q(s_τ | π)`
+  (`refs/friston2017.txt:368-372`), carried from epoch to epoch. -/
+  policyBelief : PolicyIndex → S → ℝ
   actions : List U
   history : List (PolicyIndex → PolicyEpoch M P S O)
 
@@ -196,12 +226,13 @@ def loop [LinearOrder U] (FM : ForwardModel S O U)
     (inputsAt : ℕ → (S → ℝ) → PolicyInputs PolicyIndex U)
     (world : ℕ → S) (obs : ℕ → O) (key : PolicyIndex → PolicyKey M P)
     (plan : PolicyIndex → ℕ → U) (occurrence : ℕ → String × String)
-    (supply : PolicyIndex → ℕ → Supply) (policyPrior : ℕ → PolicyIndex → S → ℝ) :
+    (supply : PolicyIndex → ℕ → Supply) :
     ℕ → Except (StepAbsence PolicyIndex) (LoopState M P S O U PolicyIndex)
-  | 0 => .ok { belief := FM.q₀, actions := [], history := [] }
-  | n + 1 => (loop FM inputsAt world obs key plan occurrence supply policyPrior n).bind fun st =>
-      (epoch FM inputsAt world obs key plan occurrence supply policyPrior n st.belief).map fun r =>
-        { belief := r.belief, actions := st.actions ++ [r.action],
+  | 0 => .ok { belief := FM.q₀, policyBelief := fun _ => FM.q₀, actions := [], history := [] }
+  | n + 1 => (loop FM inputsAt world obs key plan occurrence supply n).bind fun st =>
+      (epoch FM inputsAt world obs key plan occurrence supply n st.belief st.policyBelief).map fun r =>
+        { belief := r.belief, policyBelief := nextPolicyBelief r.evidence,
+          actions := st.actions ++ [r.action],
           history := st.history ++ [r.evidence] }
 
 /-- `epoch` carries exactly the belief computed by the established machine step. -/
@@ -209,9 +240,9 @@ theorem epoch_belief_eq_machineStep [LinearOrder U]
     (FM : ForwardModel S O U) (inputsAt : ℕ → (S → ℝ) → PolicyInputs PolicyIndex U)
     (world : ℕ → S) (obs : ℕ → O) (key : PolicyIndex → PolicyKey M P)
     (plan : PolicyIndex → ℕ → U) (occurrence : ℕ → String × String)
-    (supply : PolicyIndex → ℕ → Supply) (policyPrior : ℕ → PolicyIndex → S → ℝ)
-    (t : ℕ) (μ : S → ℝ) (r : EpochResult M P S O U PolicyIndex)
-    (h : epoch FM inputsAt world obs key plan occurrence supply policyPrior t μ = .ok r) :
+    (supply : PolicyIndex → ℕ → Supply)
+    (t : ℕ) (μ : S → ℝ) (pb : PolicyIndex → S → ℝ) (r : EpochResult M P S O U PolicyIndex)
+    (h : epoch FM inputsAt world obs key plan occurrence supply t μ pb = .ok r) :
     machineStep FM (plannedInputs inputsAt plan) world obs t μ = .ok r.belief := by
   unfold epoch at h
   cases hl : machineObservationLaw FM (plannedInputs inputsAt plan t μ) (world t) with
@@ -236,8 +267,8 @@ theorem loop_belief_eq_machineTrajectory [LinearOrder U]
     (FM : ForwardModel S O U) (inputsAt : ℕ → (S → ℝ) → PolicyInputs PolicyIndex U)
     (world : ℕ → S) (obs : ℕ → O) (key : PolicyIndex → PolicyKey M P)
     (plan : PolicyIndex → ℕ → U) (occurrence : ℕ → String × String)
-    (supply : PolicyIndex → ℕ → Supply) (policyPrior : ℕ → PolicyIndex → S → ℝ) :
-    ∀ n st, loop FM inputsAt world obs key plan occurrence supply policyPrior n = .ok st →
+    (supply : PolicyIndex → ℕ → Supply) :
+    ∀ n st, loop FM inputsAt world obs key plan occurrence supply n = .ok st →
       machineTrajectory FM (plannedInputs inputsAt plan) world obs n = .ok st.belief := by
   intro n
   induction n with
@@ -247,12 +278,13 @@ theorem loop_belief_eq_machineTrajectory [LinearOrder U]
     simpa [loop, machineTrajectory] using hs
   | succ n ih =>
     intro st h
-    cases hl : loop FM inputsAt world obs key plan occurrence supply policyPrior n with
+    cases hl : loop FM inputsAt world obs key plan occurrence supply n with
     | error a =>
       simp only [loop, hl, Except.bind] at h
       cases h
     | ok prev =>
-      cases he : epoch FM inputsAt world obs key plan occurrence supply policyPrior n prev.belief with
+      cases he : epoch FM inputsAt world obs key plan occurrence supply n prev.belief
+          prev.policyBelief with
       | error a =>
         simp only [loop, hl, Except.bind, he, Except.map] at h
         cases h
@@ -261,7 +293,7 @@ theorem loop_belief_eq_machineTrajectory [LinearOrder U]
         have hb := congrArg LoopState.belief h
         have ht := ih prev hl
         have hs := epoch_belief_eq_machineStep FM inputsAt world obs key plan occurrence supply
-          policyPrior n prev.belief r he
+          n prev.belief prev.policyBelief r he
         simp only at hb
         rw [machineTrajectory, ht, Except.bind, hs]
         exact congrArg Except.ok hb
@@ -271,16 +303,16 @@ theorem next_rollout_starts_at_loop_belief [LinearOrder U] [DecidableEq PolicyIn
     (FM : ForwardModel S O U) (inputsAt : ℕ → (S → ℝ) → PolicyInputs PolicyIndex U)
     (world : ℕ → S) (obs : ℕ → O) (key : PolicyIndex → PolicyKey M P)
     (plan : PolicyIndex → ℕ → U) (occurrence : ℕ → String × String)
-    (supply : PolicyIndex → ℕ → Supply) (policyPrior : ℕ → PolicyIndex → S → ℝ)
+    (supply : PolicyIndex → ℕ → Supply)
     (n T : ℕ) (π : PolicyIndex) (st : LoopState M P S O U PolicyIndex)
     (f : Fin (T + 1) → O → ℝ)
-    (hl : loop FM inputsAt world obs key plan occurrence supply policyPrior n = .ok st)
+    (hl : loop FM inputsAt world obs key plan occurrence supply n = .ok st)
     (hr : machineRollout FM (plannedInputs inputsAt plan) world obs n T π plan = .ok f) :
     ∀ o, f 0 o = ∑ s, FM.A s o * st.belief s := by
   obtain ⟨μ, hm, hf⟩ := machineRollout_startsAtCurrentBelief FM
     (plannedInputs inputsAt plan) world obs n T π plan f hr
   have hs := loop_belief_eq_machineTrajectory FM inputsAt world obs key plan occurrence supply
-    policyPrior n st hl
+    n st hl
   rw [hs] at hm
   cases Except.ok.inj hm
   exact hf
@@ -328,10 +360,11 @@ theorem loop_one [LinearOrder U]
     (FM : ForwardModel S O U) (inputsAt : ℕ → (S → ℝ) → PolicyInputs PolicyIndex U)
     (world : ℕ → S) (obs : ℕ → O) (key : PolicyIndex → PolicyKey M P)
     (plan : PolicyIndex → ℕ → U) (occurrence : ℕ → String × String)
-    (supply : PolicyIndex → ℕ → Supply) (policyPrior : ℕ → PolicyIndex → S → ℝ) :
-    loop FM inputsAt world obs key plan occurrence supply policyPrior 1 =
-      (epoch FM inputsAt world obs key plan occurrence supply policyPrior 0 FM.q₀).map fun r =>
-        { belief := r.belief, actions := [r.action], history := [r.evidence] } := by
+    (supply : PolicyIndex → ℕ → Supply) :
+    loop FM inputsAt world obs key plan occurrence supply 1 =
+      (epoch FM inputsAt world obs key plan occurrence supply 0 FM.q₀ (fun _ => FM.q₀)).map fun r =>
+        { belief := r.belief, policyBelief := nextPolicyBelief r.evidence,
+          actions := [r.action], history := [r.evidence] } := by
   rfl
 
 #print axioms encode_q_irrelevant
@@ -342,6 +375,8 @@ theorem loop_one [LinearOrder U]
 #print axioms contradicted_policy_has_zero_weight
 #print axioms encoded_epoch_contradiction_has_zero_weight
 #print axioms loop_one
+#print axioms policyEpoch_sPrev
+#print axioms nextPolicyBelief_admitted
 
 end
 
