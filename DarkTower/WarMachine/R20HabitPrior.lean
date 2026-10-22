@@ -39,7 +39,7 @@ Results, for a click that is certified and whose E is fed by its counts:
 
 * `selection_E_is_habit`: selection's E port is the habit prior of the habit
   row's before-state, since precision reads that port;
-* `fed_E_sums_to_one`: that E is a distribution over the two policies;
+* `fed_E_sums_to_one`: that E is a distribution over the menu's policies;
 * `run_E_reads_previous_outcome`: over a carried run, click `i + 1`'s E is
   the prior of the counts after click `i`'s outcome;
 * `success_raises_next_E`, `failure_keeps_next_E`: what one outcome does to
@@ -63,32 +63,52 @@ open DarkTower.WarMachine.R15HabitPrior
 
 open scoped BigOperators
 noncomputable section
+variable {Policy : Type} [Fintype Policy] [Nonempty Policy]
 attribute [local instance] Classical.propDecidable
 
 /-- The action class of each policy on the menu, one policy per class. -/
-structure ClassMenu where
+structure ClassMenu (Policy : Type) where
   classOf : Policy → Nat
   injective : Function.Injective classOf
 
-/-- The menu's classes, in policy order. -/
-def ClassMenu.classes (m : ClassMenu) : List Nat := [m.classOf .a, m.classOf .b]
+/-- The menu's classes: the image of `classOf`, listed once each. -/
+def ClassMenu.classes (m : ClassMenu Policy) : List Nat :=
+  (Finset.univ.image m.classOf).toList
 
-theorem ClassMenu.nodup (m : ClassMenu) : m.classes.Nodup := by
-  have ne : m.classOf .a ≠ m.classOf .b := fun h => by cases m.injective h
-  simp [ClassMenu.classes, ne]
+omit [Nonempty Policy] in
+theorem ClassMenu.nodup (m : ClassMenu Policy) : m.classes.Nodup :=
+  Finset.nodup_toList _
 
-theorem ClassMenu.mem (m : ClassMenu) (π : Policy) : m.classOf π ∈ m.classes := by
-  cases π <;> simp [ClassMenu.classes]
+omit [Nonempty Policy] in
+theorem ClassMenu.mem (m : ClassMenu Policy) (π : Policy) : m.classOf π ∈ m.classes := by
+  simp [ClassMenu.classes]
+
+omit [Nonempty Policy] in
+theorem ClassMenu.mem_iff (m : ClassMenu Policy) (k : Nat) :
+    k ∈ m.classes ↔ ∃ π, m.classOf π = k := by
+  simp [ClassMenu.classes]
+
+theorem ClassMenu.ne_nil (m : ClassMenu Policy) : m.classes ≠ [] := by
+  obtain ⟨π⟩ := (inferInstance : Nonempty Policy)
+  exact List.ne_nil_of_mem (m.mem π)
+
+omit [Nonempty Policy] in
+/-- Summing over the policies is summing over the menu's classes. -/
+theorem ClassMenu.sum_classes (m : ClassMenu Policy) (f : Nat → ℚ) :
+    ∑ π, f (m.classOf π) = (m.classes.map f).sum := by
+  rw [ClassMenu.classes, Finset.sum_map_toList,
+    Finset.sum_image (fun x _ y _ h => m.injective h)]
 
 /-- The precision row's E is the habit prior of the slow state this click
 started from, at each policy's class. -/
-def HabitFeedsE (m : ClassMenu) (records : Records) : Prop :=
+def HabitFeedsE (m : ClassMenu Policy) (records : Records Policy) : Prop :=
   ∀ h p, records .habit = some h → records .precision = some p →
     ∀ π, p.E π = (classHabitPrior h.before m.classes (m.classOf π) : ℝ)
 
+omit [Nonempty Policy] in
 /-- In a certified click fed by its counts, selection's E port, which
 enters the policy prior, is the habit prior: precision reads that port. -/
-theorem selection_E_is_habit {m : ClassMenu} {records : Records}
+theorem selection_E_is_habit {m : ClassMenu Policy} {records : Records Policy}
     {ports : R20Graph.Ports Policy} (certified : Certified records (certify records) ports)
     (fed : HabitFeedsE m records) {h : TwoTickRecord}
     {p : PrecisionFromObservation.TickRecord Policy}
@@ -107,34 +127,30 @@ private theorem num_pos_of_div_pos {x y : ℚ} (hx : 0 ≤ x) (pos : 0 < x / y) 
 
 /-- A conforming precision row has positive E, so every class on the menu has
 positive count and the fed E sums to one. -/
-theorem fed_E_sums_to_one {m : ClassMenu} {records : Records} (fed : HabitFeedsE m records)
+theorem fed_E_sums_to_one {m : ClassMenu Policy} {records : Records Policy}
+    (fed : HabitFeedsE m records)
     {h : TwoTickRecord} {p : PrecisionFromObservation.TickRecord Policy}
     (hh : records .habit = some h) (hp : records .precision = some p)
     (conforms : PrecisionFromObservation.Conforms p) :
     ∑ π, p.E π = 1 := by
   have positive : PositiveAlphas h.before m.classes := by
     intro k hk
-    have : ∃ π, m.classOf π = k := by
-      simp only [ClassMenu.classes, List.mem_cons, List.mem_nil_iff, or_false] at hk
-      rcases hk with rfl | rfl
-      · exact ⟨.a, rfl⟩
-      · exact ⟨.b, rfl⟩
-    obtain ⟨π, rfl⟩ := this
+    obtain ⟨π, rfl⟩ := (m.mem_iff k).1 hk
     have e := conforms.1 π
     rw [fed h p hh hp π] at e
     exact num_pos_of_div_pos (by simp [classAlpha]) (by exact_mod_cast e)
-  have sum := classHabitPrior_sum_one (by simp [ClassMenu.classes]) positive
-  rw [PrecisionFromObservation.sum_twoPolicy, fed h p hh hp, fed h p hh hp]
-  simp only [ClassMenu.classes, List.map_cons, List.map_nil, List.sum_cons,
-    List.sum_nil, add_zero] at sum
+  have sum := classHabitPrior_sum_one m.ne_nil positive
+  rw [← m.sum_classes] at sum
+  simp only [fed h p hh hp]
   exact_mod_cast sum
 
 /-! ## Over a run -/
 
+omit [Nonempty Policy] in
 /-- Over a carried run whose clicks are fed by their counts, click `i + 1`'s E
 is the habit prior of the counts after click `i`'s outcome. -/
 theorem run_E_reads_previous_outcome {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n) (m : ClassMenu)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n) (m : ClassMenu Policy)
     (fed : ∀ i ≤ n, HabitFeedsE m (c i).records)
     (hab : ℕ → TwoTickRecord) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
@@ -148,10 +164,11 @@ theorem run_E_reads_previous_outcome {relation : Target → Target → TargetRel
   have carried := (run.2 i hi).habit _ _ (hh i (by omega)) (hh (i + 1) (by omega))
   rw [fed (i + 1) hi _ _ (hh (i + 1) (by omega)) (hp (i + 1) hi) π, carried, good.2.2, good.2.1]
 
+omit [Nonempty Policy] in
 /-- A witnessed success of policy `π`'s class at click `i` raises `π`'s E at
 click `i + 1`, whenever the other class holds positive count. -/
 theorem success_raises_next_E {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n) (m : ClassMenu)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n) (m : ClassMenu Policy)
     (fed : ∀ i ≤ n, HabitFeedsE m (c i).records)
     (hab : ℕ → TwoTickRecord) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
@@ -165,10 +182,11 @@ theorem success_raises_next_E {relation : Target → Target → TargetRelation}
     fed i (by omega) _ _ (hh i (by omega)) (hp i (by omega)) π]
   exact_mod_cast success_strictly_increases_habit m.nodup (m.mem π) positiveTotal outsideMass
 
+omit [Nonempty Policy] in
 /-- A witnessed failure at click `i` leaves every policy's E at click `i + 1`
 where it was. -/
 theorem failure_keeps_next_E {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n) (m : ClassMenu)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n) (m : ClassMenu Policy)
     (fed : ∀ i ≤ n, HabitFeedsE m (c i).records)
     (hab : ℕ → TwoTickRecord) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i))
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
@@ -184,8 +202,16 @@ theorem failure_keeps_next_E {relation : Target → Target → TargetRelation}
 One click with the habit row's before-state `countsA` (class 1 count 3,
 class 2 count 2), so the counts give E = (3/5, 2/5). -/
 
-def menu12 : ClassMenu :=
+def menu12 : ClassMenu PrecisionFromObservation.TwoPolicy :=
   ⟨fun | .a => 1 | .b => 2, by intro x y h; cases x <;> cases y <;> first | rfl | cases h⟩
+
+@[simp] theorem menu12_a : menu12.classOf .a = 1 := rfl
+@[simp] theorem menu12_b : menu12.classOf .b = 2 := rfl
+
+theorem totalAlpha_menu12 (state : SlowState) :
+    totalAlpha state menu12.classes = classAlpha state 1 + classAlpha state 2 := by
+  have image : Finset.univ.image menu12.classOf = {1, 2} := by decide
+  rw [totalAlpha, ClassMenu.classes, Finset.sum_map_toList, image, Finset.sum_pair (by decide)]
 
 def habitAt (before : SlowState) : TwoTickRecord :=
   let outcome : FastOutcome := ⟨1, true, true⟩
@@ -194,26 +220,26 @@ def habitAt (before : SlowState) : TwoTickRecord :=
 def precisionWithE (E : Policy → ℝ) : PrecisionFromObservation.TickRecord Policy :=
   ⟨E, fun _ => 0, fun _ => 0, fun _ => 1 / 2, fun _ => 1 / 2, 1, 1⟩
 
-def clickRecords (E : Policy → ℝ) : Records :=
+def clickRecords (E : Policy → ℝ) : Records Policy :=
   rows (habitAt countsA) (evidenceAt (fun _ => 1 / 2) (fun _ => 1 / 2)) (precisionWithE E)
     ⟨7, tickAt 7 [7]⟩
 
-def countedE : Policy → ℝ := fun | .a => 3 / 5 | .b => 2 / 5
+def countedE : PrecisionFromObservation.TwoPolicy → ℝ := fun | .a => 3 / 5 | .b => 2 / 5
 
 theorem example_feeds : HabitFeedsE menu12 (clickRecords countedE) := by
   intro h p hh hp π
   simp only [clickRecords, rows] at hh hp
   cases hh; cases hp
   cases π <;>
-    norm_num [precisionWithE, countedE, habitAt, menu12, ClassMenu.classes, classHabitPrior,
-      totalAlpha, classAlpha, countsA, countsFor]
+    norm_num [precisionWithE, countedE, habitAt, classHabitPrior, totalAlpha_menu12,
+      classAlpha, countsA, countsFor]
 
 /-- E uniform although the counts give 3/5 and 2/5. -/
 theorem uncountedE_refused : ¬ HabitFeedsE menu12 (clickRecords fun _ => 1 / 2) := by
   intro fed
   have := fed _ _ rfl rfl .a
-  norm_num [precisionWithE, habitAt, menu12, ClassMenu.classes, classHabitPrior,
-    totalAlpha, classAlpha, countsA, countsFor] at this
+  norm_num [precisionWithE, habitAt, classHabitPrior, totalAlpha_menu12,
+    classAlpha, countsA, countsFor] at this
 
 /-- E computed from the counts after this click's own success of class 1,
 (4/6, 2/6): the click's outcome read into its own choice. -/
@@ -221,8 +247,8 @@ theorem postOutcomeE_refused :
     ¬ HabitFeedsE menu12 (clickRecords fun | .a => 2 / 3 | .b => 1 / 3) := by
   intro fed
   have := fed _ _ rfl rfl .a
-  norm_num [precisionWithE, habitAt, menu12, ClassMenu.classes, classHabitPrior,
-    totalAlpha, classAlpha, countsA, countsFor] at this
+  norm_num [precisionWithE, habitAt, classHabitPrior, totalAlpha_menu12,
+    classAlpha, countsA, countsFor] at this
 
 #print axioms selection_E_is_habit
 #print axioms fed_E_sums_to_one

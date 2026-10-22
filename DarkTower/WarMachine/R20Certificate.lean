@@ -1,4 +1,4 @@
-import DarkTower.WarMachine.PrecisionFromObservation
+import DarkTower.WarMachine.PrecisionFiniteMenu
 import DarkTower.WarMachine.EvidenceFromTheProcess
 import DarkTower.WarMachine.R15HabitPrior
 import DarkTower.WarMachine.CTauClassPreference
@@ -52,6 +52,12 @@ The evidence module supplies the posterior but no before/after receipt, so
 `Holes` declarations concern generic claims and witnesses rather than an
 author/reviewer receipt; `IndependenceRow` is therefore the equally small
 boundary required by this certificate.  Neither adapter adds theory.
+
+The menu of policies is any finite, nonempty type `Policy`.  The precision
+row's direction is stated for any such menu
+(`precision_similarlyOrdered_is_moreDecisive`,
+`precision_oppositelyOrdered_is_lessDecisive`, from `PrecisionFiniteMenu`);
+the earlier two-policy statements remain as instances on `TwoPolicy`.
 -/
 
 namespace DarkTower.WarMachine.R20Certificate
@@ -82,7 +88,8 @@ inductive Case
   | cost (v : CostCase)
   deriving DecidableEq, Repr
 
-abbrev Policy := PrecisionFromObservation.TwoPolicy
+variable {Policy : Type} [Fintype Policy] [Nonempty Policy]
+open PrecisionFromObservation (TwoPolicy)
 abbrev Hidden := Fin 2
 abbrev Observation := Bool
 
@@ -173,7 +180,7 @@ def costCase (r : CostRow) : CostCase :=
   else if r.msThroughSelection < r.msAfterSelection then .mostlyActing
   else .even
 
-def NodeRecord : Node → Type
+def NodeRecord (Policy : Type) : Node → Type
   | .precision => PrecisionFromObservation.TickRecord Policy
   | .evidence => EvidenceRow
   | .habit => R15TemporalHierarchy.TwoTickRecord
@@ -184,7 +191,7 @@ def NodeRecord : Node → Type
   | .jointAction => JointRow
   | .cost => CostRow
 
-def conforms : (n : Node) → NodeRecord n → Prop
+def conforms : (n : Node) → NodeRecord Policy n → Prop
   | .precision, r => PrecisionFromObservation.Conforms r
   | .evidence, r => EvidenceConforms r
   | .habit, r => R15TemporalHierarchy.TwoTickFeedback r
@@ -195,7 +202,7 @@ def conforms : (n : Node) → NodeRecord n → Prop
   | .jointAction, r => R11JointAction.OneWriter r
   | .cost, r => CostConforms r
 
-def caseOf : (n : Node) → NodeRecord n → Case
+def caseOf : (n : Node) → NodeRecord Policy n → Case
   | .precision, r => .precision <| if r.betaPosterior = r.betaPrior then .unchanged
       else if r.betaPosterior < r.betaPrior then .moreDecisive else .lessDecisive
   | .evidence, r => .evidence <| if r.posterior = r.prior then .beliefUnchanged else .beliefMoved
@@ -220,10 +227,63 @@ theorem precision_constant_F_is_unchanged
     h.2.1 r.E r.G c).mp (by simpa [hc] using fixed)
   simp [caseOf, eq]
 
+/-- Any finite menu: the row prints `moreDecisive` exactly when the expected G
+fell under the observation, and `lessDecisive` exactly when it rose. -/
+theorem precision_moreDecisive_iff
+    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r) :
+    caseOf .precision r = .precision .moreDecisive ↔
+      PrecisionFromObservation.expectedGChange r.betaPosterior r.E r.G r.F < 0 := by
+  rw [← PrecisionFromObservation.posterior_temperature_direction_lt h.2.2.1]
+  by_cases eq : r.betaPosterior = r.betaPrior
+  · simp [caseOf, eq]
+  · by_cases lt : r.betaPosterior < r.betaPrior <;> simp [caseOf, eq, lt]
+
+theorem precision_lessDecisive_iff
+    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r) :
+    caseOf .precision r = .precision .lessDecisive ↔
+      0 < PrecisionFromObservation.expectedGChange r.betaPosterior r.E r.G r.F := by
+  rw [← PrecisionFromObservation.posterior_temperature_direction_gt h.2.2.1]
+  by_cases eq : r.betaPosterior = r.betaPrior
+  · simp [caseOf, eq]
+  · by_cases lt : r.betaPosterior < r.betaPrior
+    · simp [caseOf, eq, lt, not_lt.mpr lt.le]
+    · have gt : r.betaPrior < r.betaPosterior := lt_of_le_of_ne (not_lt.mp lt) (Ne.symm eq)
+      simp [caseOf, eq, lt, gt]
+
+/-- Any finite menu: an observation that ranks the policies as G does prints
+`moreDecisive`. -/
+theorem precision_similarlyOrdered_is_moreDecisive
+    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (ordered : PrecisionFromObservation.SimilarlyOrdered r.G r.F) :
+    caseOf .precision r = .precision .moreDecisive :=
+  (precision_moreDecisive_iff r h).2
+    (PrecisionFromObservation.expectedGChange_neg_of_similarlyOrdered ordered)
+
+/-- Any finite menu: an observation that ranks the policies against G prints
+`lessDecisive`. -/
+theorem precision_oppositelyOrdered_is_lessDecisive
+    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (ordered : PrecisionFromObservation.OppositelyOrdered r.G r.F) :
+    caseOf .precision r = .precision .lessDecisive :=
+  (precision_lessDecisive_iff r h).2
+    (PrecisionFromObservation.expectedGChange_pos_of_oppositelyOrdered ordered)
+
+omit [Nonempty Policy] in
+/-- Any finite menu: a record whose temperature did not move although the
+observation changed the expected G does not conform. -/
+theorem precision_unchanged_with_change_refused
+    (r : PrecisionFromObservation.TickRecord Policy)
+    (change : PrecisionFromObservation.expectedGChange r.betaPosterior r.E r.G r.F ≠ 0)
+    (unchanged : r.betaPosterior = r.betaPrior) : ¬ PrecisionFromObservation.Conforms r := by
+  rintro ⟨_, _, ⟨_, zero⟩, _, _⟩
+  unfold PrecisionFromObservation.precisionError at zero
+  rw [unchanged] at zero
+  exact change (by rw [unchanged]; linarith)
+
 /-- With two policies that G ranks differently, a conforming record's
 temperature is unchanged exactly when F is the same for both. -/
 theorem precision_unchanged_iff_F_equal
-    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (r : PrecisionFromObservation.TickRecord TwoPolicy) (h : PrecisionFromObservation.Conforms r)
     (hG : r.G .a ≠ r.G .b) :
     caseOf .precision r = .precision .unchanged ↔ r.F .a = r.F .b := by
   constructor
@@ -242,33 +302,38 @@ theorem precision_unchanged_iff_F_equal
     · exact hF.symm
 
 theorem precision_favoured_is_moreDecisive
-    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (r : PrecisionFromObservation.TickRecord TwoPolicy) (h : PrecisionFromObservation.Conforms r)
     (hG : r.G .a < r.G .b) (hF : r.F .a < r.F .b) :
     caseOf .precision r = .precision .moreDecisive := by
   have lt := PrecisionFromObservation.favoured_observation_raises_precision h.2.2.1 hG hF
   simp [caseOf, lt.ne, lt]
 
 theorem precision_against_is_lessDecisive
-    (r : PrecisionFromObservation.TickRecord Policy) (h : PrecisionFromObservation.Conforms r)
+    (r : PrecisionFromObservation.TickRecord TwoPolicy) (h : PrecisionFromObservation.Conforms r)
     (hG : r.G .a < r.G .b) (hF : r.F .b < r.F .a) :
     caseOf .precision r = .precision .lessDecisive := by
   have gt := PrecisionFromObservation.against_favoured_lowers_precision h.2.2.1 hG hF
   simp [caseOf, gt.ne', not_lt.mpr gt.le]
 
+omit [Fintype Policy] [Nonempty Policy] in
 theorem evidence_state_independent_is_unchanged (r : EvidenceRow)
     (h : EvidenceConforms r) (normal : ∑ s, r.prior s = 1)
     (c : ℝ) (hc : 0 < c) (constant : ∀ s, r.likelihood s r.observation = c) :
-    caseOf .evidence r = .evidence .beliefUnchanged := by
+    caseOf (Policy := Policy) .evidence r = .evidence .beliefUnchanged := by
   have unchanged := EvidenceFromTheProcess.no_evidence_no_change
     r.prior r.likelihood r.observation normal c hc constant
   simp [caseOf, h.trans unchanged]
 
+omit [Fintype Policy] [Nonempty Policy] in
 theorem failed_habit_is_unchanged (r : R15TemporalHierarchy.TwoTickRecord)
-    (failed : r.outcome.succeeded = false) : caseOf .habit r = .habit .unchanged := by
+    (failed : r.outcome.succeeded = false) :
+    caseOf (Policy := Policy) .habit r = .habit .unchanged := by
   simp [caseOf, failed]
 
+omit [Fintype Policy] [Nonempty Policy] in
 theorem liveness_case_is_live_iff (r : LiveRow) :
-    caseOf .liveness r = .liveness .live ↔ R10ScheduledEntrypoint.LiveTick r := by
+    caseOf (Policy := Policy) .liveness r = .liveness .live ↔
+      R10ScheduledEntrypoint.LiveTick r := by
   simp [caseOf]
 
 /-! ## The cost row -/
@@ -289,38 +354,41 @@ theorem cost_total_is_sum_of_sides (r : CostRow) (h : CostConforms r) :
   obtain ⟨_, total, through, after⟩ := h
   rw [total, through, after, totalTokens_split]
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- More tokens after the choice than up to it: the row prints `mostlyActing`. -/
 theorem cost_mostlyActing (r : CostRow) (h : CostConforms r)
     (more : tokensWhere true r.jobs < tokensWhere false r.jobs) :
-    caseOf .cost r = .cost .mostlyActing := by
+    caseOf (Policy := Policy) .cost r = .cost .mostlyActing := by
   obtain ⟨_, _, through, after⟩ := h
   have lt : r.reportedTokensThroughSelection < r.reportedTokensAfterSelection := by
     rw [through, after]; exact more
   simp [caseOf, costCase, lt, Nat.lt_asymm lt]
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- More tokens up to the choice than after it: the row prints `mostlyChoosing`. -/
 theorem cost_mostlyChoosing (r : CostRow) (h : CostConforms r)
     (more : tokensWhere false r.jobs < tokensWhere true r.jobs) :
-    caseOf .cost r = .cost .mostlyChoosing := by
+    caseOf (Policy := Policy) .cost r = .cost .mostlyChoosing := by
   obtain ⟨_, _, through, after⟩ := h
   have lt : r.reportedTokensAfterSelection < r.reportedTokensThroughSelection := by
     rw [through, after]; exact more
   simp [caseOf, costCase, lt]
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- Equal tokens and equal time on the two sides: the row prints `even`. -/
 theorem cost_even (r : CostRow)
     (tokens : r.reportedTokensThroughSelection = r.reportedTokensAfterSelection)
     (time : r.msThroughSelection = r.msAfterSelection) :
-    caseOf .cost r = .cost .even := by
+    caseOf (Policy := Policy) .cost r = .cost .even := by
   simp [caseOf, costCase, tokens, time]
 
 inductive RowVerdict | notRecorded | agrees (case : Case) | disagrees (case : Case)
   deriving DecidableEq, Repr
 
-abbrev Records := (n : Node) → Option (NodeRecord n)
+abbrev Records (Policy : Type) := (n : Node) → Option (NodeRecord Policy n)
 abbrev Certificate := Node → RowVerdict
 
-noncomputable def certify (records : Records) : Certificate := fun n =>
+noncomputable def certify (records : Records Policy) : Certificate := fun n =>
   match records n with
   | none => .notRecorded
   | some r => if conforms n r then .agrees (caseOf n r) else .disagrees (caseOf n r)
@@ -345,7 +413,7 @@ the class-preference row's prediction and preference, to those ports, so a row
 judged on some other F is not certified. G is compared after embedding the
 row's real value in EReal: an infinite G port cannot certify this real-valued
 precision row, and no toReal conversion drops infinity. -/
-def RowsReadPorts (records : Records) (ports : R20Graph.Ports Policy) : Prop :=
+def RowsReadPorts (records : Records Policy) (ports : R20Graph.Ports Policy) : Prop :=
   (∀ r, records .precision = some r →
     r.E = ports.precisionHabit.value ∧ (fun π => (r.G π : EReal)) = ports.precisionG.value ∧
       r.F = ports.precisionF.value) ∧
@@ -359,11 +427,12 @@ def RowsReadPorts (records : Records) (ports : R20Graph.Ports Policy) : Prop :=
 /-- A click is certified only when every row agrees, its shared quantities
 are the exact artifacts declared by the R20 graph, and the consumer rows were
 judged on those artifacts. -/
-def Certified (records : Records) (certificate : Certificate)
+def Certified (records : Records Policy) (certificate : Certificate)
     (ports : R20Graph.Ports Policy) : Prop :=
   RowsCertified certificate ∧ R20Graph.Wired records ports ∧ RowsReadPorts records ports
 
-theorem rowsCertified_iff (records : Records) :
+omit [Nonempty Policy] in
+theorem rowsCertified_iff (records : Records Policy) :
     RowsCertified (certify records) ↔
       ∀ node, ∃ r, records node = some r ∧ conforms node r := by
   classical
@@ -384,15 +453,17 @@ theorem rowsCertified_iff (records : Records) :
     cases node <;> simp only [certify] at row ⊢ <;>
       rcases row with ⟨r, hr, good⟩ <;> simp [hr, good]
 
-theorem certified_iff (records : Records) (ports : R20Graph.Ports Policy) :
+omit [Nonempty Policy] in
+theorem certified_iff (records : Records Policy) (ports : R20Graph.Ports Policy) :
     Certified records (certify records) ports ↔
       (∀ node, ∃ r, records node = some r ∧ conforms node r) ∧
         R20Graph.Wired records ports ∧ RowsReadPorts records ports := by
   rw [Certified, rowsCertified_iff]
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- The precision row reads this run's post-observation inference F, whose
 value is defined from its tick inputs by H1. -/
-theorem certified_precision_reads_inference_F (records : Records) (c : Certificate)
+theorem certified_precision_reads_inference_F (records : Records Policy) (c : Certificate)
     (ports : R20Graph.Ports Policy) (certified : Certified records c ports)
     (r : PrecisionFromObservation.TickRecord Policy) (hr : records .precision = some r) :
     r.F = ports.inferenceF.value ∧ ports.inferenceF.producer = .postObservationInference ∧
@@ -400,17 +471,19 @@ theorem certified_precision_reads_inference_F (records : Records) (c : Certifica
   rcases certified with ⟨_, wired, reads⟩
   exact ⟨(reads.1 r hr).2.2.trans (by rw [wired.fRead]), wired.fProducer, wired.fRun⟩
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- The wrong-F control at the certificate: a precision row judged on an F
 other than post-observation inference's defined F is not certified. K5. -/
-theorem wrongF_not_certified (records : Records) (c : Certificate)
+theorem wrongF_not_certified (records : Records Policy) (c : Certificate)
     (ports : R20Graph.Ports Policy)
     (r : PrecisionFromObservation.TickRecord Policy) (hr : records .precision = some r)
     (wrong : r.F ≠ ports.inferenceF.value) : ¬ Certified records c ports :=
   fun certified => wrong (certified_precision_reads_inference_F records c ports certified r hr).1
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- K11: a schedule labelled as the class-preference row's but holding other
 values at some tick is not certified. -/
-theorem wrongSchedule_not_certified (records : Records) (c : Certificate)
+theorem wrongSchedule_not_certified (records : Records Policy) (c : Certificate)
     (ports : R20Graph.Ports Policy) (r : ClassPreferenceRow)
     (hr : records .classPreference = some r) (t : Fin ports.selectionG.ticks)
     (wrong : ports.selectionG.schedule.value t ≠
@@ -419,23 +492,26 @@ theorem wrongSchedule_not_certified (records : Records) (c : Certificate)
   rintro ⟨_, _, reads⟩
   exact wrong ((reads.2.1 r hr).2.2.2 t)
 
+omit [Fintype Policy] [Nonempty Policy] in
 /-- K11b: G over a different number of ticks than the row's horizon is not
 certified. -/
-theorem wrongTicks_not_certified (records : Records) (c : Certificate)
+theorem wrongTicks_not_certified (records : Records Policy) (c : Certificate)
     (ports : R20Graph.Ports Policy) (r : ClassPreferenceRow)
     (hr : records .classPreference = some r) (wrong : ports.selectionG.ticks ≠ r.horizon) :
     ¬ Certified records c ports := by
   rintro ⟨_, _, reads⟩
   exact wrong (reads.2.1 r hr).2.2.1
 
-theorem missing_not_certified (records : Records) (node : Node)
+omit [Nonempty Policy] in
+theorem missing_not_certified (records : Records Policy) (node : Node)
     (ports : R20Graph.Ports Policy) (missing : records node = none) :
     ¬ Certified records (certify records) ports := by
   intro certified
   rcases certified.1 node with ⟨c, hc⟩
   simp [certify, missing] at hc
 
-theorem refused_row_disagrees (records : Records) (node : Node) (r : NodeRecord node)
+omit [Nonempty Policy] in
+theorem refused_row_disagrees (records : Records Policy) (node : Node) (r : NodeRecord Policy node)
     (present : records node = some r) (bad : ¬ conforms node r) :
     certify records node = .disagrees (caseOf node r) := by
   simp [certify, present, bad]
@@ -473,8 +549,9 @@ def badIndependence : IndependenceRow := ⟨0, 0⟩
 theorem badIndependence_refused : ¬ IndependenceConforms badIndependence := by
   simp [IndependenceConforms, badIndependence]
 
+omit [Nonempty Policy] in
 /-- A certified click had a reviewer who was not its author. -/
-theorem certified_author_is_not_reviewer (records : Records)
+theorem certified_author_is_not_reviewer (records : Records Policy)
     (ports : R20Graph.Ports Policy)
     (certified : Certified records (certify records) ports) :
     ∃ r : IndependenceRow, records .independence = some r ∧ r.author ≠ r.reviewer :=
@@ -483,8 +560,8 @@ theorem certified_author_is_not_reviewer (records : Records)
 /-- The precision control: a record whose temperature did not move although F
 differed between two policies that G ranks differently prints "unchanged" and
 disagrees. -/
-theorem precision_control_disagrees (records : Records)
-    (r : PrecisionFromObservation.TickRecord Policy)
+theorem precision_control_disagrees (records : Records TwoPolicy)
+    (r : PrecisionFromObservation.TickRecord TwoPolicy)
     (present : records .precision = some r)
     (hG : r.G .a ≠ r.G .b) (hF : r.F .a ≠ r.F .b)
     (unchanged : r.betaPosterior = r.betaPrior) :
@@ -493,42 +570,55 @@ theorem precision_control_disagrees (records : Records)
   rw [refused_row_disagrees records .precision r present bad]
   simp [caseOf, unchanged]
 
-theorem evidence_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem evidence_control_disagrees (records : Records Policy)
     (present : records .evidence = some badEvidence) :
-    certify records .evidence = .disagrees (caseOf .evidence badEvidence) :=
+    certify records .evidence =
+      .disagrees (caseOf (Policy := Policy) .evidence badEvidence) :=
   refused_row_disagrees records .evidence badEvidence present badEvidence_refused
 
-theorem habit_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem habit_control_disagrees (records : Records Policy)
     (present : records .habit = some R15TemporalHierarchy.unwitnessedRecord) :
-    certify records .habit = .disagrees (caseOf .habit R15TemporalHierarchy.unwitnessedRecord) :=
+    certify records .habit =
+      .disagrees (caseOf (Policy := Policy) .habit R15TemporalHierarchy.unwitnessedRecord) :=
   refused_row_disagrees records .habit _ present R15TemporalHierarchy.unwitnessedRecord_is_rejected
 
-theorem class_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem class_control_disagrees (records : Records Policy)
     (present : records .classPreference = some badClass) :
-    certify records .classPreference = .disagrees (caseOf .classPreference badClass) :=
+    certify records .classPreference =
+      .disagrees (caseOf (Policy := Policy) .classPreference badClass) :=
   refused_row_disagrees records .classPreference badClass present badClass_refused
 
 def badStrategic : StrategicFocusRow := ⟨7, R15StrategicTarget.wrongClassTick⟩
-theorem strategic_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem strategic_control_disagrees (records : Records Policy)
     (present : records .strategicFocus = some badStrategic) :
-    certify records .strategicFocus = .disagrees (caseOf .strategicFocus badStrategic) :=
+    certify records .strategicFocus =
+      .disagrees (caseOf (Policy := Policy) .strategicFocus badStrategic) :=
   refused_row_disagrees records .strategicFocus badStrategic present
     (by exact R15StrategicTarget.wrongClassTick_rejected)
 
-theorem liveness_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem liveness_control_disagrees (records : Records Policy)
     (present : records .liveness = some badLive) :
-    certify records .liveness = .disagrees (caseOf .liveness badLive) :=
+    certify records .liveness =
+      .disagrees (caseOf (Policy := Policy) .liveness badLive) :=
   refused_row_disagrees records .liveness badLive present badLive_refused
 
-theorem independence_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem independence_control_disagrees (records : Records Policy)
     (present : records .independence = some badIndependence) :
-    certify records .independence = .disagrees (caseOf .independence badIndependence) :=
+    certify records .independence =
+      .disagrees (caseOf (Policy := Policy) .independence badIndependence) :=
   refused_row_disagrees records .independence badIndependence present badIndependence_refused
 
-theorem joint_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem joint_control_disagrees (records : Records Policy)
     (present : records .jointAction = some R11JointAction.bothClaim) :
     certify records .jointAction =
-      .disagrees (caseOf .jointAction R11JointAction.bothClaim) :=
+      .disagrees (caseOf (Policy := Policy) .jointAction R11JointAction.bothClaim) :=
   refused_row_disagrees records .jointAction _ present R11JointAction.both_claim_refused
 
 /-- One job of 12 tokens, reported as a total of 13. -/
@@ -553,9 +643,11 @@ theorem badJobCost_refused : ¬ CostConforms badJobCost := by
   have job := h.1 ⟨false, 10, 2, 13⟩ (by simp [badJobCost])
   simp at job
 
-theorem cost_control_disagrees (records : Records)
+omit [Nonempty Policy] in
+theorem cost_control_disagrees (records : Records Policy)
     (present : records .cost = some badCost) :
-    certify records .cost = .disagrees (caseOf .cost badCost) :=
+    certify records .cost =
+      .disagrees (caseOf (Policy := Policy) .cost badCost) :=
   refused_row_disagrees records .cost badCost present badCost_refused
 
 /-- Fixed print order for the run's succinct certificate. -/

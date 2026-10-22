@@ -66,23 +66,24 @@ open Filter Topology
 
 open scoped BigOperators
 noncomputable section
+variable {Policy : Type} [Fintype Policy] [Nonempty Policy]
 attribute [local instance] Classical.propDecidable
 
 /-- One click as the run keeps it: its rows, its ports, its outer choice, and
 the initial-state counts `d` it started from. -/
-structure Click where
-  records : Records
+structure Click (Policy : Type) where
+  records : Records Policy
   ports : R20Graph.Ports Policy
   selection : OuterSelection
   d : Hidden → ℝ
 
 /-- The evidence row's prior is the mean of `Dir(d)`. -/
-def PriorFromCounts (c : Click) : Prop :=
+def PriorFromCounts (c : Click Policy) : Prop :=
   (∀ s, 0 < c.d s) ∧
     ∀ r, c.records .evidence = some r → r.prior = fun s => c.d s / ∑ x, c.d x
 
 /-- What click `a` hands to the next click `b`. -/
-structure Carries (a b : Click) : Prop where
+structure Carries (a b : Click Policy) : Prop where
   runAdvances : a.ports.runId < b.ports.runId
   habit : ∀ ra rb, a.records .habit = some ra → b.records .habit = some rb →
     rb.before = ra.nextConsumed
@@ -94,14 +95,15 @@ structure Carries (a b : Click) : Prop where
 
 /-- Clicks `0 .. n`: each focus-certified with its prior read from its counts,
 and each carried into the next. -/
-def RunCertified (relation : Target → Target → TargetRelation) (c : ℕ → Click) (n : ℕ) :
-    Prop :=
+def RunCertified (relation : Target → Target → TargetRelation) (c : ℕ → Click Policy)
+    (n : ℕ) : Prop :=
   (∀ i ≤ n, FocusCertified relation (c i).records (c i).ports (c i).selection ∧
     PriorFromCounts (c i)) ∧
   ∀ i < n, Carries (c i) (c (i + 1))
 
+omit [Nonempty Policy] in
 /-- A certified click has every row, and every row conforms. -/
-theorem row_of_certified {relation : Target → Target → TargetRelation} {c : Click}
+theorem row_of_certified {relation : Target → Target → TargetRelation} {c : Click Policy}
     (h : FocusCertified relation c.records c.ports c.selection) (node : Node) :
     ∃ r, c.records node = some r ∧ conforms node r :=
   ((certified_iff c.records c.ports).mp h.1).1 node
@@ -125,8 +127,9 @@ theorem habit_fold (hab : ℕ → TwoTickRecord) (n : ℕ)
     simp only [List.map_cons, List.map_nil, List.foldl_cons, List.foldl_nil]
     rw [fb.2.1, carried n (by omega), (feedback n (by omega)).2.2]
 
+omit [Nonempty Policy] in
 theorem run_habit_accumulates {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
     (hab : ℕ → TwoTickRecord) (hh : ∀ i ≤ n, (c i).records .habit = some (hab i)) :
     (hab n).after =
       ((List.range (n + 1)).map fun i => (hab i).outcome).foldl advance (hab 0).before := by
@@ -141,8 +144,9 @@ theorem run_habit_accumulates {relation : Target → Target → TargetRelation}
 
 /-! ## Initial-state counts -/
 
+omit [Nonempty Policy] in
 theorem run_concentration_accumulates {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
     (ev : ℕ → EvidenceRow) (he : ∀ i ≤ n, (c i).records .evidence = some (ev i)) :
     (c n).d = (c 0).d + ∑ i ∈ Finset.range n, (ev i).posterior := by
   induction n with
@@ -170,10 +174,11 @@ theorem shifted_ratio_tendsto_one (a b : ℝ) (hb : 0 < b) :
     exact tendsto_atTop_add_const_left _ b tendsto_natCast_atTop_atTop
   simpa using (tendsto_const_nhds (x := (1 : ℝ))).sub this
 
+omit [Nonempty Policy] in
 /-- Friston 2017 :820-822. If every posterior so far was certain of `s`, the
 prior on `s` at click `n` is `(d₀ s + n) / (Σ d₀ + n)`. -/
 theorem repeated_state_prior {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
     (ev : ℕ → EvidenceRow) (he : ∀ i ≤ n, (c i).records .evidence = some (ev i))
     (s : Hidden) (certain : ∀ i < n, (ev i).posterior = pointMass s) :
     (ev n).prior s = ((c 0).d s + n) / ((∑ x, (c 0).d x) + n) := by
@@ -194,8 +199,9 @@ theorem repeated_state_dominates (d₀ : Hidden → ℝ) (pos : ∀ x, 0 < d₀ 
 
 /-! ## Prior precision, focus, run ids -/
 
+omit [Nonempty Policy] in
 theorem run_betaPrior_constant {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n)
     (pr : ℕ → PrecisionFromObservation.TickRecord Policy)
     (hp : ∀ i ≤ n, (c i).records .precision = some (pr i)) :
     ∀ i ≤ n, (pr i).betaPrior = (pr 0).betaPrior := by
@@ -205,20 +211,23 @@ theorem run_betaPrior_constant {relation : Target → Target → TargetRelation}
   | succ i ih =>
     rw [(run.2 i (by omega)).betaPrior _ _ (hp i (by omega)) (hp (i + 1) hi), ih (by omega)]
 
+omit [Nonempty Policy] in
 /-- The strategic case of click `i + 1` is read off two clicks. -/
 theorem run_focus_case {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n) {i : ℕ} (hi : i < n)
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n) {i : ℕ} (hi : i < n)
     (sa sb : StrategicFocusRow) (ha : (c i).records .strategicFocus = some sa)
     (hb : (c (i + 1)).records .strategicFocus = some sb) :
-    caseOf .strategicFocus sb = .strategicFocus .focusKept ↔ sb.tick.focus = sa.tick.focus := by
+    caseOf (Policy := Policy) .strategicFocus sb = .strategicFocus .focusKept ↔
+      sb.tick.focus = sa.tick.focus := by
   have prev := (run.2 i hi).focus _ _ ha hb
   by_cases eq : sb.tick.focus = sa.tick.focus
   · simp [caseOf, prev, eq]
   · have ne : sa.tick.focus ≠ sb.tick.focus := fun h => eq h.symm
     simp [caseOf, prev, eq, ne]
 
+omit [Nonempty Policy] in
 theorem run_ids_distinct {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n) {i j : ℕ}
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n) {i j : ℕ}
     (hij : i < j) (hj : j ≤ n) : (c i).ports.runId < (c j).ports.runId := by
   induction j with
   | zero => omega
@@ -228,10 +237,11 @@ theorem run_ids_distinct {relation : Target → Target → TargetRelation}
     · exact (ih lt (by omega)).trans step
     · exact step
 
+omit [Nonempty Policy] in
 /-- A later click whose precision row reads an earlier click's G is not
 wired: that G carries the earlier run id. -/
 theorem stale_G_not_wired {relation : Target → Target → TargetRelation}
-    {c : ℕ → Click} {n : ℕ} (run : RunCertified relation c n) {i j : ℕ}
+    {c : ℕ → Click Policy} {n : ℕ} (run : RunCertified relation c n) {i j : ℕ}
     (hij : i < j) (hj : j ≤ n)
     (stale : (c j).ports.precisionG = (c i).ports.selectionG) :
     ¬ R20Graph.Wired (c j).records (c j).ports := by
@@ -249,7 +259,7 @@ The other rows are absent: `Carries` is about the four rows that cross the
 boundary, and a certified run supplies all of them (`row_of_certified`). -/
 
 def rows (h : TwoTickRecord) (e : EvidenceRow)
-    (p : PrecisionFromObservation.TickRecord Policy) (s : StrategicFocusRow) : Records
+    (p : PrecisionFromObservation.TickRecord Policy) (s : StrategicFocusRow) : Records Policy
   | .habit => some h
   | .evidence => some e
   | .precision => some p
@@ -267,7 +277,7 @@ def selection0 : OuterSelection := ⟨[⟨7, 1⟩], ⟨7, 1⟩⟩
 def counts0 : Hidden → ℝ := fun _ => 1
 
 /-- Click 0: focus 7, posterior certain of state 0, `β` moved from 1 to 1/2. -/
-def click0 : Click :=
+def click0 : Click PrecisionFromObservation.TwoPolicy :=
   ⟨rows successRecord (evidenceAt (fun _ => 1 / 2) (pointMass 0)) (precisionAt 1 (1 / 2))
     ⟨7, tickAt 7 [7]⟩, R20Graph.goodPorts 0, selection0, counts0⟩
 
@@ -278,11 +288,12 @@ def nextHabit : TwoTickRecord :=
     nextConsumed := advance successRecord.nextConsumed failureOutcome }
 
 def click1With (h : TwoTickRecord) (d : Hidden → ℝ) (betaPrior : ℝ) (previousFocus : Target)
-    (run : R20Graph.RunId) : Click :=
+    (run : R20Graph.RunId) : Click PrecisionFromObservation.TwoPolicy :=
   ⟨rows h (evidenceAt (fun s => d s / ∑ x, d x) (pointMass 0)) (precisionAt betaPrior 1)
     ⟨previousFocus, tickAt 3 [3]⟩, R20Graph.goodPorts run, selection0, d⟩
 
-def click1 : Click := click1With nextHabit (counts0 + pointMass 0) 1 7 1
+def click1 : Click PrecisionFromObservation.TwoPolicy :=
+  click1With nextHabit (counts0 + pointMass 0) 1 7 1
 
 theorem example_carries : Carries click0 click1 := by
   refine ⟨by decide, ?_, ?_, ?_, ?_⟩

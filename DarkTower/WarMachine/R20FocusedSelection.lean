@@ -53,6 +53,7 @@ open DarkTower.WarMachine.R20Certificate
 open Real
 
 noncomputable section
+variable {Policy : Type} [Fintype Policy] [Nonempty Policy]
 attribute [local instance] Classical.propDecidable
 
 /-- The outer choice: the candidates scored and the one taken. -/
@@ -89,7 +90,7 @@ def SelectionFeedsPrediction (relation : Target → Target → TargetRelation)
 /-- A click certified by R20 whose outer choice was made by risk under the
 strategic row's focus and fed the prediction the class row scored. -/
 def FocusCertified (relation : Target → Target → TargetRelation)
-    (records : Records) (ports : R20Graph.Ports Policy) (σ : OuterSelection) : Prop :=
+    (records : Records Policy) (ports : R20Graph.Ports Policy) (σ : OuterSelection) : Prop :=
   Certified records (certify records) ports ∧
   ∃ s, records .strategicFocus = some s ∧
     OuterSelectionConforms relation s.tick σ ∧
@@ -97,10 +98,11 @@ def FocusCertified (relation : Target → Target → TargetRelation)
 
 /-! ## What a focus-certified click says -/
 
+omit [Nonempty Policy] in
 /-- The class row scored the chosen candidate's prediction, classified under
 the strategic row's focus. -/
 theorem certified_prediction (relation : Target → Target → TargetRelation)
-    (records : Records) (ports : R20Graph.Ports Policy) (σ : OuterSelection)
+    (records : Records Policy) (ports : R20Graph.Ports Policy) (σ : OuterSelection)
     (h : FocusCertified relation records ports σ)
     (s : StrategicFocusRow) (hs : records .strategicFocus = some s)
     (r : ClassPreferenceRow) (hr : records .classPreference = some r) :
@@ -112,10 +114,11 @@ theorem certified_prediction (relation : Target → Target → TargetRelation)
   refine ⟨k, hk, ?_⟩
   rw [(reads.2.1 r hr).1, wired.predictedRead, feeds]
 
+omit [Nonempty Policy] in
 /-- At the horizon, the class row's reported risk is the risk of the chosen
 candidate under the focus: `log 20 - value k reach`. -/
 theorem certified_terminal_risk (relation : Target → Target → TargetRelation)
-    (records : Records) (ports : R20Graph.Ports Policy) (σ : OuterSelection)
+    (records : Records Policy) (ports : R20Graph.Ports Policy) (σ : OuterSelection)
     (h : FocusCertified relation records ports σ)
     (s : StrategicFocusRow) (hs : records .strategicFocus = some s)
     (r : ClassPreferenceRow) (hr : records .classPreference = some r)
@@ -132,10 +135,11 @@ theorem certified_terminal_risk (relation : Target → Target → TargetRelation
   rw [rowConforms, predicted, terminal, classPreference, if_pos rfl,
     classRisk_eq k (outcomeClass_reached _ _ _ k hk)]
 
+omit [Nonempty Policy] in
 /-- If every candidate other than the repair is stuck, a focus-certified
 click chose the repair. -/
 theorem certified_selects_repair (relation : Target → Target → TargetRelation)
-    (records : Records) (ports : R20Graph.Ports Policy) (σ : OuterSelection)
+    (records : Records Policy) (ports : R20Graph.Ports Policy) (σ : OuterSelection)
     (h : FocusCertified relation records ports σ)
     (s : StrategicFocusRow) (hs : records .strategicFocus = some s)
     (repair : Candidate) (member : repair ∈ σ.candidates)
