@@ -2,7 +2,7 @@ import DarkTower.WarMachine.CascadeEFEPolicies
 import DarkTower.WarMachine.Proof2.CoApplicationKernel
 import DarkTower.WarMachine.CascadeCoapplication
 
-/-! Finite arithmetic requirements for G over reading-derived arranged cascades.
+/-! Finite arithmetic requirements for reading-derived arranged cascades.
 This does not assert runtime conformance; `Requirements.lean` states the
 countable certificate facts needed for that check. -/
 
@@ -12,33 +12,11 @@ noncomputable section
 
 set_option maxHeartbeats 5000000
 
-structure Terms where
-  risk : ℝ
-  ambiguity : ℝ
-  expectedInformationGain : ℝ
-
-def G (x : Terms) : ℝ := x.risk + x.ambiguity - x.expectedInformationGain
-
-/-- The selector uses `σ(log E - F - γG)`; this is its pre-softmax logit. -/
-def selectionLogit (logHabit freeEnergy precision : ℝ) (x : Terms) : ℝ :=
-  logHabit - freeEnergy - precision * G x
-
-theorem information_nonnegative_is_required (x : Terms)
-    (h : 0 ≤ x.expectedInformationGain) : G x ≤ x.risk + x.ambiguity := by
-  simp [G]; linarith
-
-theorem more_information_strictly_lowers_G (a b : Terms)
-    (hr : a.risk = b.risk) (ha : a.ambiguity = b.ambiguity)
-    (hi : b.expectedInformationGain < a.expectedInformationGain) : G a < G b := by
-  simp [G]; linarith
-
-theorem lower_G_strictly_raises_logit (a b : Terms) (logHabit freeEnergy precision : ℝ)
-    (hp : 0 < precision) (hG : G a < G b) :
-    selectionLogit logHabit freeEnergy precision b <
-      selectionLogit logHabit freeEnergy precision a := by
-  simp [selectionLogit]; nlinarith
-
-def droppedInformationG (x : Terms) : ℝ := x.risk + x.ambiguity
+/- A `G := risk + ambiguity - expectedInformationGain` stood here until
+2026-10-22. It subtracted information gain twice: risk + ambiguity already
+equals pragmatic cost minus information gain (`CascadeEFE.step_decomposition`).
+Removed at Joe's instruction ("delete any G that's just around and incorrect");
+the canonical G over cascades is `CascadeEFE.scoreCascade`. -/
 
 /-- S5b's C-tau log weight. Normalizing exp of these weights preserves order. -/
 def progressWeight (total completed : ℕ) (wantMet : Bool) : ℝ :=
@@ -446,14 +424,6 @@ error: unsolved goals
 ⊢ False
 -/
 #guard_msgs in
-example : droppedInformationG ⟨1, 1, 2⟩ < droppedInformationG ⟨1, 1, 1⟩ := by
-  norm_num [droppedInformationG]
-
-/--
-error: unsolved goals
-⊢ False
--/
-#guard_msgs in
 example : placeholderWeight 4 0 false < placeholderWeight 4 1 false := by
   norm_num [placeholderWeight]
 
@@ -469,7 +439,6 @@ example : constantF (9/10) < constantF (1/2) := by norm_num [constantF]
 #guard_msgs in
 example : ShapeSensitive (fun _ => 0) := by simp [ShapeSensitive]
 
-#print axioms more_information_strictly_lowers_G
 #print axioms progress_strict
 #print axioms want_met_strict
 #print axioms countEmission_preserves_strict
