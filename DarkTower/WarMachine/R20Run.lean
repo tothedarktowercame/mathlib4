@@ -20,11 +20,23 @@ Friston et al. (2017), `refs/friston2017.txt`:
 * eq. 2.7, :678: `d = d + s1`, the update of the initial-state counts.
   :820-822: "if a particular state is encountered frequently, it will come to
   dominate posterior expectations" (`repeated_state_dominates`).
-* eq. 2.1, :324-339: `β` is a parameter of the model with prior `Γ(1, β)`;
-  :1356-1357: in that paper "the only parameters that are updated are those
-  encoding prior beliefs about the initial state". So the prior precision is
-  the same at every click; carrying a click's posterior `β` forward as the
-  next prior is refused (`posteriorBetaCarried_refused`).
+* eq. 2.1, :324-339: `β` is one of the model parameters `η = {a, b, d, β}`,
+  with prior `Γ(1, β)`, the same kind of thing as `d`. :1356-1357, "In this
+  article, the only parameters that are updated are those encoding prior
+  beliefs about the initial state", says which parameters that paper chose to
+  learn in its simulations; it is not a rule that `β` cannot be learned.
+
+This module makes the same narrow choice for now: every click starts from the
+same prior `β` (`Carries.betaPrior`). SPM does the same, resetting the rate to
+the fixed `MDP.beta` at the start of each trial (`spm_MDP_VB_X.m:433`). The
+posterior `β` still moves within a click; the precision row's cases record
+which way. Carrying a click's posterior `β` forward as the next prior is
+refused separately (`posteriorBetaCarried_refused`): the posterior is about the
+precision of that click's policies, which is inferred again at every click,
+and neither source has an update of the prior `β` from it. Hesp et al. (2021),
+`refs/hesp2021.txt` §3.3, move the prior `β` from a slower level instead: a
+valence state, carried over trials, sets it, and is updated from the
+affective charge `β − β̄`.
 
 The evidence row's prior is the mean of `Dir(d)`, `d / Σ d`. Friston writes
 the expected log, `ψ(d) − ψ(d0)`, inside inference; the row records a
