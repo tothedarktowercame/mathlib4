@@ -8,6 +8,17 @@ import DarkTower.WarMachine.Proof2.ObservationAtMachine
 /-!
 # F over the machine's own executed prefix (W7, registry `:policy-free-energy`, R8)
 
+## The source
+
+Friston et al. 2017, `futon2:holes/labs/wm-contract/refs/friston2017.txt:358–372`: the
+policy "is a random variable that has to be inferred", and "the agent keeps a separate record
+of expected states—in the past and future—for each allowable policy". The past half of that
+record is what this module sums: each policy's free energy over the observations it has
+already met, so an earlier prediction stays evidence about the policy that made it, never a
+sequence the agent is bound to follow (:917–921: once an action is selected "it generates a
+new observation, and the cycle begins again"). Added 2026-10-22, claude-7
+(SPEC-useful-trial-loop-contract §7 item 2); docstring only.
+
 ## What the row says
 
 `:policy-free-energy`: `F(π) := E_Q[ln Q − ln P(o,s|π)] ≥ −ln P(o|π)`, equality at the exact
