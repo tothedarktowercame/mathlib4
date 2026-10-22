@@ -19,6 +19,7 @@ def edgeName : Edge → String
   | .strategicFocusToClassPreference => "strategicFocusToClassPreference"
   | .selectionToClassPreference => "selectionToClassPreference"
   | .classPreferenceToSelectionG => "classPreferenceToSelectionG"
+  | .interoceptionToSelectionG => "interoceptionToSelectionG"
 
 def escapeEdn : String → String := fun input =>
   input.foldl (fun output char =>

@@ -29,9 +29,7 @@ noncomputable section
 open scoped BigOperators
 attribute [local instance] Classical.propDecidable
 
-/-- The certificate's ten rows. `interoception` has no edge yet: no runtime
-code treats machine-internal state as an observation modality, so nothing
-produces or consumes its quantities (see `R20Interoception`). -/
+/-- The certificate's ten rows. -/
 inductive Node
   | precision | evidence | habit | classPreference
   | strategicFocus | liveness | independence | jointAction | cost | interoception
@@ -47,6 +45,12 @@ abbrev RunId := Nat
 
 structure HabitPrior (Policy : Type) where
   value : Policy → ℝ
+  producer : Producer
+  runId : RunId
+
+/-- Each policy's risk on the interoceptive modality. -/
+structure InteroceptiveRisk (Policy : Type) where
+  value : Policy → EReal
   producer : Producer
   runId : RunId
 
@@ -106,7 +110,7 @@ structure PolicyTemperature where
 
 inductive QuantityKind
   | habitPrior | preference | preferenceSchedule | predictedClassDistribution | policyExpectedFreeEnergy
-  | policyFreeEnergy
+  | policyFreeEnergy | interoceptiveRisk
   deriving DecidableEq, Repr
 
 inductive Endpoint
@@ -139,6 +143,13 @@ inductive Edge
   /-- Friston eq.2.6, friston2017.txt:600-620, U_τ = ln P(o_τ);
   S2 settlement row 3: class preference supplies C, selection computes G. -/
   | classPreferenceToSelectionG
+  /-- Parr, Pezzulo and Friston 2022, parr2022.txt:6537-6540: separate outcome
+  modalities have separate A tensors, and C (:13769-13770) is given per
+  modality; pp. 215-216: viable ranges are priors over interoceptive
+  observations. With independent modalities the risk of the joint outcome is
+  the sum of each modality's risk, so selection adds this row's risk to the
+  class risk (`selectionScore`). -/
+  | interoceptionToSelectionG
   deriving DecidableEq, Repr, Fintype
 
 def Edge.source : Edge → Endpoint
@@ -148,12 +159,13 @@ def Edge.source : Edge → Endpoint
   | .inferenceToPrecisionF => .postObservationInference
   | .strategicFocusToClassPreference => .row .strategicFocus
   | .classPreferenceToSelectionG => .row .classPreference
+  | .interoceptionToSelectionG => .row .interoception
 
 def Edge.target : Edge → Endpoint
   | .habitToSelectionHabit => .selection
   | .selectionToPrecisionHabit | .selectionToPrecisionG | .inferenceToPrecisionF => .row .precision
   | .strategicFocusToClassPreference | .selectionToClassPreference => .row .classPreference
-  | .classPreferenceToSelectionG => .selection
+  | .classPreferenceToSelectionG | .interoceptionToSelectionG => .selection
 
 def Edge.quantity : Edge → QuantityKind
   | .habitToSelectionHabit => .habitPrior
@@ -163,6 +175,7 @@ def Edge.quantity : Edge → QuantityKind
   | .strategicFocusToClassPreference => .preference
   | .selectionToClassPreference => .predictedClassDistribution
   | .classPreferenceToSelectionG => .preferenceSchedule
+  | .interoceptionToSelectionG => .interoceptiveRisk
 
 structure Ports (Policy : Type) where
   runId : RunId
@@ -178,12 +191,14 @@ structure Ports (Policy : Type) where
   selectionPredicted : PredictedClassDistribution
   classPredicted : PredictedClassDistribution
   precisionBeta : PolicyTemperature
+  interoceptionRisk : InteroceptiveRisk Policy
+  selectionInteroceptionRisk : InteroceptiveRisk Policy
 
 /-- Each consumer receives the producer's entire artifact from this run. -/
 structure Wired {Policy : Type} {Row : Node → Type}
     (records : (n : Node) → Option (Row n)) (ports : Ports Policy) : Prop where
-  present : ∀ n, n = .strategicFocus ∨ n = .classPreference ∨ n = .precision ∨ n = .habit →
-    records n ≠ none
+  present : ∀ n, n = .strategicFocus ∨ n = .classPreference ∨ n = .precision ∨ n = .habit ∨
+    n = .interoception → records n ≠ none
   habitRowProducer : ports.habitRowE.producer = .node .habit
   habitRowRun : ports.habitRowE.runId = ports.runId
   habitIntoSelection : ports.selectionHabit.value = ports.habitRowE.value
@@ -206,6 +221,28 @@ structure Wired {Policy : Type} {Row : Node → Type}
   predictedRead : ports.classPredicted = ports.selectionPredicted
   betaProducer : ports.precisionBeta.producer = .node .precision
   betaRun : ports.precisionBeta.runId = ports.runId
+  interoceptionProducer : ports.interoceptionRisk.producer = .node .interoception
+  interoceptionRun : ports.interoceptionRisk.runId = ports.runId
+  interoceptionRead : ports.selectionInteroceptionRisk = ports.interoceptionRisk
+
+/-- What selection scores each policy by: the class modality's G plus the
+interoceptive modality's risk. -/
+def selectionScore {Policy : Type} (ports : Ports Policy) (π : Policy) : EReal :=
+  ports.selectionG.value π + ports.selectionInteroceptionRisk.value π
+
+/-- K11: an interoceptive risk produced by selection itself is not wired. -/
+theorem k11_interoception_from_selection_not_wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
+    (wrong : ports.selectionInteroceptionRisk.producer = .selection) : ¬ Wired records ports := by
+  intro h
+  rw [h.interoceptionRead, h.interoceptionProducer] at wrong
+  contradiction
+
+/-- K12: selection scoring with another run's interoceptive risk is not wired. -/
+theorem k12_interoception_other_run_not_wired {Policy : Type} {Row : Node → Type}
+    (records : (n : Node) → Option (Row n)) (ports : Ports Policy)
+    (wrong : ports.selectionInteroceptionRisk.runId ≠ ports.runId) : ¬ Wired records ports :=
+  fun h => wrong ((congrArg InteroceptiveRisk.runId h.interoceptionRead).trans h.interoceptionRun)
 
 /-- K1: class risk is not the producer of the policy G used by precision. -/
 theorem k1_class_G_not_wired {Policy : Type} {Row : Node → Type}
@@ -285,12 +322,14 @@ def goodPorts (run : RunId) : Ports TestPolicy :=
     strategicPreference := ⟨CTauClassPreference.waitingPreference, .node .strategicFocus, run⟩
     classPreference := ⟨CTauClassPreference.waitingPreference, .node .strategicFocus, run⟩
     selectionPredicted := examplePrediction run, classPredicted := examplePrediction run
-    precisionBeta := ⟨1, .node .precision, run⟩ }
+    precisionBeta := ⟨1, .node .precision, run⟩
+    interoceptionRisk := ⟨fun _ => 0, .node .interoception, run⟩
+    selectionInteroceptionRisk := ⟨fun _ => 0, .node .interoception, run⟩ }
 
 abbrev TestRow : Node → Type := fun _ => Unit
 def goodRecords : (n : Node) → Option (TestRow n) := fun _ => some ()
 
-/-- K4: all seven edges can be wired simultaneously, with actual tick inputs.
+/-- K4: all eight edges can be wired simultaneously, with actual tick inputs.
 This is wiring, not certification of a finite-G precision row. -/
 theorem k4_goodPorts_wired (run : RunId) : Wired goodRecords (goodPorts run) := by
   constructor

@@ -101,7 +101,7 @@ theorem selection_E_is_habit {records : Records Policy}
     ports.selectionHabit.value π = (policyHabitPrior h.before (menu Policy) π : ℝ) := by
   rcases certified with ⟨_, wired, reads⟩
   rw [wired.habitIntoSelection]
-  exact reads.2.2.2 h hh π
+  exact reads.2.2.2.1 h hh π
 
 omit [Nonempty Policy] in
 /-- A certified click's precision row reads the habit prior: certification

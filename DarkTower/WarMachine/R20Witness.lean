@@ -3,7 +3,7 @@ import DarkTower.WarMachine.R20Graph
 /-!
 # Clojure field-flow witnesses for the R20 graph
 
-R20Graph declares seven producer→consumer edges. This module says what a
+R20Graph declares eight producer→consumer edges. This module says what a
 Clojure field-flow path must show to stand for one of them, and decides it.
 
 A witness lists, per edge, a chain of hops. A hop is one field written by
@@ -68,7 +68,10 @@ pin, `class-emission-model` assigns `:target-class {target :focused}` without
 reading focus, so no chain exists and the edge fails. The habit row is the
 per-policy enactment count, `fold`, and its normalisation, `masses`
 (NOTE-r20-habit-counts-2026-10-22: counts keyed by structural policy
-identity). -/
+identity). The interoception row has no Clojure site: no code in futon2
+treats machine-internal state as an observation modality (`R20Interoception`),
+so `interoceptionToSelectionG` cannot be witnessed and every real witness
+fails on it. -/
 def endpointSites : Endpoint → List Site
   | .selection =>
     [site policyClj "selection-candidate", site policyClj "selection-certificate",
@@ -89,6 +92,7 @@ def quantityTag : QuantityKind → String
   | .predictedClassDistribution => "quantity/predicted-class-distribution"
   | .policyExpectedFreeEnergy => "quantity/expected-free-energy"
   | .policyFreeEnergy => "quantity/free-energy"
+  | .interoceptiveRisk => "quantity/interoceptive-risk"
 
 /-- Container types a quantity may pass through after its first hop. The
 frozen family is `family`'s `(select-keys % [:id :g :habit])`. -/
@@ -122,7 +126,8 @@ structure Witness where
 
 def allEdges : List Edge :=
   [.habitToSelectionHabit, .selectionToPrecisionHabit, .selectionToPrecisionG, .inferenceToPrecisionF,
-   .strategicFocusToClassPreference, .selectionToClassPreference, .classPreferenceToSelectionG]
+   .strategicFocusToClassPreference, .selectionToClassPreference, .classPreferenceToSelectionG,
+   .interoceptionToSelectionG]
 
 theorem mem_allEdges (e : Edge) : e ∈ allEdges := by
   cases e <;> simp [allEdges]
@@ -239,8 +244,27 @@ def synthetic : Witness :=
         [hop (site certClj "class-preference-row") ":c-schedule" ":class-preference"
           "quantity/preference-schedule" (site policyClj "selection-candidate")]⟩] }
 
-/-- W0: the checker can say yes. -/
-theorem w0_synthetic_ok : WitnessOK synthetic = true := by decide
+/-- W0: the checker says yes to every edge whose endpoints have Clojure
+sites, so the synthetic witness passes all of them. -/
+theorem w0_synthetic_ok :
+    (allEdges.filter (· != .interoceptionToSelectionG)).all (edgeOK synthetic) = true ∧
+      distinctPorts synthetic = true := by decide
+
+/-- W0b: no witness passes while the interoception row has no Clojure site:
+no hop can start at one of its sites. -/
+theorem w0b_interoception_unwitnessable (w : Witness) :
+    edgeOK w .interoceptionToSelectionG = false := by
+  unfold edgeOK
+  split
+  · rename_i hops _
+    cases hops with
+    | nil => rfl
+    | cons h t => simp [hopsOK, endpointSites, Edge.source]
+  · rfl
+
+theorem no_witnessOK_without_interoception_site (w : Witness) : WitnessOK w = false := by
+  have := w0b_interoception_unwitnessable w
+  simp [WitnessOK, allEdges, this]
 
 def replaceEdge (w : Witness) (e : Edge) (hops : List Hop) : Witness :=
   { w with edges := w.edges.map fun ew => if ew.edge = e then ⟨e, hops⟩ else ew }
