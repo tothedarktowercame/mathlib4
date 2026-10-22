@@ -38,10 +38,14 @@ risk at an epoch is `-log C` of the outcome on the cascade's trajectory
 | chain of three | no, no, yes | `2 log 10 + log (10/9)` |
 | join of three | no, no, yes | `2 log 10 + log (10/9)` |
 
-The chain and the join of three score the same: one pattern fires per epoch,
-so a join of two independent patterns takes as many epochs as a chain of two.
-Under first-enabled firing the score sees how many epochs pass before the goal,
-not the shape of the cascade (`chain_and_join_score_equal`).
+The chain and the join of three score the same here: one pattern fires per
+epoch, so a join of two independent patterns takes as many epochs as a chain of
+two (`chain_and_join_score_equal`). That is a property of the first-enabled
+list kernel `scoreCascade` uses, not of cascades: PROOF-2a Clause 0 makes the
+cascade's transition co-application of the enabled frontier
+(`Proof2.CoApplicationKernel`), under which the join reaches the goal an epoch
+earlier and scores better (`CascadeCoScoringExamples.join_beats_chain`).
+`scoreCascade` (2026-09-15) predates Clause 0 (2026-09-24).
 -/
 
 namespace DarkTower.WarMachine.CascadeScoringExamples
