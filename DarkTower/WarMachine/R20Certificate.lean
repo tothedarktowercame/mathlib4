@@ -443,14 +443,16 @@ def menu (Policy : Type) [Fintype Policy] : List Policy := (Finset.univ : Finset
 /-- The consumer rows were judged on the values in their ports.  `Wired`
 relates the ports to each other; this ties the precision row's E, G and F, and
 the class-preference row's prediction and preference, to those ports, so a row
-judged on some other F is not certified. The habit row's port carries E as the
+judged on some other F is not certified. The precision row's G is the G
+selection scores by, over both modalities (`R20Graph.selectionScore`): the
+policy prior and posterior are softmaxes of that G, not of the class term alone. The habit row's port carries E as the
 normalised counts the click started from (`policyHabitPrior` of the row's
 `before`, never its `after`: E is fixed within a trial, Parr :12645). G is compared after embedding the
 row's real value in EReal: an infinite G port cannot certify this real-valued
 precision row, and no toReal conversion drops infinity. -/
 def RowsReadPorts (records : Records Policy) (ports : R20Graph.Ports Policy) : Prop :=
   (∀ r, records .precision = some r →
-    r.E = ports.precisionHabit.value ∧ (fun π => (r.G π : EReal)) = ports.precisionG.value ∧
+    r.E = ports.precisionHabit.value ∧ (fun π => (r.G π : EReal)) = R20Graph.selectionScore ports ∧
       r.F = ports.precisionF.value) ∧
   (∀ r, records .classPreference = some r →
     r.predicted = ports.classPredicted.value ∧

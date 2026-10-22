@@ -225,8 +225,14 @@ structure Wired {Policy : Type} {Row : Node → Type}
   interoceptionRun : ports.interoceptionRisk.runId = ports.runId
   interoceptionRead : ports.selectionInteroceptionRisk = ports.interoceptionRisk
 
-/-- What selection scores each policy by: the class modality's G plus the
-interoceptive modality's risk. -/
+/-- Each policy's expected free energy over both outcome modalities: the class
+modality's G (risk plus ambiguity, Friston eq. 2.6) plus the interoceptive
+modality's risk. Expected free energy of independent modalities is the sum of
+each modality's term. The interoceptive term is risk only, which is its whole
+G when readings are observed without noise (a deterministic interoceptive A,
+so zero ambiguity); likelihood precision for that modality is not modelled
+(`R20Interoception`). Selection scores policies by this, and the precision row
+reads this same G (`R20Certificate.RowsReadPorts`). -/
 def selectionScore {Policy : Type} (ports : Ports Policy) (π : Policy) : EReal :=
   ports.selectionG.value π + ports.selectionInteroceptionRisk.value π
 

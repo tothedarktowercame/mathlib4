@@ -12,15 +12,18 @@ The click is the simplest the conditions allow, and every value in it is
 computed by the definitions it is checked against:
 
 * class preference at the horizon (`H = τ = 1`), so C is the terminal
-  preference and G is finite: `-log (55/100)` for both policies
+  preference and the class G is finite: `-log (55/100)` for both policies
   (`R20Graph.k9_terminal_G_finite_and_sensitive`);
+* the precision row's G is the full G selection scores by: that class G plus
+  each policy's interoceptive risk (`-log (9/10)` for `a`, `-log (1/10)` for `b`);
 * fresh habit counts, so E is `1/2` for each policy;
 * the same F for both policies, so the precision row's temperature does not
   move (`PrecisionFromObservation.constant_F_posterior_temperature_iff`);
 * the interoception gauge of `R20Certificate.goodInteroception`: policy `a` is
   expected to restore the reading, `b` to leave it in alarm.
 
-Results: `example_certified`, and from it, by the general theorems,
+Results: `example_certified`; `example_prior_prefers_restoring` (the policy
+prior, a softmax of that G, puts more mass on `a`); and, by the general theorems,
 `example_E` (E is the habit prior, 1/2) and `example_restoring_scores_lower`
 (policy `a` scores lower than `b`, through the interoception edge).
 
@@ -67,17 +70,32 @@ def fConst : ℝ := (exampleF run).value .a
 theorem exampleF_const : (exampleF run).value = fun _ => fConst := by
   funext π; cases π <;> rfl
 
+/-- Each policy's interoceptive risk under the gauge: `a` is certain to read in
+range (`-log (9/10)`), `b` certain to read the alarm (`-log (1/10)`). -/
+def riskReal : TwoPolicy → ℝ
+  | .a => -Real.log (9 / 10)
+  | .b => -Real.log (1 / 10)
+
+theorem reportedRisk_eq (π : TwoPolicy) :
+    goodInteroception.reportedRisk π = (riskReal π : EReal) := by
+  cases π
+  · exact R20Interoception.pointMass_risk_of_positive (C := gauge2) (reading := (0 : Fin 2))
+      (by norm_num [gauge2]) |>.trans (by norm_num [gauge2, riskReal])
+  · exact R20Interoception.pointMass_risk_of_positive (C := gauge2) (reading := (1 : Fin 2))
+      (by norm_num [gauge2]) |>.trans (by norm_num [gauge2, riskReal])
+
+/-- The precision row's G: the class G plus the interoceptive risk. -/
+def totalG : TwoPolicy → ℝ := fun π => gValue + riskReal π
+
 def precisionRow : PrecisionFromObservation.TickRecord TwoPolicy :=
-  { E := habitE, G := fun _ => gValue, F := (exampleF run).value
-    prior := PrecisionFromObservation.priorPolicy 1 habitE (fun _ => gValue)
-    posterior := PrecisionFromObservation.posteriorPolicy 1 habitE (fun _ => gValue)
-      (exampleF run).value
+  { E := habitE, G := totalG, F := (exampleF run).value
+    prior := PrecisionFromObservation.priorPolicy 1 habitE totalG
+    posterior := PrecisionFromObservation.posteriorPolicy 1 habitE totalG (exampleF run).value
     betaPrior := 1, betaPosterior := 1 }
 
 theorem precisionRow_conforms : PrecisionFromObservation.Conforms precisionRow := by
   refine ⟨fun π => by simp [precisionRow, habitE_half], by norm_num [precisionRow], ?_, rfl, rfl⟩
-  show PrecisionFromObservation.IsPosteriorTemperature 1 1 habitE (fun _ => gValue)
-    (exampleF run).value
+  show PrecisionFromObservation.IsPosteriorTemperature 1 1 habitE totalG (exampleF run).value
   rw [exampleF_const]
   exact (PrecisionFromObservation.constant_F_posterior_temperature_iff
     (by norm_num) habitE _ fConst).mpr rfl
@@ -182,7 +200,10 @@ theorem reads : RowsReadPorts records ports := by
     subst hr
     refine ⟨rfl, ?_, rfl⟩
     funext π
-    exact ((k9_terminal_G_finite_and_sensitive run π).1).symm
+    show ((gValue + riskReal π : ℝ) : EReal) =
+      (terminalG run).value π + goodInteroception.reportedRisk π
+    rw [(k9_terminal_G_finite_and_sensitive run π).1, reportedRisk_eq]
+    rfl
   · intro r hr
     simp only [records, Option.some.injEq] at hr
     subst hr
@@ -227,6 +248,19 @@ theorem example_restoring_scores_lower : selectionScore ports .a < selectionScor
     (by show (0 : ℝ) < gauge2 1; norm_num [gauge2])
     rfl rfl gValue (g .a) (g .b)
 
+/-- The policy prior is a softmax of the full G, so with equal E it puts more
+mass on `a`, whose interoceptive risk is lower. -/
+theorem example_prior_prefers_restoring : precisionRow.prior .b < precisionRow.prior .a := by
+  have hlog : Real.log (1 / 10) < Real.log (9 / 10) :=
+    Real.log_lt_log (by norm_num) (by norm_num)
+  have hG : totalG .a < totalG .b := by
+    simp only [totalG, riskReal]; linarith
+  simp only [precisionRow, PrecisionFromObservation.priorPolicy, PrecisionFromObservation.softmax,
+    habitE_half, div_one]
+  apply div_lt_div_of_pos_right _ (Finset.sum_pos (fun _ _ => Real.exp_pos _) Finset.univ_nonempty)
+  exact Real.exp_lt_exp.mpr (by linarith)
+
+#print axioms example_prior_prefers_restoring
 #print axioms example_certified
 #print axioms example_restoring_scores_lower
 
