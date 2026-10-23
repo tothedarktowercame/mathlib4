@@ -69,8 +69,7 @@ noncomputable def canonicalSelection {ι V : Type*} [Fintype ι] [DecidableEq ι
   let assessed := assessedPairs ps (compareAtHorizonN H cands)
   (assessed.filter fun x => ∀ y ∈ assessed, x.2 ≤ y.2).map Prod.fst
 
-/-- An aligned successful canonical score list has exactly the outer tie
-frontier, so the same valid recorded draw slot chooses the same policy. -/
+/-- A refused singleton menu leaves nothing to select. -/
 theorem refused_dropped (p : OuterPolicy) (r : CascadeCoApplyG.Refusal) :
     p ∉ (assessedPairs [p] [.error r]).map Prod.fst := by simp [assessedPairs]
 
@@ -93,6 +92,40 @@ theorem outerSelection_eq_G_frontier (gamma k : Nats) (hgamma : 0 < gamma)
   · exact (objective_order_iff_G_order gamma k hgamma p q (hlnE p hp) (hlnE q hq)).mp (h q hq)
   · exact (objective_order_iff_G_order gamma k hgamma p q (hlnE p hp) (hlnE q hq)).mpr (h q hq)
 
+/-- On any menu, an assessed pair is exactly a policy aligned with a successful
+canonical score: a refusal is never converted into a score. -/
+theorem mem_assessedPairs (ps : List OuterPolicy)
+    (scores : List (Except CascadeCoApplyG.Refusal Nats)) (x : OuterPolicy × Nats) :
+    x ∈ assessedPairs ps scores ↔ (x.1, Except.ok x.2) ∈ List.zip ps scores := by
+  obtain ⟨p, n⟩ := x
+  simp only [assessedPairs, List.mem_filterMap]
+  constructor
+  · rintro ⟨⟨q, s⟩, hmem, hs⟩
+    cases s <;> simp_all
+  · intro h
+    exact ⟨(p, .ok n), h, rfl⟩
+
+theorem assessedPairs_ok (ps : List OuterPolicy) (f : OuterPolicy → Nats) :
+    assessedPairs ps (ps.map fun p => Except.ok (f p)) = ps.map fun p => (p, f p) := by
+  induction ps with
+  | nil => rfl
+  | cons p ps ih =>
+    simp only [assessedPairs, List.map_cons, List.zip_cons_cons, List.filterMap_cons] at ih ⊢
+    rw [ih]
+
+/-- An aligned successful canonical score list equal to outer G, with one
+positive menu gamma and constant lnE, has exactly the outer tie frontier, so the
+same valid recorded draw slot chooses the same policy. -/
+theorem canonicalSelection_agrees {ι V : Type*} [Fintype ι] [DecidableEq ι]
+    [Fintype V] [DecidableEq V] (H : Nat) (cands : List (CandidateN ι V))
+    (ps : List OuterPolicy) (gamma k : Nats) (hgamma : 0 < gamma)
+    (hlnE : ∀ p ∈ ps, p.lnE = k)
+    (h : compareAtHorizonN H cands = ps.map fun p => Except.ok (outerG p)) :
+    canonicalSelection H cands ps = outerSelection gamma ps := by
+  rw [outerSelection_eq_G_frontier gamma k hgamma ps hlnE]
+  simp only [canonicalSelection, h, assessedPairs_ok, List.filter_map, List.map_map]
+  simp [Function.comp_def]
+
 /-- Equal canonical G values can yield a different outer choice because today's
 selector additionally subtracts lnE. -/
 def counterA : OuterPolicy := ⟨1, 1, 0, 0, 0⟩
@@ -113,6 +146,8 @@ theorem counterexample_G_frontier :
   norm_num [minimumsBy, minimum?, outerG, counterA, counterB]
 
 #print axioms refused_dropped
+#print axioms mem_assessedPairs
+#print axioms canonicalSelection_agrees
 #print axioms objective_order_iff_G_order
 #print axioms outerSelection_eq_G_frontier
 #print axioms counterexample_same_G

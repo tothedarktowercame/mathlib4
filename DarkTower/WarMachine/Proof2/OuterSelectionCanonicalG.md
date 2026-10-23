@@ -22,8 +22,12 @@ candidate at the common H (`CascadeCoApplyGNovelty.lean:267-276`).
 positive menu gamma and a constant `lnE` over that menu, minimising
 `gamma * G - lnE` has the same frontier as minimising G. The explicit
 counterexample proves that the `lnE` condition cannot be dropped: equal G
-does not generally agree with today's objective. `refused_dropped` establishes
-that a canonical refusal is absent from the canonical selection population,
-never converted to a score. This is the O3 input: bind/remove the extra terms,
+does not generally agree with today's objective. `mem_assessedPairs` establishes,
+on any menu, that the canonical selection population is exactly the policies
+aligned with a successful score: a refusal is dropped, never converted to a
+score (`refused_dropped` is the singleton case). `canonicalSelection_agrees`
+ties the two sides: if `compareAtHorizonN` returns `.ok (outerG p)` for each
+policy in menu order, gamma is positive and lnE is constant on the menu, then
+`canonicalSelection` equals `outerSelection gamma`. This is the O3 input: bind/remove the extra terms,
 or change the selection seam; do not call the current values formally the same
 merely because both expose `G`.

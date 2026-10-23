@@ -30,3 +30,19 @@ the latter theorem fail to elaborate, which is the named bad case.
   assertion was removed before the green build.
 - The revised `#print axioms` entries report only `propext`,
   `Classical.choice`, and `Quot.sound`; no `sorryAx`.
+
+## Review additions (claude-7)
+
+- HEAD before review commit: `741925ac784cceb3a9852b902285754b62c72c64`
+- Added `mem_assessedPairs` (refusal exclusion on any menu, not only a
+  singleton), `assessedPairs_ok`, and `canonicalSelection_agrees` (the
+  `compareAtHorizonN` = `.ok outerG` hypothesis, positive gamma and constant
+  lnE give `canonicalSelection = outerSelection gamma`). O2b had removed the
+  earlier agreement theorem without a replacement tying the canonical side in.
+- Command run once: `lake build DarkTower.WarMachine.Proof2.OuterSelectionCanonicalG`
+  → `Build completed successfully (8519 jobs).` No warnings in this module;
+  all `#print axioms` list only `propext`, `Classical.choice`, `Quot.sound`.
+- Negative control for dropping the lnE hypothesis: the existing
+  `counterexample_outer_frontier` / `counterexample_G_frontier` pair is a
+  menu on which the conclusion of `canonicalSelection_agrees` without `hlnE`
+  is false (outer frontier `[counterB]`, G frontier `[counterA, counterB]`).
