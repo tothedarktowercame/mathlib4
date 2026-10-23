@@ -15,3 +15,18 @@ The negative control is constructive rather than a failing build: the proved
 same two policies with an equal canonical-G frontier and a unique outer
 objective winner, respectively. Removing `lnE` from the outer objective makes
 the latter theorem fail to elaborate, which is the named bad case.
+
+## O2b follow-up
+
+- HEAD before follow-up commit: `17543a07774fbb743a8f1f40bbae6195e6bdcef5`
+- Command run once after the revision: `lake build
+  DarkTower.WarMachine.Proof2.OuterSelectionCanonicalG`
+- Result: `Built DarkTower.WarMachine.Proof2.OuterSelectionCanonicalG (2.2s)`;
+  `Build completed successfully (8519 jobs).`
+- Negative control run once: temporarily asserted the G-frontier equality for
+  `counterA`/`counterB` without the constant-lnE condition. Lean exited 1;
+  `counterexample_outer_frontier` and `counterexample_G_frontier` are the
+  retained constructive witness of that failed assertion. The temporary
+  assertion was removed before the green build.
+- The revised `#print axioms` entries report only `propext`,
+  `Classical.choice`, and `Quot.sound`; no `sorryAx`.

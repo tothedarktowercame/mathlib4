@@ -10,9 +10,11 @@ lines 137--139 (risk + ambiguity - novelty), `outerObjective` is line 139
 equal minima in menu order before the recorded uniform tie draw. The draw is a
 valid slot into that retained list.
 
-`canonicalSelection` consumes actual `compareAtHorizonN` output. Agreement
-requires every canonical score to succeed and equal the outer *objective*, not
-merely the outer G term. -/
+`canonicalSelection` consumes actual `compareAtHorizonN` output, dropping
+refusals before comparison exactly as Clojure forms `assessed` at lines
+153--164. Agreement requires successful canonical scores to equal outer G,
+while one menu gamma and constant lnE make that order-equivalent to the outer
+objective. -/
 
 namespace DarkTower.WarMachine.Proof2.OuterSelectionCanonicalG
 
@@ -29,11 +31,10 @@ structure OuterPolicy where
   ambiguity : Nats
   novelty : Nats
   lnE : Nats
-  gamma : Nats
   deriving DecidableEq
 
 def outerG (p : OuterPolicy) : Nats := p.risk + p.ambiguity - p.novelty
-def outerObjective (p : OuterPolicy) : Nats := p.gamma * outerG p - p.lnE
+def outerObjective (gamma : Nats) (p : OuterPolicy) : Nats := gamma * outerG p - p.lnE
 
 def minimum? : List Nats → Option Nats
   | [] => none
@@ -45,8 +46,8 @@ def minimumsBy (scores : List Nats) (ps : List OuterPolicy) : List OuterPolicy :
   | none => []
   | some m => ((List.zip ps scores).filter (fun x => x.2 = m)).map Prod.fst
 
-def outerSelection (ps : List OuterPolicy) : List OuterPolicy :=
-  minimumsBy (ps.map outerObjective) ps
+def outerSelection (gamma : Nats) (ps : List OuterPolicy) : List OuterPolicy :=
+  ps.filter fun p => ∀ q ∈ ps, outerObjective gamma p ≤ outerObjective gamma q
 
 /-- The recorded Clojure draw is valid exactly when it indexes the
 equal-minimum frontier. Uniformity is an obligation of the producer, not a
@@ -58,41 +59,62 @@ structure TieDraw (tied : List OuterPolicy) where
 def applyTieDraw (tied : List OuterPolicy) (draw : TieDraw tied) : OuterPolicy :=
   tied.get ⟨draw.slot, draw.valid⟩
 
+def assessedPairs (ps : List OuterPolicy) (scores : List (Except CascadeCoApplyG.Refusal Nats)) :
+    List (OuterPolicy × Nats) :=
+  (List.zip ps scores).filterMap fun x => match x.2 with | .ok n => some (x.1, n) | .error _ => none
+
 noncomputable def canonicalSelection {ι V : Type*} [Fintype ι] [DecidableEq ι]
     [Fintype V] [DecidableEq V] (H : Nat) (cands : List (CandidateN ι V))
     (ps : List OuterPolicy) : List OuterPolicy :=
-  minimumsBy (compareAtHorizonN H cands |>.map (fun s => match s with | .ok x => x | .error _ => 0)) ps
+  let assessed := assessedPairs ps (compareAtHorizonN H cands)
+  (assessed.filter fun x => ∀ y ∈ assessed, x.2 ≤ y.2).map Prod.fst
 
 /-- An aligned successful canonical score list has exactly the outer tie
 frontier, so the same valid recorded draw slot chooses the same policy. -/
-theorem canonicalSelection_agrees {ι V : Type*} [Fintype ι] [DecidableEq ι]
-    [Fintype V] [DecidableEq V] (H : Nat) (cands : List (CandidateN ι V))
-    (ps : List OuterPolicy)
-    (h : compareAtHorizonN H cands = ps.map (fun p => Except.ok (outerObjective p))) :
-    canonicalSelection H cands ps = outerSelection ps := by
-  simp only [canonicalSelection, outerSelection, h, List.map_map]
-  rfl
+theorem refused_dropped (p : OuterPolicy) (r : CascadeCoApplyG.Refusal) :
+    p ∉ (assessedPairs [p] [.error r]).map Prod.fst := by simp [assessedPairs]
+
+theorem objective_order_iff_G_order (gamma k : Nats) (hgamma : 0 < gamma)
+    (p q : OuterPolicy) (hp : p.lnE = k) (hq : q.lnE = k) :
+    outerObjective gamma p ≤ outerObjective gamma q ↔ outerG p ≤ outerG q := by
+  rw [outerObjective, outerObjective, hp, hq]
+  constructor <;> intro h <;> nlinarith
+
+/-- On a fixed menu gamma and a constant lnE, the Clojure frontier is precisely
+the canonical-G frontier. -/
+theorem outerSelection_eq_G_frontier (gamma k : Nats) (hgamma : 0 < gamma)
+    (ps : List OuterPolicy) (hlnE : ∀ p ∈ ps, p.lnE = k) :
+    outerSelection gamma ps = ps.filter fun p => ∀ q ∈ ps, outerG p ≤ outerG q := by
+  unfold outerSelection
+  apply List.filter_congr
+  intro p hp
+  apply decide_eq_decide.mpr
+  constructor <;> intro h q hq
+  · exact (objective_order_iff_G_order gamma k hgamma p q (hlnE p hp) (hlnE q hq)).mp (h q hq)
+  · exact (objective_order_iff_G_order gamma k hgamma p q (hlnE p hp) (hlnE q hq)).mpr (h q hq)
 
 /-- Equal canonical G values can yield a different outer choice because today's
 selector additionally subtracts lnE. -/
-def counterA : OuterPolicy := ⟨1, 1, 0, 0, 0, 1⟩
-def counterB : OuterPolicy := ⟨2, 1, 0, 0, 1, 1⟩
+def counterA : OuterPolicy := ⟨1, 1, 0, 0, 0⟩
+def counterB : OuterPolicy := ⟨2, 1, 0, 0, 1⟩
 
 theorem counterexample_same_G : outerG counterA = outerG counterB := by
   norm_num [outerG, counterA, counterB]
 
 theorem counterexample_outer_prefers_B :
-    outerObjective counterB < outerObjective counterA := by
+    outerObjective 1 counterB < outerObjective 1 counterA := by
   norm_num [outerObjective, outerG, counterA, counterB]
 
-theorem counterexample_outer_frontier : outerSelection [counterA, counterB] = [counterB] := by
-  norm_num [outerSelection, minimumsBy, minimum?, outerObjective, outerG, counterA, counterB]
+theorem counterexample_outer_frontier : outerSelection 1 [counterA, counterB] = [counterB] := by
+  norm_num [outerSelection, outerObjective, outerG, counterA, counterB]
 
 theorem counterexample_G_frontier :
     minimumsBy [outerG counterA, outerG counterB] [counterA, counterB] = [counterA, counterB] := by
   norm_num [minimumsBy, minimum?, outerG, counterA, counterB]
 
-#print axioms canonicalSelection_agrees
+#print axioms refused_dropped
+#print axioms objective_order_iff_G_order
+#print axioms outerSelection_eq_G_frontier
 #print axioms counterexample_same_G
 #print axioms counterexample_outer_prefers_B
 #print axioms counterexample_outer_frontier
