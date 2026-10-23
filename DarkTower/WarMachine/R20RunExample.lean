@@ -324,7 +324,9 @@ theorem positive1 (π : TwoPolicy) : 0 < habitE before1 π := by
   rw [habitE1]; cases π <;> norm_num
 
 theorem example_carries : Carries flatLevel click0 click1 := by
-  refine ⟨by decide, ?_, ?_, ?_, ?_⟩
+  refine ⟨by decide, ⟨habitRow before0, rfl⟩, ⟨habitRow before1, rfl⟩,
+    ⟨evidenceRow d0, rfl⟩, ⟨precisionRow 0 before0, rfl⟩,
+    ⟨strategicRow, rfl⟩, ⟨strategicRow, rfl⟩, ?_, ?_, ?_, ?_⟩
   · intro ra rb ha hb
     simp only [click0, click1, clickAt, records, Option.some.injEq] at ha hb
     subst ha hb; rfl

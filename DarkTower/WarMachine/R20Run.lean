@@ -181,6 +181,12 @@ def BetaFromValence (L : AffectiveLevel) (c : Click Policy) : Prop :=
 /-- What click `a` hands to the next click `b`. -/
 structure Carries (L : AffectiveLevel) (a b : Click Policy) : Prop where
   runAdvances : a.ports.runId < b.ports.runId
+  sourceHabitPresent : ∃ r, a.records .habit = some r
+  targetHabitPresent : ∃ r, b.records .habit = some r
+  sourceEvidencePresent : ∃ r, a.records .evidence = some r
+  sourcePrecisionPresent : ∃ r, a.records .precision = some r
+  sourceFocusPresent : ∃ r, a.records .strategicFocus = some r
+  targetFocusPresent : ∃ r, b.records .strategicFocus = some r
   habit : ∀ ra rb, a.records .habit = some ra → b.records .habit = some rb →
     rb.before = ra.nextConsumed
   counts : ∀ ra, a.records .evidence = some ra → b.d = a.d + ra.posterior
@@ -188,6 +194,19 @@ structure Carries (L : AffectiveLevel) (a b : Click Policy) : Prop where
     b.valence = predict L (valenceUpdate L a.valence ra.betaPrior ra.betaPosterior)
   focus : ∀ sa sb, a.records .strategicFocus = some sa →
     b.records .strategicFocus = some sb → sb.previousFocus = sa.tick.focus
+
+omit [Fintype Policy] [Nonempty Policy] in
+/-- `Carries` is evidence about actual boundary rows, not a vacuous statement
+about conditionals whose premises never hold. -/
+theorem carries_rows_present {L : AffectiveLevel} {a b : Click Policy} (h : Carries L a b) :
+    (∃ r, a.records .habit = some r) ∧
+    (∃ r, b.records .habit = some r) ∧
+    (∃ r, a.records .evidence = some r) ∧
+    (∃ r, a.records .precision = some r) ∧
+    (∃ r, a.records .strategicFocus = some r) ∧
+    (∃ r, b.records .strategicFocus = some r) :=
+  ⟨h.sourceHabitPresent, h.targetHabitPresent, h.sourceEvidencePresent,
+    h.sourcePrecisionPresent, h.sourceFocusPresent, h.targetFocusPresent⟩
 
 /-- Clicks `0 .. n`: each focus-certified, with its evidence prior read from
 its counts and its prior `β` from its valence, and each carried into the
@@ -466,8 +485,9 @@ theorem stale_G_not_wired {relation : Target → Target → TargetRelation}
 /-! ## Controls
 
 Two clicks with the habit, evidence, precision and strategic rows present.
-The other rows are absent: `Carries` is about the four rows that cross the
-boundary, and a certified run supplies all of them (`row_of_certified`). -/
+The other rows are absent: `Carries` requires the six row occurrences used by
+its four cross-boundary equations, and a certified run supplies all of them
+(`row_of_certified`). -/
 
 def rows (h : TwoTickRecord Policy) (e : EvidenceRow)
     (p : PrecisionFromObservation.TickRecord Policy) (s : StrategicFocusRow) : Records Policy
@@ -521,7 +541,10 @@ def click1 : Click TwoPolicy :=
   click1With nextHabit (counts0 + pointMass 0) 1 7 1
 
 theorem example_carries : Carries flatLevel click0 click1 := by
-  refine ⟨by decide, ?_, ?_, ?_, ?_⟩
+  refine ⟨by decide, ⟨habit0, rfl⟩, ⟨nextHabit, rfl⟩,
+    ⟨evidenceAt (fun _ => 1 / 2) (pointMass 0), rfl⟩,
+    ⟨precisionAt 1 (1 / 2), rfl⟩,
+    ⟨⟨7, tickAt 7 [7]⟩, rfl⟩, ⟨⟨7, tickAt 3 [3]⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
   · intro ra rb ha hb
     simp only [click0, click1, click1With, rows] at ha hb
     cases ha; cases hb; rfl
@@ -599,10 +622,25 @@ theorem replayedRun_refused :
   intro h
   exact absurd h.runAdvances (by decide)
 
+def absentRows : Records TwoPolicy := fun _ => none
+
+def absentClick (run : R20Graph.RunId) : Click TwoPolicy :=
+  ⟨absentRows, R20Graph.goodPorts run, selection0, counts0, half⟩
+
+/-- Negative control for the old vacuity: even with an advancing run id, two
+clicks missing every required carry row cannot satisfy `Carries`. -/
+theorem absentRequiredRows_refused :
+    ¬ Carries flatLevel (absentClick 0) (absentClick 1) := by
+  intro h
+  obtain ⟨r, hr⟩ := h.sourceHabitPresent
+  simp [absentClick, absentRows] at hr
+
 #print axioms run_habit_accumulates
 #print axioms repeated_state_prior
 #print axioms stale_G_not_wired
 #print axioms example_carries
+#print axioms carries_rows_present
+#print axioms absentRequiredRows_refused
 #print axioms example_valence_moves
 #print axioms run_betaPrior_constant_of_flat
 
