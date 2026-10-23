@@ -1,4 +1,5 @@
 import DarkTower.WarMachine.R20FocusedSelection
+import DarkTower.WarMachine.PatternTheta
 
 /-!
 # R20 over a run: what one click hands to the next
@@ -6,7 +7,8 @@ import DarkTower.WarMachine.R20FocusedSelection
 In plain terms: the certificate judges one click. A machine is a sequence of
 clicks, and each click starts from what the previous one left. This module
 states what carries across a click boundary, and proves what follows over a
-run: the habit counts are the fold of every outcome, the belief about the
+run: pattern-learning counts consume the previous click's witnessed update,
+the habit counts are the fold of every outcome, the belief about the
 initial state is the count of every posterior, the prior precision is set by
 a valence belief that each click updates, and each click's strategic row names
 the focus the previous click held.
@@ -87,8 +89,11 @@ Results, for a run whose clicks are each focus-certified and carried:
   focus equals the previous click's;
 * `run_ids_distinct`: no two clicks share a run id, so a click whose
   precision row reads another click's G is not wired (`stale_G_not_wired`).
+* `run_theta_step`: the next click consumes the current click's retained
+  `PatternTheta.advanceWitnessed` result.
 
-Controls, each refused by `Carries`: habit counts reset between clicks; the
+Controls, each refused by `Carries`: pattern counts reset between clicks;
+habit counts reset between clicks; the
 d counts not updated; the valence not carried; a stale previous focus; a
 replayed run id. The posterior `β` carried as prior is refused by
 `BetaFromValence`. `example_carries` shows the conditions can be met.
@@ -158,15 +163,40 @@ def valenceUpdate (L : AffectiveLevel) (q : Valence → ℝ) (betaPrior betaPost
 def predict (L : AffectiveLevel) (q : Valence → ℝ) : Valence → ℝ :=
   fun k => ∑ j, L.B k j * q j
 
+/-- A nominal pattern identity. It is intentionally not `Policy`: a selected
+policy may contain or enable patterns, but this carrier names only the pattern
+whose witnessed fire the learning producer explicitly attributes. -/
+structure PatternIdentity where
+  name : String
+  deriving DecidableEq, Repr
+
+/-- The published prior and retained learning transition for one explicitly
+identified pattern. `history` witnesses how this pattern's `before` count grew
+from the reading; `outcomes` are raw events from this click. The `after` state
+is not supplied freely: it is the existing `PatternTheta.advanceWitnessed`,
+which filters by both pattern identity and witness admission. -/
+structure ThetaCarrier where
+  pattern : PatternIdentity
+  reading : PatternTheta.ThetaReading
+  history : List (R15TemporalHierarchy.FastOutcome PatternIdentity)
+  before : R15TemporalHierarchy.SlowState PatternIdentity
+  readingCounts : R15TemporalHierarchy.countsFor before pattern =
+    ⟨reading.priorS + PatternTheta.successes (PatternTheta.witnessedOutcomes pattern history),
+      reading.priorF + PatternTheta.failures (PatternTheta.witnessedOutcomes pattern history)⟩
+  outcomes : List (R15TemporalHierarchy.FastOutcome PatternIdentity)
+  after : R15TemporalHierarchy.SlowState PatternIdentity
+  after_eq : after = PatternTheta.advanceWitnessed pattern before outcomes
+
 /-- One click as the run keeps it: its rows, its ports, its outer choice, the
-initial-state counts `d` it started from, and the valence belief it started
-from. -/
+initial-state counts `d` it started from, the valence belief it started from,
+and its retained pattern-learning transition. -/
 structure Click (Policy : Type) where
   records : Records Policy
   ports : R20Graph.Ports Policy
   selection : OuterSelection
   d : Hidden → ℝ
   valence : Valence → ℝ
+  theta : ThetaCarrier
 
 /-- The evidence row's prior is the mean of `Dir(d)`. -/
 def PriorFromCounts (c : Click Policy) : Prop :=
@@ -187,6 +217,7 @@ structure Carries (L : AffectiveLevel) (a b : Click Policy) : Prop where
   sourcePrecisionPresent : ∃ r, a.records .precision = some r
   sourceFocusPresent : ∃ r, a.records .strategicFocus = some r
   targetFocusPresent : ∃ r, b.records .strategicFocus = some r
+  theta : b.theta.before = a.theta.after
   habit : ∀ ra rb, a.records .habit = some ra → b.records .habit = some rb →
     rb.before = ra.nextConsumed
   counts : ∀ ra, a.records .evidence = some ra → b.d = a.d + ra.posterior
@@ -216,6 +247,15 @@ def RunCertified (L : AffectiveLevel) (relation : Target → Target → TargetRe
   (∀ i ≤ n, FocusCertified relation (c i).records (c i).ports (c i).selection ∧
     PriorFromCounts (c i) ∧ BetaFromValence L (c i)) ∧
   ∀ i < n, Carries L (c i) (c (i + 1))
+
+omit [Nonempty Policy] in
+/-- At each certified boundary, the next click consumes the exact state made
+by the predecessor's `PatternTheta.advanceWitnessed` transition. -/
+theorem run_theta_step {relation : Target → Target → TargetRelation}
+    {L : AffectiveLevel} {c : ℕ → Click Policy} {n i : ℕ}
+    (run : RunCertified L relation c n) (hi : i < n) :
+    (c (i + 1)).theta.before = (c i).theta.after :=
+  (run.2 i hi).theta
 
 omit [Nonempty Policy] in
 /-- A certified click has every row, and every row conforms. -/
@@ -486,8 +526,9 @@ theorem stale_G_not_wired {relation : Target → Target → TargetRelation}
 
 Two clicks with the habit, evidence, precision and strategic rows present.
 The other rows are absent: `Carries` requires the six row occurrences used by
-its four cross-boundary equations, and a certified run supplies all of them
-(`row_of_certified`). -/
+its four row equations, and a certified run supplies all of them
+(`row_of_certified`). Pattern learning is a fifth equation on the mandatory
+`ThetaCarrier`, separate from the certificate rows. -/
 
 def rows (h : TwoTickRecord Policy) (e : EvidenceRow)
     (p : PrecisionFromObservation.TickRecord Policy) (s : StrategicFocusRow) : Records Policy
@@ -514,6 +555,44 @@ def habitStart : SlowState TwoPolicy := [(.a, ⟨2, 3⟩), (.b, ⟨4, 5⟩)]
 def successA : FastOutcome TwoPolicy := ⟨.a, true, true⟩
 def failureB : FastOutcome TwoPolicy := ⟨.b, true, false⟩
 
+def examplePattern : PatternIdentity := ⟨"pattern/example"⟩
+def exampleReading : PatternTheta.ThetaReading := PatternTheta.controlReading
+def thetaBefore0 : SlowState PatternIdentity := [(examplePattern, ⟨1, 1⟩)]
+def thetaSuccess : FastOutcome PatternIdentity := ⟨examplePattern, true, true⟩
+def thetaUnwitnessed : FastOutcome PatternIdentity := ⟨examplePattern, false, true⟩
+
+/-- Click 0 retains one witnessed success of the explicitly named pattern. -/
+def theta0 : ThetaCarrier where
+  pattern := examplePattern
+  reading := exampleReading
+  history := []
+  before := thetaBefore0
+  readingCounts := by
+    simp [thetaBefore0, examplePattern, exampleReading, PatternTheta.controlReading,
+      PatternTheta.witnessedOutcomes, PatternTheta.successes, PatternTheta.failures,
+      R15TemporalHierarchy.countsFor]
+  outcomes := [thetaSuccess]
+  after := PatternTheta.advanceWitnessed examplePattern thetaBefore0 [thetaSuccess]
+  after_eq := rfl
+
+/-- Click 1 consumes click 0's learned state. Its history records the same
+witnessed success, while its own event is unwitnessed and therefore inert. -/
+def theta1 : ThetaCarrier where
+  pattern := examplePattern
+  reading := exampleReading
+  history := [thetaSuccess]
+  before := theta0.after
+  readingCounts := by
+    simp [theta0, thetaSuccess, thetaBefore0, examplePattern, exampleReading,
+      PatternTheta.controlReading, PatternTheta.advanceWitnessed,
+      PatternTheta.foldFires, PatternTheta.witnessedOutcomes,
+      PatternTheta.successes, PatternTheta.failures,
+      R15TemporalHierarchy.advance, R15TemporalHierarchy.countsFor,
+      R15TemporalHierarchy.setCounts, R15TemporalHierarchy.updatedCounts]
+  outcomes := [thetaUnwitnessed]
+  after := PatternTheta.advanceWitnessed examplePattern theta0.after [thetaUnwitnessed]
+  after_eq := rfl
+
 /-- Click 0's habit row: a witnessed success of policy `a`. -/
 def habit0 : TwoTickRecord TwoPolicy :=
   { before := habitStart, outcome := successA
@@ -523,7 +602,7 @@ def habit0 : TwoTickRecord TwoPolicy :=
 `β` moved from 1 to 1/2. -/
 def click0 : Click TwoPolicy :=
   ⟨rows habit0 (evidenceAt (fun _ => 1 / 2) (pointMass 0)) (precisionAt 1 (1 / 2))
-    ⟨7, tickAt 7 [7]⟩, R20Graph.goodPorts 0, selection0, counts0, half⟩
+    ⟨7, tickAt 7 [7]⟩, R20Graph.goodPorts 0, selection0, counts0, half, theta0⟩
 
 /-- The successor that click 0 hands on. -/
 def nextHabit : TwoTickRecord TwoPolicy :=
@@ -532,10 +611,11 @@ def nextHabit : TwoTickRecord TwoPolicy :=
     nextConsumed := advance habit0.nextConsumed failureB }
 
 def click1With (h : TwoTickRecord TwoPolicy) (d : Hidden → ℝ) (betaPrior : ℝ)
-    (previousFocus : Target) (run : R20Graph.RunId) (valence : Valence → ℝ := half) :
+    (previousFocus : Target) (run : R20Graph.RunId) (valence : Valence → ℝ := half)
+    (theta : ThetaCarrier := theta1) :
     Click TwoPolicy :=
   ⟨rows h (evidenceAt (fun s => d s / ∑ x, d x) (pointMass 0)) (precisionAt betaPrior 1)
-    ⟨previousFocus, tickAt 3 [3]⟩, R20Graph.goodPorts run, selection0, d, valence⟩
+    ⟨previousFocus, tickAt 3 [3]⟩, R20Graph.goodPorts run, selection0, d, valence, theta⟩
 
 def click1 : Click TwoPolicy :=
   click1With nextHabit (counts0 + pointMass 0) 1 7 1
@@ -544,7 +624,8 @@ theorem example_carries : Carries flatLevel click0 click1 := by
   refine ⟨by decide, ⟨habit0, rfl⟩, ⟨nextHabit, rfl⟩,
     ⟨evidenceAt (fun _ => 1 / 2) (pointMass 0), rfl⟩,
     ⟨precisionAt 1 (1 / 2), rfl⟩,
-    ⟨⟨7, tickAt 7 [7]⟩, rfl⟩, ⟨⟨7, tickAt 3 [3]⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
+    ⟨⟨7, tickAt 7 [7]⟩, rfl⟩, ⟨⟨7, tickAt 3 [3]⟩, rfl⟩,
+    rfl, ?_, ?_, ?_, ?_⟩
   · intro ra rb ha hb
     simp only [click0, click1, click1With, rows] at ha hb
     cases ha; cases hb; rfl
@@ -559,6 +640,31 @@ theorem example_carries : Carries flatLevel click0 click1 := by
   · intro sa sb ha hb
     simp only [click0, click1, click1With, rows] at ha hb
     cases ha; cases hb; rfl
+
+/-- The witnessed success retained by click 0 increments only the explicitly
+named pattern's success count. -/
+theorem thetaWitnessedSuccess_moves_count :
+    R15TemporalHierarchy.countsFor theta0.after examplePattern = ⟨2, 1⟩ := by
+  simp [theta0, thetaSuccess, thetaBefore0, examplePattern,
+    PatternTheta.advanceWitnessed, PatternTheta.foldFires,
+    PatternTheta.witnessedOutcomes, R15TemporalHierarchy.advance,
+    R15TemporalHierarchy.countsFor, R15TemporalHierarchy.setCounts,
+    R15TemporalHierarchy.updatedCounts]
+
+/-- The positive two-click witness consumes that increment as click 1's
+starting count. -/
+theorem thetaWitnessedSuccess_consumed :
+    R15TemporalHierarchy.countsFor click1.theta.before examplePattern = ⟨2, 1⟩ := by
+  rw [example_carries.theta]
+  simpa only [click0] using thetaWitnessedSuccess_moves_count
+
+/-- Click 1's raw event is unwitnessed, so the existing PatternTheta admission
+rule leaves the retained state unchanged. -/
+theorem thetaUnwitnessed_unchanged : theta1.after = theta1.before := by
+  rw [theta1.after_eq]
+  change PatternTheta.advanceWitnessed examplePattern theta0.after [thetaUnwitnessed] = theta0.after
+  rw [PatternTheta.advanceWitnessed_unwitnessed examplePattern theta0.after thetaUnwitnessed [] rfl]
+  rfl
 
 /-- The successor's prior is the mean of its counts, `(2/3, 1/3)`. -/
 theorem click1_prior : PriorFromCounts click1 := by
@@ -622,10 +728,23 @@ theorem replayedRun_refused :
   intro h
   exact absurd h.runAdvances (by decide)
 
+/-- Resetting click 1 to the published prior drops click 0's witnessed success
+and therefore cannot satisfy the theta carry equation. -/
+theorem thetaReset_refused :
+    ¬ Carries flatLevel click0
+      (click1With nextHabit (counts0 + pointMass 0) 1 7 1 half theta0) := by
+  intro h
+  have counts := congrArg
+    (fun s => R15TemporalHierarchy.countsFor s examplePattern) h.theta
+  simp only [click0, click1With] at counts
+  rw [thetaWitnessedSuccess_moves_count] at counts
+  simp [theta0, thetaBefore0, examplePattern, R15TemporalHierarchy.countsFor] at counts
+
 def absentRows : Records TwoPolicy := fun _ => none
 
 def absentClick (run : R20Graph.RunId) : Click TwoPolicy :=
-  ⟨absentRows, R20Graph.goodPorts run, selection0, counts0, half⟩
+  ⟨absentRows, R20Graph.goodPorts run, selection0, counts0, half,
+    if run = 0 then theta0 else theta1⟩
 
 /-- Negative control for the old vacuity: even with an advancing run id, two
 clicks missing every required carry row cannot satisfy `Carries`. -/
@@ -641,6 +760,11 @@ theorem absentRequiredRows_refused :
 #print axioms example_carries
 #print axioms carries_rows_present
 #print axioms absentRequiredRows_refused
+#print axioms thetaWitnessedSuccess_moves_count
+#print axioms thetaWitnessedSuccess_consumed
+#print axioms thetaUnwitnessed_unchanged
+#print axioms thetaReset_refused
+#print axioms run_theta_step
 #print axioms example_valence_moves
 #print axioms run_betaPrior_constant_of_flat
 
