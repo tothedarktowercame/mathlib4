@@ -71,6 +71,51 @@ def validFreshEntry (request : RecurrenceRequest) : Bool :=
   request.freshEntry.causePin = request.classification.recordPin &&
   request.freshEntry.active
 
+/-!
+`InjuryEntry` deliberately has no attempt, origin, limit, or retained
+classification fields.  A runtime adapter must therefore supply and validate
+those fields.  `SnapshotAuthority` is that explicit boundary; it is not
+derived from a payload Boolean and this module makes no authenticity claim.
+The remaining fields that *are* present in the projected ledger are checked
+again by `BoundAdmission`.
+-/
+
+structure AuthoritativeSnapshot where
+  latest : LatestBinding
+  attemptLimit : Nat
+  seenRecords : List RecordPin
+  deriving DecidableEq, Repr
+
+abbrev SnapshotAuthority := List LedgerEntry → AuthoritativeSnapshot → Bool
+
+structure BoundRecurrenceRequest where
+  snapshot : AuthoritativeSnapshot
+  classification : InjuryClassification
+  freshEntry : InjuryEntry
+  deriving DecidableEq, Repr
+
+def asRecurrenceRequest (request : BoundRecurrenceRequest) : RecurrenceRequest :=
+  ⟨request.snapshot.latest, request.classification, request.freshEntry,
+    request.snapshot.attemptLimit, request.snapshot.seenRecords⟩
+
+def boundAdmission (snapshotAuthority : SnapshotAuthority)
+    (misclassification : MisclassificationAdmission)
+    (genuine : GenuineRepairAdmission) (ledger : List LedgerEntry)
+    (request : BoundRecurrenceRequest) : Bool :=
+  snapshotAuthority ledger request.snapshot &&
+  decide (latestFor (project misclassification genuine ledger).history
+    request.classification.injury = some request.snapshot.latest.entry) &&
+  decide (request.snapshot.seenRecords =
+    (project misclassification genuine ledger).history.map InjuryEntry.causePin) &&
+  decide (request.classification.injury = request.snapshot.latest.entry.injury) &&
+  decide (request.freshEntry.predecessor = request.snapshot.latest.entry.entry) &&
+  (project misclassification genuine ledger).history.all
+    (fun old => decide (old.entry ≠ request.freshEntry.entry)) &&
+  decide (request.freshEntry.entry ≠ request.snapshot.latest.entry.entry) &&
+  decide (request.freshEntry.injury = request.snapshot.latest.entry.injury) &&
+  decide (request.freshEntry.causePin = request.classification.recordPin) &&
+  request.freshEntry.active
+
 def recurrenceGuard (misclassification : MisclassificationAdmission)
     (genuine : GenuineRepairAdmission) (ledger : List LedgerEntry)
     (request : RecurrenceRequest) : RecurrenceResult :=
@@ -99,6 +144,15 @@ def integrateRecurrence (misclassification : MisclassificationAdmission)
           ⟨.attributableRetry, ledger, request.latest.attempt, none⟩
         else recurrenceGuard misclassification genuine ledger request
     | .open => recurrenceGuard misclassification genuine ledger request
+
+def integrateBoundRecurrence (snapshotAuthority : SnapshotAuthority)
+    (misclassification : MisclassificationAdmission)
+    (genuine : GenuineRepairAdmission) (ledger : List LedgerEntry)
+    (request : BoundRecurrenceRequest) : RecurrenceResult :=
+  if boundAdmission snapshotAuthority misclassification genuine ledger request then
+    integrateRecurrence misclassification genuine ledger (asRecurrenceRequest request)
+  else
+    ⟨.refused, ledger, request.snapshot.latest.attempt, none⟩
 
 theorem old_record_replay_inert
     (request : RecurrenceRequest)
@@ -158,6 +212,43 @@ theorem exhausted_appends_inactive_fresh_occurrence
   unfold integrateRecurrence recurrenceGuard at h ⊢
   grind
 
+theorem unbound_snapshot_refuses
+    (request : BoundRecurrenceRequest)
+    (h : boundAdmission snapshotAuthority misclassification genuine ledger request = false) :
+    integrateBoundRecurrence snapshotAuthority misclassification genuine ledger request =
+      ⟨.refused, ledger, request.snapshot.latest.attempt, none⟩ := by
+  simp [integrateBoundRecurrence, h]
+
+theorem bound_reopened_preserves_valid_ledger
+    (request : BoundRecurrenceRequest)
+    (valid : ValidLedger root prefixValid misclassification genuine ledger)
+    (actualLatest : latestFor (project misclassification genuine ledger).history
+      request.classification.injury = some request.snapshot.latest.entry)
+    (sameInjury : request.classification.injury = request.snapshot.latest.entry.injury)
+    (predecessor : request.freshEntry.predecessor = request.snapshot.latest.entry.entry)
+    (ordinalFresh : ∀ old ∈ (project misclassification genuine ledger).history,
+      old.entry ≠ request.freshEntry.entry)
+    (freshInjury : request.freshEntry.injury = request.snapshot.latest.entry.injury)
+    (prefixProof : prefixValid (.transition request.freshEntry :: ledger))
+    (h : (integrateBoundRecurrence snapshotAuthority misclassification genuine ledger
+      request).status = .reopened) :
+    ValidLedger root prefixValid misclassification genuine
+      (.transition request.freshEntry :: ledger) := by
+  have admitted : boundAdmission snapshotAuthority misclassification genuine ledger request =
+      true := by
+    cases ha : boundAdmission snapshotAuthority misclassification genuine ledger request with
+    | false => simp [integrateBoundRecurrence, ha] at h
+    | true => rfl
+  have routed : (integrateRecurrence misclassification genuine ledger
+      (asRecurrenceRequest request)).status = .reopened := by
+    simpa [integrateBoundRecurrence, admitted] using h
+  apply ValidLedger.transition valid request.freshEntry
+  · exact ordinalFresh
+  · right
+    refine ⟨request.snapshot.latest.entry, ?_, predecessor.symm⟩
+    simpa [sameInjury, freshInjury] using actualLatest
+  · exact prefixProof
+
 theorem retry_closing_law_unchanged (b : Bool) (o : SelfHealRoute.RetryClickOutcome) :
     o.closing b = SelfHealRoute.ClosingStatus.discharged ↔
       o = .successfulTaskOutcome :=
@@ -212,5 +303,66 @@ example : recurrenceFresh.occurrence ∈ effectiveActive MedicLedgerBridge.autho
     MedicLedgerBridge.noGenuine
     (integrateRecurrence MedicLedgerBridge.authority MedicLedgerBridge.noGenuine
       MedicLedgerBridge.appendedLedger openRequest).ledger := by native_decide
+
+/-! Executable authoritative-adapter controls.  The fixture authority stands
+for a runtime adapter check; it is deliberately external to ledger projection. -/
+
+def openSnapshot : AuthoritativeSnapshot :=
+  ⟨⟨MedicLedgerBridge.current, 1, .open⟩, 3, [41]⟩
+
+def enactedSnapshot : AuthoritativeSnapshot :=
+  ⟨⟨MedicLedgerBridge.current, 1, .enacted 700⟩, 3, [41]⟩
+
+def exhaustedSnapshot : AuthoritativeSnapshot :=
+  ⟨⟨MedicLedgerBridge.current, 3, .open⟩, 3, [41]⟩
+
+def fixtureSnapshotAuthority : SnapshotAuthority := fun ledger snapshot =>
+  decide (ledger.length = MedicLedgerBridge.appendedLedger.length) &&
+  decide (snapshot = openSnapshot ∨ snapshot = enactedSnapshot ∨ snapshot = exhaustedSnapshot)
+
+def boundOpenRequest : BoundRecurrenceRequest :=
+  ⟨openSnapshot, openRequest.classification, recurrenceFresh⟩
+
+def boundEnactedRequest : BoundRecurrenceRequest :=
+  ⟨enactedSnapshot, enactedRequest.classification, recurrenceFresh⟩
+
+def boundExactRetry : BoundRecurrenceRequest :=
+  { boundEnactedRequest with classification := exactRetry.classification }
+
+example : (integrateBoundRecurrence fixtureSnapshotAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger boundOpenRequest).status =
+    .reopened := by native_decide
+
+example : (integrateBoundRecurrence fixtureSnapshotAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger boundExactRetry).status =
+    .attributableRetry := by native_decide
+
+def boundOriginalReplay : BoundRecurrenceRequest :=
+  { boundOpenRequest with
+    classification := { boundOpenRequest.classification with recordPin := 41 }
+    freshEntry := { recurrenceFresh with causePin := 41 } }
+
+example : (integrateBoundRecurrence fixtureSnapshotAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger boundOriginalReplay).status =
+    .duplicate := by native_decide
+
+def callerAttemptMutation : BoundRecurrenceRequest :=
+  { boundOpenRequest with snapshot :=
+      { boundOpenRequest.snapshot with latest :=
+          { boundOpenRequest.snapshot.latest with attempt := 0 } } }
+
+example : (integrateBoundRecurrence fixtureSnapshotAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger callerAttemptMutation).status =
+    .refused := by native_decide
+
+example : (integrateBoundRecurrence fixtureSnapshotAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine staleLedger boundExactRetry).status = .refused := by native_decide
+
+def reusedOrdinal : BoundRecurrenceRequest :=
+  { boundOpenRequest with freshEntry := { recurrenceFresh with entry := MedicLedgerBridge.current.entry } }
+
+example : (integrateBoundRecurrence fixtureSnapshotAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger reusedOrdinal).status =
+    .refused := by native_decide
 
 end DarkTower.WarMachine.MedicRecurrence
