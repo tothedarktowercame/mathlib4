@@ -341,6 +341,15 @@ theorem unsupported_refusal_and_done_base_refuse :
     (medicProcess admitA9 noGenuine (some a9Proof) state
       (.historicalMisclassification doneBase)).outcome = .refused := by decide
 
+theorem external_authority_cannot_bypass_historical_structure :
+    let badPayload := { a9Payload with originalRecord := 999 }
+    let badEvidence := { a9Evidence with originalRecord := 999 }
+    let permissive : MisclassificationAdmission := fun _ _ _ => true
+    let state : MedicState := ⟨[a9Entry, otherEntry], []⟩
+    (medicProcess permissive noGenuine
+      (some (.historicalMisclassification badEvidence)) state
+      (.historicalMisclassification badPayload)).outcome = .refused := by decide
+
 theorem duplicate_inert_and_conflict_refuses :
     let once := (medicProcess admitA9 noGenuine (some a9Proof)
       ⟨[a9Entry, otherEntry], []⟩ a9Candidate).state
