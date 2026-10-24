@@ -9,5 +9,4 @@ info: DarkTower/TypedHole.lean:88:0: DarkTower.TypedHole.holeType.{uA, uB} (T : 
 info: DarkTower/TypedHole.lean:89:0: DarkTower.TypedHole.nodesBySatiety.{uA, uB} (T : TypedHole) : GradedObject SatietyGrade (Type uA)
 info: DarkTower/TypedHole.lean:90:0: DarkTower.TypedHole.gradedHoleType.{uA, uB} (T : TypedHole) (grade : SatietyGrade) (a : T.nodesBySatiety grade) :
   Type uB
-✔ [8498/8498] Built DarkTower.XiangMaLoopExample (3.1s)
 Build completed successfully (8498 jobs).

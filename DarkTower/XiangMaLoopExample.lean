@@ -47,9 +47,10 @@ Its feed into the next tick is the `outcomeJoin` port.
 
 `TypedHole.lean` offers five grades (`parse`, `payoff`, `canon`, `bundling`,
 `role`) and no notion of a partially fed port. Following the tokamak and
-`WMPipelineExample`, a fed port grades `canon` and a hungry one `payoff`. The
-two partially fed ports (`xiangTags`, `outcomeJoin`) grade `payoff`, each with
-a comment naming the partial feed: rounding them to fed would hide the gap.
+`WMPipelineExample`, a fed port grades `canon` and a hungry one `payoff`. A
+partially fed port grades `payoff`: rounding it to fed would hide the gap.
+`satietyToday` is bound to the live store by `XiangMaLoopTraceChecker.lean`,
+which fails when a measured grade differs from this table.
 
 Grounding:
 * `futon3c/holes/excursions/E-象-repl-cycle-inventory.md` §1 (stages), §2
@@ -241,37 +242,44 @@ def PortDirection : Port → Type
   | Port.marksParagraphs => List String
   | Port.commitTrailers => List String
 
-/-- Satiety as fed today (inventory §2, "Fed today?"). -/
+/-- Satiety as fed today, as measured from the live turn store by
+`futon3c/scripts/xiangma_port_export.py` and checked by
+`DarkTower/XiangMaLoopTraceChecker.lean` (run of 2026-10-24T20:25Z, window from
+2026-10-19). Rule: `canon` iff every eligible record carries the port, so a
+partial feed is `payoff`. Counts are carrying/eligible from that run. -/
 def satietyToday : Port → SatietyGrade
+  -- 1597/1597.
   | Port.operatorText => SatietyGrade.canon
-  -- Partially fed: routine turns settle by the 小象 draft alone
-  -- (`analysis_status "drafted"`) and bell turns are `declared` with no
-  -- reading. No partial grade exists, so the port grades hungry.
-  | Port.xiangTags => SatietyGrade.payoff
-  -- Fed since 2026-10-19 (packet 1b); absent on earlier records.
-  | Port.proposedPatterns => SatietyGrade.canon
-  | Port.agentReply => SatietyGrade.canon
-  | Port.commits => SatietyGrade.canon
-  -- Fed for agents listed in ma-enabled.txt only.
-  | Port.maCard => SatietyGrade.canon
-  | Port.maAlignment => SatietyGrade.canon
-  -- Not built: no per-pattern verdict vocabulary in src/, scripts/, emacs/;
-  -- 馬's verdicts are per operator act.
+  -- 389/389 non-declared turns have `.analysis.json` `:sentences`; the
+  -- "drafted" routine turns packet 2 expected did not occur in the window.
+  | Port.xiangTags => SatietyGrade.canon
+  -- 260/1597: bells never carry it (only the Emacs REPL builders pass the
+  -- record id, claude-repl.el:1067); operator turns 260/266 since 10-19T13:40Z.
+  | Port.proposedPatterns => SatietyGrade.payoff
+  -- 1436/1597; 161 records without a reply (148 bell, 13 operator).
+  | Port.agentReply => SatietyGrade.payoff
+  -- 1441/1597, read from `:happened_summary` lines.
+  | Port.commits => SatietyGrade.payoff
+  -- 44/389: cards attach only for agents in ma-enabled.txt (44/47 of theirs).
+  | Port.maCard => SatietyGrade.payoff
+  -- 351/389; 25 of the 38 missing are from 2026-10-19.
+  | Port.maAlignment => SatietyGrade.payoff
+  -- 0/1597: not built; 馬's verdicts are per operator act.
   | Port.patternVerdict => SatietyGrade.payoff
-  -- Partially fed: the join is positional (same session, `created_at` order)
-  -- plus `:reply_to`; no field says "these tags are the outcome of turn n".
+  -- 0/1597: the join is positional (same session, `created_at` order) plus
+  -- `:reply_to`; no field says "these tags are the outcome of turn n".
   | Port.outcomeJoin => SatietyGrade.payoff
-  -- Fed for settled turns. The m40 fact store is not written; that gap is
-  -- 狗's `storesFinding`, not this port.
+  -- 389/389 `e-xiang-turn-*` rows. The m40 fact store is not written; that
+  -- gap is 狗's `storesFinding`, not this port.
   | Port.memoryWrite => SatietyGrade.canon
-  -- Not fed: nothing asks 狗 to cite what it used, and nothing checks.
+  -- 2/1597: claude-11's `㊢ (m40)` line, from 2026-10-24 ~20:00Z.
   | Port.citesUsedMemory => SatietyGrade.payoff
-  -- Not fed: nothing in the loop writes the m40 fact store.
+  -- 2/1597: same line, every stored slug present as a memory file.
   | Port.storesFinding => SatietyGrade.payoff
-  -- Fed: the CLAUDE.md proforma trial; stage 5 reads the marks.
-  | Port.marksParagraphs => SatietyGrade.canon
-  -- Fed: the prepare-commit-msg hook.
-  | Port.commitTrailers => SatietyGrade.canon
+  -- 63/376 replies with every paragraph marked (proforma trial).
+  | Port.marksParagraphs => SatietyGrade.payoff
+  -- 137/153 records with commits; 16 had a commit excluded as no-trailers.
+  | Port.commitTrailers => SatietyGrade.payoff
 
 /-- The apparatus interface for a given satiety assignment. -/
 def apparatus (s : Port → SatietyGrade) : TypedHole where
@@ -296,8 +304,10 @@ instance (T : TypedHole) (a : T.poly.A) : Decidable (IsHungry T a) :=
 
 /-- The ports hungry today. -/
 def hungryToday : List Port :=
-  [Port.xiangTags, Port.patternVerdict, Port.outcomeJoin,
-   Port.citesUsedMemory, Port.storesFinding]
+  [Port.proposedPatterns, Port.agentReply, Port.commits, Port.maCard,
+   Port.maAlignment, Port.patternVerdict, Port.outcomeJoin,
+   Port.citesUsedMemory, Port.storesFinding, Port.marksParagraphs,
+   Port.commitTrailers]
 
 /-- Exactly the listed ports are hungry today. A change to any grade in
 `satietyToday` breaks this theorem. -/
@@ -326,10 +336,9 @@ theorem today_hungry : Hungry satietyToday :=
 /-! ## The built variant
 
 `satietyBuilt` feeds the per-pattern verdict and 狗's ports (a) and (b). That
-alone is not enough: the two partially fed ports stay hungry
-(`threeOnly_still_hungry`). The built apparatus also completes them: 象 tags
-on every turn (or an explicit declared-no-reading fill for bell turns), and an
-explicit outcome join from turn n+1 to turn n.
+alone is not enough: the partially fed ports stay hungry
+(`threeOnly_still_hungry` names two of them). The built apparatus also
+completes those, including an explicit outcome join from turn n+1 to turn n.
 -/
 
 /-- Today's satiety with the verdict and 狗's (a), (b) fed, and nothing else
@@ -342,7 +351,7 @@ def satietyThreeOnly : Port → SatietyGrade
 
 /-- Feeding only the three named ports leaves the partial feeds hungry. -/
 theorem threeOnly_still_hungry :
-    IsHungry (apparatus satietyThreeOnly) Port.xiangTags ∧
+    IsHungry (apparatus satietyThreeOnly) Port.maAlignment ∧
     IsHungry (apparatus satietyThreeOnly) Port.outcomeJoin := by
   decide
 

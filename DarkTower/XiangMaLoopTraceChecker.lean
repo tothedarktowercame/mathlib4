@@ -136,15 +136,15 @@ def tableCounts : List Measured :=
 
 example : agrees tableCounts = true := by decide
 
-/-- Severing 馬's alignment in one record of two is caught. -/
+/-- Severing the 象 tags of one record of two is caught. -/
 example :
     agrees (tableCounts.map fun m =>
-      if m.port = Port.maAlignment then ⟨m.port, 2, 1⟩ else m) = false := by decide
+      if m.port = Port.xiangTags then ⟨m.port, 2, 1⟩ else m) = false := by decide
 
 /-- A port the table calls hungry, measured fully carried, is caught too. -/
 example :
     agrees (tableCounts.map fun m =>
-      if m.port = Port.xiangTags then ⟨m.port, 3, 3⟩ else m) = false := by decide
+      if m.port = Port.patternVerdict then ⟨m.port, 3, 3⟩ else m) = false := by decide
 
 /-- A missing port is not agreement. -/
 example : agrees (tableCounts.filter fun m => m.port ≠ Port.maCard) = false := by decide
