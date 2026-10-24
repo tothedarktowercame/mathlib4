@@ -15,6 +15,10 @@ The success path visits 24.1 even with a zero cure budget (validation succeeds).
 
 The table leaves author/reviewer/re-review retry, revision, and standing-completion
 bounds unspecified: they are finite parameters. Cure defaults to zero as stated.
+A staged reviewer-evidence correction allowance also defaults to zero.  Its
+payload predicates are supplied by a future runtime adapter: this file proves
+control and binding consequences, not transport authentication or Clojure
+conformance.
 A detour consumes its own allowance on entry, never replenishes another allowance,
 and returns to the same main-line phase. This bounds control transitions, not the
 wall-clock duration of a poll or debugger wait. Unbounded debugger restarts in the
@@ -36,6 +40,7 @@ inductive Phase where
   | authorRetryDispatch | authorRetryWait
   | buildCureDispatch | buildCureWait
   | reviewerRetryDispatch | reviewerRetryWait
+  | reviewEvidenceCorrectionDispatch | reviewEvidenceCorrectionWait
   | revisionDispatch | revisionWait | revisionBuild
   | reReviewDispatch | reReviewWait | reReviewRetryDispatch | reReviewRetryWait
   | standingCompletionDispatch | standingCompletionWait
@@ -52,6 +57,7 @@ inductive Exit where
   | unboundDTask (kind : String)
   | buildFailed (reason : BuildReason)
   | artifactBindingMismatch
+  | reviewEvidenceCorrectionRefused
   | exception (phase : Phase)
   | historicalAwaitingValidation
   | grounded
@@ -65,7 +71,38 @@ structure Budget where
   revision : Nat
   reReview : Nat
   standing : Nat
+  reviewEvidenceCorrection : Nat := 0
   deriving DecidableEq, Repr
+
+/-- Immutable identity carried by the proposed reviewer-evidence correction.
+These strings are opaque pins supplied by the runtime adapter. -/
+structure ReviewBinding where
+  target : String
+  author : String
+  reviewer : String
+  artifactRevision : String
+  contractDigest : String
+  deriving DecidableEq, Repr
+
+/-- Supplied facts for the narrow correction admission.  `correctedBinding`
+is kept separate so changed reviewer/artifact/contract payloads can be refused
+rather than silently replacing the original pins. -/
+structure ReviewEvidenceCorrection where
+  originalBinding : ReviewBinding
+  correctedBinding : ReviewBinding
+  completedReview : Bool
+  reason : BuildReason
+  correctedEvidenceValid : Bool
+  deriving DecidableEq, Repr
+
+def ReviewEvidenceCorrection.triggered (c : ReviewEvidenceCorrection) : Prop :=
+  c.completedReview = true ∧ c.reason = .reviewExecutionEvidenceMissing
+
+def ReviewEvidenceCorrection.admissible (c : ReviewEvidenceCorrection) : Prop :=
+  c.triggered ∧
+  c.originalBinding.author ≠ c.originalBinding.reviewer ∧
+  c.correctedBinding = c.originalBinding ∧
+  c.correctedEvidenceValid = true
 
 /-- Terminal nodes have no outgoing edges. -/
 inductive Node where
@@ -151,6 +188,24 @@ inductive Step : Node → Node → Prop where
   | reviewerRetryWaited : Step (.running .reviewerRetryWait b) (.running .p26 b)
   /-- Row 27, (R review-execution-gate): retain the verdict for the later approval check. -/
   | gate27 : Step (.running .p27 b) (.running .p28 b)
+  /-- Staged row-27 correction: only a completed review with the typed missing
+  execution-evidence reason and exact immutable binding may spend this distinct
+  allowance.  The validity/authentication facts are supplied premises. -/
+  | reviewEvidenceCorrection27 (c : ReviewEvidenceCorrection)
+      (_ : c.admissible) :
+      Step (.running .p27 {b with reviewEvidenceCorrection := b.reviewEvidenceCorrection + 1})
+           (.running .reviewEvidenceCorrectionDispatch b)
+  | reviewEvidenceCorrectionDispatched :
+      Step (.running .reviewEvidenceCorrectionDispatch b)
+           (.running .reviewEvidenceCorrectionWait b)
+  /-- Re-enter the same row-27 gate; correction never jumps to approval. -/
+  | reviewEvidenceCorrectionWaited :
+      Step (.running .reviewEvidenceCorrectionWait b) (.running .p27 b)
+  /-- A triggered correction with altered reviewer/artifact/contract binding
+  is an explicit refusal, never an accepted correction. -/
+  | reviewEvidenceCorrectionBindingRefused (c : ReviewEvidenceCorrection)
+      (_ : c.triggered) (_ : c.correctedBinding ≠ c.originalBinding) :
+      Step (.running .p27 b) (.stopped .reviewEvidenceCorrectionRefused)
   /-- Row 27, (R run-revision-round :revision-dispatch): spend a revision allowance. -/
   | revise27 :
       Step (.running .p27 {b with revision := b.revision + 1}) (.running .revisionDispatch b)
@@ -202,13 +257,15 @@ def phaseRank : Phase → Nat
   | .authorRetryDispatch => 72 | .authorRetryWait => 71
   | .buildCureDispatch => 62 | .buildCureWait => 61
   | .reviewerRetryDispatch => 52 | .reviewerRetryWait => 51
+  | .reviewEvidenceCorrectionDispatch => 42 | .reviewEvidenceCorrectionWait => 41
   | .revisionDispatch => 47 | .revisionWait => 46 | .revisionBuild => 45
   | .reReviewDispatch => 44 | .reReviewWait => 43
   | .reReviewRetryDispatch => 45 | .reReviewRetryWait => 44
   | .standingCompletionDispatch => 12 | .standingCompletionWait => 11
 
 def Budget.total (b : Budget) : Nat :=
-  b.author + b.reviewer + b.cure + b.revision + b.reReview + b.standing
+  b.author + b.reviewer + b.cure + b.revision + b.reReview + b.standing +
+    b.reviewEvidenceCorrection
 
 /-- Every detour costs at least 128; every phase rank is below 128. -/
 def measure : Node → Nat
@@ -254,6 +311,8 @@ theorem progress (p : Phase) (b : Budget) : ∃ t, Step (.running p b) t := by
     | exact ⟨_, Step.cureWaited⟩
     | exact ⟨_, Step.reviewerRetryDispatched⟩
     | exact ⟨_, Step.reviewerRetryWaited⟩
+    | exact ⟨_, Step.reviewEvidenceCorrectionDispatched⟩
+    | exact ⟨_, Step.reviewEvidenceCorrectionWaited⟩
     | exact ⟨_, Step.revisionDispatched⟩
     | exact ⟨_, Step.revisionWaited⟩
     | exact ⟨_, Step.revisionBuilt⟩
@@ -357,8 +416,96 @@ theorem no_silent_skip (b : Budget) (path : Path (start b) xs (.stopped .grounde
     exact h rfl
   exact ⟨visit .p25 (Or.inl rfl), visit .p29 (Or.inr rfl)⟩
 
+/-! ## Staged reviewer-evidence correction properties -/
+
+def retainedBinding : ReviewBinding where
+  target := "M-example"
+  author := "author"
+  reviewer := "reviewer"
+  artifactRevision := "0123456789abcdef"
+  contractDigest := "contract-v1"
+
+def validCorrection : ReviewEvidenceCorrection where
+  originalBinding := retainedBinding
+  correctedBinding := retainedBinding
+  completedReview := true
+  reason := .reviewExecutionEvidenceMissing
+  correctedEvidenceValid := true
+
+theorem validCorrection_admissible : validCorrection.admissible := by
+  simp [ReviewEvidenceCorrection.admissible,
+    ReviewEvidenceCorrection.triggered, validCorrection, retainedBinding]
+
+/-- Positive control: one allowance gives one correction, then re-enters the
+same gate and only the ordinary gate edge proceeds. -/
+theorem one_review_evidence_correction_revalidates_at_same_gate (b : Budget) :
+    Path (.running .p27
+        {b with reviewEvidenceCorrection := b.reviewEvidenceCorrection + 1})
+      [.running .p27
+          {b with reviewEvidenceCorrection := b.reviewEvidenceCorrection + 1},
+       .running .reviewEvidenceCorrectionDispatch b,
+       .running .reviewEvidenceCorrectionWait b,
+       .running .p27 b,
+       .running .p28 b]
+      (.running .p28 b) := by
+  exact .cons (.reviewEvidenceCorrection27 validCorrection validCorrection_admissible)
+    (.cons .reviewEvidenceCorrectionDispatched
+      (.cons .reviewEvidenceCorrectionWaited (.cons .gate27 (.single _))))
+
+/-- A corrected response may still request changes: after returning to the
+same gate it can take the pre-existing revision edge, never coerced approval. -/
+theorem corrected_review_can_follow_existing_revision (b : Budget) :
+    Path (.running .reviewEvidenceCorrectionWait
+            {b with revision := b.revision + 1})
+      [.running .reviewEvidenceCorrectionWait {b with revision := b.revision + 1},
+       .running .p27 {b with revision := b.revision + 1},
+       .running .revisionDispatch b]
+      (.running .revisionDispatch b) := by
+  exact .cons .reviewEvidenceCorrectionWaited (.cons .revise27 (.single _))
+
+/-- Zero allowance cannot take a correction edge.  Hence a second correction
+after the one-bounce witness is unavailable unless separately supplied. -/
+theorem zero_allowance_cannot_correct (b : Budget)
+    (h : b.reviewEvidenceCorrection = 0) :
+    ¬ ∃ c next, Step (.running .p27 b) next ∧
+      next = .running .reviewEvidenceCorrectionDispatch c := by
+  rintro ⟨c, next, edge, rfl⟩
+  cases edge <;> simp_all
+
+/-- Any accepted correction edge exposes the exact typed trigger, reviewer
+independence, immutable binding, and supplied evidence-validity premises. -/
+theorem correction_edge_only_if_admissible
+    (edge : Step (.running .p27 b)
+      (.running .reviewEvidenceCorrectionDispatch b')) :
+    ∃ c : ReviewEvidenceCorrection, c.triggered ∧
+      c.originalBinding.author ≠ c.originalBinding.reviewer ∧
+      c.correctedBinding = c.originalBinding ∧
+      c.correctedEvidenceValid = true := by
+  cases edge with
+  | reviewEvidenceCorrection27 c hc =>
+      exact ⟨c, hc.1, hc.2.1, hc.2.2.1, hc.2.2.2⟩
+
+/-- The mechanical falsifier terminal is row 29 and has no correction edge.
+This includes the retained selected-want/evidence-authority failure scope. -/
+theorem reviewer_falsifier_cannot_enter_review_evidence_correction (b : Budget) :
+    ¬ Step (.running .p29 b) (.running .reviewEvidenceCorrectionDispatch b') := by
+  intro h
+  cases h
+
+/-- Correction cannot skip the same review gate and land at approval. -/
+theorem correction_wait_cannot_skip_gate (b : Budget) :
+    ¬ Step (.running .reviewEvidenceCorrectionWait b) (.running .p28 b') := by
+  intro h
+  cases h
+
 #print axioms termination_totality
 #print axioms grounding_reachable
 #print axioms no_silent_skip
+#print axioms one_review_evidence_correction_revalidates_at_same_gate
+#print axioms corrected_review_can_follow_existing_revision
+#print axioms zero_allowance_cannot_correct
+#print axioms correction_edge_only_if_admissible
+#print axioms reviewer_falsifier_cannot_enter_review_evidence_correction
+#print axioms correction_wait_cannot_skip_gate
 
 end DarkTower.WarMachine.OrdinaryClickRoute
