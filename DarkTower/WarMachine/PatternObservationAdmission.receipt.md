@@ -5,8 +5,8 @@
 - Base: `e7d38a45b75f6f01afe30c1eb1f8cad383637ef9`
 - Implementation: `44466e785548acc2823114f75466eefa8ebe696e`
 - Branch: `wm-pattern-observation-admission`
-- Module SHA-256:
-  `d4ab5cedb5bac608afc3f299c98c12df8027f9593c088ef37f45a1d9c1d39ce9`
+- Outcome-binding follow-up module SHA-256:
+  `4394946a44c369dcd86bd243fb5a2fc125463b8b8427c1764d37ccad422504cf`
 
 Existing `R15TemporalHierarchy.FastOutcome` carries only a parameter key,
 `witnessed`, and `succeeded`; it cannot retain the occurrence/effect/revision
@@ -18,7 +18,8 @@ does not change either existing definition.
 `Proof2.ObservedInterpretation` concerns publication/interpretation readings,
 not pattern-fire authority, so it was not reused as a runtime-attestation
 claim. Authority remains a supplied predicate plus a checker proved equivalent
-to that predicate.
+to that predicate. Both receive the requested identity and the actual observed
+Boolean, allowing a domain caller to bind evidence to the payload.
 
 ## Behavior
 
@@ -27,7 +28,14 @@ to that predicate.
 1. pattern key, occurrence, effect, and revision match the request;
 2. a Boolean observation is present;
 3. authority evidence is present; and
-4. the caller-supplied authority checker accepts it.
+4. the caller-supplied authority checker accepts that evidence for that exact
+   identity and Boolean payload.
+
+`project_eq_some_only_if` proves every emitted event recovers matching identity,
+the actual supplied Boolean, its evidence, and authority for that Boolean. The
+generic interface may admit both outcomes if a caller explicitly defines that
+policy; the bridge itself no longer makes outcome-insensitive authority
+unavoidable.
 
 Observed `false` remains `false` and reaches the existing failure-count update.
 Missing and unqualified evidence do not admit. Occurrences are event identity,
@@ -55,15 +63,22 @@ propext, Quot.sound
 Several concrete arithmetic/pooling controls use no axioms. No `sorry` or
 `sorryAx` occurs in the new module.
 
-The deliberate occurrence-relabeling control was:
+The deliberate occurrence-relabeling and payload-flip controls were:
 
 ```text
 lake env lean /home/joe/notes/wm-next/pattern-measurement-repair/OccurrenceMismatchNegative.lean
+lake env lean /home/joe/notes/wm-next/pattern-measurement-repair/OutcomeFlipNegative.lean
 ```
 
-Exit 1 for the intended reason: `decide` established that occurrence 0 cannot
-project as the occurrence 19 request. Scratch SHA-256:
-`327857f0bc9e7ede39dfbb8781d4ee68352d1cdce2977c0550a2ae007ae9f30a`.
+Both exit 1 for the intended semantic reasons: occurrence 0 cannot project as
+occurrence 19, and evidence attesting true cannot authorize an observed false
+under the synthetic binding gate. Scratch SHA-256 values:
+`4f429210773fab698b6372d239bd01d041d81b68bb0aec1ed18985dc947e1742`
+and `8bb5e5960ec8879aec8b3021c1dfe5a9c322829be2b2cef6723b8891084f4e88`.
+
+The positive failure-increment and cross-occurrence pooling controls now consume
+the actual results of `project`, rather than independently constructed
+`FastOutcome` literals.
 
 ## Remaining gap
 
