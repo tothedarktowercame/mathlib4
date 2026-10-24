@@ -1,0 +1,12 @@
+ℹ [8495/8499] Replayed DarkTower.BV
+info: DarkTower/BV.lean:191:0: DarkTower.BV.Cong.seq_assoc.{u} {A : Type u} (S T U : BV A) : ((S.seq T).seq U).Cong (S.seq (T.seq U))
+info: DarkTower/BV.lean:192:0: DarkTower.BV.Step.q_down.{u} {A : Type u} (R T R' T' : BV A) :
+  ((R.par T).seq (R'.par T')).Step ((R.seq R').par (T.seq T'))
+info: DarkTower/BV.lean:193:0: DarkTower.BV.atom_q_down.{u} {A : Type u} (a b c d : A) :
+  (((atom a).par (atom b)).seq ((atom c).par (atom d))).Step (((atom a).seq (atom c)).par ((atom b).seq (atom d)))
+ℹ [8497/8499] Replayed DarkTower.TypedHole
+info: DarkTower/TypedHole.lean:88:0: DarkTower.TypedHole.holeType.{uA, uB} (T : TypedHole) (a : T.poly.A) : Type uB
+info: DarkTower/TypedHole.lean:89:0: DarkTower.TypedHole.nodesBySatiety.{uA, uB} (T : TypedHole) : GradedObject SatietyGrade (Type uA)
+info: DarkTower/TypedHole.lean:90:0: DarkTower.TypedHole.gradedHoleType.{uA, uB} (T : TypedHole) (grade : SatietyGrade) (a : T.nodesBySatiety grade) :
+  Type uB
+Build completed successfully (8499 jobs).
