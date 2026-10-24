@@ -77,7 +77,8 @@ theorem mem_closureObs {scored : Finset S} {m : ProblemMap I} {s : S} :
 variable {Label : Type} {A : Type*}
 
 /-- The closure observation of a return value: scored closures of the map
-after the update by the report that `a` is supplied to realize. -/
+after the update by the report that `a` is supplied to realize.
+`(K return-obs)` corresponds to receiving that realized report directly. -/
 def returnObs (m₀ : ProblemMap I) (scored : Finset S)
     (realize : A → Option (ReturnReport I Label)) (a : A) : Finset S :=
   closureObs scored (update m₀ (realize a))

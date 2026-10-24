@@ -28,7 +28,8 @@ section Proofs
 universe u
 variable {S : Type u} [Fintype S] [DecidableEq S] {I : S → Prop}
 
-/-- One structural saturation step, useful for executable inspection. -/
+/-- One structural saturation step, useful for executable inspection.
+`(K closure-step)` -/
 def step (m : ProblemMap I) (T : Finset S) : Finset S :=
   T ∪ Finset.univ.filter fun s =>
     (∃ a ∈ m.artifacts, a.stmt = s) ∨
@@ -48,7 +49,9 @@ theorem step_mono (m : ProblemMap I) : Monotone (step m) := by
     · exact Or.inl hs
     · exact Or.inr ⟨r, hr, rfl, fun t htt => hAB (ht t htt)⟩
 
-/-- The production-shaped bounded saturation algorithm. -/
+/-- The production-shaped bounded saturation algorithm. `(K closed-set)` uses
+the cardinal bound while the source stops early; their fixed-point relation is
+witnessed by `iterate_eq_executable_of_fixed`. -/
 def iterativeClosedSet (m : ProblemMap I) : Finset S :=
   (step m)^[Fintype.card S] ∅
 

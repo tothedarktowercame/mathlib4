@@ -81,7 +81,8 @@ inductive Closed (m : ProblemMap I) : S → Prop
       (htails : ∀ t ∈ r.tails, Closed m t) : Closed m r.head
 
 /-- A checked conditional reduction exists for `s`.  This is weaker than
-`Closed m s`. -/
+`Closed m s`. `(K has-reduction?)` is a proof-erased structural correspondence;
+the caller still supplies H-real for the fixed interpretation. -/
 def HasReduction (m : ProblemMap I) (s : S) : Prop :=
   ∃ r ∈ m.reductions, r.head = s
 
@@ -107,7 +108,8 @@ theorem closed_least {m : ProblemMap I} {T : Set S} (hT : RuleClosed m T)
 theorem closed_ruleClosed (m : ProblemMap I) : RuleClosed m {s | Closed m s} :=
   ⟨fun a ha => Closed.artifact a ha, fun r hr ht => Closed.reduction r hr ht⟩
 
-/-- The closed IDs as a finite subset of the fixed universe. -/
+/-- The closed IDs as a finite subset of the fixed universe. `(K closed-set)`
+anchors the specification; executable equality is proved separately. -/
 noncomputable def closedSet [Fintype S] (m : ProblemMap I) : Finset S := by
   classical exact Finset.univ.filter (Closed m)
 
@@ -132,20 +134,22 @@ structure ReturnReport (I : S → Prop) (Label : Type) where
   checked : CheckedReturn I
 
 /-- Admit checked artifacts and reductions, keeping everything already in the
-map, including the declared obligations. -/
+map, including the declared obligations. `(K admit)` is structural under the
+caller's H-real assumption; it does not authenticate erased proofs. -/
 def admit (m : ProblemMap I) (c : CheckedReturn I) : ProblemMap I where
   artifacts := m.artifacts ++ c.artifacts
   reductions := m.reductions ++ c.reductions
   obligations := m.obligations
 
 /-- Update from an optional report.  An absent report changes nothing; a
-present one contributes only its checked part. -/
+present one contributes only its checked part. `(K update)` -/
 def update {Label : Type} (m : ProblemMap I) :
     Option (ReturnReport I Label) → ProblemMap I
   | none => m
   | some r => admit m r.checked
 
-/-- Unresolved obligations: declared but not closed. -/
+/-- Unresolved obligations: declared but not closed. `(K open-obligations)`
+relates this membership property to the returned collection. -/
 def Open (m : ProblemMap I) (s : S) : Prop :=
   s ∈ m.obligations ∧ ¬ Closed m s
 
