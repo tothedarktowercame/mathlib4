@@ -257,4 +257,223 @@ theorem existing_retry_discharge_unchanged (b : Bool)
       o = SelfHealRoute.RetryClickOutcome.successfulTaskOutcome :=
   SelfHealRoute.closing_dischargesOnlyOnSuccess b o
 
+/-!
+## Proposed broader medic-repaired disposition
+
+Joe's subsequent direction broadens the proposed disposition to genuine
+externally repaired defects as well as proven historical misclassification.
+The constructors remain distinct.  In particular, a genuine repair must carry
+an independently admitted replay of its *original acceptance contract*; the
+misclassification constructor cannot be used for it.
+-/
+
+structure GenuineRepairPayload where
+  injury : InjuryId
+  predecessor : EntryId
+  causeRecord : RecordId
+  causePin : Pin
+  acceptanceContract : Pin
+  patch : PatchId
+  sourceRevision : Revision
+  evaluator : Principal
+  reviewer : Principal
+  replayReceipt : Pin
+  originalAcceptanceRepaired : Bool
+  deriving DecidableEq, Repr
+
+structure GenuineRepairEvidence where
+  injury : InjuryId
+  predecessor : EntryId
+  causeRecord : RecordId
+  causePin : Pin
+  acceptanceContract : Pin
+  patch : PatchId
+  sourceRevision : Revision
+  evaluator : Principal
+  reviewer : Principal
+  replayReceipt : Pin
+  originalAcceptanceRepaired : Bool
+  deriving DecidableEq, Repr
+
+inductive MedicCorrection where
+  | historicalMisclassification (payload : CorrectionPayload)
+  | genuineDefect (payload : GenuineRepairPayload)
+  deriving DecidableEq, Repr
+
+inductive MedicEvidence where
+  | historicalMisclassification (evidence : Evidence)
+  | genuineDefect (evidence : GenuineRepairEvidence)
+  deriving DecidableEq, Repr
+
+def MedicCorrection.injury : MedicCorrection → InjuryId
+  | .historicalMisclassification payload => payload.injury
+  | .genuineDefect payload => payload.injury
+
+abbrev MisclassificationAdmission := InjuryEntry → CorrectionPayload → Evidence → Bool
+abbrev GenuineRepairAdmission := InjuryEntry → GenuineRepairPayload → GenuineRepairEvidence → Bool
+
+def exactGenuineBinding (payload : GenuineRepairPayload)
+    (evidence : GenuineRepairEvidence) : Bool :=
+  decide (payload.injury = evidence.injury) &&
+  decide (payload.predecessor = evidence.predecessor) &&
+  decide (payload.causeRecord = evidence.causeRecord) &&
+  decide (payload.causePin = evidence.causePin) &&
+  decide (payload.acceptanceContract = evidence.acceptanceContract) &&
+  decide (payload.patch = evidence.patch) &&
+  decide (payload.sourceRevision = evidence.sourceRevision) &&
+  decide (payload.evaluator = evidence.evaluator) &&
+  decide (payload.reviewer = evidence.reviewer) &&
+  decide (payload.replayReceipt = evidence.replayReceipt) &&
+  decide (payload.originalAcceptanceRepaired = evidence.originalAcceptanceRepaired)
+
+def genuineQualified (admit : GenuineRepairAdmission) (current : InjuryEntry)
+    (payload : GenuineRepairPayload) (evidence : GenuineRepairEvidence) : Bool :=
+  current.active &&
+  decide (current.injury = payload.injury) &&
+  decide (current.predecessor = payload.predecessor) &&
+  payload.originalAcceptanceRepaired &&
+  decide (payload.evaluator ≠ payload.reviewer) &&
+  exactGenuineBinding payload evidence && admit current payload evidence
+
+def medicQualified (misclassification : MisclassificationAdmission)
+    (genuine : GenuineRepairAdmission) (current : InjuryEntry)
+    (candidate : MedicCorrection) (evidence : MedicEvidence) : Bool :=
+  match candidate, evidence with
+  | .historicalMisclassification payload, .historicalMisclassification proof =>
+      misclassification current payload proof
+  | .genuineDefect payload, .genuineDefect proof =>
+      genuineQualified genuine current payload proof
+  | _, _ => false
+
+structure MedicState where
+  history : List InjuryEntry
+  corrections : List MedicCorrection
+  deriving DecidableEq, Repr
+
+structure MedicResult where
+  outcome : Outcome
+  state : MedicState
+  deriving DecidableEq, Repr
+
+def medicProcess (misclassification : MisclassificationAdmission)
+    (genuine : GenuineRepairAdmission) (current : InjuryEntry)
+    (evidence : MedicEvidence) (state : MedicState)
+    (candidate : MedicCorrection) : MedicResult :=
+  if ! medicQualified misclassification genuine current candidate evidence then
+    ⟨.refused, state⟩
+  else if candidate ∈ state.corrections then
+    ⟨.duplicate, state⟩
+  else if state.corrections.any (fun old => old.injury = candidate.injury) then
+    ⟨.conflict, state⟩
+  else
+    ⟨.appended, { state with corrections := state.corrections ++ [candidate] }⟩
+
+def medicEffectiveActive (state : MedicState) : List InjuryId :=
+  (state.history.filter (·.active)).map (·.injury) |>.filter
+    (fun injury => injury ∉ state.corrections.map MedicCorrection.injury)
+
+structure MedicRequest where
+  current : InjuryEntry
+  candidate : MedicCorrection
+  evidence : MedicEvidence
+
+def medicSweep (misclassification : MisclassificationAdmission)
+    (genuine : GenuineRepairAdmission) : MedicState → List MedicRequest → MedicState
+  | state, [] => state
+  | state, request :: rest =>
+      medicSweep misclassification genuine
+        (medicProcess misclassification genuine request.current request.evidence
+          state request.candidate).state rest
+
+theorem medicProcess_preserves_history :
+    (medicProcess misclassification genuine current evidence state candidate).state.history =
+      state.history := by
+  unfold medicProcess
+  split <;> try rfl
+  split <;> try rfl
+  split <;> rfl
+
+theorem medic_appended_only_if_qualified
+    (h : (medicProcess misclassification genuine current evidence state candidate).outcome =
+      .appended) :
+    medicQualified misclassification genuine current candidate evidence = true := by
+  simp only [medicProcess] at h
+  split at h <;> simp_all
+
+theorem medic_duplicate_inert
+    (hq : medicQualified misclassification genuine current candidate evidence = true)
+    (hmem : candidate ∈ state.corrections) :
+    medicProcess misclassification genuine current evidence state candidate =
+      ⟨.duplicate, state⟩ := by
+  simp [medicProcess, hq, hmem]
+
+theorem medic_conflict_inert
+    (hq : medicQualified misclassification genuine current candidate evidence = true)
+    (hnew : candidate ∉ state.corrections)
+    (hold : ∃ old ∈ state.corrections, old.injury = candidate.injury) :
+    medicProcess misclassification genuine current evidence state candidate =
+      ⟨.conflict, state⟩ := by
+  simp only [medicProcess, hq, hnew, List.any_eq_true]
+  simp_all
+
+theorem medic_no_qualified_evidence_no_change
+    (hq : medicQualified misclassification genuine current candidate evidence = false) :
+    medicProcess misclassification genuine current evidence state candidate =
+      ⟨.refused, state⟩ := by
+  simp [medicProcess, hq]
+
+theorem all_active_qualified_corrections_clear_effective_set
+    (covered : ∀ entry ∈ state.history, entry.active = true →
+      entry.injury ∈ state.corrections.map MedicCorrection.injury) :
+    medicEffectiveActive state = [] := by
+  apply List.eq_nil_iff_forall_not_mem.mpr
+  intro injury hinjury
+  simp only [medicEffectiveActive, List.mem_filter, List.mem_map] at hinjury
+  rcases hinjury with ⟨⟨entry, ⟨hentry, hactive⟩, rfl⟩, hnotcorrected⟩
+  have hcovered := covered entry hentry hactive
+  rw [List.mem_map] at hcovered
+  obtain ⟨correction, hcorrection, heq⟩ := hcovered
+  exact (of_decide_eq_true hnotcorrected) ⟨correction, hcorrection, heq⟩
+
+def realEntry : InjuryEntry := ⟨84, 37, 25, 846, true⟩
+def realRepair : GenuineRepairPayload := ⟨84, 37, 25, 846, 900, 560, 561, 21, 22, 910, true⟩
+def realEvidence : GenuineRepairEvidence := ⟨84, 37, 25, 846, 900, 560, 561, 21, 22, 910, true⟩
+
+def admitA9 : MisclassificationAdmission := fun current payload evidence =>
+  decide (current = a9Entry ∧ payload = a9Correction ∧ evidence = a9Evidence)
+
+def admitReal : GenuineRepairAdmission := fun current payload evidence =>
+  decide (current = realEntry ∧ payload = realRepair ∧ evidence = realEvidence)
+
+def mixedInitial : MedicState := ⟨[a9Entry, realEntry, otherEntry], []⟩
+def a9MedicRequest : MedicRequest :=
+  ⟨a9Entry, .historicalMisclassification a9Correction,
+    .historicalMisclassification a9Evidence⟩
+def realMedicRequest : MedicRequest :=
+  ⟨realEntry, .genuineDefect realRepair, .genuineDefect realEvidence⟩
+
+theorem composed_medic_sweep_clears_only_qualified :
+    medicEffectiveActive (medicSweep admitA9 admitReal mixedInitial
+      [a9MedicRequest, realMedicRequest]) = [41] := by decide
+
+theorem unresolved_injury_prevents_clear_all :
+    medicEffectiveActive (medicSweep admitA9 admitReal mixedInitial
+      [a9MedicRequest]) = [84, 41] := by decide
+
+theorem unrelated_green_test_cannot_qualify_genuine_repair :
+    let bad := { realRepair with originalAcceptanceRepaired := false }
+    (medicProcess admitA9 admitReal realEntry (.genuineDefect realEvidence)
+      mixedInitial (.genuineDefect bad)).outcome = .refused := by decide
+
+theorem evidence_constructor_mismatch_refuses :
+    (medicProcess admitA9 admitReal realEntry (.historicalMisclassification a9Evidence)
+      mixedInitial (.genuineDefect realRepair)).outcome = .refused := by decide
+
+/-- Medic repair is an effective-active overlay, not a new retry outcome. -/
+theorem medic_preserves_success_only_retry_law (b : Bool)
+    (o : SelfHealRoute.RetryClickOutcome) :
+    o.closing b = SelfHealRoute.ClosingStatus.discharged ↔
+      o = SelfHealRoute.RetryClickOutcome.successfulTaskOutcome :=
+  SelfHealRoute.closing_dischargesOnlyOnSuccess b o
+
 end DarkTower.WarMachine.HistoricalMisclassificationCorrection
