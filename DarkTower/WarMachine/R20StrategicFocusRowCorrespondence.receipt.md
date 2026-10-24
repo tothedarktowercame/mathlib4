@@ -1,8 +1,11 @@
 # Finite strategic-focus supplied-value correspondence receipt
 
-Date: 2026-10-24 UTC  
-Author: codex-9; independent reviewer: codex-11  
-Branch: `wm-strategic-focus-formal`  
+Date: 2026-10-24 UTC
+
+Author: codex-9; independent reviewer: codex-11
+
+Branch: `wm-strategic-focus-formal`
+
 Worktree: `/home/joe/worktrees/mathlib4-strategic-focus-formal`
 
 ## Pins
