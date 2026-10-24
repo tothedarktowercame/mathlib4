@@ -284,6 +284,58 @@ theorem bound_reopened_preserves_valid_ledger
     simpa [sameInjury, freshInjury] using actualLatest
   · exact prefixProof
 
+theorem bound_exhausted_preserves_valid_ledger
+    (request : BoundRecurrenceRequest)
+    (valid : ValidLedger root prefixValid misclassification genuine ledger)
+    (prefixProof : prefixValid
+      (.transition { request.freshEntry with active := false } :: ledger))
+    (h : (integrateBoundRecurrence snapshotAuthority misclassification genuine ledger
+      request).status = .exhausted) :
+    ValidLedger root prefixValid misclassification genuine
+      (integrateBoundRecurrence snapshotAuthority misclassification genuine ledger
+        request).ledger := by
+  have admitted : boundAdmission snapshotAuthority misclassification genuine ledger request =
+      true := by
+    cases ha : boundAdmission snapshotAuthority misclassification genuine ledger request with
+    | false => simp [integrateBoundRecurrence, ha] at h
+    | true => rfl
+  have routed : (integrateRecurrence misclassification genuine ledger
+      (asRecurrenceRequest request)).status = .exhausted := by
+    simpa [integrateBoundRecurrence, admitted] using h
+  have resultLedger :
+      (integrateBoundRecurrence snapshotAuthority misclassification genuine ledger
+        request).ledger =
+        .transition { request.freshEntry with active := false } :: ledger := by
+    simp only [integrateBoundRecurrence, admitted, ↓reduceIte]
+    exact (exhausted_appends_inactive_fresh_occurrence
+      (asRecurrenceRequest request) routed).1
+  have actualLatest : latestFor (project misclassification genuine ledger).history
+      request.classification.injury = some request.snapshot.latest.entry := by
+    unfold boundAdmission at admitted
+    grind
+  have sameInjury : request.classification.injury = request.snapshot.latest.entry.injury := by
+    unfold boundAdmission at admitted
+    grind
+  have predecessor : request.freshEntry.predecessor = request.snapshot.latest.entry.entry := by
+    unfold boundAdmission at admitted
+    grind
+  have ordinalFresh : ∀ old ∈ (project misclassification genuine ledger).history,
+      old.entry ≠ request.freshEntry.entry := by
+    unfold boundAdmission at admitted
+    simp only [Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true] at admitted
+    grind
+  have freshInjury : request.freshEntry.injury = request.snapshot.latest.entry.injury := by
+    unfold boundAdmission at admitted
+    grind
+  rw [resultLedger]
+  apply ValidLedger.transition valid { request.freshEntry with active := false }
+  · simpa using ordinalFresh
+  · right
+    refine ⟨request.snapshot.latest.entry, ?_, ?_⟩
+    · simpa [sameInjury, freshInjury] using actualLatest
+    · exact predecessor.symm
+  · exact prefixProof
+
 theorem retry_closing_law_unchanged (b : Bool) (o : SelfHealRoute.RetryClickOutcome) :
     o.closing b = SelfHealRoute.ClosingStatus.discharged ↔
       o = .successfulTaskOutcome :=
@@ -414,6 +466,17 @@ example : (integrateBoundRecurrence exhaustedFixtureAuthority MedicLedgerBridge.
     MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger boundExhausted).status =
     .exhausted := by native_decide
 
+theorem inhabited_exhausted_result_valid :
+    ValidLedger MedicLedgerBridge.root MedicLedgerBridge.suppliedPrefixValidity
+      MedicLedgerBridge.authority MedicLedgerBridge.noGenuine
+      (integrateBoundRecurrence exhaustedFixtureAuthority MedicLedgerBridge.authority
+        MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger
+        boundExhausted).ledger := by
+  apply bound_exhausted_preserves_valid_ledger boundExhausted
+    MedicLedgerBridge.admitted_append_valid
+  · trivial
+  · native_decide
+
 example : (integrateBoundRecurrence exhaustedFixtureAuthority MedicLedgerBridge.authority
     MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger boundOpenRequest).status =
     .refused := by native_decide
@@ -424,5 +487,13 @@ def reusedOrdinal : BoundRecurrenceRequest :=
 example : (integrateBoundRecurrence fixtureSnapshotAuthority MedicLedgerBridge.authority
     MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger reusedOrdinal).status =
     .refused := by native_decide
+
+example : (integrateBoundRecurrence exhaustedFixtureAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine MedicLedgerBridge.appendedLedger reusedOrdinal).status ≠
+    .exhausted := by native_decide
+
+example : (integrateBoundRecurrence exhaustedFixtureAuthority MedicLedgerBridge.authority
+    MedicLedgerBridge.noGenuine staleLedger boundExhausted).status ≠ .exhausted := by
+  native_decide
 
 end DarkTower.WarMachine.MedicRecurrence
