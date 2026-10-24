@@ -28,6 +28,10 @@ inductive LedgerEntry where
   | medic (operation : MedicOperation)
   | audit (auditId : Nat)
 
+/-- The formal list is newest-first. Runtime append vectors are oldest-first
+and must pass through this explicit adapter. -/
+def fromChronological (entries : List LedgerEntry) : List LedgerEntry := entries.reverse
+
 def requestEq (left right : MedicRequest) : Bool :=
   decide (left.candidate = right.candidate) && decide (left.evidence = right.evidence)
 
@@ -54,21 +58,31 @@ def effectiveActive (misclassification : MisclassificationAdmission)
     (genuine : GenuineRepairAdmission) (ledger : List LedgerEntry) : List Occurrence :=
   medicEffectiveActiveOccurrences (project misclassification genuine ledger)
 
-inductive ValidLedger (misclassification : MisclassificationAdmission)
+inductive ValidLedger (root : List LedgerEntry → Root)
+    (prefixValid : List LedgerEntry → Prop)
+    (misclassification : MisclassificationAdmission)
     (genuine : GenuineRepairAdmission) : List LedgerEntry → Prop
-  | nil : ValidLedger misclassification genuine []
-  | transition {ledger : List LedgerEntry} (valid : ValidLedger misclassification genuine ledger)
+  | nil (emptyValid : prefixValid []) : ValidLedger root prefixValid misclassification genuine []
+  | transition {ledger : List LedgerEntry}
+      (valid : ValidLedger root prefixValid misclassification genuine ledger)
       (entry : InjuryEntry)
       (ordinalUnique : ∀ old ∈ (project misclassification genuine ledger).history,
         old.entry ≠ entry.entry)
-      (predecessorValid : entry.predecessor = 0 ∨
+      (predecessorValid :
+        (entry.predecessor = 0 ∧ latestFor
+          (project misclassification genuine ledger).history entry.injury = none) ∨
         ∃ old, latestFor (project misclassification genuine ledger).history entry.injury =
-          some old ∧ old.entry = entry.predecessor) :
-      ValidLedger misclassification genuine (.transition entry :: ledger)
-  | audit {ledger : List LedgerEntry} (valid : ValidLedger misclassification genuine ledger)
-      (auditId : Nat) : ValidLedger misclassification genuine (.audit auditId :: ledger)
-  | medic {ledger : List LedgerEntry} (valid : ValidLedger misclassification genuine ledger)
+          some old ∧ old.entry = entry.predecessor)
+      (prefixProof : prefixValid (.transition entry :: ledger)) :
+      ValidLedger root prefixValid misclassification genuine (.transition entry :: ledger)
+  | audit {ledger : List LedgerEntry}
+      (valid : ValidLedger root prefixValid misclassification genuine ledger)
+      (auditId : Nat) (prefixProof : prefixValid (.audit auditId :: ledger)) :
+      ValidLedger root prefixValid misclassification genuine (.audit auditId :: ledger)
+  | medic {ledger : List LedgerEntry}
+      (valid : ValidLedger root prefixValid misclassification genuine ledger)
       (operation : MedicOperation)
+      (rootMatches : operation.expectedRoot = root ledger)
       (current : InjuryEntry) (evidence : MedicEvidence)
       (present : operation.request.evidence = some evidence)
       (latest : latestFor (project misclassification genuine ledger).history
@@ -76,11 +90,12 @@ inductive ValidLedger (misclassification : MisclassificationAdmission)
       (authority : medicQualified misclassification genuine current
         operation.request.candidate evidence = true)
       (fresh : ∀ prior, LedgerEntry.medic prior ∈ ledger →
-        prior.request.candidate.occurrence ≠ operation.request.candidate.occurrence) :
-      ValidLedger misclassification genuine (.medic operation :: ledger)
+        prior.request.candidate.occurrence ≠ operation.request.candidate.occurrence)
+      (prefixProof : prefixValid (.medic operation :: ledger)) :
+      ValidLedger root prefixValid misclassification genuine (.medic operation :: ledger)
 
 theorem effectiveActive_eq_landed
-    (_valid : ValidLedger misclassification genuine ledger) :
+    (_valid : ValidLedger root prefixValid misclassification genuine ledger) :
     effectiveActive misclassification genuine ledger =
       medicEffectiveActiveOccurrences (project misclassification genuine ledger) := rfl
 
@@ -118,7 +133,11 @@ def appendMedic (misclassification : MisclassificationAdmission)
         if ! medicQualified misclassification genuine current
             operation.request.candidate evidence then ⟨.refused, ledger⟩
         else if occurrencePresent ledger operation.request then ⟨.conflict, ledger⟩
-        else ⟨.appended, .medic operation :: ledger⟩
+        else
+          let processed := medicProcess misclassification genuine
+            operation.request.evidence before operation.request.candidate
+          if processed.outcome = .appended then ⟨.appended, .medic operation :: ledger⟩
+          else ⟨.refused, ledger⟩
     | _, _ => ⟨.refused, ledger⟩
 
 theorem exact_replay_before_stale
@@ -131,6 +150,51 @@ theorem changed_operation_stale_before_conflict
     (stale : operation.expectedRoot ≠ root ledger) :
     appendMedic misclassification genuine root ledger operation = ⟨.stale, ledger⟩ := by
   simp [appendMedic, notExact, stale]
+
+theorem appendMedic_appended_admission
+    (h : appendMedic misclassification genuine root ledger operation =
+      ⟨.appended, .medic operation :: ledger⟩) :
+    operation.expectedRoot = root ledger ∧
+      ∃ current evidence,
+        operation.request.evidence = some evidence ∧
+        latestFor (project misclassification genuine ledger).history
+          operation.request.candidate.injury = some current ∧
+        medicQualified misclassification genuine current
+          operation.request.candidate evidence = true ∧
+        occurrencePresent ledger operation.request = false ∧
+        (medicProcess misclassification genuine operation.request.evidence
+          (project misclassification genuine ledger)
+          operation.request.candidate).outcome = .appended := by
+  unfold appendMedic at h
+  grind
+
+theorem appendMedic_appended_process
+    (h : appendMedic misclassification genuine root ledger operation =
+      ⟨.appended, .medic operation :: ledger⟩) :
+    (medicProcess misclassification genuine operation.request.evidence
+      (project misclassification genuine ledger)
+      operation.request.candidate).outcome = .appended := by
+  rcases appendMedic_appended_admission h with
+    ⟨_, current, evidence, _, _, _, _, processed⟩
+  exact processed
+
+theorem appendMedic_preserves_validity
+    (valid : ValidLedger root prefixValid misclassification genuine ledger)
+    (prefixProof : prefixValid (.medic operation :: ledger))
+    (h : appendMedic misclassification genuine root ledger operation =
+      ⟨.appended, .medic operation :: ledger⟩) :
+    ValidLedger root prefixValid misclassification genuine
+      (.medic operation :: ledger) := by
+  rcases appendMedic_appended_admission h with
+    ⟨rootMatches, current, evidence, present, latest, qualified, freshBool, processed⟩
+  apply ValidLedger.medic valid operation rootMatches current evidence present latest qualified
+  · intro prior hprior same
+    have : occurrencePresent ledger operation.request = true := by
+      simp only [occurrencePresent, List.any_eq_true]
+      refine ⟨.medic prior, hprior, ?_⟩
+      simp [sameOccurrence, same]
+    simp [freshBool] at this
+  · exact prefixProof
 
 theorem appended_projects_through_existing_process
     (_h : appendMedic misclassification genuine root ledger operation =
@@ -180,11 +244,35 @@ def noGenuine : GenuineRepairAdmission := fun _ _ _ => false
 def root : List LedgerEntry → Root := List.length
 def operation : MedicOperation := ⟨91, 1, request⟩
 def baseLedger : List LedgerEntry := [.transition current]
+def suppliedPrefixValidity : List LedgerEntry → Prop := fun _ => True
+
+theorem baseLedgerValid :
+    ValidLedger root suppliedPrefixValidity authority noGenuine baseLedger := by
+  apply ValidLedger.transition (.nil trivial) current
+  · simp [project]
+  · left
+    simp [project, current, latestFor, latestEntries]
+  · trivial
 
 example : (appendMedic authority noGenuine root baseLedger operation).status = .appended := by
   native_decide
 
+theorem admitted_append_valid :
+    ValidLedger root suppliedPrefixValidity authority noGenuine
+      (.medic operation :: baseLedger) := by
+  apply appendMedic_preserves_validity baseLedgerValid trivial
+  rfl
+
 def appendedLedger : List LedgerEntry := [.medic operation, .transition current]
+
+def wrongRoot : MedicOperation := { operation with expectedRoot := 999 }
+
+theorem stale_root_entry_not_valid :
+    ¬ ValidLedger root suppliedPrefixValidity authority noGenuine
+      (.medic wrongRoot :: baseLedger) := by
+  intro valid
+  cases valid with
+  | medic _ _ rootMatches _ _ _ _ _ _ _ => simp [wrongRoot, root, baseLedger] at rootMatches
 
 example : (appendMedic authority noGenuine root appendedLedger operation).status = .duplicate := by
   native_decide
