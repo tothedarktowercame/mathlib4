@@ -178,6 +178,78 @@ def update
   | none => ⟨⟨state.history ++ [outcome]⟩, .appended⟩
   | some old => if old = outcome then ⟨state, .duplicate⟩ else ⟨state, .conflict⟩
 
+inductive ProcessDisposition where
+  | rejected
+  | admitted (replay : ReplayDisposition)
+  deriving DecidableEq, Repr
+
+/-- Result of the composed admission/update boundary. `outcome = none` is a
+rejection and necessarily retains the input state. -/
+structure ProcessResult (Family Event Effect Route Revision : Type) where
+  state : State Family Event Effect Route Revision
+  disposition : ProcessDisposition
+  outcome : Option (AttemptDeliveryOutcome Family Event Effect Route Revision)
+  deriving DecidableEq, Repr
+
+/-- The only operation in this module that turns a supplied observation into a
+counted history entry. Raw `update` remains available for proofs over already
+admitted outcomes. The input state's prior history is supplied and is not
+retrospectively certified by this operation. -/
+def admitAndUpdate
+    (authority : AuthorityCheck Evidence Family Event Effect Route Revision)
+    (population : PopulationCheck Family Event Effect Route Revision)
+    (requested : Request Family Event Effect Route Revision)
+    (observation : SuppliedObservation Family Event Effect Route Revision Evidence)
+    (state : State Family Event Effect Route Revision) :
+    ProcessResult Family Event Effect Route Revision :=
+  match admit authority population requested observation with
+  | none => ⟨state, .rejected, none⟩
+  | some outcome =>
+      let result := update state outcome
+      ⟨result.state, .admitted result.disposition, some outcome⟩
+
+theorem admitAndUpdate_rejected_state
+    (authority : AuthorityCheck Evidence Family Event Effect Route Revision)
+    (population : PopulationCheck Family Event Effect Route Revision)
+    (requested : Request Family Event Effect Route Revision)
+    (observation : SuppliedObservation Family Event Effect Route Revision Evidence)
+    (state : State Family Event Effect Route Revision)
+    (h : admit authority population requested observation = none) :
+    admitAndUpdate authority population requested observation state =
+      ⟨state, .rejected, none⟩ := by
+  simp [admitAndUpdate, h]
+
+/-- Any appended composed result comes from the exact admitted outcome; the
+admission theorem then recovers payload-bound authority and population proof. -/
+theorem admitAndUpdate_appended_only_if
+    (authority : AuthorityCheck Evidence Family Event Effect Route Revision)
+    (population : PopulationCheck Family Event Effect Route Revision)
+    (requested : Request Family Event Effect Route Revision)
+    (observation : SuppliedObservation Family Event Effect Route Revision Evidence)
+    (state : State Family Event Effect Route Revision)
+    (next : State Family Event Effect Route Revision)
+    (hout : AttemptDeliveryOutcome Family Event Effect Route Revision)
+    (h : admitAndUpdate authority population requested observation state =
+      ⟨next, .admitted .appended, some hout⟩) :
+    admit authority population requested observation = some hout ∧
+      update state hout = ⟨next, .appended⟩ ∧
+      ∃ delivered evidence,
+        observation = ⟨requested.family, requested.event, requested.effect,
+          requested.route, requested.revision, some delivered, some evidence⟩ ∧
+        authority.Admits evidence requested delivered ∧
+        population.Admits requested delivered ∧
+        hout = ⟨requested.family, requested.event, requested.effect,
+          requested.route, requested.revision, delivered⟩ := by
+  cases hadmit : admit authority population requested observation with
+  | none => simp [admitAndUpdate, hadmit] at h
+  | some outcome =>
+    cases hupdate : update state outcome with
+    | mk updated disposition =>
+      simp [admitAndUpdate, hadmit, hupdate] at h
+      rcases h with ⟨rfl, rfl, rfl⟩
+      exact ⟨rfl, hupdate,
+        admit_eq_some_only_if authority population requested observation outcome hadmit⟩
+
 def familyBools (family : Family)
     (state : State Family Event Effect Route Revision) : List Bool :=
   (state.history.filter (fun outcome => outcome.family = family)).map (·.delivered)
@@ -194,6 +266,19 @@ def concentrations (prior : Prior) (family : Family)
   let xs := familyBools family state
   (prior.success + PatternTheta.successes xs,
     prior.failure + PatternTheta.failures xs)
+
+theorem admitAndUpdate_rejected_concentrations
+    (prior : Prior) (family : Family)
+    (authority : AuthorityCheck Evidence Family Event Effect Route Revision)
+    (population : PopulationCheck Family Event Effect Route Revision)
+    (requested : Request Family Event Effect Route Revision)
+    (observation : SuppliedObservation Family Event Effect Route Revision Evidence)
+    (state : State Family Event Effect Route Revision)
+    (h : admit authority population requested observation = none) :
+    concentrations prior family
+        (admitAndUpdate authority population requested observation state).state =
+      concentrations prior family state := by
+  simp [admitAndUpdate, h]
 
 theorem append_true_changes_success_once (prior : Prior) (family : Family)
     (state : State Family Event Effect Route Revision)
@@ -222,6 +307,44 @@ theorem append_false_changes_failure_once (prior : Prior) (family : Family)
     PatternTheta.successes_append, PatternTheta.failures_append,
     PatternTheta.successes, PatternTheta.failures]
   ring
+
+theorem admitted_fresh_true_changes_success_once
+    (prior : Prior) (family : Family)
+    (authority : AuthorityCheck Evidence Family Event Effect Route Revision)
+    (population : PopulationCheck Family Event Effect Route Revision)
+    (requested : Request Family Event Effect Route Revision)
+    (observation : SuppliedObservation Family Event Effect Route Revision Evidence)
+    (state : State Family Event Effect Route Revision)
+    (outcome : AttemptDeliveryOutcome Family Event Effect Route Revision)
+    (hadmit : admit authority population requested observation = some outcome)
+    (hf : outcome.family = family)
+    (fresh : state.history.find? (fun old => old.event = outcome.event) = none)
+    (ht : outcome.delivered = true) :
+    concentrations prior family
+        (admitAndUpdate authority population requested observation state).state =
+      ((concentrations prior family state).1 + 1,
+       (concentrations prior family state).2) := by
+  simp [admitAndUpdate, hadmit]
+  exact append_true_changes_success_once prior family state outcome hf fresh ht
+
+theorem admitted_fresh_false_changes_failure_once
+    (prior : Prior) (family : Family)
+    (authority : AuthorityCheck Evidence Family Event Effect Route Revision)
+    (population : PopulationCheck Family Event Effect Route Revision)
+    (requested : Request Family Event Effect Route Revision)
+    (observation : SuppliedObservation Family Event Effect Route Revision Evidence)
+    (state : State Family Event Effect Route Revision)
+    (outcome : AttemptDeliveryOutcome Family Event Effect Route Revision)
+    (hadmit : admit authority population requested observation = some outcome)
+    (hf : outcome.family = family)
+    (fresh : state.history.find? (fun old => old.event = outcome.event) = none)
+    (ht : outcome.delivered = false) :
+    concentrations prior family
+        (admitAndUpdate authority population requested observation state).state =
+      ((concentrations prior family state).1,
+       (concentrations prior family state).2 + 1) := by
+  simp [admitAndUpdate, hadmit]
+  exact append_false_changes_failure_once prior family state outcome hf fresh ht
 
 theorem replay_does_not_update (state : State Family Event Effect Route Revision)
     (outcome : AttemptDeliveryOutcome Family Event Effect Route Revision)
@@ -274,6 +397,11 @@ def examplePopulation : PopulationCheck FamilyExample Nat EffectExample RouteExa
   check r _ := decide (r.family = .reusable)
   check_iff _ _ := by simp
 
+def rejectPopulation : PopulationCheck FamilyExample Nat EffectExample RouteExample Nat where
+  Admits _ _ := False
+  check _ _ := false
+  check_iff _ _ := by simp
+
 def exampleRequest : Request FamilyExample Nat EffectExample RouteExample Nat :=
   ⟨.reusable, 19, .done, .ordinary, 7⟩
 
@@ -289,7 +417,7 @@ theorem admitted_delivery_without_fire_field :
       (exampleObservation 19 7 .ordinary (some true) (some (exampleEvidence true))) =
       some ⟨.reusable, 19, .done, .ordinary, 7, true⟩ := by decide
 
-theorem selected_only_unqualified_cannot_update :
+theorem selected_only_unqualified_not_admitted :
     admit exampleAuthority examplePopulation exampleRequest
       (exampleObservation 19 7 .ordinary (some true) none) = none := by decide
 
@@ -318,13 +446,60 @@ theorem wrong_revision_not_admitted :
     admit exampleAuthority examplePopulation exampleRequest
       (exampleObservation 19 8 .ordinary (some true) (some (exampleEvidence true))) = none := by decide
 
+def emptyExampleState : State FamilyExample Nat EffectExample RouteExample Nat := ⟨[]⟩
+def trueOutcome : AttemptDeliveryOutcome FamilyExample Nat EffectExample RouteExample Nat :=
+  ⟨.reusable, 19, .done, .ordinary, 7, true⟩
+def falseOutcome : AttemptDeliveryOutcome FamilyExample Nat EffectExample RouteExample Nat :=
+  ⟨.reusable, 19, .done, .ordinary, 7, false⟩
+def trueObservation := exampleObservation 19 7 .ordinary (some true) (some (exampleEvidence true))
+def falseObservation := exampleObservation 19 7 .ordinary (some false) (some (exampleEvidence false))
+
+theorem composed_admitted_true_appends :
+    admitAndUpdate exampleAuthority examplePopulation exampleRequest trueObservation emptyExampleState =
+      ⟨⟨[trueOutcome]⟩, .admitted .appended, some trueOutcome⟩ := by decide
+
+theorem composed_admitted_false_appends :
+    admitAndUpdate exampleAuthority examplePopulation exampleRequest falseObservation emptyExampleState =
+      ⟨⟨[falseOutcome]⟩, .admitted .appended, some falseOutcome⟩ := by decide
+
+theorem composed_population_rejection_unchanged :
+    admitAndUpdate exampleAuthority rejectPopulation exampleRequest trueObservation emptyExampleState =
+      ⟨emptyExampleState, .rejected, none⟩ := by decide
+
+theorem composed_unqualified_unchanged :
+    admitAndUpdate exampleAuthority examplePopulation exampleRequest
+      (exampleObservation 19 7 .ordinary (some true) none) emptyExampleState =
+      ⟨emptyExampleState, .rejected, none⟩ := by decide
+
+theorem composed_wrong_identity_unchanged :
+    admitAndUpdate exampleAuthority examplePopulation exampleRequest
+      (exampleObservation 20 7 .ordinary (some true) (some (exampleEvidence true)))
+      emptyExampleState = ⟨emptyExampleState, .rejected, none⟩ := by decide
+
+theorem composed_exact_replay_duplicate :
+    admitAndUpdate exampleAuthority examplePopulation exampleRequest trueObservation
+      ⟨[trueOutcome]⟩ = ⟨⟨[trueOutcome]⟩, .admitted .duplicate, some trueOutcome⟩ := by decide
+
+/-- The flipped Boolean has separately matching authority, but immutable event
+identity makes it a conflict and leaves the prior true history unchanged. -/
+theorem composed_flipped_payload_conflict :
+    admitAndUpdate exampleAuthority examplePopulation exampleRequest falseObservation
+      ⟨[trueOutcome]⟩ = ⟨⟨[trueOutcome]⟩, .admitted .conflict, some falseOutcome⟩ := by decide
+
 #print axioms admit_of_exact
 #print axioms admit_eq_some_only_if
+#print axioms admitAndUpdate_rejected_state
+#print axioms admitAndUpdate_rejected_concentrations
+#print axioms admitAndUpdate_appended_only_if
 #print axioms append_true_changes_success_once
 #print axioms append_false_changes_failure_once
+#print axioms admitted_fresh_true_changes_success_once
+#print axioms admitted_fresh_false_changes_failure_once
 #print axioms replay_does_not_update
 #print axioms conflict_does_not_update
 #print axioms untouched_family_unchanged
-#print axioms selected_only_unqualified_cannot_update
+#print axioms composed_population_rejection_unchanged
+#print axioms composed_exact_replay_duplicate
+#print axioms composed_flipped_payload_conflict
 
 end DarkTower.WarMachine.AttemptDeliveryTheta
