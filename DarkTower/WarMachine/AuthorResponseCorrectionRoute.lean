@@ -54,13 +54,30 @@ structure OriginalResult where
   claimedArtifact : String
   deriving DecidableEq, Repr
 
-/-- A later response must name the original request and result exactly. -/
+/-- Immutable identity allocated for one bounded correction request. -/
+structure CorrectionRequest where
+  correctionId : String
+  originalRequestId : String
+  originalResultId : String
+  binding : Binding
+  deriving DecidableEq, Repr
+
+def CorrectionRequest.matchesOriginal (c : CorrectionRequest) (o : OriginalResult) : Bool :=
+  c.originalRequestId == o.requestId &&
+  c.originalResultId == o.resultId &&
+  c.binding == o.binding
+
+/-- A later response must name the correction request as well as the retained
+original request/result. Completion and return provenance are supplied facts
+from a future adapter, not self-authentication claims. -/
 structure CorrectedReply where
   correctionId : String
   requestId : String
   originalResultId : String
   binding : Binding
   cancelled : Bool
+  completed : Bool
+  returnProvenanceVerified : Bool
   form : ReplyForm
   artifact : String
   validAlreadySatisfiedCard : Bool
@@ -84,6 +101,14 @@ def CorrectedReply.matches (r : CorrectedReply) (o : OriginalResult) : Bool :=
   r.originalResultId == o.resultId &&
   r.binding == o.binding &&
   r.cancelled == false
+
+def CorrectedReply.qualifiedFor (r : CorrectedReply)
+    (o : OriginalResult) (c : CorrectionRequest) : Bool :=
+  c.matchesOriginal o &&
+  r.correctionId == c.correctionId &&
+  r.matches o &&
+  r.completed == true &&
+  r.returnProvenanceVerified == true
 
 inductive GateResult where
   | alreadySatisfied
@@ -110,55 +135,73 @@ inductive Refusal where
   | invalidOrChangedReply
   deriving DecidableEq, Repr
 
-/-- The original result is present in every detour state; a reply appears only
-after the bounded correction prompt/wait states. -/
+/-- The original result and correction request are present in every detour
+state. A reply appears only after its own immutable correction wait. -/
 inductive Node where
   | gate (original : OriginalResult) (ordinaryBudget : OrdinaryBudget) (allowance : Nat)
-  | correctionPrompt (original : OriginalResult) (ordinaryBudget : OrdinaryBudget) (allowance : Nat)
-  | correctionWait (original : OriginalResult) (ordinaryBudget : OrdinaryBudget) (allowance : Nat)
-  | response (original : OriginalResult) (reply : CorrectedReply)
+  | correctionPrompt (original : OriginalResult) (request : CorrectionRequest)
       (ordinaryBudget : OrdinaryBudget) (allowance : Nat)
-  | alreadySatisfied (original : OriginalResult) (reply : CorrectedReply)
+  | correctionWait (original : OriginalResult) (request : CorrectionRequest)
+      (ordinaryBudget : OrdinaryBudget) (allowance : Nat)
+  | response (original : OriginalResult) (request : CorrectionRequest) (reply : CorrectedReply)
+      (ordinaryBudget : OrdinaryBudget) (allowance : Nat)
+  | validated (original : OriginalResult) (request : CorrectionRequest) (reply : CorrectedReply)
+      (qualified : reply.qualifiedFor original request = true)
+      (ordinaryBudget : OrdinaryBudget) (allowance : Nat)
+  | alreadySatisfied (original : OriginalResult) (request : CorrectionRequest) (reply : CorrectedReply)
+      (qualified : reply.qualifiedFor original request = true)
       (ordinaryBudget : OrdinaryBudget)
-  | continuedToBuild (ordinary : OrdinaryClickRoute.Node)
-  | refused (original : OriginalResult) (reply : CorrectedReply)
+  | continuedToBuild (original : OriginalResult) (request : CorrectionRequest) (reply : CorrectedReply)
+      (qualified : reply.qualifiedFor original request = true)
+      (ordinary : OrdinaryClickRoute.Node)
+  | refused (original : OriginalResult) (request : CorrectionRequest) (reply : CorrectedReply)
       (reason : Refusal) (ordinaryBudget : OrdinaryBudget)
-  deriving DecidableEq, Repr
+  deriving Repr
 
 /-- The allowance is consumed on entry; the reply is retained and evaluated
 only after wait.  A valid refusal terminates as an explicit no-fresh-artifact
 outcome; a valid fresh `DONE` merely resumes the existing row-24 build path. -/
 inductive Step : Node → Node → Prop where
-  | beginCorrection (h : original.correctableDoneAtBase) :
-      Step (.gate original b (n + 1)) (.correctionPrompt original b n)
+  | beginCorrection (h : original.correctableDoneAtBase)
+      (hrequest : request.matchesOriginal original = true) :
+      Step (.gate original b (n + 1)) (.correctionPrompt original request b n)
   | prompted :
-      Step (.correctionPrompt original b n) (.correctionWait original b n)
+      Step (.correctionPrompt original request b n) (.correctionWait original request b n)
   | replied (reply : CorrectedReply) :
-      Step (.correctionWait original b n) (.response original reply b n)
+      Step (.correctionWait original request b n) (.response original request reply b n)
+  | qualified (h : reply.qualifiedFor original request = true) :
+      Step (.response original request reply b n) (.validated original request reply h b n)
+  | unqualified (h : reply.qualifiedFor original request = false) :
+      Step (.response original request reply b n)
+        (.refused original request reply .invalidOrChangedReply b)
   | validRefusal (h : authorGate original reply = .alreadySatisfied) :
-      Step (.response original reply b n) (.alreadySatisfied original reply b)
+      Step (.validated original request reply qualified b n)
+        (.alreadySatisfied original request reply qualified b)
   | validFreshDone (h : authorGate original reply = .freshDone) :
-      Step (.response original reply b n)
-        (.continuedToBuild (.running OrdinaryClickRoute.Phase.p24 b))
-  | invalidReply (h : authorGate original reply = .refused) :
-      Step (.response original reply b n)
-        (.refused original reply .invalidOrChangedReply b)
+      Step (.validated original request reply qualified b n)
+        (.continuedToBuild original request reply qualified (.running OrdinaryClickRoute.Phase.p24 b))
+  | invalidGateReply (h : authorGate original reply = .refused) :
+      Step (.validated original request reply qualified b n)
+        (.refused original request reply .invalidOrChangedReply b)
 
 def measure : Node → Nat
-  | .gate _ _ n => 3 * n + 1
-  | .correctionPrompt _ _ n => 3 * n + 3
-  | .correctionWait _ _ n => 3 * n + 2
-  | .response _ _ _ n => 3 * n + 1
-  | .alreadySatisfied _ _ _ | .continuedToBuild _ | .refused _ _ _ _ => 0
+  | .gate _ _ n => 4 * n + 1
+  | .correctionPrompt _ _ _ n => 4 * n + 4
+  | .correctionWait _ _ _ n => 4 * n + 3
+  | .response _ _ _ _ n => 4 * n + 2
+  | .validated _ _ _ _ _ n => 4 * n + 1
+  | .alreadySatisfied _ _ _ _ _ | .continuedToBuild _ _ _ _ _ | .refused _ _ _ _ _ => 0
 
 theorem step_decreases (h : Step s t) : measure t < measure s := by
   cases h
   case beginCorrection => simp [measure]; omega
   case prompted => simp [measure]
   case replied => simp [measure]
+  case qualified => simp [measure]
+  case unqualified => simp [measure]
   case validRefusal => simp [measure]
   case validFreshDone => simp [measure]
-  case invalidReply => simp [measure]
+  case invalidGateReply => simp [measure]
 
 theorem step_wellFounded : WellFounded (fun t s => Step s t) :=
   Subrelation.wf (fun h => step_decreases h) (InvImage.wf measure Nat.lt_wfRel.wf)
@@ -195,6 +238,12 @@ def exampleOriginal : OriginalResult where
   form := .done
   claimedArtifact := exampleBinding.baseRevision
 
+def exampleCorrectionRequest : CorrectionRequest where
+  correctionId := "correction-example"
+  originalRequestId := exampleOriginal.requestId
+  originalResultId := exampleOriginal.resultId
+  binding := exampleBinding
+
 /-- Synthetic later refusal; its card/artifact booleans are supplied adapter
 facts, not assertions about c52's historical reply. -/
 def correctedRefusal : CorrectedReply where
@@ -208,6 +257,8 @@ def correctedRefusal : CorrectedReply where
   validAlreadySatisfiedCard := true
   existingArtifactVerified := true
   freshArtifactBindingVerified := false
+  completed := true
+  returnProvenanceVerified := true
 
 def baseDoneReply : CorrectedReply where
   correctionId := "wrong-base-done"
@@ -220,6 +271,20 @@ def baseDoneReply : CorrectedReply where
   validAlreadySatisfiedCard := false
   existingArtifactVerified := false
   freshArtifactBindingVerified := false
+  completed := true
+  returnProvenanceVerified := true
+
+def unrelatedCorrectionReply : CorrectedReply :=
+  { correctedRefusal with correctionId := "unrelated-correction" }
+
+def incompleteReply : CorrectedReply :=
+  { correctedRefusal with completed := false }
+
+def unprovenReply : CorrectedReply :=
+  { correctedRefusal with returnProvenanceVerified := false }
+
+def cancelledReply : CorrectedReply :=
+  { correctedRefusal with cancelled := true }
 
 theorem exampleOriginal_is_precisely_correctable :
     exampleOriginal.correctableDoneAtBase := by
@@ -228,13 +293,20 @@ theorem exampleOriginal_is_precisely_correctable :
 /-- Positive control: the later refusal returns through the author gate, not
 directly to build/grounding. -/
 theorem corrected_refusal_reaches_only_alreadySatisfied (b : OrdinaryBudget) :
-    ∃ n, Step (.gate exampleOriginal b (n + 1)) (.correctionPrompt exampleOriginal b n) ∧
-      Step (.correctionPrompt exampleOriginal b n) (.correctionWait exampleOriginal b n) ∧
-      Step (.correctionWait exampleOriginal b n) (.response exampleOriginal correctedRefusal b n) ∧
-      Step (.response exampleOriginal correctedRefusal b n)
-        (.alreadySatisfied exampleOriginal correctedRefusal b) := by
-  refine ⟨0, .beginCorrection exampleOriginal_is_precisely_correctable, .prompted,
+    ∃ n, Step (.gate exampleOriginal b (n + 1))
+        (.correctionPrompt exampleOriginal exampleCorrectionRequest b n) ∧
+      Step (.correctionPrompt exampleOriginal exampleCorrectionRequest b n)
+        (.correctionWait exampleOriginal exampleCorrectionRequest b n) ∧
+      Step (.correctionWait exampleOriginal exampleCorrectionRequest b n)
+        (.response exampleOriginal exampleCorrectionRequest correctedRefusal b n) ∧
+      (∃ hqualified,
+        Step (.response exampleOriginal exampleCorrectionRequest correctedRefusal b n)
+          (.validated exampleOriginal exampleCorrectionRequest correctedRefusal hqualified b n) ∧
+        Step (.validated exampleOriginal exampleCorrectionRequest correctedRefusal hqualified b n)
+          (.alreadySatisfied exampleOriginal exampleCorrectionRequest correctedRefusal hqualified b)) := by
+  refine ⟨0, .beginCorrection exampleOriginal_is_precisely_correctable (by decide), .prompted,
     .replied correctedRefusal, ?_⟩
+  refine ⟨by decide, .qualified (by decide), ?_⟩
   apply Step.validRefusal
   decide
 
@@ -242,6 +314,22 @@ theorem corrected_refusal_reaches_only_alreadySatisfied (b : OrdinaryBudget) :
 theorem done_at_base_remains_refused :
     authorGate exampleOriginal baseDoneReply = .refused := by
   simp [authorGate, CorrectedReply.matches, baseDoneReply, exampleOriginal, exampleBinding]
+
+theorem unrelated_example_is_unqualified :
+    unrelatedCorrectionReply.qualifiedFor exampleOriginal exampleCorrectionRequest = false := by
+  decide
+
+theorem incomplete_example_is_unqualified :
+    incompleteReply.qualifiedFor exampleOriginal exampleCorrectionRequest = false := by
+  decide
+
+theorem unproven_example_is_unqualified :
+    unprovenReply.qualifiedFor exampleOriginal exampleCorrectionRequest = false := by
+  decide
+
+theorem cancelled_example_is_unqualified :
+    cancelledReply.qualifiedFor exampleOriginal exampleCorrectionRequest = false := by
+  decide
 
 theorem zero_allowance_cannot_begin (original : OriginalResult) (b : OrdinaryBudget) :
     ¬ ∃ next, Step (.gate original b 0) next := by
@@ -272,23 +360,68 @@ theorem absent_reply_is_refused (reply : CorrectedReply)
     authorGate original reply = .refused := by
   simp [authorGate, hmatch, habsent]
 
+theorem unrelated_correction_is_unqualified
+    (reply : CorrectedReply) (request : CorrectionRequest) (original : OriginalResult)
+    (h : reply.correctionId ≠ request.correctionId) :
+    reply.qualifiedFor original request = false := by
+  simp [CorrectedReply.qualifiedFor, h]
+
+theorem incomplete_reply_is_unqualified
+    (reply : CorrectedReply) (request : CorrectionRequest) (original : OriginalResult)
+    (hincomplete : reply.completed = false) :
+    reply.qualifiedFor original request = false := by
+  simp [CorrectedReply.qualifiedFor, hincomplete]
+
+theorem unproven_return_is_unqualified
+    (reply : CorrectedReply) (request : CorrectionRequest) (original : OriginalResult)
+    (hunproven : reply.returnProvenanceVerified = false) :
+    reply.qualifiedFor original request = false := by
+  simp [CorrectedReply.qualifiedFor, hunproven]
+
+theorem cancelled_reply_is_unqualified
+    (reply : CorrectedReply) (request : CorrectionRequest) (original : OriginalResult)
+    (hcancelled : reply.cancelled = true) :
+    reply.qualifiedFor original request = false := by
+  simp [CorrectedReply.qualifiedFor, CorrectedReply.matches, hcancelled]
+
+/-- Any transition to the qualified no-fresh-artifact result carries an
+explicit completed, provenance-verified reply bound to the same correction
+request and retained original. -/
+theorem alreadySatisfied_step_only_if_qualified
+    (h : Step s (.alreadySatisfied original request reply qualified b)) :
+    reply.qualifiedFor original request = true ∧
+      authorGate original reply = .alreadySatisfied := by
+  cases h with
+  | validRefusal gate => exact ⟨qualified, gate⟩
+
 /-- A fresh `DONE` only reaches the existing build control point after the
 separate supplied fresh-binding fact; it is not declared a successful repair. -/
 theorem fresh_done_continues_only_at_row24
-    (h : Step (.response original reply b n) (.continuedToBuild ordinary)) :
-    ordinary = .running OrdinaryClickRoute.Phase.p24 b := by
+    (h : Step (.validated original request reply qualified b n)
+      (.continuedToBuild original request reply qualified ordinary)) :
+    reply.qualifiedFor original request = true ∧
+      ordinary = .running OrdinaryClickRoute.Phase.p24 b := by
   cases h
-  rfl
+  exact ⟨qualified, rfl⟩
 
 #print axioms step_wellFounded
 #print axioms noInfiniteCorrection
 #print axioms corrected_refusal_reaches_only_alreadySatisfied
 #print axioms done_at_base_remains_refused
+#print axioms unrelated_example_is_unqualified
+#print axioms incomplete_example_is_unqualified
+#print axioms unproven_example_is_unqualified
+#print axioms cancelled_example_is_unqualified
 #print axioms zero_allowance_cannot_begin
 #print axioms cancelled_original_cannot_begin
 #print axioms mechanical_falsifier_cannot_begin
 #print axioms mismatched_reply_is_refused
 #print axioms absent_reply_is_refused
+#print axioms unrelated_correction_is_unqualified
+#print axioms incomplete_reply_is_unqualified
+#print axioms unproven_return_is_unqualified
+#print axioms cancelled_reply_is_unqualified
+#print axioms alreadySatisfied_step_only_if_qualified
 #print axioms fresh_done_continues_only_at_row24
 
 end DarkTower.WarMachine.AuthorResponseCorrectionRoute
