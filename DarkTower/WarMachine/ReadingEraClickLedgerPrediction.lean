@@ -1,5 +1,6 @@
 import DarkTower.WarMachine.ReadingEraClickPrediction
 import DarkTower.WarMachine.MedicLedgerBridge
+import DarkTower.WarMachine.AlreadySatisfiedArtifactRefSeam
 
 /-!
 # The third click's ledger gate and terminal effect, predicted beside the record
@@ -376,5 +377,300 @@ theorem miniBefore_fresh_injury :
 #print axioms miniBefore_shape
 #print axioms miniBefore_observation
 #print axioms miniBefore_fresh_injury
+
+/-! ## The fourth click: the already-satisfied close through the repaired seam
+
+Source: the packet from claude-9, 2026-10-26 18:06Z.  The third click's close
+was `:build-failed :invalid-author-refusal` (R24): the terminal opened entry
+47 and the readback after the click was the control's shape
+(`after3Observed`).  Entry 47 was retired by the medic operation
+`987e211a…` (entry 48, 17:53Z).  Both halves of the artifact-ref seam are
+repaired and reloaded (`AlreadySatisfiedArtifactRefSeam`, Parts 2 and 4), so
+the same answer from the author now closes `:already-satisfied` at
+`:author-wait` and the terminal classifies it a non-injury through
+`producer-qualified-already-satisfied?`.
+
+**The before-state.**  `before4` transcribes the readback at 18:01:02Z
+(generation 10, nine scopes; `fourth-click-2026-10-26/claude9-readback-pre-click.edn`),
+re-counted against `ledger.edn` (sha `d41add47…`): 48 entries, 31 with the
+transition schema and 17 with the observation schema; raw 9, effective 0, ids
+empty; budget 176 of 178.  The structure's `operationCount` field is
+documented as counting `263dcf88…`; for this click the operation that matters
+is `987e211a…` (entry 48), and `before4` counts that one.  Both occur
+exactly once in the ledger, so the value is 1 under either reading.
+
+**The close.**  `close4` is `recordOf (.alreadySatisfied 978)` from the seam
+module: the close `throw-if-author-refused!` writes for the repaired
+consumer's answer on either ordering of the reply
+(`repaired_agrees_on_both_replies`), and on the deployed Agency's extraction
+(`either_half_suffices`).  Its `verdictOf` is non-injury by the kind, not by
+the close: `closeVerdict .alreadySatisfied true = none`
+(`control_agrees_by_kind_not_by_close`).  `classificationOf_eq_verdictOf`
+ties this module's `classificationOf` to the seam's `verdictOf` in general:
+whenever the kind's verdict is `some k`, `classificationOf` with `k` is
+`verdictOf`.  `fourth_click_after` then takes `k` from `verdictOf close4`
+and not from a literal.
+
+**The control.**  `classify` reaches `:non-injury` for kind
+`:already-satisfied` only through `producer-qualified-already-satisfied?`
+(`meta_terminal_injury.clj` 59–73): the kind is not in
+`explicit-non-injury-kinds` (10–14: abstained, operator-cancelled,
+declared-no-work, diagnostic-only).  The qualification reads the grounded
+commit: a non-blank repo and a sha matching `git-re`, 40–64 hex.  The
+runner's `author-refusal-classification` accepts 7–40 hex from the reply or
+the card (`\b[0-9a-f]{7,40}\b`, 3281–3284), so a short sha grounds a close the
+terminal then refuses to qualify, and the default injury branch opens a
+transition.  `GroundedCommit` carries the two things the qualification
+reads; `qualifiedKindVerdict` is `kindVerdict` with the qualification
+applied; `verdictOfQualified` is `verdictOf` with it.  The three `:detail`
+fields and `[:run-output :outcome]` agree whenever `throw-if-author-refused!`
+wrote the close, so the sha's length is the one live way to fail.
+`runner_terminal_length_gap` names the lengths the runner accepts and the
+terminal refuses: exactly 7 to 39.  `control_short_sha_opens_transition` is
+the control: the seam's `shortOnlyReply` grounds the short form, the close is
+`alreadySatisfied` with that kind, the qualified verdict is injury, the
+after-state is raw 10, effective 1, and click 5 is blocked.
+
+**Numeral key**: the fresh injury the control would open ↦ 7002; the full
+sha ↦ 978 (40 hex), the short form ↦ 977 (8 hex), as in the seam module. -/
+
+open DarkTower.WarMachine.AlreadySatisfiedArtifactRefSeam
+  (Close FailureKind Consumed recordOf verdictOf kindVerdict failurePresent
+    repairedClassifier currentClassifier firstArtifactRef preferredArtifactRef
+    store3 storeResolvingShort card3 full3 witnessReply controlReply witnessReplyFull
+    shortOnlyReply)
+
+/-- The readback after the third click (16:14:48Z, generation 9): 47 entries,
+31 transitions, 16 observations, raw 9, effective 1 with entry 47's injury
+(`injury/2aef7e0c…` ↦ 2001), the operation once, budget 176 of 178.  It is
+the control's shape with the fresh id 2001 for the placeholder 7001. -/
+def after3Observed : ClickLedgerPrediction :=
+  ⟨47, 31, 16, 9, 1, [2001], 1, 176, 178⟩
+
+theorem after3Observed_is_control_shape :
+    after3Observed = afterClick before 2001 (classificationOf .buildFailed true .injury) := by
+  decide
+
+/-- The readback at 18:01:02Z, after entry 48 retired entry 47.  The
+operation counted is `987e211a…`. -/
+def before4 : ClickLedgerPrediction :=
+  ⟨48, 31, 17, 9, 0, [], 1, 176, 178⟩
+
+/-- Entry 48's effect on the shape: one observation row, the one effective
+injury retired, the history untouched (the retirement in the medic form is
+`AlreadySatisfiedArtifactRefSeam.entry47_correction_qualifies`). -/
+theorem medic_operation_48_effect :
+    before4 = { after3Observed with entries := 48, observations := 17,
+                                    effectiveActive := 0, effectiveIds := [] } := rfl
+
+/-! ### The gate -/
+
+theorem gate_before4 : gateState before4 = .noActiveInjury := rfl
+
+/-- The fourth click's gate finds no effective injury and ordinary selection runs. -/
+theorem fourth_click_reaches_ordinary_selection :
+    reaches (gateState before4) .ordinarySelection = true := by decide
+
+/-- The click after the third met an active injury on `after3Observed`; the
+medic operation is what reopened the door. -/
+theorem after3_was_blocked_before4_is_not :
+    gateState after3Observed = .activeInjury ∧
+      reaches (gateState after3Observed) .ordinarySelection = false ∧
+      reaches (gateState before4) .ordinarySelection = true :=
+  ⟨rfl, SelfHealRoute.noFallback, by decide⟩
+
+/-! ### The close -/
+
+/-- The fourth click's close as the terminal reads it: outcome
+`alreadySatisfied`, failure kind `alreadySatisfied`. -/
+def close4 : Close := recordOf (.alreadySatisfied 978)
+
+/-- The close is what the repaired consumer writes on either ordering of the
+reply, and what the deployed Agency's extraction feeds either consumer. -/
+theorem close4_from_repaired_seam :
+    repairedClassifier store3 card3 (firstArtifactRef witnessReply) =
+        some (.alreadySatisfied 978) ∧
+      repairedClassifier store3 card3 (firstArtifactRef controlReply) =
+        some (.alreadySatisfied 978) ∧
+      currentClassifier store3 card3 (preferredArtifactRef full3 witnessReplyFull) =
+        some (.alreadySatisfied 978) ∧
+      close4 = ⟨.alreadySatisfied, .alreadySatisfied⟩ :=
+  ⟨AlreadySatisfiedArtifactRefSeam.repaired_agrees_on_both_replies.1,
+   AlreadySatisfiedArtifactRefSeam.repaired_agrees_on_both_replies.2.1,
+   AlreadySatisfiedArtifactRefSeam.either_half_suffices.2.1, rfl⟩
+
+/-- The close does not decide (a failure kind is present); the kind decides,
+non-injury. -/
+theorem close4_decided_by_kind :
+    closeVerdict (image close4.outcome) (failurePresent close4.failure) = none ∧
+      kindVerdict close4.failure = some .nonInjury ∧
+      verdictOf close4 = some .nonInjury := by decide
+
+/-- `classificationOf` is `verdictOf` whenever the kind's verdict is the
+supplied one: the tie between this module's classifier and the seam's. -/
+theorem classificationOf_eq_verdictOf (c : Close) (k : Verdict)
+    (h : kindVerdict c.failure = some k) :
+    some (classificationOf c.outcome (failurePresent c.failure) k) = verdictOf c := by
+  unfold classificationOf verdictOf
+  cases closeVerdict (image c.outcome) (failurePresent c.failure) <;> simp [h]
+
+/-- The predicted after-state: 49 entries (31 transitions, 18 observations),
+raw 9, effective 0, ids empty, the operation once, budget 177 of 178. -/
+def after4 : ClickLedgerPrediction :=
+  ⟨49, 31, 18, 9, 0, [], 1, 177, 178⟩
+
+/-- The whole predicted after-state, for the predicted close, with the kind's
+verdict taken from the seam's `verdictOf close4`. -/
+theorem fourth_click_after (k : Verdict) (hk : verdictOf close4 = some k) :
+    afterClick before4 7002 (classificationOf close4.outcome (failurePresent close4.failure) k) =
+      after4 := by
+  have : k = .nonInjury := by
+    have h := close4_decided_by_kind.2.2
+    rw [hk] at h; exact Option.some.inj h
+  subst this; decide
+
+/-- The same, stated as the packet asked: the close `.alreadySatisfied` with a
+failure present, and `k` the verdict of `recordOf (.alreadySatisfied s)`. -/
+theorem fourth_click_after_packet_form (s : Nat) (k : Verdict)
+    (hk : verdictOf (recordOf (.alreadySatisfied s)) = some k) :
+    afterClick before4 7002 (classificationOf .alreadySatisfied true k) = after4 := by
+  have : k = .nonInjury := by
+    have h : verdictOf (recordOf (.alreadySatisfied s)) = some .nonInjury := rfl
+    rw [hk] at h; exact Option.some.inj h
+  subst this; decide
+
+/-- The after-state leaves the effective set and the transitions as they were
+and adds one observation; the ledger gains one observation and no transition. -/
+theorem fourth_click_observation_only :
+    after4.effectiveActive = before4.effectiveActive ∧ after4.effectiveIds = before4.effectiveIds ∧
+      after4.transitions = before4.transitions ∧ after4.observations = before4.observations + 1 := by
+  decide
+
+/-- Click 5 is not blocked. -/
+theorem fifth_click_not_blocked :
+    gateState after4 = .noActiveInjury ∧ reaches (gateState after4) .ordinarySelection = true :=
+  ⟨rfl, by decide⟩
+
+/-! ### The control: a grounded sha the terminal does not qualify -/
+
+/-- What `producer-qualified-already-satisfied?` reads of the grounded commit:
+whether `:repo` is non-blank, and the sha's hex length (`git-re` is
+`[0-9a-f]{40,64}`, matched whole). -/
+structure GroundedCommit where
+  repoNonBlank : Bool
+  shaHexLength : Nat
+  deriving DecidableEq, Repr
+
+/-- The terminal's acceptance of a sha: 40 to 64 hex digits. -/
+def terminalAcceptsSha (n : Nat) : Bool := 40 ≤ n && n ≤ 64
+
+/-- The runner's acceptance (`author-refusal-classification`,
+`\b[0-9a-f]{7,40}\b`): 7 to 40. -/
+def runnerAcceptsSha (n : Nat) : Bool := 7 ≤ n && n ≤ 40
+
+/-- The lengths the runner grounds and the terminal refuses: exactly 7 to 39. -/
+theorem runner_terminal_length_gap (n : Nat) :
+    (runnerAcceptsSha n = true ∧ terminalAcceptsSha n = false) ↔ (7 ≤ n ∧ n ≤ 39) := by
+  simp [runnerAcceptsSha, terminalAcceptsSha]; omega
+
+def producerQualified (g : GroundedCommit) : Bool :=
+  g.repoNonBlank && terminalAcceptsSha g.shaHexLength
+
+/-- `kindVerdict` with the qualification applied: `:already-satisfied` is a
+non-injury only when the grounded commit qualifies, else the default injury
+branch; the other kinds as before. -/
+def qualifiedKindVerdict (g : GroundedCommit) : FailureKind → Option Verdict
+  | .alreadySatisfied => some (if producerQualified g then .nonInjury else .injury)
+  | k => kindVerdict k
+
+/-- `verdictOf` with the qualification applied. -/
+def verdictOfQualified (g : GroundedCommit) (c : Close) : Option Verdict :=
+  match closeVerdict (image c.outcome) (failurePresent c.failure) with
+  | some v => some v
+  | none => qualifiedKindVerdict g c.failure
+
+/-- A qualifying grounded commit changes nothing: the qualified reading is the
+seam's. -/
+theorem qualified_agrees_with_seam (g : GroundedCommit) (hg : producerQualified g = true)
+    (c : Close) : verdictOfQualified g c = verdictOf c := by
+  unfold verdictOfQualified verdictOf
+  cases closeVerdict (image c.outcome) (failurePresent c.failure) with
+  | some v => rfl
+  | none =>
+    simp only
+    cases c.failure <;> simp [qualifiedKindVerdict, kindVerdict, hg]
+
+/-- The full sha in `futon5a`: qualifies. -/
+def fullGrounded : GroundedCommit := ⟨true, 40⟩
+
+/-- The short form `09a7cb8d`: the runner grounds it, the terminal does not
+qualify it. -/
+def shortGrounded : GroundedCommit := ⟨true, 8⟩
+
+theorem fourth_click_qualified :
+    producerQualified fullGrounded = true ∧
+      verdictOfQualified fullGrounded close4 = some .nonInjury := by decide
+
+/-- The control: the author names only the short sha; the deployed Agency
+extracts it (no full sha to prefer), the repaired classifier grounds it, the
+close is `alreadySatisfied` with that kind, the terminal refuses to qualify
+the 8-hex sha, the default injury branch opens a transition (49 entries, 32
+transitions, raw 10, effective 1), and click 5 meets an active injury. -/
+theorem control_short_sha_opens_transition :
+    preferredArtifactRef full3 shortOnlyReply = some (.sha 977) ∧
+      repairedClassifier storeResolvingShort card3 (preferredArtifactRef full3 shortOnlyReply) =
+        some (.alreadySatisfied 977) ∧
+      recordOf (.alreadySatisfied 977) = close4 ∧
+      producerQualified shortGrounded = false ∧
+      verdictOfQualified shortGrounded close4 = some .injury ∧
+      afterClick before4 7002 (classificationOf .alreadySatisfied true .injury) =
+        ⟨49, 32, 17, 10, 1, [7002], 1, 177, 178⟩ ∧
+      gateState (afterClick before4 7002 (classificationOf .alreadySatisfied true .injury)) =
+        .activeInjury ∧
+      reaches .activeInjury .ordinarySelection = false := by
+  refine ⟨by decide, by decide, rfl, rfl, by decide, by decide, rfl, SelfHealRoute.noFallback⟩
+
+/-- The seam's unqualified `verdictOf` and the qualified reading differ on
+the short sha: the control is visible only with the qualification. -/
+theorem short_sha_control_needs_qualification :
+    verdictOf close4 = some .nonInjury ∧
+      verdictOfQualified shortGrounded close4 = some .injury := by decide
+
+/-- A blank repo fails the qualification too, with a full sha. -/
+theorem blank_repo_not_qualified :
+    verdictOfQualified ⟨false, 40⟩ close4 = some .injury := by decide
+
+/-- The prediction and the control differ on the terminal. -/
+theorem fourth_prediction_differs_from_control :
+    after4 ≠ afterClick before4 7002 (classificationOf .alreadySatisfied true .injury) := by
+  decide
+
+/-- The `:invalid-author-refusal` close, click 3's, under the qualified
+reading: still an injury (the kind's verdict, unchanged by `g`). -/
+theorem click3_close_still_injury (g : GroundedCommit) :
+    verdictOfQualified g (recordOf .invalidAuthorRefusal) = some .injury := by
+  unfold verdictOfQualified
+  simp [recordOf, qualifiedKindVerdict, kindVerdict, failurePresent, closeVerdict, image]
+
+#print axioms after3Observed_is_control_shape
+#print axioms medic_operation_48_effect
+#print axioms gate_before4
+#print axioms fourth_click_reaches_ordinary_selection
+#print axioms after3_was_blocked_before4_is_not
+#print axioms close4_from_repaired_seam
+#print axioms close4_decided_by_kind
+#print axioms classificationOf_eq_verdictOf
+#print axioms fourth_click_after
+#print axioms fourth_click_after_packet_form
+#print axioms fourth_click_observation_only
+#print axioms fifth_click_not_blocked
+#print axioms runner_terminal_length_gap
+#print axioms qualified_agrees_with_seam
+#print axioms fourth_click_qualified
+#print axioms control_short_sha_opens_transition
+#print axioms short_sha_control_needs_qualification
+#print axioms blank_repo_not_qualified
+#print axioms fourth_prediction_differs_from_control
+#print axioms click3_close_still_injury
 
 end DarkTower.WarMachine.ReadingEraClickLedgerPrediction

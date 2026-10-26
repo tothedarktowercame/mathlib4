@@ -738,4 +738,173 @@ theorem third_click_record_unchanged : predictedRecord3 = predictedRecord2 := rf
 #print axioms predicted3_holds
 #print axioms third_click_record_unchanged
 
+/-! ## The prediction for the fourth click
+
+The third click (`wm-click-9468efd5…`, run `2026-10-26-f444287e…`) reached
+ordinary selection, chose the same policy as click 1, and the author answered
+in the rule-7 grammar that the want already holds at base head `09a7cb8d…`.
+The Agency's artifact-ref was the mission path, the classifier closed
+`:build-failed :invalid-author-refusal`, and the terminal opened ledger entry
+47 (R24, `AlreadySatisfiedArtifactRefSeam`).  Since then both halves of the
+seam were repaired and reloaded (futon3c `6b1bb1358`, futon2 `097fd9f4c`) and
+entry 47 was retired by entry 48 (medic operation `987e211a…`, 17:53Z).  The
+close and the ledger are predicted in `ReadingEraClickLedgerPrediction`; this
+is the record half.  Values forced by the state (claude-9, checked live
+17:58Z–18:05Z; probes under `fourth-click-2026-10-26/`):
+
+* `unmetReadings` 96: click 3's preparation published three readings
+  (`M-distributed-frontiermath` 15:53:05Z, `M-war-machine-aif-last-mile`
+  15:59:52Z, `M-essays-edit-cycle` 16:02:05Z), all `:current-candidate`
+  beside click 1's three; click 3 read 99.
+* `preparation` `ran 3 0 94`: 97 needs now, budget 3.
+* Frontier 109 eligible, 3 ranked, 106 unranked: click 3's census was 109
+  (click 2's prediction said 110; the census is unforced).  The ranked count
+  is unforced upward as before (`more_ranked_families_also_predicted`).
+* `sourceCheck` current, no stale namespace: drift `{:drift [] :registered
+  112}` at 17:58Z; futon2 src at `097fd9f4c`, no src commit since.
+* `predecessor` present: click 3's run, its closed event the last line of
+  `run-stream.edn`.
+* `q6Carrier` notTriggered: that event's `:q6 :outcome` is `{:status
+  :present :outcome :invalid :raw :build-failed}`; `decide-exclusion`
+  (`previous_run.clj` 216–217) answers `:not-triggered
+  :previous-outcome-not-refused` for any outcome that is not `:refused`.
+* `requirements` `checked false`, as click 3.
+* The pattern domain: the predicted close is `:already-satisfied` at
+  `:author-wait`, which builds nothing, so there is no after-revision cascade:
+  TO `[:pattern-observations]` is `{:status :refused :kind
+  :after-revision-missing}` and `[:pattern-comparison :status]` `:refused`,
+  as click 3 showed.  So `patternRows` is `none`, `patternComparison`
+  `refused`, `patternRowsNotExecutable` 0.
+
+R8 and R8a are written for a close that builds (one supplied row per pattern
+prediction, every row prose).  They fail on this record for that reason, and
+the prediction says so rather than weakening the clauses:
+`fourth_click_failing` names exactly those two, and
+`rows_absent_fails_exactly_r8_r8a` says that is what any rowless record does
+to this clause set, whatever its other fields.  `fourth_click_otherwise_predicted`
+is the form `observed3.lean` used: with the rows a building close would
+write, nothing fails.  The branch not predicted: if the author builds again
+(click 1's shape), the close is `:grounded-progress`, the rows exist, and the
+record is `predictedRecord4Building`, which differs from `predictedRecord3`
+only on the two forced reading counts and the unforced census.  Either branch
+is a non-injury at the terminal.
+
+The predicted choice (not a field): the same policy and G as clicks 1 and 3,
+unless a newly read family scores lower. -/
+def predictedRecord4 : ClickRecord :=
+  { predictedRecord3 with
+      unmetReadings := 96
+      preparation := some (.ran 3 0 94)
+      frontierEligible := 109
+      frontierRanked := 3
+      frontierUnranked := 106
+      patternRows := none
+      patternComparison := .refused
+      patternRowsNotExecutable := 0 }
+
+/-- The fourth click is predicted to fail exactly the two pattern-domain
+clauses, because the already-satisfied close builds nothing. -/
+theorem fourth_click_failing : failing predictedRecord4 = [.r8, .r8a] := by decide
+
+/-- The rows a building close writes, for any record: one supplied prose row
+per pattern prediction, no Boolean row, nothing scored against the mission. -/
+def withRows (r : ClickRecord) : ClickRecord :=
+  { r with patternRows := some r.patternPredictions
+           patternComparison := .compared
+           patternRowsNotExecutable := r.patternPredictions
+           patternRowsBoolean := 0
+           patternTokensScoredAgainstMission := 0 }
+
+/-- The failing clauses outside an excluded set. -/
+def failingOutside (excl : List Clause) (r : ClickRecord) : List Clause :=
+  (failing r).filter (fun c => !excl.contains c)
+
+/-- No clause but R8 and R8a reads the pattern-domain fields. -/
+theorem holds_withRows (r : ClickRecord) (c : Clause) (h8 : c ≠ .r8) (h8a : c ≠ .r8a) :
+    c.holds (withRows r) = c.holds r := by
+  cases c <;> first | exact absurd rfl h8 | exact absurd rfl h8a | rfl
+
+/-- The reason, in general: a record without pattern rows fails R8 and R8a,
+and outside those two it fails exactly what it would fail with the rows a
+building close writes.  So `fourth_click_failing` is the prediction for every
+field but the two the close leaves empty. -/
+theorem rows_absent_fails_exactly_r8_r8a (r : ClickRecord) (h : r.patternRows = none) :
+    Clause.r8 ∈ failing r ∧ Clause.r8a ∈ failing r ∧
+      failingOutside [.r8, .r8a] r = failingOutside [.r8, .r8a] (withRows r) := by
+  refine ⟨?_, ?_, ?_⟩
+  · simp [failing, Clause.all, List.mem_filter, Clause.holds, r8Holds, h]
+  · simp [failing, Clause.all, List.mem_filter, Clause.holds, r8aHolds, h]
+  · unfold failingOutside failing
+    simp only [List.filter_filter]
+    apply List.filter_congr
+    intro c _
+    cases c <;> rfl
+
+/-- `failingOutside` on the predicted record is empty: the exact list in
+`fourth_click_failing` is the stronger statement, and this is its reading
+over all other clauses. -/
+theorem fourth_click_predicted_outside_rows :
+    failingOutside [.r8, .r8a] predictedRecord4 = [] := by decide
+
+/-- The form `observed3.lean` used: with the rows a building close writes,
+every other clause holds. -/
+theorem fourth_click_otherwise_predicted :
+    failing { predictedRecord4 with patternRows := some 3, patternComparison := .compared,
+                                     patternRowsNotExecutable := 3 } = [] := by decide
+
+/-- The branch not predicted: the author builds again, the rows exist. -/
+def predictedRecord4Building : ClickRecord :=
+  { predictedRecord4 with patternRows := some 3, patternComparison := .compared,
+                           patternRowsNotExecutable := 3 }
+
+theorem predicted4Building_holds : Predicted predictedRecord4Building := by decide
+
+/-- The building branch differs from the third click's prediction only on the
+reading counts the batch forced and the unforced census: it is not
+`predictedRecord3`, as the packet's shorthand had it. -/
+theorem fourth_click_building_changes :
+    predictedRecord4Building =
+      { predictedRecord3 with
+          unmetReadings := 96
+          preparation := some (.ran 3 0 94)
+          frontierEligible := 109
+          frontierUnranked := 106 } := rfl
+
+/-- What the fourth click is predicted to show that the third's prediction did
+not: three more targets read, and the rowless pattern domain of a close that
+builds nothing. -/
+theorem fourth_click_changes :
+    predictedRecord4 =
+      { predictedRecord3 with
+          unmetReadings := 96
+          preparation := some (.ran 3 0 94)
+          frontierEligible := 109
+          frontierUnranked := 106
+          patternRows := none
+          patternComparison := .refused
+          patternRowsNotExecutable := 0 } := rfl
+
+/-- The unforced upward edge, on this record. -/
+theorem fourth_click_more_ranked_also :
+    failing { predictedRecord4 with frontierRanked := 6, frontierUnranked := 103 } =
+      [.r8, .r8a] := by decide
+
+/-- A Boolean row is still a finding on this click; its absence of rows is
+not a licence. -/
+theorem fourth_click_boolean_row_not_predicted :
+    ¬ Predicted { predictedRecord4Building with
+        patternRowsBoolean := 1
+        patternRowsNotExecutable := 2 } := by decide
+
+#print axioms fourth_click_failing
+#print axioms holds_withRows
+#print axioms rows_absent_fails_exactly_r8_r8a
+#print axioms fourth_click_predicted_outside_rows
+#print axioms fourth_click_otherwise_predicted
+#print axioms predicted4Building_holds
+#print axioms fourth_click_building_changes
+#print axioms fourth_click_changes
+#print axioms fourth_click_more_ranked_also
+#print axioms fourth_click_boolean_row_not_predicted
+
 end DarkTower.WarMachine.ReadingEraClickPrediction

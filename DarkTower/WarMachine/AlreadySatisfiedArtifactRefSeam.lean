@@ -225,8 +225,9 @@ def recordOf : Consumed → Close
 def authored : Close := ⟨authoredClose, .none⟩
 
 /-- The kind's verdict when the close does not decide (`classify` 171–173):
-`:already-satisfied` is producer-qualified (and in
-`explicit-non-injury-kinds`); `:invalid-author-refusal` takes the default
+`:already-satisfied` is producer-qualified (it is not in
+`explicit-non-injury-kinds`; `producer-qualified-already-satisfied?` 59–73
+is the rescue); `:invalid-author-refusal` takes the default
 injury branch.  `none` when no kind is present: the cell the close left
 undecided is not decided here. -/
 def kindVerdict : FailureKind → Option Verdict
@@ -451,6 +452,81 @@ theorem entry47_later_reopening_remains_active :
     let reopened := { entry47 with entry := 48, predecessor := 47 }
     medicEffectiveActive { corrected with history := corrected.history ++ [reopened] } =
       [2001] := by decide
+
+/-! ## Part 4: the Agency half, as deployed (futon3c `6b1bb1358`)
+
+`first-artifact-ref` no longer takes the leftmost match.  Over all matches
+of `artifact-ref-re` in text order it prefers a PR link, then a sha of
+exactly 40 hex digits, then any sha, then a path.  The model's `Ref.sha`
+carries no length, so `preferredArtifactRef` takes the full-sha test as a
+parameter: `full s` says the token is the 40-digit form.  Beside the runner
+half (`repairedClassifier`), this is the second repair; either alone turns
+the witness reply's answer into the authored one. -/
+
+/-- `first-artifact-ref` at futon3c `6b1bb1358`: PR link, else full sha, else
+any sha, else path; within a rank, text order. -/
+def preferredArtifactRef (full : Sha → Bool) (reply : Reply) : Option Ref :=
+  (reply.find? (fun r => match r with | .prLink _ => true | _ => false)) <|>
+  (reply.find? (fun r => match r with | .sha s => full s | _ => false)) <|>
+  (reply.find? (fun r => match r with | .sha _ => true | _ => false)) <|>
+  (reply.find? (fun r => match r with | .path _ => true | _ => false))
+
+/-- The sha `09a7cb8d…` ↦ 978 is the full form; the short form `09a7cb8d`
+↦ 977 (the reply's token at offset 291; the full form first appears at
+1058). -/
+def full3 : Sha → Bool := fun s => s == 978
+
+/-- The reply as sent, with the short sha first: path at 242, short sha at
+291, a second path at 1011, the full sha at 1058. -/
+def witnessReplyFull : Reply := [.path 1, .sha 977, .path 2, .sha 978]
+
+/-- The deployed Agency extracts the full sha from the witness reply, whatever
+precedes it; the current classifier then grounds it without the runner
+repair, and the repaired classifier agrees.  Either half alone suffices. -/
+theorem either_half_suffices :
+    preferredArtifactRef full3 witnessReplyFull = some (.sha 978) ∧
+    currentClassifier store3 card3 (preferredArtifactRef full3 witnessReplyFull) =
+      some (.alreadySatisfied 978) ∧
+    repairedClassifier store3 card3 (firstArtifactRef witnessReply) =
+      some (.alreadySatisfied 978) ∧
+    repairedClassifier store3 card3 (preferredArtifactRef full3 witnessReplyFull) =
+      some (.alreadySatisfied 978) := by decide
+
+/-- The old extraction on the same reply is the witness: the path. -/
+theorem old_extraction_is_the_witness :
+    firstArtifactRef witnessReplyFull = some (.path 1) := rfl
+
+/-- `cat-file` resolves the short form too: a store that knows both. -/
+def storeResolvingShort : CommitStore := fun s => s == 978 || s == 977
+
+/-- The control reply for click 4: the author names only the short sha in
+the text.  The Agency falls to "any sha" and extracts the short form; the
+repaired classifier grounds it (the runner accepts 7–40 hex and the store
+resolves it); the close is `alreadySatisfied` with kind `alreadySatisfied`
+and a short grounded sha.  `verdictOf` here says non-injury because
+`kindVerdict` does not read the grounded commit; the terminal's
+qualification of that sha is `ReadingEraClickLedgerPrediction.verdictOfQualified`. -/
+def shortOnlyReply : Reply := [.path 1, .sha 977]
+
+theorem short_only_reply_grounds_short_sha :
+    preferredArtifactRef full3 shortOnlyReply = some (.sha 977) ∧
+    repairedClassifier storeResolvingShort card3 (preferredArtifactRef full3 shortOnlyReply) =
+      some (.alreadySatisfied 977) ∧
+    recordOf (.alreadySatisfied 977) = ⟨.alreadySatisfied, .alreadySatisfied⟩ := by decide
+
+/-- A PR link outranks every sha and path, in any position. -/
+theorem pr_link_outranks :
+    preferredArtifactRef full3 [.path 1, .sha 978, .prLink 12] = some (.prLink 12) := rfl
+
+/-- With no ref the extraction is empty under both readers. -/
+theorem empty_reply_extracts_nothing :
+    preferredArtifactRef full3 [] = none ∧ firstArtifactRef [] = none := ⟨rfl, rfl⟩
+
+#print axioms either_half_suffices
+#print axioms old_extraction_is_the_witness
+#print axioms short_only_reply_grounds_short_sha
+#print axioms pr_link_outranks
+#print axioms empty_reply_extracts_nothing
 
 #print axioms click3_law_nonInjury
 #print axioms authored_nonInjury
