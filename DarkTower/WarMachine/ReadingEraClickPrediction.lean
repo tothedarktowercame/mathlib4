@@ -544,4 +544,151 @@ theorem prediction_is_not_the_control : predictedRecord ≠ attempt002Record := 
 #print axioms attempt002_failing_clauses
 #print axioms predicted_iff_no_failing
 
+
+/-! ## The first click as observed (run `2026-10-26-8be8ff03…`, 09:48Z)
+
+Read from the files named in the field docstrings by claude-9
+(`~/notes/wm-next/outer-selection/first-click-2026-10-26/observed.lean`).
+It matched `predictedRecord` on every clause but R11.  The counts differ from
+the expected values (102 unmet, 110 eligible, 3 ranked, 3 pattern predictions,
+no tie) without failing a clause, as the module docstring allowed.  R11 failed
+because of the click script, not the machine (R19): `wm_click.sh` gave up on
+the 107 s admission POST and never ran the requirements checker, so REQ was
+absent and `requirements` reads `notChecked`.  R19 was repaired in
+`1d81bfb3d`; R21a/b/c brought the hold to about 1.5 s. -/
+def firstClickRecord : ClickRecord where
+  unmetReadings := 102
+  preparation := some (.ran 3 0 100)
+  frontierSchema := .outerV1
+  frontierStatus := .decidedFailure
+  frontierEligible := 110
+  frontierRanked := 3
+  frontierUnranked := 107
+  unrankedHeadlinesInRankedKinds := some 0
+  policyStages := some (1, 1, 1)
+  stageProvenancePins := 3
+  policy := .selected
+  predictionInputPresent := true
+  predictionFrozen := true
+  patternPredictions := 3
+  patternRows := some 3
+  patternComparison := .compared
+  patternRowsBoolean := 0
+  patternRowsNotExecutable := 3
+  patternTokensScoredAgainstMission := 0
+  sourceCheck := .current
+  staleNamespaces := 0
+  requirements := .notChecked
+  selfHealChild := .noChild
+  tie := false
+  selectionDraw := .sealed
+  q6Carrier := .notRecomputable
+  predecessor := .legacySeal
+
+/-- The first click's single finding: the requirements check did not run
+(R19, the click script). -/
+theorem firstClick_failing : failing firstClickRecord = [.r11] := by decide
+
+/-! ## The prediction for the second click
+
+The second click is the first whose Q6 predecessor is a run sealed by the
+fixed digest (R18), and the first after a click that published readings.
+Values forced by the state on 2026-10-26 (claude-9, checked live
+13:30Z–13:36Z; probe `second-click-2026-10-26/readings-probe.clj`):
+
+* `unmetReadings` 99: the first click's preparation published three readings
+  (`M-G-over-cascades` 08:57:27Z, `M-daily-scan` 08:59:51Z,
+  `M-daily-scan-multi-axis-queue` 09:02:26Z), all `:current-candidate` in
+  `storage/wm-target-readings`; the first click read 102 unmet.
+* `preparation` `ran 3 0 97`: budget 3; 100 needs now, 97 pending after the
+  batch.  The next three in pending order are `M-distributed-frontiermath`,
+  `M-war-machine-aif-last-mile`, `M-essays-edit-cycle`.
+* Frontier: the route is unchanged, the census is 110 as on the first click,
+  and the three scored families of the first click are still the scored ones
+  (self-improvement-loop −3.944, stack-geometry −2.004,
+  recommendation-bindings −3.956), so 3 ranked and 107 unranked.  The ranked
+  count is unforced upward: the three newly read targets may build scoring
+  families (their families on the first click failed only on
+  `:no-current-target-reading`, but seed-not-in-graph, isolated-seed and
+  void-pattern-citation are seen on other read targets).  A record with 4–6
+  ranked and the unranked count reduced to match fails no clause.
+* Pattern domain: 3 predictions, 3 rows, all prose, as on the first click for
+  `M-recommendation-bindings`; unforced if another target wins.  R8b's one
+  locator clause (`req_f7374bcce` occurrence 0) belongs to the
+  `M-war-machine-wiring` reading, which is unread (pending), so it cannot be
+  on this click's rows.
+* `sourceCheck` current, no stale namespace: drift `{:drift [] :registered
+  112}` at 13:36Z, to be re-probed before the click.
+* `requirements` `checked false`: the script now writes REQ after the POST
+  recovery (R19 repaired); the verdict is as on the first click (Q1 and Q5
+  hold, Q7 violated, the rest unverifiable, `:conforms false`).  This is the
+  field that turns R11 from failing to holding.
+* `tie` false: three scored rows with distinct G and no new row predicted; the
+  draw is sealed regardless (R13).
+* `predecessor` present: `previous-run/predecessor` at 13:33Z reads
+  `{:status :present :previous-run/id "2026-10-26-8be8ff03-…"}`; the first
+  click's terminal was sealed by the server after R18 and the seal verifies.
+* `q6Carrier` notTriggered: `decide-exclusion` (`previous_run.clj`) finds the
+  predecessor present and its outcome `:invalid` (raw `:grounded-progress`,
+  R22 in DEFECTS) not `:refused`, so `{:status :not-triggered :reason
+  :previous-outcome-not-refused}`.
+
+The predicted choice (not a field): the same policy as the first click,
+`M-recommendation-bindings/policy-7e8a0806fea29fa47914`, canonical G
+−3.9560226735640867, because nothing excludes it and the three scored G are
+unchanged.  A lower G from a newly read family would move it. -/
+def predictedRecord2 : ClickRecord where
+  unmetReadings := 99
+  preparation := some (.ran 3 0 97)
+  frontierSchema := .outerV1
+  frontierStatus := .decidedFailure
+  frontierEligible := 110
+  frontierRanked := 3
+  frontierUnranked := 107
+  unrankedHeadlinesInRankedKinds := some 0
+  policyStages := some (1, 1, 1)
+  stageProvenancePins := 3
+  policy := .selected
+  predictionInputPresent := true
+  predictionFrozen := true
+  patternPredictions := 3
+  patternRows := some 3
+  patternComparison := .compared
+  patternRowsBoolean := 0
+  patternRowsNotExecutable := 3
+  patternTokensScoredAgainstMission := 0
+  sourceCheck := .current
+  staleNamespaces := 0
+  requirements := .checked false
+  selfHealChild := .noChild
+  tie := false
+  selectionDraw := .sealed
+  q6Carrier := .notTriggered
+  predecessor := .present
+
+theorem predicted2_holds : Predicted predictedRecord2 := by decide
+
+/-- What the second click is predicted to show that the first did not: the
+read set grew by the batch, the requirements check ran, and the Q6 predecessor
+was read through a verifying seal and found not to trigger.  Every other
+field is the first click's. -/
+theorem second_click_changes :
+    predictedRecord2 =
+      { firstClickRecord with
+          unmetReadings := 99
+          preparation := some (.ran 3 0 97)
+          requirements := .checked false
+          q6Carrier := .notTriggered
+          predecessor := .present } := rfl
+
+/-- The unforced upward edge: newly read targets building scoring families
+fails no clause. -/
+theorem more_ranked_families_also_predicted :
+    Predicted { predictedRecord2 with frontierRanked := 6, frontierUnranked := 104 } := by
+  decide
+
+#print axioms firstClick_failing
+#print axioms predicted2_holds
+#print axioms second_click_changes
+
 end DarkTower.WarMachine.ReadingEraClickPrediction
