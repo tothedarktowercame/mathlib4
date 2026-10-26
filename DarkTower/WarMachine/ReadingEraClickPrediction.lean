@@ -691,4 +691,51 @@ theorem more_ranked_families_also_predicted :
 #print axioms predicted2_holds
 #print axioms second_click_changes
 
+/-! ## The prediction for the third click
+
+The second click (`wm-click-b56496c7…`, 13:43Z) produced no record: `route!`
+found entry 45 open in the durable injury ledger and refused before ordinary
+selection (R23).  No field of `ClickRecord` reads that ledger, so
+`predictedRecord2` could neither hold nor fail.  Entry 45 was retired at
+15:18Z by a medic operation (`263dcf88…`), the close-image law and the medic
+replay value landed (`CloseOutcomeImage`, `HistoricalMisclassificationCorrection`),
+and the ledger gate and terminal effect are predicted beside this record in
+`ReadingEraClickLedgerPrediction`.  The record itself is unchanged from the
+second click's prediction.  The five fields `second_click_changes` names keep
+their click-2 values, as checked live by claude-9 (15:21Z–15:27Z):
+
+* `unmetReadings` 99: no reading has been published since click 1's three
+  (newest `M-daily-scan-multi-axis-queue` 09:02:26Z; a `find -newermt
+  2026-10-26T09:03:00Z` over `storage/wm-target-readings` is empty); click 2
+  refused before preparation ran, so it published none.
+* `preparation` `ran 3 0 97`: 100 needs, budget 3.
+* `requirements` `checked false`: R19 repaired; the verdict as on click 1.
+* `q6Carrier` `notTriggered`: the predecessor is still run
+  `2026-10-26-8be8ff03…` (click 2 wrote no stream event; its requested run id
+  `c26b309e` is absent from `run-stream.edn`).  Its sealed terminal carrier
+  reads `:outcome :invalid :raw :grounded-progress` (live
+  `previous-run/predecessor`, 15:25Z).  The R22 map at futon2 `aa8bf5ed5`
+  (`lean-outcomes` now sends `:grounded-progress` to `:changed`) applies to
+  closes sealed after it; the stream is left as written.  `decide-exclusion`
+  (`previous_run.clj`) sees an outcome that is not `:refused` either way and
+  answers `{:status :not-triggered :reason :previous-outcome-not-refused}`.
+* `predecessor` `present`: as above.
+
+Every other field as in `predictedRecord2`, with the same unforced edges
+(`more_ranked_families_also_predicted` still covers 4–6 ranked).  Drift
+`{:drift [] :registered 112}` at 15:23Z; the three futon2 src commits since
+the click-2 probe (`aa8bf5ed5`, `5d8b19443`, `ad0c99054`) were each reloaded
+into :7070 after review. -/
+def predictedRecord3 : ClickRecord := predictedRecord2
+
+theorem predicted3_holds : Predicted predictedRecord3 := by decide
+
+/-- The third click is predicted to show the 27 fields of the second click's
+prediction; what it shows that the second could not is outside the fields
+(`ReadingEraClickLedgerPrediction`). -/
+theorem third_click_record_unchanged : predictedRecord3 = predictedRecord2 := rfl
+
+#print axioms predicted3_holds
+#print axioms third_click_record_unchanged
+
 end DarkTower.WarMachine.ReadingEraClickPrediction
