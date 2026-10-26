@@ -348,4 +348,283 @@ theorem requirement_excluded_cascade_valid : requirementExcludedCascade.Valid :=
 theorem foreign_exclusion_invalid : ¬ foreignExclusionCascade.Valid := by
   decide
 
+/-! ## Typed-unranked frontier coverage (defect lines R3, R12)
+
+Source: `~/notes/wm-next/outer-selection/DEFECTS-reading-era.md` R3, R12
+(claude-9, 2026-10-26); Clojure carrier `futon2.aif.q8-frontier/canonical-outer-frontier`
+(futon2 `f764d36a4`, schema `:wm/q8-outer-frontier-v1`) whose fields
+`[:census :eligible]`, `:entries`, `:unranked` and `:census-verdict` these
+definitions read.  `SelectionCertificate.Valid` above already requires
+`taskSet frontier = openTasks`; this section states the typed-unranked form
+beside it, so that an eligible task with no entry is accounted for (with a
+reason) rather than silently absent, and shows that an accounted-but-uncovered
+frontier is still not a selectable one. -/
+
+/-- Why an eligible task has no ranked entry: a failure kind the carrier
+recorded, or the carrier saying it cannot name one.  No absent inhabitant. -/
+inductive OmissionReason where
+  | failure (kind : Id)
+  | unexplained
+  deriving DecidableEq, Repr
+
+/-- One `:unranked` row: `{:task :stage :reason :reasons}`. -/
+structure Omission where
+  task : Id
+  stage : Id
+  reason : OmissionReason
+  reasons : Finset Id
+  deriving DecidableEq
+
+/-- `[:census :eligible]`, `:entries`, `:unranked`. -/
+structure FrontierCoverage where
+  eligible : Finset Id
+  ranked : List Entry
+  unranked : List Omission
+  deriving DecidableEq
+
+def omittedTasks (xs : List Omission) : Finset Id :=
+  xs.toFinset.image (·.task)
+
+/-- The headline reason is one of the recorded kinds (or is `unexplained`). -/
+def OmissionReason.named : OmissionReason → Finset Id → Prop
+  | .failure k, kinds => k ∈ kinds
+  | .unexplained, _ => True
+
+instance (r : OmissionReason) (kinds : Finset Id) : Decidable (r.named kinds) := by
+  cases r <;> unfold OmissionReason.named <;> infer_instance
+
+/-- R3.  Every eligible task is ranked or typed-unranked, never both and never
+neither.  The carrier's refusals `:eligible-task-unaccounted`,
+`:entry-also-unranked` and `:frontier-task-not-eligible` are the three ways the
+union clause fails. -/
+def FrontierCoverage.Valid (c : FrontierCoverage) : Prop :=
+  (c.ranked.map (·.task)).Nodup ∧
+  (c.unranked.map (·.task)).Nodup ∧
+  Disjoint (taskSet c.ranked) (omittedTasks c.unranked) ∧
+  taskSet c.ranked ∪ omittedTasks c.unranked = c.eligible ∧
+  allIn c.unranked (fun o => o.reason.named o.reasons)
+
+instance (c : FrontierCoverage) : Decidable c.Valid := by
+  unfold FrontierCoverage.Valid
+  infer_instance
+
+/-- `:census-verdict :pass`: nothing unranked. -/
+def FrontierCoverage.Covers (c : FrontierCoverage) : Prop := c.unranked = []
+
+theorem unaccounted_eligible_task_invalid (c : FrontierCoverage) (t : Id)
+    (ht : t ∈ c.eligible) (hr : t ∉ taskSet c.ranked) (hu : t ∉ omittedTasks c.unranked) :
+    ¬ c.Valid := by
+  intro h
+  have : t ∈ taskSet c.ranked ∪ omittedTasks c.unranked := by rw [h.2.2.2.1]; exact ht
+  rcases Finset.mem_union.mp this with h1 | h1
+  · exact hr h1
+  · exact hu h1
+
+theorem entry_also_unranked_invalid (c : FrontierCoverage) (t : Id)
+    (hr : t ∈ taskSet c.ranked) (hu : t ∈ omittedTasks c.unranked) : ¬ c.Valid := by
+  intro h
+  exact Finset.disjoint_left.mp h.2.2.1 hr hu
+
+/-- An accounted but uncovered frontier is not a selectable Q8 frontier: with
+`openTasks` the eligible census, `SelectionCertificate.Valid` fails for every
+certificate, because the omitted task is eligible and not in the frontier. -/
+theorem uncovered_frontier_not_selectable (c : FrontierCoverage) (hc : c.Valid)
+    (o : Omission) (ho : o ∈ c.unranked) (s : SelectionCertificate) :
+    ¬ s.Valid c.ranked c.eligible := by
+  intro hs
+  have hmem : o.task ∈ omittedTasks c.unranked := by
+    simp only [omittedTasks, Finset.mem_image, List.mem_toFinset]
+    exact ⟨o, ho, rfl⟩
+  have hel : o.task ∈ c.eligible := by
+    rw [← hc.2.2.2.1]
+    exact Finset.mem_union_right _ hmem
+  have hr : o.task ∈ taskSet c.ranked := by rw [hs.2.1]; exact hel
+  exact Finset.disjoint_left.mp hc.2.2.1 hr hmem
+
+/-- R12.  The headline reason discriminates: it is a failure kind that no ranked
+task also carries.  `rankedKinds` is the set of kinds in the sealed menu's
+`:failures` rows whose target is ranked. -/
+def OmissionReason.discriminates : OmissionReason → Finset Id → Prop
+  | .failure k, rankedKinds => k ∉ rankedKinds
+  | .unexplained, _ => True
+
+instance (r : OmissionReason) (rankedKinds : Finset Id) : Decidable (r.discriminates rankedKinds) := by
+  cases r <;> unfold OmissionReason.discriminates <;> infer_instance
+
+def FrontierCoverage.Discriminating (c : FrontierCoverage) (rankedKinds : Finset Id) : Prop :=
+  allIn c.unranked (fun o => o.reason.discriminates rankedKinds)
+
+instance (c : FrontierCoverage) (rankedKinds : Finset Id) :
+    Decidable (c.Discriminating rankedKinds) := by
+  unfold FrontierCoverage.Discriminating
+  infer_instance
+
+theorem shared_kind_reason_not_discriminating (c : FrontierCoverage) (rankedKinds : Finset Id)
+    (o : Omission) (ho : o ∈ c.unranked) (k : Id) (hk : o.reason = .failure k)
+    (hshared : k ∈ rankedKinds) : ¬ c.Discriminating rankedKinds := by
+  intro h
+  have hd : o.reason.discriminates rankedKinds := h o ho
+  rw [hk] at hd
+  exact hd hshared
+
+/-! ### Control: machinery-150 attempt-002 (the Q8a fixture)
+
+Task ids are positions in the sorted `:support` census (109 tasks).  Ranked:
+71 M-recommendation-bindings, 73 M-self-improvement-loop, 79 M-stack-geometry,
+98 M-war-machine-wiring.  Unranked at S4 (stage 4): 31 M-digital-nomad-patterns,
+40 M-formal-war-machine, 65 M-pattern-posteriors.  Unranked at S2 (stage 2):
+93 M-vsatarcs-writer and the 101 others.  Failure kinds: 1
+`:no-current-target-reading`, 2 `:occurrence-squares-not-authored`, 3
+`:seed-not-in-graph`, 4 `:isolated-seed`, 5 `:target-class-unknown`, 6
+`:void-pattern-citation`, 7 `:frontier-too-wide-for-exact-enumeration`, 8
+`:occurrence-identity-absent`.  The ranked tasks' menu failure kinds are
+{3, 4, 6, 7, 8}; the carrier's headline reasons for 31 and 40 are 4 and 3. -/
+
+def m150RankedTasks : List Id := [71, 73, 79, 98]
+def m150S4Tasks : List Id := [31, 40, 65]
+
+def m150Ranked : List Entry := m150RankedTasks.map stableEntry
+
+def m150S2Unranked : List Omission :=
+  ((List.range 109).filter
+      (fun t => decide (t ∉ m150RankedTasks ∧ t ∉ m150S4Tasks ∧ t ≠ 93))).map
+    (fun t => ⟨t, 2, .failure 1, {1}⟩)
+
+def m150Coverage : FrontierCoverage where
+  eligible := (List.range 109).toFinset
+  ranked := m150Ranked
+  unranked :=
+    ⟨31, 4, .failure 4, {4, 5}⟩ :: ⟨40, 4, .failure 3, {3, 5}⟩ ::
+    ⟨65, 4, .failure 5, {5}⟩ :: ⟨93, 2, .failure 2, {2}⟩ :: m150S2Unranked
+
+def m150RankedKinds : Finset Id := {3, 4, 6, 7, 8}
+
+theorem m150_unranked_count : m150Coverage.unranked.length = 105 := by native_decide
+
+/-- The Q8a carrier's reading: every eligible task accounted for (`:decided-failure`,
+not `:not-recomputable`). -/
+theorem m150_coverage_valid : m150Coverage.Valid := by native_decide
+
+theorem m150_not_covered : ¬ m150Coverage.Covers := by
+  simp [FrontierCoverage.Covers, m150Coverage]
+
+/-- R3 on the receipt: no certificate makes this frontier selectable over its
+own eligible census. -/
+theorem m150_not_selectable (s : SelectionCertificate) :
+    ¬ s.Valid m150Coverage.ranked m150Coverage.eligible :=
+  uncovered_frontier_not_selectable m150Coverage m150_coverage_valid
+    ⟨40, 4, .failure 3, {3, 5}⟩ (by simp [m150Coverage]) s
+
+/-- R12 on the receipt: M-formal-war-machine's headline `:seed-not-in-graph` is
+also carried by ranked M-self-improvement-loop. -/
+theorem m150_not_discriminating : ¬ m150Coverage.Discriminating m150RankedKinds :=
+  shared_kind_reason_not_discriminating m150Coverage m150RankedKinds
+    ⟨40, 4, .failure 3, {3, 5}⟩ (by simp [m150Coverage]) 3 rfl (by decide)
+
+/-- The repaired carrier: headline reasons taken outside the ranked kinds. -/
+def m150Repaired : FrontierCoverage :=
+  { m150Coverage with
+    unranked :=
+      ⟨31, 4, .failure 5, {4, 5}⟩ :: ⟨40, 4, .failure 5, {3, 5}⟩ ::
+      ⟨65, 4, .failure 5, {5}⟩ :: ⟨93, 2, .failure 2, {2}⟩ :: m150S2Unranked }
+
+theorem m150_repaired_valid : m150Repaired.Valid := by native_decide
+theorem m150_repaired_discriminating : m150Repaired.Discriminating m150RankedKinds := by
+  native_decide
+
+/-- The silent form the stub produced: four entries, nothing unranked, eligible
+census of 109.  Not valid coverage. -/
+def m150Stub : FrontierCoverage := { m150Coverage with unranked := [] }
+
+theorem m150_stub_invalid : ¬ m150Stub.Valid :=
+  unaccounted_eligible_task_invalid m150Stub 40 (by simp [m150Stub, m150Coverage])
+    (by native_decide) (by simp [m150Stub, omittedTasks])
+
+/-! ## Cascade certification needs the selected carrier's stages (defect line R4)
+
+Source: DEFECTS R4; `q8_frontier.clj:438` returns
+`{:status :not-recomputable :reason :policy-stages-absent}` when the decision
+has no `[:selection-certificate :policy-stages]`; on the canonical route they
+are absent (machinery-150 attempt-002). -/
+
+/-- Where the stages came from: the carrier's `[:recomputation :q4]` pin and the
+sealed menu pin.  Zero is the refused "no pin". -/
+structure StageProvenance where
+  q4Pin : Id
+  menuPin : Id
+  deriving DecidableEq, Repr
+
+inductive CascadeCertification where
+  | notRecomputable (reason : Id)
+  | present (c : TargetCascadeCertificate) (provenance : StageProvenance)
+  deriving DecidableEq
+
+/-- `:policy-stages-absent` and `:stage-provenance-absent`. -/
+def policyStagesAbsent : Id := 1
+def stageProvenanceAbsent : Id := 2
+
+/-- Certification is a function of the stage input.  No input, no `present`;
+input without provenance, no `present`. -/
+def certifyStages : Option (TargetCascadeCertificate × StageProvenance) → CascadeCertification
+  | none => .notRecomputable policyStagesAbsent
+  | some (c, p) =>
+    if p.q4Pin ≠ 0 ∧ p.menuPin ≠ 0 then .present c p
+    else .notRecomputable stageProvenanceAbsent
+
+/-- A record's certification claim is valid only when it is what the stage
+input certifies. -/
+def CertificationClaim.Valid (stages : Option (TargetCascadeCertificate × StageProvenance))
+    (claim : CascadeCertification) : Prop :=
+  claim = certifyStages stages
+
+instance (stages : Option (TargetCascadeCertificate × StageProvenance))
+    (claim : CascadeCertification) : Decidable (CertificationClaim.Valid stages claim) := by
+  unfold CertificationClaim.Valid
+  infer_instance
+
+theorem absent_stages_never_present (c : TargetCascadeCertificate) (p : StageProvenance) :
+    certifyStages none ≠ .present c p := by
+  simp [certifyStages]
+
+theorem present_claim_without_stages_invalid (c : TargetCascadeCertificate)
+    (p : StageProvenance) : ¬ CertificationClaim.Valid none (.present c p) := by
+  unfold CertificationClaim.Valid
+  exact fun h => absent_stages_never_present c p h.symm
+
+theorem unpinned_stages_never_present (c : TargetCascadeCertificate) (p : StageProvenance)
+    (hp : p.q4Pin = 0 ∨ p.menuPin = 0) (c' : TargetCascadeCertificate) (p' : StageProvenance) :
+    certifyStages (some (c, p)) ≠ .present c' p' := by
+  rcases hp with h | h <;> simp [certifyStages, h]
+
+/-- The canonical route today: stages absent, so the only valid claim is the
+typed refusal, and `Q8`'s `selectedCascade.Valid` clause has nothing to check. -/
+theorem m150_cascade_certification :
+    certifyStages none = .notRecomputable policyStagesAbsent := rfl
+
+theorem pinned_stages_present (c : TargetCascadeCertificate) :
+    certifyStages (some (c, ⟨5, 6⟩)) = .present c ⟨5, 6⟩ := by
+  simp [certifyStages]
+
+/-! ## U1, a question rather than a clause: graph failures on a reading
+
+Observation (m150-002, claude-9 2026-10-26): the graph failures
+`:isolated-seed`, `:seed-not-in-graph`, `:void-pattern-citation` are carried from
+a reading into a `:computed` family's `:failures` (policy-id nil);
+`family-coverage-kind` maps none of them to a coverage kind, so they count as
+`:current` and touch neither scoring nor binding.  All four ranked tasks carry
+them, including the chosen M-war-machine-wiring (`:isolated-seed`).  Today:
+neither disqualifying nor measured.
+
+Conjecture (claude-5): a reading's graph failures are a measurement of the
+reading, not a standing verdict on the target.  They should raise the ambiguity
+of every policy drawn from that reading (the reading is evidence of lower
+precision about what the target's patterns are), monotonically in the set of
+failures, while the target stays eligible.  Disqualifying on them would
+reinstate the whitelist in another form (landscape §10.1, Joe's rule).  Stated
+as a predicate on a scorer; not proved; no runtime carries it. -/
+def U1Conjecture {α : Type} [Preorder α] (ambiguity : Id → Finset Id → α)
+    (eligibleUnder : Id → Finset Id → Prop) : Prop :=
+  (∀ t (k₁ k₂ : Finset Id), k₁ ⊆ k₂ → ambiguity t k₁ ≤ ambiguity t k₂) ∧
+  (∀ t k, eligibleUnder t ∅ → eligibleUnder t k)
+
 end DarkTower.WarMachine.IncrementalTaskFrontier
