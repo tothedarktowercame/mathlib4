@@ -1,4 +1,5 @@
 import DarkTower.WarMachine.SelfHealRoute
+import DarkTower.WarMachine.CloseOutcomeImage
 
 /-!
 # Proposed medic-repaired disposition
@@ -8,6 +9,46 @@ latest injury occurrence from the effective active set.  Historical
 misclassification and genuine external repair are distinct evidence kinds.
 Neither asserts task success or creates learning credit.  Authority and pin
 authenticity are supplied admission predicates, not payload self-attestation.
+
+## The successful-close replay value (R23, ledger entry 45; 2026-10-26)
+
+Source: `~/notes/wm-next/outer-selection/packets/R23-medic-replay-successful-close-packet.md`
+(claude-9).  Ledger entry 45 (`injury/9c6220388033cbd1…`, ordinal 45,
+`:injury-predecessor nil`, cause record
+`tick-run-record-2026-10-26-8be8ff03…`, pin `e9a5eb35…`) was opened at click
+1's terminal by the classifier's default branch on a `:grounded-progress`
+close with no failure (`CloseOutcomeImage.click1_code_injury_law_nonInjury`).
+The ordinary ledger transitions cannot retire an `:open` entry that was never
+injured, so the medic path is the only honest one.  Until this revision
+`ReplayResult` had one non-injury replay, `producerQualifiedNonInjury`, which
+is a *failure* rescued by its producer (a9: `:already-satisfied` at
+`:author-wait`).  Replaying the repaired classifier on click 1's record gives
+`:non-injury-reason :successful-task-outcome`, not a producer-qualified
+failure, so naming `producerQualifiedNonInjury` in entry 45's correction would
+be a false statement in the ledger.
+
+`successfulCloseNonInjury` is that fifth value: the repaired classifier replays
+the record as a successful close.  `misclassificationQualified` admits either
+non-injury replay; the other three values still refuse.  `replayFromClose`
+connects the two modules: the replay value a record's close alone supplies is
+`successfulCloseNonInjury` exactly when `CloseOutcomeImage.closeVerdict` says
+`nonInjury` (`successfulClose_replay_iff_law_nonInjury`), it is never
+`producerQualifiedNonInjury` (that value is about a failure kind, which the
+close cannot see), and for click 1 it is the successful-close value
+(`click1_replay_is_successfulClose`).  `entry45Payload.replay` is that value
+by construction (`entry45_replay_from_click1_close`), so the medic cannot name
+a successful-close replay for a record the law calls an injury.
+
+This adds a constructor to a medic-model type.  Nothing Joe ruled names
+`ReplayResult`'s four values (the module is codex/claude authored, 2026-10-24),
+so this is read as an extension with a case, not a specification change.
+
+**Clojure correspondence (conformance in a separate packet, not here).**
+`futon2/src/futon2/aif/medic_disposition.clj` `replay-results` gains
+`:successful-close-non-injury`, and `local-binding?` accepts it beside
+`:producer-qualified-non-injury`; `meta_medic_authority.clj`
+`required-findings` and the evaluation recipe's `check.clj` need the same
+keyword.  Entry 45's numerals below are a transcription key, not identities.
 -/
 
 namespace DarkTower.WarMachine.HistoricalMisclassificationCorrection
@@ -37,12 +78,23 @@ structure InjuryEntry where
 def InjuryEntry.occurrence (entry : InjuryEntry) : Occurrence :=
   ⟨entry.injury, entry.entry⟩
 
+/-- The replay of the repaired classifier on the original record.
+`producerQualifiedNonInjury`: a failure of a kind its producer qualifies as a
+non-injury (a9).  `successfulCloseNonInjury`: a successful close with no
+failure, `:non-injury-reason :successful-task-outcome` (entry 45). -/
 inductive ReplayResult where
   | producerQualifiedNonInjury
   | unsupportedAuthorRefusal
   | doneAtBaseRevision
   | injury
+  | successfulCloseNonInjury
   deriving DecidableEq, Repr
+
+/-- The two replay values that say the original record was not an injury. -/
+def ReplayResult.nonInjury (r : ReplayResult) : Prop :=
+  r = .producerQualifiedNonInjury ∨ r = .successfulCloseNonInjury
+
+instance : DecidablePred ReplayResult.nonInjury := fun _ => inferInstanceAs (Decidable (_ ∨ _))
 
 structure MisclassificationPayload where
   occurrence : Occurrence
@@ -169,7 +221,7 @@ def misclassificationQualified (admit : MisclassificationAdmission)
   decide (current.predecessor = payload.predecessor) &&
   decide (current.causeRecord = payload.originalRecord) &&
   decide (current.causePin = payload.originalPin) &&
-  decide (payload.replay = .producerQualifiedNonInjury) &&
+  decide payload.replay.nonInjury &&
   decide (payload.reviewer ≠ payload.evaluator) &&
   exactMisclassificationBinding payload evidence && admit current payload evidence
 
@@ -379,6 +431,164 @@ theorem genuine_requires_original_acceptance_and_three_receipts :
       (.genuineDefect badVerdict)).outcome = .refused ∧
     (medicProcess noMisclassification admitReal (some realProof) mixedInitial
       (.genuineDefect badReceipt)).outcome = .refused := by decide
+
+/-! ## The successful-close replay value (R23) -/
+
+/-- Only the two non-injury replays qualify; the other three refuse whatever
+the binding and the admission say. -/
+theorem qualified_replay_nonInjury (admit : MisclassificationAdmission)
+    (current : InjuryEntry) (payload : MisclassificationPayload)
+    (evidence : MisclassificationEvidence)
+    (h : misclassificationQualified admit current payload evidence = true) :
+    payload.replay.nonInjury := by
+  simp only [misclassificationQualified, Bool.and_eq_true, decide_eq_true_eq] at h
+  exact h.1.1.1.2
+
+theorem replay_nonInjury_iff (r : ReplayResult) :
+    r.nonInjury ↔ r = .producerQualifiedNonInjury ∨ r = .successfulCloseNonInjury :=
+  Iff.rfl
+
+/-- Control: a9's payload with the new value is admitted only when its binding
+holds.  Against the retained a9 evidence (replay `producerQualifiedNonInjury`)
+the exact binding fails and the process refuses, even under an admission that
+names the new payload; against evidence carrying the same value it appends. -/
+def a9ClosePayload : MisclassificationPayload :=
+  { a9Payload with replay := .successfulCloseNonInjury }
+def a9CloseEvidence : MisclassificationEvidence :=
+  { a9Evidence with replay := .successfulCloseNonInjury }
+def admitA9Close : MisclassificationAdmission := fun current payload evidence =>
+  decide (current = a9Entry ∧ payload = a9ClosePayload ∧ evidence = a9CloseEvidence)
+
+theorem a9_new_value_qualifies_only_under_binding :
+    let state : MedicState := ⟨[a9Entry, otherEntry], []⟩
+    (medicProcess admitA9Close noGenuine (some a9Proof) state
+      (.historicalMisclassification a9ClosePayload)).outcome = .refused ∧
+    (medicProcess admitA9 noGenuine
+      (some (.historicalMisclassification a9CloseEvidence)) state
+      (.historicalMisclassification a9ClosePayload)).outcome = .refused ∧
+    (medicProcess admitA9Close noGenuine
+      (some (.historicalMisclassification a9CloseEvidence)) state
+      (.historicalMisclassification a9ClosePayload)).outcome = .appended := by decide
+
+/-- Control: a payload whose replay is `injury` still refuses, with a matching
+binding and a permissive admission. -/
+theorem injury_replay_refuses :
+    let injured := { a9Payload with replay := .injury }
+    let injuredEvidence := { a9Evidence with replay := .injury }
+    let permissive : MisclassificationAdmission := fun _ _ _ => true
+    let state : MedicState := ⟨[a9Entry, otherEntry], []⟩
+    (medicProcess permissive noGenuine (some (.historicalMisclassification injuredEvidence))
+      state (.historicalMisclassification injured)).outcome = .refused := by decide
+
+/-- Ledger entry 45, transcribed.  Key (numerals are not the identities):
+injury `injury/9c6220388033cbd1…` ↦ 9622; entry ordinal 45 ↦ 45;
+`:injury-predecessor nil` ↦ 0 (the convention of `MedicLedgerBridge`);
+cause record `tick-run-record-2026-10-26-8be8ff03…` ↦ 8603; cause pin
+`e9a5eb35…` ↦ 9535; `:attempt 1`, `:state :open`. -/
+def entry45 : InjuryEntry := ⟨9622, 45, 0, 8603, 9535, true⟩
+
+/-- The replay value a record's close alone supplies, read off
+`CloseOutcomeImage.closeVerdict`: `successfulCloseNonInjury` when the law says
+the close is a non-injury; `injury` when it says injury (it never does,
+`close_never_opens_injury`); `none` when the close does not decide. -/
+def replayFromClose (c : CloseOutcomeImage.CloseOutcome) (failurePresent : Bool) :
+    Option ReplayResult :=
+  match CloseOutcomeImage.closeVerdict (CloseOutcomeImage.image c) failurePresent with
+  | some .nonInjury => some .successfulCloseNonInjury
+  | some .injury => some .injury
+  | none => none
+
+/-- The medic cannot name a successful-close replay for a record the law
+calls an injury: the close supplies `successfulCloseNonInjury` exactly when
+`closeVerdict` is `nonInjury`. -/
+theorem successfulClose_replay_iff_law_nonInjury (c : CloseOutcomeImage.CloseOutcome)
+    (b : Bool) :
+    replayFromClose c b = some .successfulCloseNonInjury ↔
+      CloseOutcomeImage.closeVerdict (CloseOutcomeImage.image c) b =
+        some .nonInjury := by
+  unfold replayFromClose
+  cases CloseOutcomeImage.closeVerdict (CloseOutcomeImage.image c) b with
+  | none => simp
+  | some v => cases v <;> simp
+
+/-- The close never supplies the producer-qualified value: that value is
+about a failure kind, which the close cannot see.  The two non-injury replays
+are distinct evidence kinds. -/
+theorem close_never_producerQualified (c : CloseOutcomeImage.CloseOutcome) (b : Bool) :
+    replayFromClose c b ≠ some .producerQualifiedNonInjury := by
+  unfold replayFromClose
+  cases CloseOutcomeImage.closeVerdict (CloseOutcomeImage.image c) b with
+  | none => simp
+  | some v => cases v <;> simp
+
+/-- The close never supplies `injury` (`CloseOutcomeImage.close_never_opens_injury`). -/
+theorem close_never_injury_replay (c : CloseOutcomeImage.CloseOutcome) (b : Bool) :
+    replayFromClose c b ≠ some .injury := by
+  unfold replayFromClose
+  have h := CloseOutcomeImage.close_never_opens_injury (CloseOutcomeImage.image c) b
+  cases hv : CloseOutcomeImage.closeVerdict (CloseOutcomeImage.image c) b with
+  | none => simp
+  | some v => cases v <;> simp_all
+
+/-- Click 1's record (`:grounded-progress`, `:failure {:absent :no-failure}`)
+replays as a successful close. -/
+theorem click1_replay_is_successfulClose :
+    replayFromClose .groundedProgress false = some .successfulCloseNonInjury :=
+  (successfulClose_replay_iff_law_nonInjury _ _).mpr CloseOutcomeImage.click1_law_nonInjury
+
+/-- Entry 45's correction.  Replay is taken from click 1's close, not chosen:
+`entry45_replay_from_click1_close`.  Other numerals: classifier revision,
+patch, reviewer, evaluator, evidence pin are placeholders for the correction
+envelope that does not exist yet. -/
+def entry45Payload : MisclassificationPayload :=
+  ⟨entry45.occurrence, 0, 8603, 9535, 2310, .successfulCloseNonInjury, 2301, 9, 10, 4501⟩
+def entry45Evidence : MisclassificationEvidence :=
+  ⟨entry45.occurrence, 0, 8603, 9535, 2310, .successfulCloseNonInjury, 2301, 9, 10, 4501⟩
+def admitEntry45 : MisclassificationAdmission := fun current payload evidence =>
+  decide (current = entry45 ∧ payload = entry45Payload ∧ evidence = entry45Evidence)
+
+/-- The premise of the new constructor's use: entry 45's replay value is the
+one click 1's close supplies. -/
+theorem entry45_replay_from_click1_close :
+    some entry45Payload.replay = replayFromClose .groundedProgress false := rfl
+
+/-- Entry 45's correction qualifies under the exact binding and removes
+exactly that occurrence from the effective active set; the same payload with
+the a9 value refuses under entry 45's admission (the binding names the
+successful-close value), and a bare `.injury` replay refuses. -/
+theorem entry45_correction_qualifies_with_successful_close_replay :
+    let state : MedicState := ⟨[entry45, otherEntry], []⟩
+    let result := medicProcess admitEntry45 noGenuine
+      (some (.historicalMisclassification entry45Evidence)) state
+      (.historicalMisclassification entry45Payload)
+    result.outcome = .appended ∧ result.state.history = [entry45, otherEntry] ∧
+      medicEffectiveActive result.state = [41] ∧
+    (medicProcess admitEntry45 noGenuine
+      (some (.historicalMisclassification entry45Evidence)) state
+      (.historicalMisclassification
+        { entry45Payload with replay := .producerQualifiedNonInjury })).outcome = .refused := by
+  decide
+
+/-- A reopening of entry 45's injury after the correction is active again:
+the correction covers one exact occurrence. -/
+theorem entry45_later_reopening_remains_active :
+    let corrected := (medicProcess admitEntry45 noGenuine
+      (some (.historicalMisclassification entry45Evidence))
+      ⟨[entry45, otherEntry], []⟩ (.historicalMisclassification entry45Payload)).state
+    let reopened := { entry45 with entry := 46, predecessor := 45 }
+    medicEffectiveActive { corrected with history := corrected.history ++ [reopened] } =
+      [41, 9622] := by decide
+
+#print axioms qualified_replay_nonInjury
+#print axioms a9_new_value_qualifies_only_under_binding
+#print axioms injury_replay_refuses
+#print axioms successfulClose_replay_iff_law_nonInjury
+#print axioms close_never_producerQualified
+#print axioms close_never_injury_replay
+#print axioms click1_replay_is_successfulClose
+#print axioms entry45_replay_from_click1_close
+#print axioms entry45_correction_qualifies_with_successful_close_replay
+#print axioms entry45_later_reopening_remains_active
 
 /-- The proposal does not modify the established retry closing law. -/
 theorem medic_preserves_success_only_retry_law (b : Bool)
