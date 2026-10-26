@@ -43,6 +43,10 @@ def PreparationOutcome.isAttempted : PreparationOutcome → Bool
   | .attempted _ => true
   | _ => false
 
+def PreparationOutcome.isRefused : PreparationOutcome → Bool
+  | .refused _ => true
+  | _ => false
+
 def PreparationOutcome.isDeferred : PreparationOutcome → Bool
   | .deferredByBudget _ => true
   | _ => false
@@ -64,19 +68,33 @@ def preparedTasks (rows : List PreparationRow) : Finset Id :=
 def attemptedCount (rows : List PreparationRow) : Nat :=
   (rows.filter (fun r => r.outcome.isAttempted)).length
 
+def refusedCount (rows : List PreparationRow) : Nat :=
+  (rows.filter (fun r => r.outcome.isRefused)).length
+
 def deferredCount (rows : List PreparationRow) : Nat :=
   (rows.filter (fun r => r.outcome.isDeferred)).length
 
 /-- R1.  A valid step prepares, for every unmet eligible target, exactly one
-typed outcome; attempts stay within the budget; and a deferral is admissible
-only when the budget was actually spent (otherwise "deferred" would be the
-empty preparation set under another name). -/
+typed outcome; the slots spent (attempts and refusals together) stay within the
+budget; and a deferral is admissible only when the budget was actually spent
+(otherwise "deferred" would be the empty preparation set under another name).
+
+Amendment (claude-9, 2026-10-26, review of `8683505654`): a refusal spends a
+slot too.  A step that attempted two, had one refused and deferred the other
+98 is a valid preparation; under the original conjuncts (attempts alone
+against the budget) it was not.  Today's `prepare!` (futon2
+`target_reading_preparation.clj:52-80`) stops the whole batch at the first
+refusal and leaves the refused need in `:pending` with the rest unrecorded;
+that shape has no row for the refused target and fails `preparedTasks = unmet`.
+The R1 Clojure repair is to continue past a refusal, recording it as a
+`refused` row that counts against the budget. -/
 def PreparationStep.Valid (s : PreparationStep) : Prop :=
   s.unmet ⊆ s.eligible ∧
   (s.preparation.map (·.task)).Nodup ∧
   preparedTasks s.preparation = s.unmet ∧
-  attemptedCount s.preparation ≤ s.budget ∧
-  (0 < deferredCount s.preparation → attemptedCount s.preparation = s.budget)
+  attemptedCount s.preparation + refusedCount s.preparation ≤ s.budget ∧
+  (0 < deferredCount s.preparation →
+    attemptedCount s.preparation + refusedCount s.preparation = s.budget)
 
 instance (s : PreparationStep) : Decidable s.Valid := by
   unfold PreparationStep.Valid
@@ -93,14 +111,23 @@ theorem empty_preparation_with_unmet_invalid (s : PreparationStep)
   simp only [preparedTasks, List.toFinset_nil, Finset.image_empty] at h3
   exact hunmet.ne_empty h3.symm
 
-/-- Deferring everything while attempting nothing, with budget to spare, is not
-preparation. -/
+/-- Deferring everything while spending no slot (nothing attempted, nothing
+refused), with budget to spare, is not preparation.  (The `hnoref` hypothesis
+is new with the amendment: with refusals counting as spent slots, a step that
+refused exactly `budget` targets and deferred the rest is valid.) -/
 theorem all_deferred_under_budget_invalid (s : PreparationStep)
     (hpos : 0 < s.budget) (hnone : attemptedCount s.preparation = 0)
+    (hnoref : refusedCount s.preparation = 0)
     (hdef : 0 < deferredCount s.preparation) : ¬ s.Valid := by
   intro h
   have := h.2.2.2.2 hdef
   omega
+
+/-- A deferral is admitted only once the budget is spent, counting refusals. -/
+theorem deferral_needs_spent_budget (s : PreparationStep) (h : s.Valid)
+    (hdef : 0 < deferredCount s.preparation) :
+    attemptedCount s.preparation + refusedCount s.preparation = s.budget :=
+  h.2.2.2.2 hdef
 
 /-- R2 at the receipt boundary.  The preparation field of a selection receipt is
 one of these; `notRun` carries its reason.  The Clojure receipt before C4a could
@@ -182,5 +209,46 @@ def m150AllDeferred : PreparationStep :=
     preparation := unmet.zipIdx.map (fun p => ⟨p.1, .deferredByBudget p.2⟩) }
 
 theorem m150_all_deferred_invalid : ¬ m150AllDeferred.Valid := by native_decide
+
+/-! ### Amendment controls: a refusal spends a slot
+
+Budget 3 over `m150Unmet` (101 targets).  Reason id `1` stands for the typed
+refusal reason of the refused reading request. -/
+
+/-- Two attempted, one refused, 98 deferred: the budget is spent, the deferrals
+are admissible, every unmet target has a row. -/
+def m150TwoAttemptedOneRefused : PreparationStep :=
+  let unmet := (List.range 109).filter (fun t => decide (t ∉ readTasks))
+  { m150Step with
+    preparation :=
+      (unmet.take 2).map (fun t => ⟨t, .attempted t⟩) ++
+      ((unmet.drop 2).take 1).map (fun t => ⟨t, .refused 1⟩) ++
+      ((unmet.drop 3).zipIdx.map (fun p => ⟨p.1, .deferredByBudget p.2⟩)) }
+
+theorem m150_two_attempted_one_refused_valid : m150TwoAttemptedOneRefused.Valid := by
+  native_decide
+
+/-- One attempted, one refused, 99 deferred: a slot was left unspent, so the
+99 deferrals are not admissible. -/
+def m150OneAttemptedOneRefused : PreparationStep :=
+  let unmet := (List.range 109).filter (fun t => decide (t ∉ readTasks))
+  { m150Step with
+    preparation :=
+      (unmet.take 1).map (fun t => ⟨t, .attempted t⟩) ++
+      ((unmet.drop 1).take 1).map (fun t => ⟨t, .refused 1⟩) ++
+      ((unmet.drop 2).zipIdx.map (fun p => ⟨p.1, .deferredByBudget p.2⟩)) }
+
+theorem m150_one_attempted_one_refused_invalid : ¬ m150OneAttemptedOneRefused.Valid := by
+  native_decide
+
+/-- Today's `prepare!` shape after one refusal among three slots: two attempted
+rows, then the batch stops; the refused target and the other 98 have no row.
+Not valid, by the totality conjunct, independent of the budget conjuncts. -/
+def m150StopAtRefusal : PreparationStep :=
+  let unmet := (List.range 109).filter (fun t => decide (t ∉ readTasks))
+  { m150Step with
+    preparation := (unmet.take 2).map (fun t => ⟨t, .attempted t⟩) }
+
+theorem m150_stop_at_refusal_invalid : ¬ m150StopAtRefusal.Valid := by native_decide
 
 end DarkTower.WarMachine.SelectionPreparation
