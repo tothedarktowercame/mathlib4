@@ -1,4 +1,6 @@
 import DarkTower.WarMachine.R20Run
+import Mathlib.Data.List.MinMax
+import Mathlib.Data.List.Sort
 
 /-!
 # R20 as a computed step function: carried counts
@@ -24,8 +26,34 @@ abbrev EndingClass := CTauClassPreference.EndingClass
 abbrev CCounts := CTauClassPreference.Distribution
 abbrev PatternIdentity := R20Run.PatternIdentity
 abbrev Valence := R20Run.Valence
+abbrev Candidate := R15InjuryTier.Candidate
+abbrev Target := R15StrategicTarget.Target
+abbrev TargetRelation := CTauClassPreference.TargetRelation
 
 variable {Policy : Type} [DecidableEq Policy] [Fintype Policy] [Nonempty Policy]
+
+/-- Gates and orders are the two roles in the task-selection README: gates
+filter candidates and orders stably put the least key first. -/
+inductive SelectionStep where
+  | gate (keep : Candidate → Bool)
+  | order (key : Candidate → ℚ)
+
+/-- A task-selection policy is a cascade of gates and stable orders. -/
+abbrev SelectionCascade := List SelectionStep
+
+/-- Apply one task-selection step. -/
+noncomputable def applySelectionStep (field : List Candidate) : SelectionStep → List Candidate
+  | .gate keep => field.filter keep
+  | .order key => field.insertionSort (fun a b => key a ≤ key b)
+
+/-- Apply a task-selection cascade from left to right. -/
+noncomputable def applySelectionCascade (cascade : SelectionCascade)
+    (field : List Candidate) : List Candidate :=
+  cascade.foldl applySelectionStep field
+
+/-- The task selected by a cascade, if its gates leave any candidate. -/
+noncomputable def cascadePick (cascade : SelectionCascade) (field : List Candidate) : Option Candidate :=
+  (applySelectionCascade cascade field).head?
 
 /-- Total rational Beta counts.  Totality makes Smith, Friston & Whyte 2022
 §4 Eqs. 34 and 37 forgetting reach keys absent from a finite slow-state list. -/
@@ -82,6 +110,9 @@ structure Makeup (Policy : Type) where
   q₀ : Valence → ℝ
   /-- Fixed numerical iteration count for Friston 2017 equation 2.7. -/
   precisionIterations : ℕ
+  cascades : List SelectionCascade
+  cascades_nonempty : cascades ≠ []
+  relation : Target → Target → TargetRelation
   initialFocus : Nat
 
 /-- State carried from one click to the next.  `d` is the concentration from
@@ -111,6 +142,8 @@ structure Observation (Policy : Type) where
   G : Policy → ℝ
   /-- Free energy supplied externally in this slice; model computation is later work. -/
   F : Policy → ℝ
+  /-- Candidate field supplied externally in this slice; producing it is later work. -/
+  field : List Candidate
 
 /-- Rows produced by one computed click.  Evidence uses Friston 2017,
 equation 2.7; `C` is the normalized Smith, Friston & Whyte 2022 preference
@@ -126,6 +159,9 @@ structure Click (Policy : Type) where
   C : CTauClassPreference.Distribution
   precision : PrecisionFromObservation.TickRecord Policy
   valence : Valence → ℝ
+  selection : Option R20FocusedSelection.OuterSelection
+  cascadeIndex : Nat
+  cascadeScores : List EReal
   previousFocus : Nat
   focus : Nat
   runId : Nat
@@ -154,6 +190,74 @@ def endingDelta (observed : EndingClass) : CCounts := fun ending =>
 /-- Normalize learned Smith, Friston & Whyte 2022 preference counts. -/
 def normalizeC (c : CCounts) : CTauClassPreference.Distribution := fun ending =>
   c ending / CTauClassPreference.totalMass c
+
+/-- A cascade predicts its picked target's terminal class and reach.  Missing
+picks or unknown classes put all mass on stop-the-line. -/
+noncomputable def cascadePrediction (focus : Target)
+    (relation : Target → Target → TargetRelation) (field : List Candidate)
+    (cascade : SelectionCascade) : CTauClassPreference.Distribution :=
+  match cascadePick cascade field with
+  | some candidate =>
+      match R15StrategicTarget.outcomeClass focus relation (some candidate.target) with
+      | some ending => R15InjuryTier.candidatePrediction ending candidate.reach
+      | none => fun ending => if ending = .stopTheLine then 1 else 0
+  | none => fun ending => if ending = .stopTheLine then 1 else 0
+
+/-- Score one task-selection cascade against the learned C carried in state. -/
+noncomputable def cascadeScore (focus : Target)
+    (relation : Target → Target → TargetRelation) (field : List Candidate)
+    (C : CTauClassPreference.Distribution) (cascade : SelectionCascade) : EReal :=
+  CTauClassPreference.classRisk (cascadePrediction focus relation field cascade) C
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+/-- The indexed cascade menu used to retain menu-order tie breaking. -/
+def indexedCascades (m : Makeup Policy) : List (SelectionCascade × Nat) := m.cascades.zipIdx
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+theorem indexedCascades_nonempty (m : Makeup Policy) : indexedCascades m ≠ [] := by
+  simpa [indexedCascades] using m.cascades_nonempty
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+/-- First minimum-risk cascade.  Equal scores are resolved by menu order only
+so `step` is a function; such ties are a defect for better evidence to remove,
+not a selection rule. -/
+noncomputable def chosenCascadeEntry (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) : SelectionCascade × Nat :=
+  (indexedCascades m).argmin
+    (fun entry => cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1) |>.get
+      (by
+        cases h : (indexedCascades m).argmin
+          (fun entry => cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1) with
+        | none => exact False.elim (indexedCascades_nonempty m (List.argmin_eq_none.mp h))
+        | some _ => rfl)
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+theorem chosenCascadeEntry_mem_argmin (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) :
+    chosenCascadeEntry m s o ∈ (indexedCascades m).argmin
+      (fun entry => cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1) := by
+  unfold chosenCascadeEntry
+  exact Option.some_get _ |>.symm
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+theorem chosenCascadeEntry_mem (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) : chosenCascadeEntry m s o ∈ indexedCascades m :=
+  List.argmin_mem (chosenCascadeEntry_mem_argmin m s o)
+
+theorem applySelectionStep_mem {field : List Candidate} {step : SelectionStep} {c : Candidate}
+    (present : c ∈ applySelectionStep field step) : c ∈ field := by
+  cases step with
+  | gate keep => exact (List.mem_filter.mp (by simpa [applySelectionStep] using present)).1
+  | order key => simpa [applySelectionStep, List.mem_insertionSort] using present
+
+theorem applySelectionCascade_mem {cascade : SelectionCascade} {field : List Candidate}
+    {c : Candidate} (present : c ∈ applySelectionCascade cascade field) : c ∈ field := by
+  induction cascade generalizing field with
+  | nil => simpa [applySelectionCascade] using present
+  | cons step cascade ih =>
+      apply applySelectionStep_mem (step := step)
+      apply ih
+      simpa [applySelectionCascade] using present
 
 /-- A `classPreference`-shaped schedule whose terminal value is learned C. -/
 def learnedClassPreference (C : CTauClassPreference.Distribution)
@@ -235,6 +339,11 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
       betaPrior := betaPrior, betaPosterior := betaPosterior }
   let valenceAfter := R20Run.predict m.L
     (R20Run.valenceUpdate m.L s.valence betaPrior betaPosterior)
+  let chosen := chosenCascadeEntry m s o
+  let scores := m.cascades.map
+    (cascadeScore o.focus m.relation o.field (normalizeC s.c))
+  let selection := (cascadePick chosen.1 o.field).map fun candidate =>
+    ({ candidates := o.field, selected := candidate } : R20FocusedSelection.OuterSelection)
   ({ d := s.d
      evidence := ⟨prior, m.A, o.observation, posterior⟩
      habitBefore := s.habit
@@ -245,6 +354,9 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      C := normalizeC s.c
      precision := precision
      valence := s.valence
+     selection := selection
+     cascadeIndex := chosen.2
+     cascadeScores := scores
      previousFocus := s.previousFocus
      focus := o.focus
      runId := s.runId },
@@ -255,6 +367,59 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      valence := valenceAfter
      previousFocus := o.focus
      runId := s.runId + 1 })
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+theorem chosenCascade_score_le (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) {cascade : SelectionCascade} (present : cascade ∈ m.cascades) :
+    cascadeScore o.focus m.relation o.field (normalizeC s.c) (chosenCascadeEntry m s o).1 ≤
+      cascadeScore o.focus m.relation o.field (normalizeC s.c) cascade := by
+  obtain ⟨index, at_index⟩ := List.get_of_mem present
+  have entry_present : (cascade, index.val) ∈ indexedCascades m := by
+    let zippedIndex : Fin (indexedCascades m).length :=
+      ⟨index.val, by simpa [indexedCascades] using index.isLt⟩
+    apply List.mem_iff_get.mpr
+    refine ⟨zippedIndex, ?_⟩
+    simp only [indexedCascades, zippedIndex, List.get_eq_getElem, List.getElem_zipIdx,
+      zero_add, Prod.mk.injEq, and_true]
+    simpa only [List.get_eq_getElem] using at_index
+  let scoreEntry := fun entry : SelectionCascade × Nat =>
+    cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1
+  change scoreEntry (chosenCascadeEntry m s o) ≤ scoreEntry (cascade, index.val)
+  exact List.le_of_mem_argmin (f := scoreEntry) entry_present
+    (chosenCascadeEntry_mem_argmin m s o)
+
+theorem cascadePick_some_mem {cascade : SelectionCascade} {field : List Candidate}
+    {candidate : Candidate} (picked : cascadePick cascade field = some candidate) :
+    candidate ∈ field := by
+  apply applySelectionCascade_mem
+  apply List.mem_of_mem_head?
+  simpa [cascadePick, Option.mem_def] using picked
+
+omit [Nonempty Policy] in
+theorem step_selection_some (m : Makeup Policy) (s : State Policy) (o : Observation Policy)
+    (selection : R20FocusedSelection.OuterSelection)
+    (selected : (step m s o).1.selection = some selection) :
+    selection.selected ∈ o.field ∧ selection.candidates = o.field := by
+  simp only [step] at selected
+  cases picked : cascadePick (chosenCascadeEntry m s o).1 o.field with
+  | none => simp [picked] at selected
+  | some candidate =>
+      simp [picked] at selected
+      subst selection
+      exact ⟨cascadePick_some_mem picked, rfl⟩
+
+omit [Nonempty Policy] in
+theorem step_selection_none_iff (m : Makeup Policy) (s : State Policy) (o : Observation Policy) :
+    (step m s o).1.selection = none ↔
+      cascadePick (chosenCascadeEntry m s o).1 o.field = none := by
+  simp [step]
+
+omit [Nonempty Policy] in
+theorem step_scores_read_carried_C (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) :
+    (step m s o).1.cascadeScores = m.cascades.map
+      (cascadeScore o.focus m.relation o.field (normalizeC s.c)) := by
+  rfl
 
 /-- Fold `step` from a supplied state, returning the computed clicks and final
 state.  Its updates are exactly the Friston 2017 and Smith, Friston & Whyte
@@ -883,6 +1048,9 @@ noncomputable def exampleMakeup : Makeup Unit where
   L := R20Run.hespLevel
   q₀ := R20Run.half
   precisionIterations := 2
+  cascades := [[]]
+  cascades_nonempty := by simp
+  relation := fun _ _ => .other 0
   initialFocus := 7
 
 /-- One R15 outcome used in the sourced-update example. -/
@@ -898,6 +1066,7 @@ def exampleObservation (ending : EndingClass) (focus : Nat) : Observation Unit w
   E := fun _ => 1
   G := fun _ => 1
   F := fun _ => 0
+  field := []
 
 example :
     let clicks := run exampleMakeup
@@ -945,6 +1114,9 @@ noncomputable def precisionExampleMakeup : Makeup ExamplePolicy where
   L := R20Run.hespLevel
   q₀ := R20Run.half
   precisionIterations := 2
+  cascades := [[]]
+  cascades_nonempty := by simp
+  relation := fun _ _ => .other 0
   initialFocus := 7
 
 /-- Two-policy E, G, F arrive as observations in slice 2; constant F makes
@@ -959,6 +1131,7 @@ def precisionExampleObservation (ending : EndingClass) (focus : Nat) :
   E := fun | .a => 2 | .b => 1
   G := fun | .a => 0 | .b => 1
   F := fun _ => 0
+  field := []
 
 example :
     let clicks := run precisionExampleMakeup
@@ -989,6 +1162,7 @@ noncomputable def movingPrecisionObservation (ending : EndingClass) (focus : Nat
   E := fun _ => 1
   G := fun | .a => 0 | .b => 5 / 4 * Real.log 3
   F := fun | .a => 0 | .b => -Real.log 3
+  field := []
 
 /-- The exact first-click expected-G displacement. -/
 noncomputable def movingX : ℝ := 5 / 16 * Real.log 3
@@ -1044,8 +1218,80 @@ theorem moving_click_one_betaPrior_moved :
     nlinarith
   exact ⟨ne_of_gt greater, greater⟩
 
+/-! A concrete outer task-selection menu. -/
+
+def selectionCandidateOne : Candidate := ⟨1, 1 / 2⟩
+def selectionCandidateTwo : Candidate := ⟨2, 1 / 2⟩
+def selectionCandidateThree : Candidate := ⟨3, 1 / 4⟩
+
+def selectionExampleCascadeA : SelectionCascade :=
+  [.gate (fun candidate => decide (candidate.target = 2)),
+   .order (fun candidate => -candidate.reach)]
+
+def selectionExampleCascadeB : SelectionCascade :=
+  [.order (fun candidate => candidate.target)]
+
+/-- The first cascade gates to target 2; the second orders the whole field by target id. -/
+def selectionExampleCascades : List SelectionCascade :=
+  [selectionExampleCascadeA, selectionExampleCascadeB]
+
+noncomputable def selectionExampleMakeup : Makeup ExamplePolicy :=
+  { precisionExampleMakeup with
+    cascades := selectionExampleCascades
+    cascades_nonempty := by simp [selectionExampleCascades]
+    relation := fun _ target => if target = 1 ∨ target = 2 then .focus else .associated }
+
+noncomputable def selectionExampleObservation : Observation ExamplePolicy :=
+  { precisionExampleObservation .focused 7 with
+    field := [selectionCandidateOne, selectionCandidateTwo, selectionCandidateThree] }
+
+noncomputable def selectionExampleScore : EReal :=
+  CTauClassPreference.classRisk
+    (R15InjuryTier.candidatePrediction .focused (1 / 2)) kit
+
+example :
+    let click := (step selectionExampleMakeup (init selectionExampleMakeup)
+      selectionExampleObservation).1
+    click.cascadeIndex = 0 ∧
+      click.cascadeScores = [selectionExampleScore, selectionExampleScore] ∧
+      click.selection = some
+        { candidates := selectionExampleObservation.field, selected := selectionCandidateTwo } := by
+  have scoreA : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.field
+      (normalizeC (init selectionExampleMakeup).c) selectionExampleCascadeA = selectionExampleScore := by
+    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
+      applySelectionStep, selectionExampleCascadeA, selectionExampleMakeup,
+      selectionExampleObservation, selectionCandidateOne, selectionCandidateTwo,
+      selectionCandidateThree, selectionExampleScore, init, normalize_initialC,
+      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
+  have scoreB : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.field
+      (normalizeC (init selectionExampleMakeup).c) selectionExampleCascadeB = selectionExampleScore := by
+    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
+      applySelectionStep, selectionExampleCascadeB, selectionExampleMakeup,
+      selectionExampleObservation, selectionCandidateOne, selectionCandidateTwo,
+      selectionCandidateThree, selectionExampleScore, init, normalize_initialC,
+      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
+  have chosen : chosenCascadeEntry selectionExampleMakeup (init selectionExampleMakeup)
+      selectionExampleObservation = (selectionExampleCascadeA, 0) := by
+    unfold chosenCascadeEntry
+    change (([(selectionExampleCascadeA, 0), (selectionExampleCascadeB, 1)]).argmin
+      (fun entry => cascadeScore 7 selectionExampleMakeup.relation
+        selectionExampleObservation.field (normalizeC (init selectionExampleMakeup).c)
+        entry.1)).get _ = (selectionExampleCascadeA, 0)
+    simp [List.argmin, List.argAux, scoreA, scoreB]
+  simp only [step]
+  rw [chosen]
+  norm_num [selectionExampleMakeup,
+    selectionExampleCascades, selectionExampleObservation, precisionExampleObservation,
+    precisionExampleMakeup, init, cascadeScore, cascadePrediction, cascadePick,
+    applySelectionCascade, applySelectionStep, selectionExampleScore,
+    selectionExampleCascadeA, selectionExampleCascadeB, scoreA, scoreB, chosen,
+    selectionCandidateOne, selectionCandidateTwo, selectionCandidateThree,
+    normalize_initialC, R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
+
 #print axioms moving_click_one_betaPrior
 #print axioms moving_click_one_betaPrior_moved
+#print axioms chosenCascade_score_le
+#print axioms step_selection_some
 
 #print axioms step_betaPrior_next
 #print axioms click_betaPrior_constant_of_flat
