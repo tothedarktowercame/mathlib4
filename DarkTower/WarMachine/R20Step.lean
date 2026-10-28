@@ -147,6 +147,20 @@ structure Makeup (Policy : Type) where
   stateKit_pos : ∀ status state, 0 < stateKit status state
   gainKit : ReadyGain → ℚ
   gainKit_pos : ∀ gain, 0 < gainKit gain
+  /-- Hidden-state learning rate η_state; Smith, Friston & Whyte 2022 §4. -/
+  etaState : ℚ
+  etaState_pos : 0 < etaState
+  /-- Hidden-state forgetting rate ω_state; Smith, Friston & Whyte 2022 §4. -/
+  omegaState : ℚ
+  omegaState_pos : 0 < omegaState
+  omegaState_le_one : omegaState ≤ 1
+  /-- Ready-gain learning rate η_gain; Smith, Friston & Whyte 2022 §4. -/
+  etaGain : ℚ
+  etaGain_pos : 0 < etaGain
+  /-- Ready-gain forgetting rate ω_gain; Smith, Friston & Whyte 2022 §4. -/
+  omegaGain : ℚ
+  omegaGain_pos : 0 < omegaGain
+  omegaGain_le_one : omegaGain ≤ 1
   /-- Evidence learning rate η_d; Smith, Friston & Whyte 2022 §4 Eq. 34. -/
   etaD : ℝ
   etaD_pos : 0 < etaD
@@ -208,6 +222,9 @@ structure Observation (Policy : Type) where
   habitOutcome : FastOutcome Policy
   thetaOutcomes : List (FastOutcome PatternIdentity)
   endingClass : EndingClass
+  /-- How many items the selected task's landing actually made ready, supplied
+  externally just like `field`. -/
+  observedGain : ReadyGain
   focus : Nat
   /-- Habit evidence supplied externally in this slice; deriving it from learned habit is later work. -/
   E : Policy → ℝ
@@ -602,6 +619,21 @@ def init (m : Makeup Policy) : State Policy where
   previousFocus := m.initialFocus
   runId := 0
 
+/-- Forget every ready-gain count, then add the observed gain exactly when the
+click selected a task.  A click with no selection therefore performs decay
+only. -/
+def advanceGainCounts (eta omega : ℚ) (before : ReadyGain → ℚ)
+    (observed : ReadyGain) (selected : Bool) : ReadyGain → ℚ := fun gain =>
+  omega * before gain + if selected && decide (gain = observed) then eta else 0
+
+theorem advanceGainCounts_pos (eta omega : ℚ) (before : ReadyGain → ℚ)
+    (eta_nonnegative : 0 ≤ eta) (omega_pos : 0 < omega)
+    (before_pos : ∀ gain, 0 < before gain) (observed : ReadyGain) (selected : Bool) :
+    ∀ gain, 0 < advanceGainCounts eta omega before observed selected gain := by
+  intro gain
+  simp only [advanceGainCounts]
+  split <;> nlinarith [before_pos gain]
+
 /-- The evidence prior is the mean of the current Friston 2017 equation 2.7
 concentration. -/
 noncomputable def evidencePrior (s : State Policy) : EvidenceFromTheProcess.Belief Hidden :=
@@ -609,7 +641,9 @@ noncomputable def evidencePrior (s : State Policy) : EvidenceFromTheProcess.Beli
 
 /-- Compute one click and its successor.  The evidence concentration update is
 Friston 2017 equation 2.7; the C-count update is Smith, Friston & Whyte 2022.
-Slice 3d carries `stateCounts` and `gainCounts` unchanged; their updates are 3e. -/
+Slice 3e forgets all gain counts and adds the externally observed gain when a
+task was selected.  The hidden-state posterior update follows in the next 3e
+packet, so this definition still carries `stateCounts` unchanged. -/
 noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation Policy) :
     Click Policy × State Policy :=
   let prior := evidencePrior s
@@ -652,10 +686,19 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      theta := thetaAfter
      c := cAfter
      stateCounts := s.stateCounts
-     gainCounts := s.gainCounts
+     gainCounts := advanceGainCounts m.etaGain m.omegaGain s.gainCounts
+       o.observedGain selection.isSome
      valence := valenceAfter
      previousFocus := o.focus
      runId := s.runId + 1 })
+
+theorem step_gainCounts (m : Makeup Policy) (s : State Policy) (o : Observation Policy) :
+    (step m s o).2.gainCounts =
+      advanceGainCounts m.etaGain m.omegaGain s.gainCounts o.observedGain
+        ((cascadePick (chosenCascadeEntry m s o).1 o.facts o.field).map fun candidate =>
+          ({ candidates := o.field, selected := candidate } :
+            R20FocusedSelection.OuterSelection)).isSome := by
+  rfl
 
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem chosenCascade_score_le (m : Makeup Policy) (s : State Policy)
@@ -1351,7 +1394,9 @@ theorem step_outerStateInvariant (m : Makeup Policy) (s : State Policy)
     OuterStateInvariant (step m s o).2 := by
   refine ⟨?_, ?_, ?_, ?_⟩
   · simpa [step] using valid.stateCounts_pos
-  · simpa [step] using valid.gainCounts_pos
+  · simpa [step] using advanceGainCounts_pos m.etaGain m.omegaGain s.gainCounts
+      m.etaGain_pos.le m.omegaGain_pos valid.gainCounts_pos o.observedGain
+      (cascadePick (chosenCascadeEntry m s o).1 o.facts o.field).isSome
   · simpa [step] using advanceC_nonnegative valid.c_nonnegative m.etaC m.omegaC
       m.etaC_pos.le m.omegaC_pos.le o.endingClass
   · simp only [step, advanceC_total]
@@ -1438,6 +1483,14 @@ def exampleOmegaHabit : ℚ := 1
 def exampleEtaTheta : ℚ := 1
 /-- Example ω_θ is 1 because pattern rates are not the demonstrated quantity. -/
 def exampleOmegaTheta : ℚ := 1
+/-- Example η_state is explicit although the posterior update is the next packet. -/
+def exampleEtaState : ℚ := 1
+/-- Example ω_state is explicit although the posterior update is the next packet. -/
+def exampleOmegaState : ℚ := 1
+/-- Example η_gain adds one observed ready-gain event. -/
+def exampleEtaGain : ℚ := 1
+/-- Example ω_gain retains all earlier ready-gain evidence. -/
+def exampleOmegaGain : ℚ := 1
 
 /-- Concrete makeup for the Friston 2017 / Smith, Friston & Whyte 2022 example. -/
 noncomputable def exampleMakeup : Makeup Unit where
@@ -1452,6 +1505,16 @@ noncomputable def exampleMakeup : Makeup Unit where
   stateKit_pos := by intros; norm_num
   gainKit := fun | .none => 1 | .one => 2 | .several => 4
   gainKit_pos := by intro gain; cases gain <;> norm_num
+  etaState := exampleEtaState
+  etaState_pos := by norm_num [exampleEtaState]
+  omegaState := exampleOmegaState
+  omegaState_pos := by norm_num [exampleOmegaState]
+  omegaState_le_one := by norm_num [exampleOmegaState]
+  etaGain := exampleEtaGain
+  etaGain_pos := by norm_num [exampleEtaGain]
+  omegaGain := exampleOmegaGain
+  omegaGain_pos := by norm_num [exampleOmegaGain]
+  omegaGain_le_one := by norm_num [exampleOmegaGain]
   etaD := exampleEtaD
   etaD_pos := by norm_num [exampleEtaD]
   omegaD := exampleOmegaD
@@ -1489,6 +1552,7 @@ def exampleObservation (ending : EndingClass) (focus : Nat) : Observation Unit w
   habitOutcome := exampleOutcome
   thetaOutcomes := []
   endingClass := ending
+  observedGain := .none
   focus := focus
   E := fun _ => 1
   G := fun _ => 1
@@ -1523,6 +1587,16 @@ noncomputable def precisionExampleMakeup : Makeup ExamplePolicy where
   stateKit_pos := by intros; norm_num
   gainKit := fun | .none => 1 | .one => 2 | .several => 4
   gainKit_pos := by intro gain; cases gain <;> norm_num
+  etaState := 1
+  etaState_pos := by norm_num
+  omegaState := 1
+  omegaState_pos := by norm_num
+  omegaState_le_one := by norm_num
+  etaGain := 1
+  etaGain_pos := by norm_num
+  omegaGain := 1
+  omegaGain_pos := by norm_num
+  omegaGain_le_one := by norm_num
   etaD := 1
   etaD_pos := by norm_num
   omegaD := 1
@@ -1559,6 +1633,7 @@ def precisionExampleObservation (ending : EndingClass) (focus : Nat) :
   habitOutcome := ⟨.a, true, true⟩
   thetaOutcomes := []
   endingClass := ending
+  observedGain := .none
   focus := focus
   E := fun | .a => 2 | .b => 1
   G := fun | .a => 0 | .b => 1
@@ -1591,6 +1666,7 @@ noncomputable def movingPrecisionObservation (ending : EndingClass) (focus : Nat
   habitOutcome := ⟨.a, true, true⟩
   thetaOutcomes := []
   endingClass := ending
+  observedGain := .none
   focus := focus
   E := fun _ => 1
   G := fun | .a => 0 | .b => 5 / 4 * Real.log 3
@@ -1887,6 +1963,7 @@ theorem learned_selection_click_zero :
       learnedSelectionCascadeA, learnedSelectionObservation,
       selectionCandidateOne, learnedSelectionCandidateThree]
 
+set_option maxHeartbeats 800000 in
 /-- At click one learned C prefers the related pick strictly; cascade B and
 target 3 therefore win independently of menu order. -/
 theorem learned_selection_click_one :
@@ -1897,6 +1974,58 @@ theorem learned_selection_click_one :
     learnedSelectionClick1.cascadeIndex = 1 ∧
     learnedSelectionClick1.selection = some
       { candidates := learnedSelectionObservation.field, selected := learnedSelectionCandidateThree } := by
+  have chosen0 : chosenCascadeEntry learnedSelectionMakeup learnedSelectionState0
+      learnedSelectionObservation = (learnedSelectionCascadeA, 0) := by
+    unfold chosenCascadeEntry
+    change (([(learnedSelectionCascadeA, 0), (learnedSelectionCascadeB, 1)]).argmin
+      (fun entry => carriedOuterScore learnedSelectionMakeup learnedSelectionState0
+        learnedSelectionObservation entry.1)).get _ = (learnedSelectionCascadeA, 0)
+    have not_reverse := not_lt_of_ge (le_of_lt learned_selection_click_zero.1)
+    simp [List.argmin, List.argAux, not_reverse]
+  have first_selected :
+      (cascadePick (chosenCascadeEntry learnedSelectionMakeup learnedSelectionState0
+        learnedSelectionObservation).1 learnedSelectionObservation.facts
+        learnedSelectionObservation.field).isSome = true := by
+    rw [chosen0]
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep,
+      learnedSelectionCascadeA, learnedSelectionObservation,
+      selectionCandidateOne, learnedSelectionCandidateThree]
+  have gain_state : learnedSelectionState1.gainCounts =
+      advanceGainCounts learnedSelectionMakeup.etaGain learnedSelectionMakeup.omegaGain
+        learnedSelectionState0.gainCounts learnedSelectionObservation.observedGain true := by
+    funext gain
+    simp [learnedSelectionState1, step, first_selected]
+  have gain_run : (stateAfter learnedSelectionMakeup
+      [learnedSelectionObservation]).gainCounts =
+      advanceGainCounts learnedSelectionMakeup.etaGain learnedSelectionMakeup.omegaGain
+        learnedSelectionState0.gainCounts learnedSelectionObservation.observedGain true := by
+    exact gain_state
+  have score_eq (cascade : SelectionCascade) :
+      carriedOuterScore learnedSelectionMakeup
+          (stateAfter learnedSelectionMakeup [learnedSelectionObservation])
+          learnedSelectionObservation cascade =
+        outerScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
+          learnedSelectionObservation.facts learnedSelectionObservation.field
+          (stateAfter learnedSelectionMakeup [learnedSelectionObservation]).stateCounts
+          (stateAfter_outerStateInvariant learnedSelectionMakeup
+            [learnedSelectionObservation]).stateCounts_pos
+          (normalizeC (stateAfter learnedSelectionMakeup [learnedSelectionObservation]).c)
+          (normalizeC_probability
+            (stateAfter_outerStateInvariant learnedSelectionMakeup
+              [learnedSelectionObservation]).c_nonnegative
+            (stateAfter_outerStateInvariant learnedSelectionMakeup
+              [learnedSelectionObservation]).c_total_positive)
+          (advanceGainCounts learnedSelectionMakeup.etaGain learnedSelectionMakeup.omegaGain
+            learnedSelectionState0.gainCounts learnedSelectionObservation.observedGain true)
+          (advanceGainCounts_pos learnedSelectionMakeup.etaGain learnedSelectionMakeup.omegaGain
+            learnedSelectionState0.gainCounts learnedSelectionMakeup.etaGain_pos.le
+            learnedSelectionMakeup.omegaGain_pos
+            (init_outerStateInvariant learnedSelectionMakeup).gainCounts_pos
+            learnedSelectionObservation.observedGain true)
+          cascade := by
+    simpa only [gain_run] using
+      carriedOuterScore_stateAfter_eq_outerScore learnedSelectionMakeup
+        [learnedSelectionObservation] learnedSelectionObservation cascade
   have strict : carriedOuterScore learnedSelectionMakeup learnedSelectionState1
       learnedSelectionObservation learnedSelectionCascadeB <
         carriedOuterScore learnedSelectionMakeup learnedSelectionState1
@@ -1907,12 +2036,12 @@ theorem learned_selection_click_one :
       carriedOuterScore learnedSelectionMakeup
         (stateAfter learnedSelectionMakeup [learnedSelectionObservation])
         learnedSelectionObservation learnedSelectionCascadeA
-    rw [carriedOuterScore_stateAfter_eq_outerScore,
-      carriedOuterScore_stateAfter_eq_outerScore]
+    rw [score_eq, score_eq]
     simp only [outerScore]
     split_ifs <;> simp [learnedSelectionMakeup, selectionExampleMakeup,
-      precisionExampleMakeup, learnedSelectionObservation, precisionExampleObservation,
-      stateAfter, runFrom, step, init, normalizeC, advanceC, initialC, endingDelta,
+      precisionExampleMakeup, learnedSelectionState0, learnedSelectionObservation,
+      precisionExampleObservation,
+      stateAfter, runFrom, step, init, advanceGainCounts, normalizeC, advanceC, initialC, endingDelta,
       kit, CTauClassPreference.totalMass, outerModel, outerPreferenceKernel,
       outerCountKernel, pickedOuterKernel, CascadeEFE.finiteKernel, CascadeEFE.push,
       CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity, CascadeEFE.entropy,
@@ -1922,14 +2051,14 @@ theorem learned_selection_click_one :
       applySelectionStep, readyGain, R15StrategicTarget.outcomeClass,
       CTauClassPreference.scorerClass, R15InjuryTier.sum_endingClass,
       Fintype.sum_prod_type, sum_taskState, sum_readyGain, card_taskState,
-      card_readyGain, reduceCtorEq] at *
+      card_readyGain, chosen0, first_selected, reduceCtorEq] at *
     all_goals try
       rcases ‹∃ _ _, _› with ⟨ending, gain, positive, zero⟩
       fin_cases ending <;> fin_cases gain <;> simp [learnedSelectionC, kit] at positive zero <;>
         norm_num at positive zero
     all_goals try norm_num [learnedSelectionC, kit] at *
     all_goals try
-      have logs : Real.log ((665 : ℝ) / 263) < Real.log ((665 : ℝ) / 99) :=
+      have logs : Real.log ((380 : ℝ) / 263) < Real.log ((380 : ℝ) / 99) :=
         Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
       norm_num at *
       norm_cast at *
