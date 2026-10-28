@@ -1330,6 +1330,88 @@ theorem normalizeC_probability {c : CCounts}
           ring]
     exact div_self positive.ne'
 
+/-- The carried facts that make every outer score on a real run admissible at
+the state-model boundary.  The two facts about raw `c` imply that its
+normalisation is a probability distribution. -/
+structure OuterStateInvariant (s : State Policy) : Prop where
+  stateCounts_pos : ∀ status state, 0 < s.stateCounts status state
+  gainCounts_pos : ∀ gain, 0 < s.gainCounts gain
+  c_nonnegative : CTauClassPreference.Nonnegative s.c
+  c_total_positive : 0 < CTauClassPreference.totalMass s.c
+
+omit [Fintype Policy] [Nonempty Policy] in
+theorem init_outerStateInvariant (m : Makeup Policy) : OuterStateInvariant (init m) := by
+  refine ⟨m.stateKit_pos, m.gainKit_pos, ?_, ?_⟩
+  · simpa [init] using initialC_nonnegative m
+  · simpa [init, initialC_total] using m.kappa_pos
+
+omit [Nonempty Policy] in
+theorem step_outerStateInvariant (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) (valid : OuterStateInvariant s) :
+    OuterStateInvariant (step m s o).2 := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · simpa [step] using valid.stateCounts_pos
+  · simpa [step] using valid.gainCounts_pos
+  · simpa [step] using advanceC_nonnegative valid.c_nonnegative m.etaC m.omegaC
+      m.etaC_pos.le m.omegaC_pos.le o.endingClass
+  · simp only [step, advanceC_total]
+    split <;> nlinarith [m.omegaC_pos, m.etaC_pos, valid.c_total_positive]
+
+omit [Nonempty Policy] in
+theorem runFrom_outerStateInvariant (m : Makeup Policy) (s : State Policy)
+    (obs : List (Observation Policy)) (valid : OuterStateInvariant s) :
+    OuterStateInvariant (runFrom m s obs).2 := by
+  induction obs generalizing s with
+  | nil => simpa [runFrom]
+  | cons o obs ih =>
+      exact ih (step m s o).2 (step_outerStateInvariant m s o valid)
+
+omit [Nonempty Policy] in
+/-- Every state reached by `run` takes the finite-model branch of
+`carriedOuterScore`; its three guards cannot fail on a real run. -/
+theorem stateAfter_outerStateInvariant (m : Makeup Policy)
+    (obs : List (Observation Policy)) : OuterStateInvariant (stateAfter m obs) := by
+  exact runFrom_outerStateInvariant m (init m) obs (init_outerStateInvariant m)
+
+omit [Nonempty Policy] in
+theorem carriedOuterScore_stateAfter_eq_outerScore (m : Makeup Policy)
+    (pre : List (Observation Policy)) (o : Observation Policy)
+    (cascade : SelectionCascade) :
+    carriedOuterScore m (stateAfter m pre) o cascade =
+      outerScore o.focus m.relation o.facts o.field
+        (stateAfter m pre).stateCounts
+        (stateAfter_outerStateInvariant m pre).stateCounts_pos
+        (normalizeC (stateAfter m pre).c)
+        (normalizeC_probability (stateAfter_outerStateInvariant m pre).c_nonnegative
+          (stateAfter_outerStateInvariant m pre).c_total_positive)
+        (stateAfter m pre).gainCounts
+        (stateAfter_outerStateInvariant m pre).gainCounts_pos cascade := by
+  classical
+  let valid := stateAfter_outerStateInvariant m pre
+  let C_probability := normalizeC_probability valid.c_nonnegative valid.c_total_positive
+  rw [carriedOuterScore, dif_pos valid.stateCounts_pos,
+    dif_pos C_probability, dif_pos valid.gainCounts_pos]
+
+omit [Nonempty Policy] in
+/-- Every score recorded by a real click is the outer `stepG` score, with no
+fallback-to-`⊤` guard branch. -/
+theorem click_cascadeScores_eq_outerScore (m : Makeup Policy)
+    (pre : List (Observation Policy)) (o : Observation Policy) :
+    (step m (stateAfter m pre) o).1.cascadeScores =
+      m.cascades.map (fun cascade =>
+        outerScore o.focus m.relation o.facts o.field
+          (stateAfter m pre).stateCounts
+          (stateAfter_outerStateInvariant m pre).stateCounts_pos
+          (normalizeC (stateAfter m pre).c)
+          (normalizeC_probability (stateAfter_outerStateInvariant m pre).c_nonnegative
+            (stateAfter_outerStateInvariant m pre).c_total_positive)
+          (stateAfter m pre).gainCounts
+          (stateAfter_outerStateInvariant m pre).gainCounts_pos cascade) := by
+  rw [step_scores_read_carried_C]
+  apply List.map_congr_left
+  intro cascade present
+  exact carriedOuterScore_stateAfter_eq_outerScore m pre o cascade
+
 omit [Nonempty Policy] in
 theorem click_C_probability (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
@@ -2112,6 +2194,8 @@ theorem outer_ready_gain_matters :
 #print axioms moving_click_one_betaPrior_moved
 #print axioms chosenCascade_score_le
 #print axioms step_selection_some
+#print axioms stateAfter_outerStateInvariant
+#print axioms click_cascadeScores_eq_outerScore
 
 #print axioms step_betaPrior_next
 #print axioms click_betaPrior_constant_of_flat
