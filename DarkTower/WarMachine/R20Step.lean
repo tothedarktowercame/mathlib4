@@ -972,6 +972,81 @@ example :
     R20Run.affectiveEvidence, R20Run.charge, R20Run.hespLevel, R20Run.half,
     R20Run.identityB, R20Run.sum_valence]
 
+/-! A nonconstant-F two-click example where precision changes valence. -/
+
+/-- One Friston 2017 equation 2.7 iteration makes the nonconstant-F effect explicit. -/
+noncomputable def movingPrecisionMakeup : Makeup ExamplePolicy :=
+  { precisionExampleMakeup with precisionIterations := 1 }
+
+/-- Exact two-policy scores: F cancels G/β for policy b at the initial β = 5/4. -/
+noncomputable def movingPrecisionObservation (ending : EndingClass) (focus : Nat) :
+    Observation ExamplePolicy where
+  observation := true
+  habitOutcome := ⟨.a, true, true⟩
+  thetaOutcomes := []
+  endingClass := ending
+  focus := focus
+  E := fun _ => 1
+  G := fun | .a => 0 | .b => 5 / 4 * Real.log 3
+  F := fun | .a => 0 | .b => -Real.log 3
+
+/-- The exact first-click expected-G displacement. -/
+noncomputable def movingX : ℝ := 5 / 16 * Real.log 3
+
+theorem moving_click_zero_betaPosterior :
+    let clicks := run movingPrecisionMakeup
+      [movingPrecisionObservation .focused 8, movingPrecisionObservation .related 9]
+    (clicks.head?.getD (step movingPrecisionMakeup (init movingPrecisionMakeup)
+      (movingPrecisionObservation .focused 8)).1).precision.betaPosterior = 5 / 4 + movingX := by
+  norm_num [run, runFrom, step, init, movingPrecisionMakeup, precisionExampleMakeup,
+    movingPrecisionObservation, movingX, iteratePrecision,
+    PrecisionFromObservation.firstIterate, PrecisionFromObservation.expectedGChange,
+    PrecisionFromObservation.priorPolicy, PrecisionFromObservation.posteriorPolicy,
+    PrecisionFromObservation.softmax, R20Run.descend, R20Run.hespLevel, R20Run.half,
+    R20Run.sum_valence, PrecisionFromObservation.sum_twoPolicy, Real.exp_neg]
+  rw [Real.exp_log (by norm_num : (0 : ℝ) < 3)]
+  norm_num
+  ring
+
+theorem moving_click_one_betaPrior :
+    let first := movingPrecisionObservation .focused 8
+    let second := movingPrecisionObservation .related 9
+    (step movingPrecisionMakeup (step movingPrecisionMakeup
+      (init movingPrecisionMakeup) first).2 second).1.precision.betaPrior =
+      (10 + 17 * movingX) / (8 + 10 * movingX) := by
+  norm_num [step, init, movingPrecisionMakeup, precisionExampleMakeup,
+    movingPrecisionObservation, movingX, iteratePrecision,
+    PrecisionFromObservation.firstIterate, PrecisionFromObservation.expectedGChange,
+    PrecisionFromObservation.priorPolicy, PrecisionFromObservation.posteriorPolicy,
+    PrecisionFromObservation.softmax, PrecisionFromObservation.sum_twoPolicy,
+    R20Run.descend, R20Run.predict, R20Run.valenceUpdate, R20Run.normalize,
+    R20Run.affectiveEvidence, R20Run.charge, R20Run.hespLevel, R20Run.half,
+    R20Run.identityB, R20Run.sum_valence, Real.exp_neg]
+  rw [Real.exp_log (by norm_num : (0 : ℝ) < 3)]
+  have log_pos : 0 < Real.log 3 := Real.log_pos (by norm_num)
+  field_simp <;> ring_nf <;> nlinarith
+
+theorem moving_click_one_betaPrior_moved :
+    let first := movingPrecisionObservation .focused 8
+    let second := movingPrecisionObservation .related 9
+    let beta := (step movingPrecisionMakeup (step movingPrecisionMakeup
+      (init movingPrecisionMakeup) first).2 second).1.precision.betaPrior
+    beta ≠ 5 / 4 ∧ 5 / 4 < beta := by
+  dsimp only
+  rw [moving_click_one_betaPrior]
+  have log_pos : 0 < Real.log 3 := Real.log_pos (by norm_num)
+  have x_pos : 0 < movingX := by
+    unfold movingX
+    positivity
+  have denominator_pos : 0 < 8 + 10 * movingX := by positivity
+  have greater : (5 / 4 : ℝ) < (10 + 17 * movingX) / (8 + 10 * movingX) := by
+    rw [lt_div_iff₀ denominator_pos]
+    nlinarith
+  exact ⟨ne_of_gt greater, greater⟩
+
+#print axioms moving_click_one_betaPrior
+#print axioms moving_click_one_betaPrior_moved
+
 #print axioms step_betaPrior_next
 #print axioms click_betaPrior_constant_of_flat
 #print axioms iteratePrecision_constant_F
