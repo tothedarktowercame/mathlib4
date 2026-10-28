@@ -634,6 +634,108 @@ theorem advanceGainCounts_pos (eta omega : ℚ) (before : ReadyGain → ℚ)
   simp only [advanceGainCounts]
   split <;> nlinarith [before_pos gain]
 
+/-- The rational observation likelihood used by `pickedOuterKernel`. -/
+def outerStateLikelihood (landing observed : OuterOutcome) (rawReach : ℚ) :
+    TaskState → ℚ
+  | .blocked => if observed = (.stopTheLine, .none) then 1 else 0
+  | .doable =>
+      if landing = (.stopTheLine, .none) then
+        if observed = (.stopTheLine, .none) then 1 else 0
+      else if observed = landing then boundedReach rawReach
+      else if observed = (.stopTheLine, .none) then 1 - boundedReach rawReach else 0
+
+theorem outerStateLikelihood_nonneg (landing observed : OuterOutcome) (reach : ℚ) :
+    ∀ state, 0 ≤ outerStateLikelihood landing observed reach state := by
+  intro state
+  cases state with
+  | blocked =>
+      simp only [outerStateLikelihood]
+      split <;> norm_num
+  | doable =>
+      by_cases landing_stop : landing = (.stopTheLine, .none)
+      · simp only [outerStateLikelihood, landing_stop, if_true]
+        split <;> norm_num
+      · by_cases observed_landing : observed = landing
+        · simp [outerStateLikelihood, landing_stop, observed_landing,
+            boundedReach_nonnegative reach]
+        · by_cases observed_stop : observed = (.stopTheLine, .none)
+          · have stop_ne_landing : (.stopTheLine, .none) ≠ landing :=
+              fun equality => landing_stop equality.symm
+            simp [outerStateLikelihood, landing_stop, observed_landing, observed_stop,
+              stop_ne_landing, boundedReach_le_one reach]
+          · simp [outerStateLikelihood, landing_stop, observed_landing, observed_stop]
+
+/-- Bayes posterior for the picked task's hidden state.  The common
+normalising denominator of `outerModel`'s `q` cancels, leaving count times
+the likelihood from its action kernel.  A zero denominator means that the
+observation was impossible under the model; in that case no evidence is
+added (later work may treat that as model failure). -/
+def outerStatePosterior (counts : TaskState → ℚ) (landing observed : OuterOutcome)
+    (reach : ℚ) (state : TaskState) : ℚ :=
+  let weight := fun x => counts x * outerStateLikelihood landing observed reach x
+  let total := ∑ x, weight x
+  if total = 0 then 0 else weight state / total
+
+theorem outerStatePosterior_nonneg (counts : TaskState → ℚ)
+    (counts_nonneg : ∀ state, 0 ≤ counts state) (landing observed : OuterOutcome)
+    (reach : ℚ) : ∀ state, 0 ≤ outerStatePosterior counts landing observed reach state := by
+  intro state
+  simp only [outerStatePosterior]
+  by_cases zero : (∑ x, counts x * outerStateLikelihood landing observed reach x) = 0
+  · simp [zero]
+  · rw [if_neg zero]
+    apply div_nonneg
+    · exact mul_nonneg (counts_nonneg state)
+        (outerStateLikelihood_nonneg landing observed reach state)
+    · exact Finset.sum_nonneg fun x _ => mul_nonneg (counts_nonneg x)
+        (outerStateLikelihood_nonneg landing observed reach x)
+
+/-- Decay every readiness-status row.  For a selected task, add its Bayes
+posterior only to the row for that task's current Giraffe status. -/
+def advanceStateCounts (eta omega : ℚ)
+    (before : ReadinessStatus → TaskState → ℚ) (focus : Target)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (observed : OuterOutcome) (picked : Option Candidate) :
+    ReadinessStatus → TaskState → ℚ := fun status state =>
+  omega * before status state + match picked with
+    | none => 0
+    | some candidate =>
+        if status = (facts candidate.target).status then
+          let landing := match R15StrategicTarget.outcomeClass focus relation
+              (some candidate.target) with
+            | some ending => (ending, readyGain (facts candidate.target).unblocks)
+            | none => (.stopTheLine, .none)
+          eta * outerStatePosterior (before status) landing observed candidate.reach state
+        else 0
+
+theorem advanceStateCounts_pos (eta omega : ℚ)
+    (before : ReadinessStatus → TaskState → ℚ) (eta_nonnegative : 0 ≤ eta)
+    (omega_pos : 0 < omega) (before_pos : ∀ status state, 0 < before status state)
+    (focus : Target) (relation : Target → Target → TargetRelation)
+    (facts : Target → GiraffeFacts) (observed : OuterOutcome) (picked : Option Candidate) :
+    ∀ status state,
+      0 < advanceStateCounts eta omega before focus relation facts observed picked status state := by
+  intro status state
+  cases picked with
+  | none =>
+      simp [advanceStateCounts]
+      exact mul_pos omega_pos (before_pos status state)
+  | some candidate =>
+      by_cases same : status = (facts candidate.target).status
+      · subst status
+        simp only [advanceStateCounts, if_true]
+        have posterior_nonneg := outerStatePosterior_nonneg
+          (before (facts candidate.target).status)
+          (fun x => (before_pos (facts candidate.target).status x).le)
+          (match R15StrategicTarget.outcomeClass focus relation (some candidate.target) with
+            | some ending => (ending, readyGain (facts candidate.target).unblocks)
+            | none => (.stopTheLine, .none)) observed candidate.reach state
+        exact add_pos_of_pos_of_nonneg
+          (mul_pos omega_pos (before_pos (facts candidate.target).status state))
+          (mul_nonneg eta_nonnegative posterior_nonneg)
+      · simp [advanceStateCounts, same]
+        exact mul_pos omega_pos (before_pos status state)
+
 /-- The evidence prior is the mean of the current Friston 2017 equation 2.7
 concentration. -/
 noncomputable def evidencePrior (s : State Policy) : EvidenceFromTheProcess.Belief Hidden :=
@@ -642,8 +744,9 @@ noncomputable def evidencePrior (s : State Policy) : EvidenceFromTheProcess.Beli
 /-- Compute one click and its successor.  The evidence concentration update is
 Friston 2017 equation 2.7; the C-count update is Smith, Friston & Whyte 2022.
 Slice 3e forgets all gain counts and adds the externally observed gain when a
-task was selected.  The hidden-state posterior update follows in the next 3e
-packet, so this definition still carries `stateCounts` unchanged. -/
+task was selected.  It also adds the selected task's Bayes hidden-state
+posterior to that task's readiness-status row; impossible observations and
+clicks with no selection add nothing, while every row still decays. -/
 noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation Policy) :
     Click Policy × State Policy :=
   let prior := evidencePrior s
@@ -663,7 +766,8 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
   let chosen := chosenCascadeEntry m s o
   let scores := m.cascades.map
     (carriedOuterScore m s o)
-  let selection := (cascadePick chosen.1 o.facts o.field).map fun candidate =>
+  let picked := cascadePick chosen.1 o.facts o.field
+  let selection := picked.map fun candidate =>
     ({ candidates := o.field, selected := candidate } : R20FocusedSelection.OuterSelection)
   ({ d := s.d
      evidence := ⟨prior, m.A, o.observation, posterior⟩
@@ -685,7 +789,8 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      habit := habitAfter
      theta := thetaAfter
      c := cAfter
-     stateCounts := s.stateCounts
+     stateCounts := advanceStateCounts m.etaState m.omegaState s.stateCounts
+       o.focus m.relation o.facts (o.endingClass, o.observedGain) picked
      gainCounts := advanceGainCounts m.etaGain m.omegaGain s.gainCounts
        o.observedGain selection.isSome
      valence := valenceAfter
@@ -699,6 +804,50 @@ theorem step_gainCounts (m : Makeup Policy) (s : State Policy) (o : Observation 
           ({ candidates := o.field, selected := candidate } :
             R20FocusedSelection.OuterSelection)).isSome := by
   rfl
+
+theorem advanceStateCounts_selected_same (eta omega : ℚ)
+    (before : ReadinessStatus → TaskState → ℚ) (focus : Target)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (observed : OuterOutcome) (candidate : Candidate) (state : TaskState) :
+    advanceStateCounts eta omega before focus relation facts observed (some candidate)
+        (facts candidate.target).status state =
+      omega * before (facts candidate.target).status state + eta *
+        outerStatePosterior (before (facts candidate.target).status)
+          (match R15StrategicTarget.outcomeClass focus relation (some candidate.target) with
+            | some ending => (ending, readyGain (facts candidate.target).unblocks)
+            | none => (.stopTheLine, .none)) observed candidate.reach state := by
+  simp [advanceStateCounts]
+
+theorem advanceStateCounts_selected_other (eta omega : ℚ)
+    (before : ReadinessStatus → TaskState → ℚ) (focus : Target)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (observed : OuterOutcome) (candidate : Candidate) (status : ReadinessStatus)
+    (different : status ≠ (facts candidate.target).status) (state : TaskState) :
+    advanceStateCounts eta omega before focus relation facts observed (some candidate)
+        status state = omega * before status state := by
+  simp [advanceStateCounts, different]
+
+theorem step_stateCounts_selected (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) (candidate : Candidate)
+    (picked : cascadePick (chosenCascadeEntry m s o).1 o.facts o.field = some candidate)
+    (state : TaskState) :
+    (step m s o).2.stateCounts (o.facts candidate.target).status state =
+      m.omegaState * s.stateCounts (o.facts candidate.target).status state + m.etaState *
+        outerStatePosterior (s.stateCounts (o.facts candidate.target).status)
+          (match R15StrategicTarget.outcomeClass o.focus m.relation (some candidate.target) with
+            | some ending => (ending, readyGain (o.facts candidate.target).unblocks)
+            | none => (.stopTheLine, .none))
+          (o.endingClass, o.observedGain) candidate.reach state := by
+  simp [step, picked, advanceStateCounts_selected_same]
+
+theorem step_stateCounts_selected_other (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) (candidate : Candidate)
+    (picked : cascadePick (chosenCascadeEntry m s o).1 o.facts o.field = some candidate)
+    (status : ReadinessStatus) (different : status ≠ (o.facts candidate.target).status)
+    (state : TaskState) :
+    (step m s o).2.stateCounts status state =
+      m.omegaState * s.stateCounts status state := by
+  simp [step, picked, advanceStateCounts_selected_other, different]
 
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem chosenCascade_score_le (m : Makeup Policy) (s : State Policy)
@@ -1393,7 +1542,10 @@ theorem step_outerStateInvariant (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) (valid : OuterStateInvariant s) :
     OuterStateInvariant (step m s o).2 := by
   refine ⟨?_, ?_, ?_, ?_⟩
-  · simpa [step] using valid.stateCounts_pos
+  · simpa [step] using advanceStateCounts_pos m.etaState m.omegaState s.stateCounts
+      m.etaState_pos.le m.omegaState_pos valid.stateCounts_pos o.focus m.relation
+      o.facts (o.endingClass, o.observedGain)
+      (cascadePick (chosenCascadeEntry m s o).1 o.facts o.field)
   · simpa [step] using advanceGainCounts_pos m.etaGain m.omegaGain s.gainCounts
       m.etaGain_pos.le m.omegaGain_pos valid.gainCounts_pos o.observedGain
       (cascadePick (chosenCascadeEntry m s o).1 o.facts o.field).isSome
@@ -2000,15 +2152,33 @@ theorem learned_selection_click_one :
       advanceGainCounts learnedSelectionMakeup.etaGain learnedSelectionMakeup.omegaGain
         learnedSelectionState0.gainCounts learnedSelectionObservation.observedGain true := by
     exact gain_state
+  have state_run : (stateAfter learnedSelectionMakeup
+      [learnedSelectionObservation]).stateCounts = learnedSelectionState0.stateCounts := by
+    have chosen_init : chosenCascadeEntry learnedSelectionMakeup (init learnedSelectionMakeup)
+        learnedSelectionObservation = (learnedSelectionCascadeA, 0) := by
+      simpa only [learnedSelectionState0] using chosen0
+    have zero_task_sum :
+        (∑ x : TaskState, (match x with | .blocked => 0 | .doable => 0 : ℚ)) = 0 := by
+      native_decide
+    funext status state
+    simp only [stateAfter, runFrom, step]
+    rw [chosen_init]
+    simp [advanceStateCounts,
+      outerStatePosterior, outerStateLikelihood, learnedSelectionMakeup,
+      learnedSelectionState0, learnedSelectionObservation, selectionExampleMakeup,
+      precisionExampleMakeup, precisionExampleObservation, init, boundedReach,
+      cascadePick, applySelectionCascade,
+      applySelectionStep, learnedSelectionCascadeA, selectionCandidateOne,
+      learnedSelectionCandidateThree, readyGain, R15StrategicTarget.outcomeClass,
+      CTauClassPreference.scorerClass, sum_taskState, zero_task_sum, reduceCtorEq]
   have score_eq (cascade : SelectionCascade) :
       carriedOuterScore learnedSelectionMakeup
           (stateAfter learnedSelectionMakeup [learnedSelectionObservation])
           learnedSelectionObservation cascade =
         outerScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
           learnedSelectionObservation.facts learnedSelectionObservation.field
-          (stateAfter learnedSelectionMakeup [learnedSelectionObservation]).stateCounts
-          (stateAfter_outerStateInvariant learnedSelectionMakeup
-            [learnedSelectionObservation]).stateCounts_pos
+          learnedSelectionState0.stateCounts
+          (init_outerStateInvariant learnedSelectionMakeup).stateCounts_pos
           (normalizeC (stateAfter learnedSelectionMakeup [learnedSelectionObservation]).c)
           (normalizeC_probability
             (stateAfter_outerStateInvariant learnedSelectionMakeup
@@ -2023,7 +2193,7 @@ theorem learned_selection_click_one :
             (init_outerStateInvariant learnedSelectionMakeup).gainCounts_pos
             learnedSelectionObservation.observedGain true)
           cascade := by
-    simpa only [gain_run] using
+    simpa only [state_run, gain_run] using
       carriedOuterScore_stateAfter_eq_outerScore learnedSelectionMakeup
         [learnedSelectionObservation] learnedSelectionObservation cascade
   have strict : carriedOuterScore learnedSelectionMakeup learnedSelectionState1
@@ -2563,6 +2733,7 @@ theorem outer_ready_gain_matters :
 #print axioms moving_click_one_betaPrior_moved
 #print axioms chosenCascade_score_le
 #print axioms step_selection_some
+#print axioms step_outerStateInvariant
 #print axioms stateAfter_outerStateInvariant
 #print axioms click_cascadeScores_eq_outerScore
 
