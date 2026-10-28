@@ -3,14 +3,14 @@ import DarkTower.WarMachine.R20Run
 /-!
 # R20 as a computed step function: carried counts
 
-This is slice 1 of the R20 reconstruction.  `step` computes each click and the
+This module contains slices 1 and 2 of the R20 reconstruction.  `step` computes each click and the
 state handed to its successor; `run` folds `step` from `init`.  Evidence counts
 follow Friston 2017, equation 2.7.  Learned terminal-class preferences follow
 the preference-count update described by Smith, Friston & Whyte 2022.
 
-Precision and valence are deliberately absent from `State`; they enter in
-slice 2.  `Click` consequently has no outside candidate list, menu, or
-selection field.
+Precision follows Friston 2017 equation 2.7's fixed-count numerical iteration;
+valence follows the update cited by `R20Run` from Hesp et al. 2021, pp. 286–288.
+`Click` has no outside candidate list, menu, or selection field.
 -/
 
 namespace DarkTower.WarMachine.R20Step
@@ -23,8 +23,9 @@ abbrev ProcessObservation := R20Certificate.Observation
 abbrev EndingClass := CTauClassPreference.EndingClass
 abbrev CCounts := CTauClassPreference.Distribution
 abbrev PatternIdentity := R20Run.PatternIdentity
+abbrev Valence := R20Run.Valence
 
-variable {Policy : Type} [DecidableEq Policy]
+variable {Policy : Type} [DecidableEq Policy] [Fintype Policy] [Nonempty Policy]
 
 /-- Total rational Beta counts.  Totality makes Smith, Friston & Whyte 2022
 §4 Eqs. 34 and 37 forgetting reach keys absent from a finite slow-state list. -/
@@ -75,6 +76,12 @@ structure Makeup (Policy : Type) where
   omegaTheta : ℚ
   omegaTheta_pos : 0 < omegaTheta
   omegaTheta_le_one : omegaTheta ≤ 1
+  /-- Affective level used by the Hesp et al. 2021, pp. 286–288 valence update. -/
+  L : R20Run.AffectiveLevel
+  /-- Initial valence belief for the Hesp et al. 2021, pp. 286–288 update. -/
+  q₀ : Valence → ℝ
+  /-- Fixed numerical iteration count for Friston 2017 equation 2.7. -/
+  precisionIterations : ℕ
   initialFocus : Nat
 
 /-- State carried from one click to the next.  `d` is the concentration from
@@ -85,6 +92,7 @@ structure State (Policy : Type) where
   habit : RatedCounts Policy
   theta : RatedCounts PatternIdentity
   c : CCounts
+  valence : Valence → ℝ
   previousFocus : Nat
   runId : Nat
 
@@ -97,6 +105,12 @@ structure Observation (Policy : Type) where
   thetaOutcomes : List (FastOutcome PatternIdentity)
   endingClass : EndingClass
   focus : Nat
+  /-- Habit evidence supplied externally in this slice; deriving it from learned habit is later work. -/
+  E : Policy → ℝ
+  /-- Expected free energy supplied externally in this slice; model computation is later work. -/
+  G : Policy → ℝ
+  /-- Free energy supplied externally in this slice; model computation is later work. -/
+  F : Policy → ℝ
 
 /-- Rows produced by one computed click.  Evidence uses Friston 2017,
 equation 2.7; `C` is the normalized Smith, Friston & Whyte 2022 preference
@@ -110,6 +124,8 @@ structure Click (Policy : Type) where
   thetaAfter : RatedCounts PatternIdentity
   c : CCounts
   C : CTauClassPreference.Distribution
+  precision : PrecisionFromObservation.TickRecord Policy
+  valence : Valence → ℝ
   previousFocus : Nat
   focus : Nat
   runId : Nat
@@ -143,6 +159,12 @@ def normalizeC (c : CCounts) : CTauClassPreference.Distribution := fun ending =>
 def learnedClassPreference (C : CTauClassPreference.Distribution)
     (horizon tau : Nat) : CTauClassPreference.Distribution :=
   if tau = horizon then C else CTauClassPreference.waitingPreference
+
+/-- Fixed-count numerical iteration of Friston 2017 equation 2.7, matching
+SPM's bounded routine without claiming convergence. -/
+noncomputable def iteratePrecision (iterations : ℕ) (betaPrior : ℝ) (E G F : Policy → ℝ) : ℝ :=
+  (fun beta => PrecisionFromObservation.firstIterate betaPrior beta E G F)^[iterations]
+    betaPrior
 
 /-- Decay every total Beta count by ω once.  The rate is the forgetting rate
 of Smith, Friston & Whyte 2022 §4 Eqs. 34 and 37. -/
@@ -186,6 +208,7 @@ def init (m : Makeup Policy) : State Policy where
   habit := ofSlowState m.habit₀
   theta := ofSlowState m.theta₀
   c := initialC m
+  valence := m.q₀
   previousFocus := m.initialFocus
   runId := 0
 
@@ -203,6 +226,15 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
   let habitAfter := advanceRated m.etaHabit m.omegaHabit s.habit o.habitOutcome
   let thetaAfter := advanceWitnessedRated m.etaTheta m.omegaTheta m.pattern s.theta o.thetaOutcomes
   let cAfter := advanceC m.etaC m.omegaC s.c o.endingClass
+  let betaPrior := R20Run.descend m.L s.valence
+  let betaPosterior := iteratePrecision m.precisionIterations betaPrior o.E o.G o.F
+  let precision : PrecisionFromObservation.TickRecord Policy :=
+    { E := o.E, G := o.G, F := o.F
+      prior := PrecisionFromObservation.priorPolicy betaPosterior o.E o.G
+      posterior := PrecisionFromObservation.posteriorPolicy betaPosterior o.E o.G o.F
+      betaPrior := betaPrior, betaPosterior := betaPosterior }
+  let valenceAfter := R20Run.predict m.L
+    (R20Run.valenceUpdate m.L s.valence betaPrior betaPosterior)
   ({ d := s.d
      evidence := ⟨prior, m.A, o.observation, posterior⟩
      habitBefore := s.habit
@@ -211,6 +243,8 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      thetaAfter := thetaAfter
      c := s.c
      C := normalizeC s.c
+     precision := precision
+     valence := s.valence
      previousFocus := s.previousFocus
      focus := o.focus
      runId := s.runId },
@@ -218,6 +252,7 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      habit := habitAfter
      theta := thetaAfter
      c := cAfter
+     valence := valenceAfter
      previousFocus := o.focus
      runId := s.runId + 1 })
 
@@ -263,6 +298,7 @@ def sumBeliefs : List (Hidden → ℝ) → Hidden → ℝ
   | [] => 0
   | p :: ps => p + sumBeliefs ps
 
+omit [Nonempty Policy] in
 theorem posteriorHistoryFrom_length (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (posteriorHistoryFrom m s obs).length = obs.length := by
@@ -274,6 +310,7 @@ theorem addEnding_eq_add (c : CCounts) (ending : EndingClass) :
     addEnding c ending = c + endingDelta ending := by
   rfl
 
+omit [Nonempty Policy] in
 theorem runFrom_append_one (m : Makeup Policy) (s : State Policy)
     (pre : List (Observation Policy)) (o : Observation Policy) :
     (runFrom m s (pre ++ [o])).1 =
@@ -292,6 +329,7 @@ def geometricBeliefs (omega : ℝ) : List (Hidden → ℝ) → Hidden → ℝ
   | [] => 0
   | p :: ps => omega ^ ps.length • p + geometricBeliefs omega ps
 
+omit [Nonempty Policy] in
 theorem stateAfterFrom_c (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.c =
@@ -305,7 +343,7 @@ theorem stateAfterFrom_c (m : Makeup Policy) (s : State Policy)
       simp [advanceC]
       ring
 
-omit [DecidableEq Policy] in
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem fold_addEnding (base : CCounts) (obs : List (Observation Policy)) :
     obs.foldl (fun c o => addEnding c o.endingClass) base = base + endingCounts obs := by
   induction obs generalizing base with
@@ -318,11 +356,13 @@ theorem fold_addEnding (base : CCounts) (obs : List (Observation Policy)) :
       simp [endingDelta]
       ring
 
+omit [Nonempty Policy] in
 theorem stateAfter_c (m : Makeup Policy) (obs : List (Observation Policy)) :
     (stateAfter m obs).c =
       m.omegaC ^ obs.length • initialC m + m.etaC • geometricEndings m.omegaC obs := by
   simpa [stateAfter, init] using stateAfterFrom_c m (init m) obs
 
+omit [Nonempty Policy] in
 theorem click_c_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     let click := (step m (stateAfter m pre) o).1
@@ -331,11 +371,13 @@ theorem click_c_at (m : Makeup Policy) (pre : List (Observation Policy))
       click.C = normalizeC click.c := by
   simp [step, stateAfter_c]
 
+omit [Nonempty Policy] in
 theorem click_zero_C_kit (m : Makeup Policy) (o : Observation Policy) :
     let click := (step m (init m) o).1
     click.c = initialC m ∧ click.C = normalizeC (initialC m) := by
   simp [step, init]
 
+omit [Nonempty Policy] in
 theorem stateAfterFrom_d (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.d = m.omegaD ^ obs.length • s.d +
@@ -349,11 +391,13 @@ theorem stateAfterFrom_d (m : Makeup Policy) (s : State Policy)
       simp [posteriorHistoryFrom_length]
       ring
 
+omit [Nonempty Policy] in
 theorem stateAfter_d (m : Makeup Policy) (obs : List (Observation Policy)) :
     (stateAfter m obs).d = m.omegaD ^ obs.length • m.d₀ +
       m.etaD • geometricBeliefs m.omegaD (posteriorHistory m obs) := by
   simpa [stateAfter, posteriorHistory, init] using stateAfterFrom_d m (init m) obs
 
+omit [Nonempty Policy] in
 theorem click_d_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.d =
@@ -361,6 +405,7 @@ theorem click_d_at (m : Makeup Policy) (pre : List (Observation Policy))
         m.etaD • geometricBeliefs m.omegaD (posteriorHistory m pre) := by
   simp [step, stateAfter_d]
 
+omit [Nonempty Policy] in
 theorem stateAfterFrom_habit (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.habit =
@@ -370,12 +415,14 @@ theorem stateAfterFrom_habit (m : Makeup Policy) (s : State Policy)
   | nil => simp [runFrom]
   | cons o obs ih => simpa [runFrom, step] using ih (step m s o).2
 
+omit [Nonempty Policy] in
 theorem stateAfter_habit (m : Makeup Policy) (obs : List (Observation Policy)) :
     (stateAfter m obs).habit =
       obs.foldl (fun habit o => advanceRated m.etaHabit m.omegaHabit habit o.habitOutcome)
         (ofSlowState m.habit₀) := by
   simpa [stateAfter, init] using stateAfterFrom_habit m (init m) obs
 
+omit [Nonempty Policy] in
 theorem click_habit_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.habitBefore =
@@ -383,6 +430,7 @@ theorem click_habit_at (m : Makeup Policy) (pre : List (Observation Policy))
         (ofSlowState m.habit₀) := by
   simp [step, stateAfter_habit]
 
+omit [Nonempty Policy] in
 theorem stateAfterFrom_theta (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.theta =
@@ -393,12 +441,14 @@ theorem stateAfterFrom_theta (m : Makeup Policy) (s : State Policy)
   | nil => simp [runFrom]
   | cons o obs ih => simpa [runFrom, step] using ih (step m s o).2
 
+omit [Nonempty Policy] in
 theorem stateAfter_theta (m : Makeup Policy) (obs : List (Observation Policy)) :
     (stateAfter m obs).theta =
       obs.foldl (fun theta o => advanceWitnessedRated m.etaTheta m.omegaTheta
         m.pattern theta o.thetaOutcomes) (ofSlowState m.theta₀) := by
   simpa [stateAfter, init] using stateAfterFrom_theta m (init m) obs
 
+omit [Nonempty Policy] in
 theorem click_theta_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.thetaBefore =
@@ -450,7 +500,7 @@ theorem advanceWitnessedRated_one (pattern : PatternIdentity)
   simp [PatternTheta.advanceWitnessed,
     fold_addRated_one_ofSlowState]
 
-omit [DecidableEq Policy] in
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem geometricEndings_one (obs : List (Observation Policy)) :
     geometricEndings 1 obs = endingCounts obs := by
   induction obs with
@@ -464,23 +514,127 @@ theorem geometricBeliefs_one (ps : List (Hidden → ℝ)) :
   | nil => rfl
   | cons p ps ih => simp [geometricBeliefs, sumBeliefs, ih]
 
+omit [Nonempty Policy] in
 theorem stateAfter_c_unit_rates (m : Makeup Policy) (obs : List (Observation Policy))
     (heta : m.etaC = 1) (homega : m.omegaC = 1) :
     (stateAfter m obs).c = initialC m + endingCounts obs := by
   rw [stateAfter_c, heta, homega, geometricEndings_one]
   simp
 
+omit [Nonempty Policy] in
 theorem stateAfter_d_unit_rates (m : Makeup Policy) (obs : List (Observation Policy))
     (heta : m.etaD = 1) (homega : m.omegaD = 1) :
     (stateAfter m obs).d = m.d₀ + sumBeliefs (posteriorHistory m obs) := by
   rw [stateAfter_d, heta, homega, geometricBeliefs_one]
   simp
 
+omit [Nonempty Policy] in
+/-- The next click's Friston 2017 equation 2.7 prior is computed from this
+click's Hesp et al. 2021, pp. 286–288 valence transition. -/
+theorem step_betaPrior_next (m : Makeup Policy) (s : State Policy)
+    (o next : Observation Policy) :
+    (step m (step m s o).2 next).1.precision.betaPrior =
+      R20Run.descend m.L
+        (R20Run.predict m.L (R20Run.valenceUpdate m.L s.valence
+          (step m s o).1.precision.betaPrior (step m s o).1.precision.betaPosterior)) := by
+  rfl
+
+omit [Nonempty Policy] in
+/-- Zero affective charge leaves only the Hesp et al. 2021, pp. 286–288
+prediction step in the next valence. -/
+theorem step_zero_charge_keeps_valence (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy)
+    (same : (step m s o).1.precision.betaPosterior = (step m s o).1.precision.betaPrior)
+    (nonzero : (step m s o).1.precision.betaPrior ≠ 0)
+    (rates : ∀ k, m.L.rate k ≠ 0) (normal : ∑ k, s.valence k = 1) :
+    (step m s o).2.valence = R20Run.predict m.L s.valence := by
+  simp only [step] at same nonzero ⊢
+  rw [same, R20Run.zero_charge_keeps_valence m.L s.valence nonzero rates normal]
+
+omit [Nonempty Policy] in
+theorem runFrom_append_one_state (m : Makeup Policy) (s : State Policy)
+    (pre : List (Observation Policy)) (o : Observation Policy) :
+    (runFrom m s (pre ++ [o])).2 = (step m (runFrom m s pre).2 o).2 := by
+  induction pre generalizing s with
+  | nil => rfl
+  | cons x xs ih => simpa [runFrom] using ih (step m s x).2
+
+omit [Nonempty Policy] in
+/-- Under flat affective rates and stochastic transitions, every computed
+Friston 2017 equation 2.7 prior remains the flat rate.  `nondeg` is needed
+because `valenceUpdate` normalizes by that weighted evidence sum. -/
+theorem click_betaPrior_constant_of_flat (m : Makeup Policy) {r : ℝ}
+    (flat : ∀ k, m.L.rate k = r)
+    (stoch : ∀ j, ∑ k, m.L.B k j = 1)
+    (start : ∑ k, m.q₀ k = 1)
+    (nondeg : ∀ (pre : List (Observation Policy)) (o : Observation Policy),
+      ∑ k, (stateAfter m pre).valence k *
+        R20Run.affectiveEvidence m.L
+          (step m (stateAfter m pre) o).1.precision.betaPrior
+          (step m (stateAfter m pre) o).1.precision.betaPosterior k ≠ 0)
+    (pre : List (Observation Policy)) (o : Observation Policy) :
+    (step m (stateAfter m pre) o).1.precision.betaPrior = r := by
+  have total : ∀ xs : List (Observation Policy), ∑ k, (stateAfter m xs).valence k = 1 := by
+    intro xs
+    induction xs using List.reverseRecOn with
+    | nil => simpa only [stateAfter, runFrom, init] using start
+    | append_singleton x xs ih =>
+        rw [stateAfter, runFrom_append_one_state]
+        simp only [step]
+        rw [R20Run.predict_sum m.L stoch]
+        apply R20Run.normalize_sum
+        simpa [stateAfter, R20Run.valenceUpdate, step] using nondeg x xs
+  simp only [step]
+  exact R20Run.descend_flat m.L flat (total pre)
+
+omit [DecidableEq Policy] in
+theorem firstIterate_constant_F (betaPrior beta : ℝ) (E G : Policy → ℝ) (c : ℝ) :
+    PrecisionFromObservation.firstIterate betaPrior beta E G (fun _ => c) = betaPrior := by
+  unfold PrecisionFromObservation.firstIterate PrecisionFromObservation.expectedGChange
+  rw [PrecisionFromObservation.posterior_eq_prior_of_constant_F]
+  simp
+
+omit [DecidableEq Policy] in
+/-- Constant F is the exact fixed point of every bounded Friston 2017
+equation 2.7 iteration count. -/
+theorem iteratePrecision_constant_F (iterations : ℕ) (betaPrior : ℝ)
+    (E G : Policy → ℝ) (c : ℝ) :
+    iteratePrecision iterations betaPrior E G (fun _ => c) = betaPrior := by
+  induction iterations with
+  | zero => rfl
+  | succ n ih =>
+      rw [iteratePrecision, Function.iterate_succ_apply']
+      exact firstIterate_constant_F betaPrior _ E G c
+
+theorem step_constant_F (m : Makeup Policy) (s : State Policy) (o : Observation Policy)
+    (c : ℝ) (constant : o.F = fun _ => c) :
+    (step m s o).1.precision.betaPosterior = (step m s o).1.precision.betaPrior := by
+  simp [step, constant, iteratePrecision_constant_F]
+
+omit [Nonempty Policy] in
+/-- Once the bounded iterate is a positive fixed point, the computed precision
+row satisfies `IsPosteriorTemperature`; no general convergence is claimed. -/
+theorem step_precision_conforms_at_fixed_point (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy)
+    (fixed : PrecisionFromObservation.firstIterate
+      (step m s o).1.precision.betaPrior (step m s o).1.precision.betaPosterior
+      o.E o.G o.F = (step m s o).1.precision.betaPosterior)
+    (positive : 0 < (step m s o).1.precision.betaPosterior) :
+    PrecisionFromObservation.IsPosteriorTemperature
+      (step m s o).1.precision.betaPrior (step m s o).1.precision.betaPosterior
+      o.E o.G o.F := by
+  refine ⟨positive, ?_⟩
+  unfold PrecisionFromObservation.firstIterate at fixed
+  unfold PrecisionFromObservation.precisionError
+  linarith
+
+omit [Nonempty Policy] in
 theorem click_evidence_conforms (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) :
     R20Certificate.EvidenceConforms (step m s o).1.evidence := by
   rfl
 
+omit [Nonempty Policy] in
 theorem run_evidence_conforms (m : Makeup Policy) (obs : List (Observation Policy)) :
     ∀ click ∈ run m obs, R20Certificate.EvidenceConforms click.evidence := by
   intro click present
@@ -494,6 +648,7 @@ theorem run_evidence_conforms (m : Makeup Policy) (obs : List (Observation Polic
       · exact click_evidence_conforms m s o
       · exact ih (step m s o).2 present
 
+omit [Nonempty Policy] in
 theorem stateAfterFrom_runId (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.runId = s.runId + obs.length := by
@@ -504,21 +659,25 @@ theorem stateAfterFrom_runId (m : Makeup Policy) (s : State Policy)
       simp [step]
       omega
 
+omit [Nonempty Policy] in
 theorem stateAfter_runId (m : Makeup Policy) (obs : List (Observation Policy)) :
     (stateAfter m obs).runId = obs.length := by
   simpa [stateAfter, init] using stateAfterFrom_runId m (init m) obs
 
+omit [Nonempty Policy] in
 theorem click_runId_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.runId = pre.length := by
   simp [step, stateAfter_runId]
 
+omit [Nonempty Policy] in
 theorem consecutive_runIds (m : Makeup Policy) (pre : List (Observation Policy))
     (a b : Observation Policy) :
     (step m (stateAfter m pre) a).1.runId <
       (step m (stateAfter m (pre ++ [a])) b).1.runId := by
   simp [click_runId_at]
 
+omit [Nonempty Policy] in
 theorem stateAfterFrom_focus (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.previousFocus =
@@ -527,6 +686,7 @@ theorem stateAfterFrom_focus (m : Makeup Policy) (s : State Policy)
   | nil => simp [runFrom]
   | cons o obs ih => simpa [runFrom, step] using ih (step m s o).2
 
+omit [Nonempty Policy] in
 theorem click_previousFocus_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.previousFocus =
@@ -536,13 +696,13 @@ theorem click_previousFocus_at (m : Makeup Policy) (pre : List (Observation Poli
 theorem kit_total : CTauClassPreference.totalMass kit = 1 := by
   norm_num [CTauClassPreference.totalMass, kit]
 
-omit [DecidableEq Policy] in
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem initialC_total (m : Makeup Policy) :
     CTauClassPreference.totalMass (initialC m) = m.kappa := by
   simp [CTauClassPreference.totalMass, initialC, kit]
   ring
 
-omit [DecidableEq Policy] in
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem normalize_initialC (m : Makeup Policy) : normalizeC (initialC m) = kit := by
   funext ending
   unfold normalizeC
@@ -550,11 +710,12 @@ theorem normalize_initialC (m : Makeup Policy) : normalizeC (initialC m) = kit :
   unfold initialC
   field_simp [m.kappa_pos.ne']
 
+omit [Nonempty Policy] in
 theorem click_zero_C_is_kit (m : Makeup Policy) (o : Observation Policy) :
     (step m (init m) o).1.C = kit := by
   simp [step, init, normalize_initialC]
 
-omit [DecidableEq Policy] in
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem initialC_nonnegative (m : Makeup Policy) :
     CTauClassPreference.Nonnegative (initialC m) := by
   intro ending
@@ -568,7 +729,7 @@ theorem addEnding_nonnegative {c : CCounts} (hc : CTauClassPreference.Nonnegativ
   · linarith [hc x]
   · simpa using hc x
 
-omit [DecidableEq Policy] in
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem fold_addEnding_nonnegative {c : CCounts}
     (hc : CTauClassPreference.Nonnegative c) (obs : List (Observation Policy)) :
     CTauClassPreference.Nonnegative
@@ -588,6 +749,7 @@ theorem advanceC_nonnegative {c : CCounts} (hc : CTauClassPreference.Nonnegative
     by_cases h : ending = x ∧ x ≠ .notYetEvaluated <;> simp [endingDelta, h]
   nlinarith [hc x]
 
+omit [Nonempty Policy] in
 theorem runFrom_c_nonnegative (m : Makeup Policy) (s : State Policy)
     (hs : CTauClassPreference.Nonnegative s.c) (obs : List (Observation Policy)) :
     CTauClassPreference.Nonnegative (runFrom m s obs).2.c := by
@@ -598,6 +760,7 @@ theorem runFrom_c_nonnegative (m : Makeup Policy) (s : State Policy)
       simpa [step] using advanceC_nonnegative hs m.etaC m.omegaC
         m.etaC_pos.le m.omegaC_pos.le o.endingClass
 
+omit [Nonempty Policy] in
 theorem stateAfter_c_nonnegative (m : Makeup Policy) (obs : List (Observation Policy)) :
     CTauClassPreference.Nonnegative (stateAfter m obs).c := by
   exact runFrom_c_nonnegative m (init m) (by simpa [init] using initialC_nonnegative m) obs
@@ -613,7 +776,7 @@ theorem advanceC_total (eta omega : ℚ) (c : CCounts) (ending : EndingClass) :
         eta * if ending = .notYetEvaluated then 0 else 1 := by
   fin_cases ending <;> simp [CTauClassPreference.totalMass, advanceC, endingDelta] <;> ring
 
-omit [DecidableEq Policy] in
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem fold_addEnding_total_positive {c : CCounts}
     (hc : 0 < CTauClassPreference.totalMass c) (obs : List (Observation Policy)) :
     0 < CTauClassPreference.totalMass
@@ -626,6 +789,7 @@ theorem fold_addEnding_total_positive {c : CCounts}
       rw [addEnding_total]
       split <;> linarith
 
+omit [Nonempty Policy] in
 theorem stateAfter_c_total_positive (m : Makeup Policy) (obs : List (Observation Policy)) :
     0 < CTauClassPreference.totalMass (stateAfter m obs).c := by
   have aux : ∀ (s : State Policy) (xs : List (Observation Policy)),
@@ -660,6 +824,7 @@ theorem normalizeC_probability {c : CCounts}
           ring]
     exact div_self positive.ne'
 
+omit [Nonempty Policy] in
 theorem click_C_probability (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     CTauClassPreference.ProbabilityDistribution (step m (stateAfter m pre) o).1.C := by
@@ -687,7 +852,7 @@ def exampleEtaTheta : ℚ := 1
 def exampleOmegaTheta : ℚ := 1
 
 /-- Concrete makeup for the Friston 2017 / Smith, Friston & Whyte 2022 example. -/
-def exampleMakeup : Makeup Unit where
+noncomputable def exampleMakeup : Makeup Unit where
   A := fun _ _ => 1
   d₀ := fun _ => 1
   habit₀ := []
@@ -715,6 +880,9 @@ def exampleMakeup : Makeup Unit where
   omegaTheta := exampleOmegaTheta
   omegaTheta_pos := by norm_num [exampleOmegaTheta]
   omegaTheta_le_one := by norm_num [exampleOmegaTheta]
+  L := R20Run.hespLevel
+  q₀ := R20Run.half
+  precisionIterations := 2
   initialFocus := 7
 
 /-- One R15 outcome used in the sourced-update example. -/
@@ -727,6 +895,9 @@ def exampleObservation (ending : EndingClass) (focus : Nat) : Observation Unit w
   thetaOutcomes := []
   endingClass := ending
   focus := focus
+  E := fun _ => 1
+  G := fun _ => 1
+  F := fun _ => 0
 
 example :
     let clicks := run exampleMakeup
@@ -740,8 +911,69 @@ example :
     exampleOmegaHabit, exampleEtaTheta, exampleOmegaTheta, decayRated, addRated,
     advanceRated, advanceWitnessedRated, h]
 
-#print axioms stateAfter_c
-#print axioms stateAfter_d
-#print axioms advanceRated_one
+abbrev ExamplePolicy := PrecisionFromObservation.TwoPolicy
+
+/-- Two-policy makeup for the computed Friston 2017 precision example. -/
+noncomputable def precisionExampleMakeup : Makeup ExamplePolicy where
+  A := fun _ _ => 1
+  d₀ := fun _ => 1
+  habit₀ := []
+  pattern := ⟨"pattern/precision-example"⟩
+  theta₀ := []
+  kappa := 100
+  kappa_pos := by norm_num
+  etaD := 1
+  etaD_pos := by norm_num
+  omegaD := 1
+  omegaD_pos := by norm_num
+  omegaD_le_one := by norm_num
+  etaC := 1
+  etaC_pos := by norm_num
+  omegaC := 9 / 10
+  omegaC_pos := by norm_num
+  omegaC_le_one := by norm_num
+  etaHabit := 1
+  etaHabit_pos := by norm_num
+  omegaHabit := 1
+  omegaHabit_pos := by norm_num
+  omegaHabit_le_one := by norm_num
+  etaTheta := 1
+  etaTheta_pos := by norm_num
+  omegaTheta := 1
+  omegaTheta_pos := by norm_num
+  omegaTheta_le_one := by norm_num
+  L := R20Run.hespLevel
+  q₀ := R20Run.half
+  precisionIterations := 2
+  initialFocus := 7
+
+/-- Two-policy E, G, F arrive as observations in slice 2; constant F makes
+the fixed point exact while E and G remain policy-indexed. -/
+def precisionExampleObservation (ending : EndingClass) (focus : Nat) :
+    Observation ExamplePolicy where
+  observation := true
+  habitOutcome := ⟨.a, true, true⟩
+  thetaOutcomes := []
+  endingClass := ending
+  focus := focus
+  E := fun | .a => 2 | .b => 1
+  G := fun | .a => 0 | .b => 1
+  F := fun _ => 0
+
+example :
+    let clicks := run precisionExampleMakeup
+      [precisionExampleObservation .focused 8, precisionExampleObservation .related 9]
+    clicks.map (fun click => click.precision.betaPrior) = [5 / 4, 5 / 4] := by
+  norm_num [run, runFrom, step, init, precisionExampleMakeup, precisionExampleObservation,
+    iteratePrecision, PrecisionFromObservation.firstIterate,
+    PrecisionFromObservation.expectedGChange,
+    PrecisionFromObservation.posterior_eq_prior_of_constant_F,
+    R20Run.descend, R20Run.predict, R20Run.valenceUpdate, R20Run.normalize,
+    R20Run.affectiveEvidence, R20Run.charge, R20Run.hespLevel, R20Run.half,
+    R20Run.identityB, R20Run.sum_valence]
+
+#print axioms step_betaPrior_next
+#print axioms click_betaPrior_constant_of_flat
+#print axioms iteratePrecision_constant_F
 
 end DarkTower.WarMachine.R20Step
