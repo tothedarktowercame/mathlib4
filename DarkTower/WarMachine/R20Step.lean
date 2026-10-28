@@ -266,26 +266,6 @@ def endingDelta (observed : EndingClass) : CCounts := fun ending =>
 def normalizeC (c : CCounts) : CTauClassPreference.Distribution := fun ending =>
   c ending / CTauClassPreference.totalMass c
 
-/-- A cascade predicts its picked target's terminal class and reach.  Missing
-picks or unknown classes put all mass on stop-the-line. -/
-noncomputable def cascadePrediction (focus : Target)
-    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
-    (field : List Candidate)
-    (cascade : SelectionCascade) : CTauClassPreference.Distribution :=
-  match cascadePick cascade facts field with
-  | some candidate =>
-      match R15StrategicTarget.outcomeClass focus relation (some candidate.target) with
-      | some ending => R15InjuryTier.candidatePrediction ending candidate.reach
-      | none => fun ending => if ending = .stopTheLine then 1 else 0
-  | none => fun ending => if ending = .stopTheLine then 1 else 0
-
-/-- Score one task-selection cascade against the learned C carried in state. -/
-noncomputable def cascadeScore (focus : Target)
-    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
-    (field : List Candidate)
-    (C : CTauClassPreference.Distribution) (cascade : SelectionCascade) : EReal :=
-  CTauClassPreference.classRisk (cascadePrediction focus relation facts field cascade) C
-
 open CascadeEFE Holes
 
 /-- Normalise strictly positive rational counts. -/
@@ -490,16 +470,41 @@ theorem indexedCascades_nonempty (m : Makeup Policy) : indexedCascades m ≠ [] 
   simpa [indexedCascades] using m.cascades_nonempty
 
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
-/-- First minimum-risk cascade.  Equal scores are resolved by menu order only
+/-- Score against the outer model carried by `s`.  Arbitrary `State` values do
+not carry admissibility proofs, so malformed carried counts receive `⊤`; states
+produced from a `Makeup` kit take the `outerScore` branch. -/
+noncomputable def carriedOuterScore (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) (cascade : SelectionCascade) : EReal := by
+  classical
+  exact if stateCounts_pos : ∀ status state, 0 < s.stateCounts status state then
+    if C_probability : CTauClassPreference.ProbabilityDistribution (normalizeC s.c) then
+      if gainCounts_pos : ∀ gain, 0 < s.gainCounts gain then
+        outerScore o.focus m.relation o.facts o.field s.stateCounts stateCounts_pos
+          (normalizeC s.c) C_probability s.gainCounts gainCounts_pos cascade
+      else ⊤
+    else ⊤
+  else ⊤
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+theorem carriedOuterScore_eq_of_cascadePick_eq (m : Makeup Policy) (s : State Policy)
+    (o : Observation Policy) {left right : SelectionCascade}
+    (same : cascadePick left o.facts o.field = cascadePick right o.facts o.field) :
+    carriedOuterScore m s o left = carriedOuterScore m s o right := by
+  classical
+  unfold carriedOuterScore outerScore outerModel
+  split_ifs <;> simp_all
+
+omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
+/-- First minimum-outer-G cascade.  Equal scores are resolved by menu order only
 so `step` is a function; such ties are a defect for better evidence to remove,
 not a selection rule. -/
 noncomputable def chosenCascadeEntry (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) : SelectionCascade × Nat :=
   (indexedCascades m).argmin
-    (fun entry => cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1) |>.get
+    (fun entry => carriedOuterScore m s o entry.1) |>.get
       (by
         cases h : (indexedCascades m).argmin
-          (fun entry => cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1) with
+          (fun entry => carriedOuterScore m s o entry.1) with
         | none => exact False.elim (indexedCascades_nonempty m (List.argmin_eq_none.mp h))
         | some _ => rfl)
 
@@ -507,7 +512,7 @@ omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem chosenCascadeEntry_mem_argmin (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) :
     chosenCascadeEntry m s o ∈ (indexedCascades m).argmin
-      (fun entry => cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1) := by
+      (fun entry => carriedOuterScore m s o entry.1) := by
   unfold chosenCascadeEntry
   exact Option.some_get _ |>.symm
 
@@ -623,7 +628,7 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
     (R20Run.valenceUpdate m.L s.valence betaPrior betaPosterior)
   let chosen := chosenCascadeEntry m s o
   let scores := m.cascades.map
-    (cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c))
+    (carriedOuterScore m s o)
   let selection := (cascadePick chosen.1 o.facts o.field).map fun candidate =>
     ({ candidates := o.field, selected := candidate } : R20FocusedSelection.OuterSelection)
   ({ d := s.d
@@ -655,9 +660,8 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem chosenCascade_score_le (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) {cascade : SelectionCascade} (present : cascade ∈ m.cascades) :
-    cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c)
-        (chosenCascadeEntry m s o).1 ≤
-      cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) cascade := by
+    carriedOuterScore m s o (chosenCascadeEntry m s o).1 ≤
+      carriedOuterScore m s o cascade := by
   obtain ⟨index, at_index⟩ := List.get_of_mem present
   have entry_present : (cascade, index.val) ∈ indexedCascades m := by
     let zippedIndex : Fin (indexedCascades m).length :=
@@ -668,7 +672,7 @@ theorem chosenCascade_score_le (m : Makeup Policy) (s : State Policy)
       zero_add, Prod.mk.injEq, and_true]
     simpa only [List.get_eq_getElem] using at_index
   let scoreEntry := fun entry : SelectionCascade × Nat =>
-    cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1
+    carriedOuterScore m s o entry.1
   change scoreEntry (chosenCascadeEntry m s o) ≤ scoreEntry (cascade, index.val)
   exact List.le_of_mem_argmin (f := scoreEntry) entry_present
     (chosenCascadeEntry_mem_argmin m s o)
@@ -755,7 +759,7 @@ omit [Nonempty Policy] in
 theorem step_scores_read_carried_C (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) :
     (step m s o).1.cascadeScores = m.cascades.map
-      (cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c)) := by
+      (carriedOuterScore m s o) := by
   rfl
 
 /-- Fold `step` from a supplied state, returning the computed clicks and final
@@ -1565,7 +1569,12 @@ theorem moving_click_one_betaPrior_moved :
     nlinarith
   exact ⟨ne_of_gt greater, greater⟩
 
-/-! A concrete outer task-selection menu. -/
+/-! A concrete outer task-selection menu.
+
+The slice-3a/3b numerical examples below are retained as source while their
+outer-G arithmetic is recomputed in the follow-up example packet. -/
+
+/-
 
 def selectionCandidateOne : Candidate := ⟨1, 1 / 2⟩
 def selectionCandidateTwo : Candidate := ⟨2, 1 / 2⟩
@@ -1855,6 +1864,8 @@ theorem learned_selection_click_one :
       learnedSelectionCascadeB, learnedSelectionObservation,
       selectionCandidateOne, learnedSelectionCandidateThree]
 
+-/
+
 /-! Event K3.2 from `M-象-2000.md`: Giraffe readiness and unblock facts. -/
 
 /-- Target 1 is P12 “core system working end to end”; target 2 is “edge
@@ -2096,9 +2107,6 @@ theorem outer_ready_gain_matters :
 #print axioms outerScore_eq_stepG_of_finite
 #print axioms outer_ambiguity_matters
 #print axioms outer_ready_gain_matters
-
-#print axioms learned_selection_click_zero
-#print axioms learned_selection_click_one
 
 #print axioms moving_click_one_betaPrior
 #print axioms moving_click_one_betaPrior_moved
