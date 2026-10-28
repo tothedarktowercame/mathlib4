@@ -69,6 +69,12 @@ theorem sum_taskState (f : TaskState → ℝ) :
     ext x; fin_cases x <;> simp]
   simp [add_comm]
 
+theorem sum_taskState_rat (f : TaskState → ℚ) :
+    ∑ state, f state = f .doable + f .blocked := by
+  rw [show (Finset.univ : Finset TaskState) = {.doable, .blocked} by
+    ext x; fin_cases x <;> simp]
+  simp [add_comm]
+
 theorem sum_readyGain (f : ReadyGain → ℝ) :
     ∑ gain, f gain = f .none + f .one + f .several := by
   rw [show (Finset.univ : Finset ReadyGain) = {.none, .one, .several} by
@@ -643,6 +649,23 @@ def outerStateLikelihood (landing observed : OuterOutcome) (rawReach : ℚ) :
         if observed = (.stopTheLine, .none) then 1 else 0
       else if observed = landing then boundedReach rawReach
       else if observed = (.stopTheLine, .none) then 1 - boundedReach rawReach else 0
+
+/-- The rational likelihood used for learning is exactly the observation
+kernel used to score the picked cascade. -/
+theorem pickedOuterKernel_mass_eq_outerStateLikelihood (landing : OuterOutcome)
+    (reach : ℚ) (state : TaskState) (observed : OuterOutcome) :
+    (pickedOuterKernel landing reach).mass state observed =
+      (outerStateLikelihood landing observed reach state : ℝ) := by
+  cases state <;> simp only [pickedOuterKernel, outerStateLikelihood, finiteKernel] <;>
+    split_ifs <;> norm_num
+
+/-- The no-class landing is the stopped kernel used by the scored model. -/
+theorem stoppedOuterKernel_mass_eq_outerStateLikelihood (reach : ℚ)
+    (state : TaskState) (observed : OuterOutcome) :
+    stoppedOuterKernel.mass state observed =
+      (outerStateLikelihood (.stopTheLine, .none) observed reach state : ℝ) := by
+  cases state <;> simp only [stoppedOuterKernel, outerStateLikelihood, finiteKernel] <;>
+    split_ifs <;> norm_num
 
 theorem outerStateLikelihood_nonneg (landing observed : OuterOutcome) (reach : ℚ) :
     ∀ state, 0 ≤ outerStateLikelihood landing observed reach state := by
@@ -2159,7 +2182,8 @@ theorem learned_selection_click_one :
       simpa only [learnedSelectionState0] using chosen0
     have zero_task_sum :
         (∑ x : TaskState, (match x with | .blocked => 0 | .doable => 0 : ℚ)) = 0 := by
-      native_decide
+      rw [sum_taskState_rat]
+      norm_num
     funext status state
     simp only [stateAfter, runFrom, step]
     rw [chosen_init]
@@ -2170,7 +2194,7 @@ theorem learned_selection_click_one :
       cascadePick, applySelectionCascade,
       applySelectionStep, learnedSelectionCascadeA, selectionCandidateOne,
       learnedSelectionCandidateThree, readyGain, R15StrategicTarget.outcomeClass,
-      CTauClassPreference.scorerClass, sum_taskState, zero_task_sum, reduceCtorEq]
+      CTauClassPreference.scorerClass, sum_taskState_rat, zero_task_sum, reduceCtorEq]
   have score_eq (cascade : SelectionCascade) :
       carriedOuterScore learnedSelectionMakeup
           (stateAfter learnedSelectionMakeup [learnedSelectionObservation])
@@ -2718,16 +2742,64 @@ theorem outer_ready_gain_matters :
     Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
   linarith
 
+/-! The slice-3e hidden-state update moves the normalised row in the
+direction supported by the observed task-level outcome. -/
+
+def stateLearningCandidate : Candidate := ⟨11, 1 / 2⟩
+
+def stateLearningFacts (target : Target) : GiraffeFacts :=
+  if target = 11 then ⟨.ready, 0, 0⟩ else ⟨.notReady, 0, 0⟩
+
+noncomputable def stateLearningMakeup : Makeup ExamplePolicy :=
+  { precisionExampleMakeup with
+    relation := fun _ target => if target = 11 then .focus else .other 0 }
+
+def stateLearningObservation (ending : EndingClass) : Observation ExamplePolicy :=
+  { precisionExampleObservation ending 7 with
+    endingClass := ending
+    observedGain := .none
+    field := [stateLearningCandidate]
+    facts := stateLearningFacts }
+
+def normalisedStateCount (counts : ReadinessStatus → TaskState → ℚ)
+    (status : ReadinessStatus) (state : TaskState) : ℚ :=
+  counts status state / ∑ x, counts status x
+
+/-- With reach 1/2, a stopped outcome supports `blocked`, while the predicted
+focused/no-gain outcome supports `doable`; both comparisons are through
+successor states computed by `step`. -/
+theorem state_learning_moves_belief :
+    let before := init stateLearningMakeup
+    let afterStopped := (step stateLearningMakeup before
+      (stateLearningObservation .stopTheLine)).2
+    let afterLanded := (step stateLearningMakeup before
+      (stateLearningObservation .focused)).2
+    normalisedStateCount afterStopped.stateCounts .ready .blocked >
+        normalisedStateCount before.stateCounts .ready .blocked ∧
+      normalisedStateCount afterLanded.stateCounts .ready .doable >
+        normalisedStateCount before.stateCounts .ready .doable := by
+  have focused_ne_stop : CTauClassPreference.EndingClass.focused ≠
+      CTauClassPreference.EndingClass.stopTheLine := by decide
+  norm_num [normalisedStateCount, stateLearningMakeup, stateLearningObservation,
+    stateLearningCandidate, stateLearningFacts, precisionExampleMakeup,
+    precisionExampleObservation, init, step, chosenCascadeEntry, indexedCascades,
+    carriedOuterScore, advanceStateCounts, outerStatePosterior, outerStateLikelihood,
+    boundedReach, cascadePick, applySelectionCascade, applySelectionStep,
+    readyGain, R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass,
+    sum_taskState_rat, card_taskState, focused_ne_stop, reduceCtorEq]
+
 #print axioms whatOthersWaitOnFirst_pick
 #print axioms whatOthersWaitOnFirst_none_of_no_ready
 
 #print axioms outerScore_eq_stepG_of_finite
+#print axioms pickedOuterKernel_mass_eq_outerStateLikelihood
 #print axioms outer_ambiguity_matters
 #print axioms outer_ready_gain_matters
 
 #print axioms learned_selection_click_zero
 #print axioms learned_selection_click_one
 #print axioms ambiguity_changes_outer_choice
+#print axioms state_learning_moves_belief
 
 #print axioms moving_click_one_betaPrior
 #print axioms moving_click_one_betaPrior_moved
