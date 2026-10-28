@@ -2944,6 +2944,146 @@ theorem outerNovelty_status_example :
     R15InjuryTier.sum_endingClass, sum_readyGain, focused_ne_stop,
     one_ne_none, several_ne_none, reduceCtorEq] <;> split_ifs <;> norm_num
 
+def noveltyChoiceField : List Candidate := [⟨21, 1 / 2⟩, ⟨22, 1 / 2⟩]
+
+noncomputable def noveltyChoiceMakeup : Makeup ExamplePolicy :=
+  { precisionExampleMakeup with
+    cascades := [outerNoveltyReadyCascade, outerNoveltyUndeterminedCascade]
+    cascades_nonempty := by simp
+    stateKit := outerNoveltyExampleCounts
+    stateKit_pos := by intro status state; fin_cases status <;> fin_cases state <;>
+      norm_num [outerNoveltyExampleCounts]
+    gainKit := outerExampleGainCounts
+    gainKit_pos := outerExampleGainCounts_pos
+    relation := fun _ _ => .focus }
+
+noncomputable def noveltyChoiceState : State ExamplePolicy :=
+  { init noveltyChoiceMakeup with
+    c := outerExampleC
+    stateCounts := outerNoveltyExampleCounts
+    gainCounts := outerExampleGainCounts }
+
+noncomputable def noveltyChoiceObservation : Observation ExamplePolicy :=
+  { precisionExampleObservation .focused 0 with
+    field := noveltyChoiceField
+    facts := outerNoveltyExampleFacts }
+
+theorem noveltyChoiceNormalizedC_probability :
+    CTauClassPreference.ProbabilityDistribution (normalizeC outerExampleC) := by
+  constructor
+  · intro ending; fin_cases ending <;>
+      norm_num [normalizeC, CTauClassPreference.totalMass, outerExampleC]
+  · norm_num [normalizeC, CTauClassPreference.totalMass, outerExampleC]
+
+noncomputable def noveltyChoicePreference : ProbabilityKernel Unit OuterOutcome :=
+  outerPreferenceKernel (normalizeC outerExampleC) noveltyChoiceNormalizedC_probability
+    outerExampleGainCounts outerExampleGainCounts_pos
+
+theorem noveltyChoice_admissible (q : ProbabilityKernel Unit OuterOutcome) :
+    PreferenceRiskSeparation.riskAdmissible q noveltyChoicePreference := by
+  intro _ outcome _ _
+  exact outerPreferenceKernel_mass_pos (normalizeC outerExampleC)
+    noveltyChoiceNormalizedC_probability
+    (by intro ending; fin_cases ending <;>
+      norm_num [normalizeC, CTauClassPreference.totalMass, outerExampleC])
+    outerExampleGainCounts outerExampleGainCounts_pos outcome
+
+def NoveltyChoiceStepGEqual : Prop :=
+    let readyModel := outerModel 0 noveltyChoiceMakeup.relation
+      outerNoveltyExampleFacts noveltyChoiceField outerNoveltyExampleCounts
+      (by intro status state; fin_cases status <;> fin_cases state <;>
+        norm_num [outerNoveltyExampleCounts]) outerNoveltyReadyCascade
+    let unknownModel := outerModel 0 noveltyChoiceMakeup.relation
+      outerNoveltyExampleFacts noveltyChoiceField outerNoveltyExampleCounts
+      (by intro status state; fin_cases status <;> fin_cases state <;>
+        norm_num [outerNoveltyExampleCounts]) outerNoveltyUndeterminedCascade
+    stepG readyModel.1 readyModel.2 noveltyChoicePreference
+        (noveltyChoice_admissible (push readyModel.1 readyModel.2)) =
+      stepG unknownModel.1 unknownModel.2 noveltyChoicePreference
+        (noveltyChoice_admissible (push unknownModel.1 unknownModel.2))
+
+/-- Equal class, gain, reach and balanced prior mean the two `stepG` terms
+are equal; only concentration, and hence novelty, differs. -/
+theorem noveltyChoice_stepG_eq : NoveltyChoiceStepGEqual := by
+  unfold NoveltyChoiceStepGEqual
+  norm_num [outerModel, noveltyChoiceMakeup, noveltyChoiceField,
+    outerNoveltyExampleFacts, outerNoveltyExampleCounts,
+    outerNoveltyReadyCascade, outerNoveltyUndeterminedCascade,
+    outerCountKernel, cascadePick, applySelectionCascade, applySelectionStep,
+    readyGain, R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass,
+    finiteKernel, sum_taskState, CascadeEFE.stepG, CascadeEFE.risk,
+    CascadeEFE.ambiguity, CascadeEFE.entropy, CascadeEFE.klTerm,
+    noveltyChoicePreference, outerPreferenceKernel, outerExampleC,
+    outerExampleGainCounts, CascadeEFE.push, Fintype.sum_prod_type,
+    R15InjuryTier.sum_endingClass, sum_readyGain, card_taskState,
+    card_readyGain, boundedReach]
+
+/-- With equal risk and ambiguity, subtracting the larger information gain
+makes `step` choose the less-observed status row. -/
+theorem novelty_decides_outer_choice :
+    NoveltyChoiceStepGEqual ∧
+    carriedOuterScore noveltyChoiceMakeup noveltyChoiceState
+        noveltyChoiceObservation outerNoveltyUndeterminedCascade <
+      carriedOuterScore noveltyChoiceMakeup noveltyChoiceState
+        noveltyChoiceObservation outerNoveltyReadyCascade ∧
+    (step noveltyChoiceMakeup noveltyChoiceState
+        noveltyChoiceObservation).1.cascadeIndex = 1 ∧
+    (step noveltyChoiceMakeup noveltyChoiceState
+        noveltyChoiceObservation).1.selection =
+      some ⟨noveltyChoiceField, (⟨22, 1 / 2⟩ : Candidate)⟩ := by
+  have strict : carriedOuterScore noveltyChoiceMakeup noveltyChoiceState
+      noveltyChoiceObservation outerNoveltyUndeterminedCascade <
+    carriedOuterScore noveltyChoiceMakeup noveltyChoiceState
+      noveltyChoiceObservation outerNoveltyReadyCascade := by
+    unfold carriedOuterScore
+    simp only [noveltyChoiceState]
+    split_ifs
+    · simp only [outerScore]
+      split_ifs
+      · simp only [EReal.coe_lt_coe_iff]
+        norm_num [outerModel, outerNovelty, outerKernelNovelty,
+          noveltyChoiceMakeup, noveltyChoiceObservation, noveltyChoiceField,
+          outerNoveltyExampleCounts, outerNoveltyExampleFacts,
+          outerNoveltyReadyCascade, outerNoveltyUndeterminedCascade,
+          outerPreferenceKernel, outerCountKernel, pickedOuterKernel, finiteKernel,
+          CascadeEFE.push, CascadeEFE.stepG, CascadeEFE.risk,
+          CascadeEFE.ambiguity, CascadeEFE.entropy, CascadeEFE.klTerm,
+          cascadePick, applySelectionCascade, applySelectionStep, readyGain,
+          R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass,
+          boundedReach, Fintype.sum_prod_type, R15InjuryTier.sum_endingClass,
+          sum_taskState, sum_readyGain, card_taskState, card_readyGain,
+          noveltyChoicePreference, outerExampleC, outerExampleGainCounts,
+          normalizeC, CTauClassPreference.totalMass, reduceCtorEq] at * <;>
+          split_ifs <;> norm_num at *
+      · exact (‹¬ PreferenceRiskSeparation.riskAdmissible _ _›
+          (noveltyChoice_admissible _)).elim
+      · exact (‹¬ PreferenceRiskSeparation.riskAdmissible _ _›
+          (noveltyChoice_admissible _)).elim
+      · exact (‹¬ PreferenceRiskSeparation.riskAdmissible _ _›
+          (noveltyChoice_admissible _)).elim
+    · exact (‹¬ ∀ gain, 0 < outerExampleGainCounts gain›
+        outerExampleGainCounts_pos).elim
+    · exact (‹¬ CTauClassPreference.ProbabilityDistribution
+        (normalizeC outerExampleC)› noveltyChoiceNormalizedC_probability).elim
+    · exact (‹¬ ∀ status state, 0 < outerNoveltyExampleCounts status state›
+        (by intro status state; fin_cases status <;> fin_cases state <;>
+          norm_num [outerNoveltyExampleCounts])).elim
+  have chosen : chosenCascadeEntry noveltyChoiceMakeup noveltyChoiceState
+      noveltyChoiceObservation = (outerNoveltyUndeterminedCascade, 1) := by
+    unfold chosenCascadeEntry
+    change (([(outerNoveltyReadyCascade, 0),
+      (outerNoveltyUndeterminedCascade, 1)]).argmin
+        (fun entry => carriedOuterScore noveltyChoiceMakeup noveltyChoiceState
+          noveltyChoiceObservation entry.1)).get _ = _
+    simp [List.argmin, List.argAux, strict]
+  refine ⟨noveltyChoice_stepG_eq, strict, ?_, ?_⟩
+  · simp [step, chosen]
+  · simp only [step]
+    rw [chosen]
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep,
+      outerNoveltyUndeterminedCascade, noveltyChoiceObservation,
+      outerNoveltyExampleFacts, noveltyChoiceField, precisionExampleObservation]
+
 #print axioms whatOthersWaitOnFirst_pick
 #print axioms whatOthersWaitOnFirst_none_of_no_ready
 
@@ -2954,6 +3094,7 @@ theorem outerNovelty_status_example :
 #print axioms outerKernelNovelty_revealing_le_pattern
 #print axioms outerKernelNovelty_reach_half_lt_one
 #print axioms outerNovelty_status_example
+#print axioms novelty_decides_outer_choice
 #print axioms outer_ambiguity_matters
 #print axioms outer_ready_gain_matters
 
