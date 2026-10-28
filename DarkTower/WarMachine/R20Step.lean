@@ -417,70 +417,115 @@ noncomputable def outerModel (focus : Target) (relation : Target → Target → 
       (outerCountKernel (stateCounts (facts candidate.target).status) (stateCounts_pos _),
         pickedOuterKernel landing candidate.reach)
 
-/-- Expected one-count information gain about the picked task's binary
-doable/blocked count row.  Expanding the requested observation expectation,
-`Σ_o P(o) Σ_s P(s|o) Δ_s`, and using total posterior responsibility
-`Σ_o P(o)P(s|o)=q(s)`, gives exactly the binary Dirichlet expression already
-formalised by `PatternThetaNovelty.novelty`.  Applying Da Costa et al.'s
-observation-parameter arithmetic to these outer state counts is our model
-choice, as it is for pattern θ in `PatternThetaNovelty`.  No pick yields zero. -/
-noncomputable def outerNovelty (facts : Target → GiraffeFacts) (field : List Candidate)
-    (stateCounts : ReadinessStatus → TaskState → ℚ) (cascade : SelectionCascade) : ℝ :=
+/-- Fisher-information approximation to the expected KL between the posterior
+and prior for the outer doable/blocked parameter: one half times its Beta
+variance times expected observation Fisher information.  It has the same
+asymptotic order as Da Costa et al. 2020 equation 57, but vanishes for an
+uninformative observation kernel.  A fully revealing kernel gives
+`1 / (2 * (a + b + 1))`, rather than `PatternThetaNovelty.novelty a b =
+1 / (2 * (a + b))`. -/
+noncomputable def outerKernelNovelty (a b : ℚ)
+    (kernel : ProbabilityKernel TaskState OuterOutcome) : ℝ :=
+  let total : ℝ := a + b
+  let variance : ℝ := (a * b : ℚ) / ((a + b) ^ 2 * (a + b + 1))
+  (1 / 2 : ℝ) * variance * ∑ outcome,
+    let prediction := ((a : ℝ) * kernel.mass .doable outcome +
+      (b : ℝ) * kernel.mass .blocked outcome) / total
+    if 0 < prediction then
+      (kernel.mass .doable outcome - kernel.mass .blocked outcome) ^ 2 / prediction
+    else 0
+
+/-- Novelty of the scored picked-task kernel.  A missing pick has no parameter
+information gain. -/
+noncomputable def outerNovelty (focus : Target)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (field : List Candidate) (stateCounts : ReadinessStatus → TaskState → ℚ)
+    (cascade : SelectionCascade) : ℝ :=
   match cascadePick cascade facts field with
   | none => 0
   | some candidate =>
-      PatternThetaNovelty.novelty
-        (stateCounts (facts candidate.target).status .doable)
-        (stateCounts (facts candidate.target).status .blocked)
-
-/-- A revealing scored kernel reduces to the source's binary novelty.  The
-closed form is in fact kernel-independent after averaging posterior
-responsibilities, so the reach and landing hypotheses identify the requested
-revealing case rather than being needed algebraically. -/
-theorem outerNovelty_revealing (facts : Target → GiraffeFacts) (field : List Candidate)
-    (stateCounts : ReadinessStatus → TaskState → ℚ) (cascade : SelectionCascade)
-    (candidate : Candidate) (picked : cascadePick cascade facts field = some candidate)
-    (focus : Target) (relation : Target → Target → TargetRelation)
-    (_reach_one : candidate.reach = 1)
-    (_landing_ne :
-      (match R15StrategicTarget.outcomeClass focus relation (some candidate.target) with
+      let status := (facts candidate.target).status
+      let landing := match R15StrategicTarget.outcomeClass focus relation
+          (some candidate.target) with
         | some ending => (ending, readyGain (facts candidate.target).unblocks)
-        | none => (.stopTheLine, .none)) ≠ (.stopTheLine, .none)) :
-    outerNovelty facts field stateCounts cascade =
-      PatternThetaNovelty.novelty
-        (stateCounts (facts candidate.target).status .doable)
-        (stateCounts (facts candidate.target).status .blocked) := by
-  simp [outerNovelty, picked]
+        | none => (.stopTheLine, .none)
+      outerKernelNovelty (stateCounts status .doable) (stateCounts status .blocked)
+        (pickedOuterKernel landing candidate.reach)
 
-theorem outerNovelty_nonneg (facts : Target → GiraffeFacts) (field : List Candidate)
-    (stateCounts : ReadinessStatus → TaskState → ℚ)
-    (positive : ∀ status state, 0 < stateCounts status state)
-    (cascade : SelectionCascade) : 0 ≤ outerNovelty facts field stateCounts cascade := by
+theorem outerKernelNovelty_uninformative (a b : ℚ)
+    (kernel : ProbabilityKernel TaskState OuterOutcome)
+    (uninformative : ∀ outcome, kernel.mass .doable outcome = kernel.mass .blocked outcome) :
+    outerKernelNovelty a b kernel = 0 := by
+  simp [outerKernelNovelty, uninformative]
+
+theorem outerKernelNovelty_nonneg (a b : ℚ) (ha : 0 < a) (hb : 0 < b)
+    (kernel : ProbabilityKernel TaskState OuterOutcome) :
+    0 ≤ outerKernelNovelty a b kernel := by
+  unfold outerKernelNovelty
+  apply mul_nonneg
+  · apply mul_nonneg (by norm_num)
+    exact_mod_cast div_nonneg (mul_nonneg ha.le hb.le)
+      (mul_nonneg (sq_nonneg (a + b)) (by linarith))
+  · apply Finset.sum_nonneg
+    intro outcome _
+    dsimp only
+    split_ifs <;> positivity
+
+theorem outerNovelty_nonneg (focus : Target)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (field : List Candidate) (stateCounts : ReadinessStatus → TaskState → ℚ)
+    (stateCounts_pos : ∀ status state, 0 < stateCounts status state)
+    (cascade : SelectionCascade) :
+    0 ≤ outerNovelty focus relation facts field stateCounts cascade := by
   unfold outerNovelty
   split
   · norm_num
-  · apply PatternThetaNovelty.novelty_nonneg <;> exact_mod_cast positive _ _
+  · apply outerKernelNovelty_nonneg <;> apply stateCounts_pos
 
-/-- At a fixed picked status (hence also at a fixed count ratio), increasing
-the positive total concentration strictly reduces outer novelty. -/
-theorem outerNovelty_lt_of_total_lt (facts : Target → GiraffeFacts)
-    (field : List Candidate) (cascade : SelectionCascade) (candidate : Candidate)
-    (picked : cascadePick cascade facts field = some candidate)
-    (small large : ReadinessStatus → TaskState → ℚ)
-    (small_pos : ∀ status state, 0 < small status state)
-    (large_pos : ∀ status state, 0 < large status state)
-    (total_lt : small (facts candidate.target).status .doable +
-        small (facts candidate.target).status .blocked <
-      large (facts candidate.target).status .doable +
-        large (facts candidate.target).status .blocked) :
-    outerNovelty facts field large cascade < outerNovelty facts field small cascade := by
-  simp only [outerNovelty, picked]
-  apply PatternThetaNovelty.novelty_lt_of_total_lt
-  · exact_mod_cast small_pos _ .doable
-  · exact_mod_cast small_pos _ .blocked
-  · exact_mod_cast large_pos _ .doable
-  · exact_mod_cast large_pos _ .blocked
-  · exact_mod_cast total_lt
+set_option maxHeartbeats 800000 in
+theorem outerKernelNovelty_revealing (a b : ℚ) (ha : 0 < a) (hb : 0 < b)
+    (landing : OuterOutcome) (landing_ne : landing ≠ (.stopTheLine, .none)) :
+    outerKernelNovelty a b (pickedOuterKernel landing 1) =
+      1 / (2 * ((a : ℝ) + b + 1)) := by
+  have har : 0 < (a : ℝ) := by exact_mod_cast ha
+  have hbr : 0 < (b : ℝ) := by exact_mod_cast hb
+  have hsum : 0 < (a : ℝ) + b := add_pos har hbr
+  have ha_half : 0 < (a : ℝ) / 2 := by positivity
+  have half_plus_b : 0 < (a : ℝ) / 2 + b := by positivity
+  have min_half : min (1 : ℝ) (1 / 2) = 1 / 2 := by norm_num
+  rcases landing with ⟨ending, gain⟩
+  fin_cases ending <;> fin_cases gain <;>
+    simp [outerKernelNovelty, pickedOuterKernel, finiteKernel, boundedReach,
+      Fintype.sum_prod_type, R15InjuryTier.sum_endingClass, sum_readyGain,
+      min_def, har, hbr, hsum, ha_half, half_plus_b, min_half, reduceCtorEq] at landing_ne ⊢ <;>
+    field_simp <;> ring
+
+theorem outerKernelNovelty_revealing_le_pattern (a b : ℚ)
+    (ha : 0 < a) (hb : 0 < b) (landing : OuterOutcome)
+    (landing_ne : landing ≠ (.stopTheLine, .none)) :
+    outerKernelNovelty a b (pickedOuterKernel landing 1) ≤
+      PatternThetaNovelty.novelty a b := by
+  rw [outerKernelNovelty_revealing a b ha hb landing landing_ne,
+    PatternThetaNovelty.novelty_eq _ _ (by exact_mod_cast ha) (by exact_mod_cast hb)]
+  apply one_div_le_one_div_of_le
+  · positivity
+  · linarith
+
+/-- With the same even state counts and the same non-stop landing, the certain
+pick is strictly more informative than the half-reach pick. -/
+theorem outerKernelNovelty_reach_half_lt_one :
+    outerKernelNovelty 1 1
+        (pickedOuterKernel (.focused, .none) (1 / 2)) <
+      outerKernelNovelty 1 1
+        (pickedOuterKernel (.focused, .none) 1) := by
+  have focused_ne_stop : CTauClassPreference.EndingClass.focused ≠
+      CTauClassPreference.EndingClass.stopTheLine := by decide
+  have one_ne_none : ReadyGain.one ≠ ReadyGain.none := by decide
+  have several_ne_none : ReadyGain.several ≠ ReadyGain.none := by decide
+  norm_num [outerKernelNovelty, pickedOuterKernel, finiteKernel, boundedReach,
+    min_def, Fintype.sum_prod_type, R15InjuryTier.sum_endingClass,
+    sum_readyGain, focused_ne_stop, one_ne_none, several_ne_none, reduceCtorEq] <;>
+    split_ifs <;> norm_num <;> simp_all
 
 /-- Outer expected free energy.  As with `classRisk`, inadmissibility is `⊤`. -/
 noncomputable def outerScore (focus : Target) (relation : Target → Target → TargetRelation)
@@ -2873,22 +2918,32 @@ def outerNoveltyExampleCounts : ReadinessStatus → TaskState → ℚ
 /-- Identical certain-reach picks differ only in readiness status; the row
 with fewer observations has strictly greater expected parameter information. -/
 theorem outerNovelty_status_example :
-    outerNovelty outerNoveltyExampleFacts outerNoveltyExampleField
+    outerNovelty 0 (fun _ _ => .focus) outerNoveltyExampleFacts outerNoveltyExampleField
         outerNoveltyExampleCounts outerNoveltyReadyCascade <
-      outerNovelty outerNoveltyExampleFacts outerNoveltyExampleField
+      outerNovelty 0 (fun _ _ => .focus) outerNoveltyExampleFacts outerNoveltyExampleField
         outerNoveltyExampleCounts outerNoveltyUndeterminedCascade := by
+  have focused_ne_stop : CTauClassPreference.EndingClass.focused ≠
+      CTauClassPreference.EndingClass.stopTheLine := by decide
+  have one_ne_none : ReadyGain.one ≠ ReadyGain.none := by decide
+  have several_ne_none : ReadyGain.several ≠ ReadyGain.none := by decide
   norm_num [outerNovelty, outerNoveltyExampleFacts, outerNoveltyExampleField,
     outerNoveltyExampleCounts, outerNoveltyReadyCascade,
     outerNoveltyUndeterminedCascade, cascadePick, applySelectionCascade,
-    applySelectionStep, PatternThetaNovelty.novelty]
+    applySelectionStep, outerKernelNovelty, pickedOuterKernel, finiteKernel,
+    boundedReach, min_def, readyGain, R15StrategicTarget.outcomeClass,
+    CTauClassPreference.scorerClass, Fintype.sum_prod_type,
+    R15InjuryTier.sum_endingClass, sum_readyGain, focused_ne_stop,
+    one_ne_none, several_ne_none, reduceCtorEq] <;> split_ifs <;> norm_num
 
 #print axioms whatOthersWaitOnFirst_pick
 #print axioms whatOthersWaitOnFirst_none_of_no_ready
 
 #print axioms outerScore_eq_stepG_of_finite
 #print axioms pickedOuterKernel_mass_eq_outerStateLikelihood
-#print axioms outerNovelty_revealing
-#print axioms outerNovelty_lt_of_total_lt
+#print axioms outerKernelNovelty_uninformative
+#print axioms outerKernelNovelty_revealing
+#print axioms outerKernelNovelty_revealing_le_pattern
+#print axioms outerKernelNovelty_reach_half_lt_one
 #print axioms outerNovelty_status_example
 #print axioms outer_ambiguity_matters
 #print axioms outer_ready_gain_matters
