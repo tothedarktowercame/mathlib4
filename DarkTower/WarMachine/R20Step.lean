@@ -1,4 +1,5 @@
 import DarkTower.WarMachine.R20Run
+import DarkTower.WarMachine.CascadeEFE
 import Mathlib.Data.List.MinMax
 import Mathlib.Data.List.Sort
 
@@ -36,10 +37,46 @@ variable {Policy : Type} [DecidableEq Policy] [Fintype Policy] [Nonempty Policy]
 /-- Facts recomputed each click by `futon3c.giraffe.pass`: readiness from need
 edges, one-step unblocks, and the transitive dependency cone.  Readiness is
 never stored on the task (M-giraffe; Joe, 2026-10-26). -/
+inductive ReadinessStatus where
+  | ready | notReady | undetermined
+  deriving DecidableEq, Fintype, Nonempty
+
+inductive TaskState where
+  | doable | blocked
+  deriving DecidableEq, Fintype, Nonempty
+
+inductive ReadyGain where
+  | none | one | several
+  deriving DecidableEq, Fintype, Nonempty
+
+abbrev OuterOutcome := EndingClass × ReadyGain
+
 structure GiraffeFacts where
-  ready : Bool
+  status : ReadinessStatus
   unblocks : ℕ
   cone : ℕ
+
+def GiraffeFacts.ready (facts : GiraffeFacts) : Bool := facts.status = .ready
+
+def readyGain : ℕ → ReadyGain
+  | 0 => .none
+  | 1 => .one
+  | _ => .several
+
+theorem sum_taskState (f : TaskState → ℝ) :
+    ∑ state, f state = f .doable + f .blocked := by
+  rw [show (Finset.univ : Finset TaskState) = {.doable, .blocked} by
+    ext x; fin_cases x <;> simp]
+  simp [add_comm]
+
+theorem sum_readyGain (f : ReadyGain → ℝ) :
+    ∑ gain, f gain = f .none + f .one + f .several := by
+  rw [show (Finset.univ : Finset ReadyGain) = {.none, .one, .several} by
+    ext x; fin_cases x <;> simp]
+  simp [add_assoc]
+
+theorem card_taskState : Fintype.card TaskState = 2 := by decide
+theorem card_readyGain : Fintype.card ReadyGain = 3 := by decide
 
 /-- Gates and orders are the roles in the task-selection README.  The named
 constructors express `only-what-can-start-now` and
@@ -106,6 +143,10 @@ structure Makeup (Policy : Type) where
   theta₀ : SlowState PatternIdentity
   kappa : ℚ
   kappa_pos : 0 < kappa
+  stateKit : ReadinessStatus → TaskState → ℚ
+  stateKit_pos : ∀ status state, 0 < stateKit status state
+  gainKit : ReadyGain → ℚ
+  gainKit_pos : ∀ gain, 0 < gainKit gain
   /-- Evidence learning rate η_d; Smith, Friston & Whyte 2022 §4 Eq. 34. -/
   etaD : ℝ
   etaD_pos : 0 < etaD
@@ -153,6 +194,8 @@ structure State (Policy : Type) where
   habit : RatedCounts Policy
   theta : RatedCounts PatternIdentity
   c : CCounts
+  stateCounts : ReadinessStatus → TaskState → ℚ
+  gainCounts : ReadyGain → ℚ
   valence : Valence → ℝ
   previousFocus : Nat
   runId : Nat
@@ -242,6 +285,201 @@ noncomputable def cascadeScore (focus : Target)
     (field : List Candidate)
     (C : CTauClassPreference.Distribution) (cascade : SelectionCascade) : EReal :=
   CTauClassPreference.classRisk (cascadePrediction focus relation facts field cascade) C
+
+open CascadeEFE Holes
+
+/-- Normalise strictly positive rational counts. -/
+noncomputable def outerCountKernel {X : Type} [Fintype X] [Nonempty X]
+    (counts : X → ℚ) (positive : ∀ x, 0 < counts x) : ProbabilityKernel Unit X :=
+  finiteKernel (fun _ x => (counts x : ℝ) / (∑ y, counts y : ℚ))
+    (by
+      intro _ x
+      exact div_nonneg (Rat.cast_nonneg.mpr (le_of_lt (positive x)))
+        (Rat.cast_nonneg.mpr (Finset.sum_nonneg fun y _ => le_of_lt (positive y))))
+    (by
+      intro
+      rw [← Finset.sum_div]
+      norm_cast
+      apply div_self
+      exact ne_of_gt (Finset.sum_pos (fun x _ => positive x) Finset.univ_nonempty))
+
+/-- Entropy of a binary reach/failure observation. -/
+noncomputable def binaryEntropy (r : ℚ) : ℝ :=
+  -(if (r : ℝ) = 0 then 0 else (r : ℝ) * Real.log r) -
+    (if 1 - (r : ℝ) = 0 then 0 else (1 - r : ℚ) * Real.log (1 - r))
+
+def boundedReach (reach : ℚ) : ℚ := max 0 (min 1 reach)
+
+theorem boundedReach_nonnegative (reach : ℚ) : 0 ≤ boundedReach reach := le_max_left _ _
+theorem boundedReach_le_one (reach : ℚ) : boundedReach reach ≤ 1 :=
+  max_le (by norm_num) (min_le_left _ _)
+theorem boundedReach_eq (reach : ℚ) (nonnegative : 0 ≤ reach) (le_one : reach ≤ 1) :
+    boundedReach reach = reach := by simp [boundedReach, nonnegative, le_one]
+
+/-- Observation kernel for one picked task.  Reach is clamped to `[0,1]` at
+this exogenous-input boundary; in-range candidate reaches are unchanged. -/
+noncomputable def pickedOuterKernel (landing : OuterOutcome) (rawReach : ℚ) :
+    ProbabilityKernel TaskState OuterOutcome :=
+  let reach := boundedReach rawReach
+  finiteKernel (fun state outcome => match state with
+    | .blocked => if outcome = (.stopTheLine, .none) then 1 else 0
+    | .doable => if landing = (.stopTheLine, .none) then
+        if outcome = (.stopTheLine, .none) then 1 else 0
+      else if outcome = landing then (reach : ℝ)
+      else if outcome = (.stopTheLine, .none) then (1 - reach : ℚ) else 0)
+    (by
+      intro state outcome
+      cases state <;> split_ifs <;> norm_num
+      all_goals first | exact_mod_cast boundedReach_nonnegative rawReach |
+        exact_mod_cast boundedReach_le_one rawReach)
+    (by
+      intro state
+      cases state with
+      | blocked => simp
+      | doable =>
+        by_cases h : landing = (.stopTheLine, .none)
+        · simp [h]
+        · classical
+          simp only [h, if_false]
+          have point_sum (a : OuterOutcome) (v : ℝ) :
+            ∑ x, (if x = a then v else 0) = v := by
+            rw [Finset.sum_ite_eq' Finset.univ a]
+            simp
+          rw [show (∑ x : OuterOutcome,
+            if x = landing then (reach : ℝ)
+            else if x = (.stopTheLine, .none) then (1 - reach : ℚ) else 0) =
+            (∑ x, if x = landing then (reach : ℝ) else 0) +
+            (∑ x, if x = (CTauClassPreference.EndingClass.stopTheLine, ReadyGain.none)
+              then (1 - reach : ℝ) else 0) by
+            rw [← Finset.sum_add_distrib]
+            apply Finset.sum_congr rfl
+            intro x _
+            by_cases hx : x = landing <;>
+              by_cases hs : x = (.stopTheLine, .none) <;> simp_all]
+          rw [point_sum, point_sum]
+          norm_num)
+
+noncomputable def stoppedOuterKernel : ProbabilityKernel TaskState OuterOutcome :=
+  finiteKernel (fun _ outcome => if outcome = (.stopTheLine, .none) then 1 else 0)
+    (by intros; split_ifs <;> norm_num) (by intro; simp)
+
+/-- Product of two learned marginals.  No Q9 factorisation claim is made here. -/
+noncomputable def outerPreferenceKernel (C : CTauClassPreference.Distribution)
+    (C_probability : CTauClassPreference.ProbabilityDistribution C)
+    (gainCounts : ReadyGain → ℚ) (gainCounts_pos : ∀ gain, 0 < gainCounts gain) :
+    ProbabilityKernel Unit OuterOutcome :=
+  let gain := outerCountKernel gainCounts gainCounts_pos
+  finiteKernel (fun _ outcome => C outcome.1 * gain.mass () outcome.2)
+    (by
+      intro _ outcome
+      exact mul_nonneg (by exact_mod_cast C_probability.1 outcome.1)
+        (gain.nonnegative () outcome.2))
+    (by
+      intro
+      rw [Fintype.sum_prod_type]
+      simp_rw [← Finset.mul_sum, kernel_sum]
+      simp only [mul_one]
+      simp only [R15InjuryTier.sum_endingClass]
+      exact_mod_cast C_probability.2)
+
+theorem outerPreferenceKernel_mass_pos (C : CTauClassPreference.Distribution)
+    (C_probability : CTauClassPreference.ProbabilityDistribution C)
+    (C_pos : ∀ ending, 0 < C ending)
+    (gainCounts : ReadyGain → ℚ) (gainCounts_pos : ∀ gain, 0 < gainCounts gain)
+    (outcome : OuterOutcome) :
+    0 < (outerPreferenceKernel C C_probability gainCounts gainCounts_pos).mass () outcome := by
+  unfold outerPreferenceKernel outerCountKernel
+  dsimp only [finiteKernel]
+  apply mul_pos
+  · exact_mod_cast C_pos outcome.1
+  · apply div_pos
+    · exact_mod_cast gainCounts_pos outcome.2
+    · exact_mod_cast Finset.sum_pos (fun gain _ => gainCounts_pos gain) Finset.univ_nonempty
+
+/-- The task-level hidden-state and observation kernels for one cascade.  They
+read only whole-task facts: readiness status, unblocks, reach, and target relation. -/
+noncomputable def outerModel (focus : Target) (relation : Target → Target → TargetRelation)
+    (facts : Target → GiraffeFacts) (field : List Candidate)
+    (stateCounts : ReadinessStatus → TaskState → ℚ)
+    (stateCounts_pos : ∀ status state, 0 < stateCounts status state)
+    (cascade : SelectionCascade) :
+    ProbabilityKernel Unit TaskState × ProbabilityKernel TaskState OuterOutcome :=
+  match cascadePick cascade facts field with
+  | none => (point .blocked, stoppedOuterKernel)
+  | some candidate =>
+      let landing := match R15StrategicTarget.outcomeClass focus relation (some candidate.target) with
+        | some ending => (ending, readyGain (facts candidate.target).unblocks)
+        | none => (.stopTheLine, .none)
+      (outerCountKernel (stateCounts (facts candidate.target).status) (stateCounts_pos _),
+        pickedOuterKernel landing candidate.reach)
+
+/-- Outer expected free energy.  As with `classRisk`, inadmissibility is `⊤`. -/
+noncomputable def outerScore (focus : Target) (relation : Target → Target → TargetRelation)
+    (facts : Target → GiraffeFacts) (field : List Candidate)
+    (stateCounts : ReadinessStatus → TaskState → ℚ)
+    (stateCounts_pos : ∀ status state, 0 < stateCounts status state)
+    (C : CTauClassPreference.Distribution)
+    (C_probability : CTauClassPreference.ProbabilityDistribution C)
+    (gainCounts : ReadyGain → ℚ) (gainCounts_pos : ∀ gain, 0 < gainCounts gain)
+    (cascade : SelectionCascade) : EReal := by
+  classical
+  let model := outerModel focus relation facts field stateCounts stateCounts_pos cascade
+  let preference := outerPreferenceKernel C C_probability gainCounts gainCounts_pos
+  exact if h : PreferenceRiskSeparation.riskAdmissible (push model.1 model.2) preference then
+    (stepG model.1 model.2 preference h : ℝ)
+  else ⊤
+
+theorem outerScore_eq_stepG_of_finite (focus : Target)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (field : List Candidate) (stateCounts : ReadinessStatus → TaskState → ℚ)
+    (stateCounts_pos : ∀ status state, 0 < stateCounts status state)
+    (C : CTauClassPreference.Distribution)
+    (C_probability : CTauClassPreference.ProbabilityDistribution C)
+    (gainCounts : ReadyGain → ℚ) (gainCounts_pos : ∀ gain, 0 < gainCounts gain)
+    (cascade : SelectionCascade)
+    (finite : outerScore focus relation facts field stateCounts stateCounts_pos C C_probability
+      gainCounts gainCounts_pos cascade ≠ ⊤) :
+    ∃ h : PreferenceRiskSeparation.riskAdmissible
+        (push (outerModel focus relation facts field stateCounts stateCounts_pos cascade).1
+          (outerModel focus relation facts field stateCounts stateCounts_pos cascade).2)
+        (outerPreferenceKernel C C_probability gainCounts gainCounts_pos),
+      outerScore focus relation facts field stateCounts stateCounts_pos C C_probability
+          gainCounts gainCounts_pos cascade =
+        (stepG
+          (outerModel focus relation facts field stateCounts stateCounts_pos cascade).1
+          (outerModel focus relation facts field stateCounts stateCounts_pos cascade).2
+          (outerPreferenceKernel C C_probability gainCounts gainCounts_pos) h : ℝ) := by
+  classical
+  simp only [outerScore] at finite ⊢
+  split_ifs with h
+  · exact ⟨h, rfl⟩
+  · simp [h] at finite
+
+set_option maxHeartbeats 1000000 in
+theorem pickedOuterKernel_ambiguity (q : ProbabilityKernel Unit TaskState)
+    (landing : OuterOutcome) (reach : ℚ) (reach_nonnegative : 0 ≤ reach)
+    (reach_le_one : reach ≤ 1)
+    (landing_ne_stop : landing ≠ (.stopTheLine, .none)) :
+    CascadeEFE.ambiguity q (pickedOuterKernel landing reach) =
+      q.mass () .doable * binaryEntropy reach := by
+  classical
+  have sum_task (f : TaskState → ℝ) :
+      ∑ x, f x = f .doable + f .blocked := by
+    rw [show (Finset.univ : Finset TaskState) = {.doable, .blocked} by
+      ext x; fin_cases x <;> simp]
+    simp [add_comm]
+  have sum_gain (f : ReadyGain → ℝ) :
+      ∑ x, f x = f .none + f .one + f .several := by
+    rw [show (Finset.univ : Finset ReadyGain) = {.none, .one, .several} by
+      ext x; fin_cases x <;> simp]
+    simp [add_assoc]
+  rcases landing with ⟨ending, gain⟩
+  fin_cases ending <;> fin_cases gain <;>
+    simp_all [CascadeEFE.ambiguity, binaryEntropy, CascadeEFE.entropy,
+      pickedOuterKernel, finiteKernel, Fintype.sum_prod_type,
+      R15InjuryTier.sum_endingClass, sum_task, sum_gain,
+      boundedReach_eq reach reach_nonnegative reach_le_one] <;> ring
+  all_goals simp
 
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 /-- The indexed cascade menu used to retain menu-order tie breaking. -/
@@ -353,6 +591,8 @@ def init (m : Makeup Policy) : State Policy where
   habit := ofSlowState m.habit₀
   theta := ofSlowState m.theta₀
   c := initialC m
+  stateCounts := m.stateKit
+  gainCounts := m.gainKit
   valence := m.q₀
   previousFocus := m.initialFocus
   runId := 0
@@ -363,7 +603,8 @@ noncomputable def evidencePrior (s : State Policy) : EvidenceFromTheProcess.Beli
   fun hidden => s.d hidden / ∑ x, s.d x
 
 /-- Compute one click and its successor.  The evidence concentration update is
-Friston 2017 equation 2.7; the C-count update is Smith, Friston & Whyte 2022. -/
+Friston 2017 equation 2.7; the C-count update is Smith, Friston & Whyte 2022.
+Slice 3d carries `stateCounts` and `gainCounts` unchanged; their updates are 3e. -/
 noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation Policy) :
     Click Policy × State Policy :=
   let prior := evidencePrior s
@@ -405,6 +646,8 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      habit := habitAfter
      theta := thetaAfter
      c := cAfter
+     stateCounts := s.stateCounts
+     gainCounts := s.gainCounts
      valence := valenceAfter
      previousFocus := o.focus
      runId := s.runId + 1 })
@@ -1119,6 +1362,10 @@ noncomputable def exampleMakeup : Makeup Unit where
   theta₀ := []
   kappa := 100
   kappa_pos := by norm_num
+  stateKit := fun _ _ => 1
+  stateKit_pos := by intros; norm_num
+  gainKit := fun | .none => 1 | .one => 2 | .several => 4
+  gainKit_pos := by intro gain; cases gain <;> norm_num
   etaD := exampleEtaD
   etaD_pos := by norm_num [exampleEtaD]
   omegaD := exampleOmegaD
@@ -1161,7 +1408,7 @@ def exampleObservation (ending : EndingClass) (focus : Nat) : Observation Unit w
   G := fun _ => 1
   F := fun _ => 0
   field := []
-  facts := fun _ => ⟨false, 0, 0⟩
+  facts := fun _ => ⟨ReadinessStatus.notReady, 0, 0⟩
 
 example :
     let clicks := run exampleMakeup
@@ -1186,6 +1433,10 @@ noncomputable def precisionExampleMakeup : Makeup ExamplePolicy where
   theta₀ := []
   kappa := 100
   kappa_pos := by norm_num
+  stateKit := fun _ _ => 1
+  stateKit_pos := by intros; norm_num
+  gainKit := fun | .none => 1 | .one => 2 | .several => 4
+  gainKit_pos := by intro gain; cases gain <;> norm_num
   etaD := 1
   etaD_pos := by norm_num
   omegaD := 1
@@ -1227,7 +1478,7 @@ def precisionExampleObservation (ending : EndingClass) (focus : Nat) :
   G := fun | .a => 0 | .b => 1
   F := fun _ => 0
   field := []
-  facts := fun _ => ⟨false, 0, 0⟩
+  facts := fun _ => ⟨ReadinessStatus.notReady, 0, 0⟩
 
 example :
     let clicks := run precisionExampleMakeup
@@ -1259,7 +1510,7 @@ noncomputable def movingPrecisionObservation (ending : EndingClass) (focus : Nat
   G := fun | .a => 0 | .b => 5 / 4 * Real.log 3
   F := fun | .a => 0 | .b => -Real.log 3
   field := []
-  facts := fun _ => ⟨false, 0, 0⟩
+  facts := fun _ => ⟨ReadinessStatus.notReady, 0, 0⟩
 
 /-- The exact first-click expected-G displacement. -/
 noncomputable def movingX : ℝ := 5 / 16 * Real.log 3
@@ -1276,7 +1527,6 @@ theorem moving_click_zero_betaPosterior :
     PrecisionFromObservation.softmax, R20Run.descend, R20Run.hespLevel, R20Run.half,
     R20Run.sum_valence, PrecisionFromObservation.sum_twoPolicy, Real.exp_neg]
   rw [Real.exp_log (by norm_num : (0 : ℝ) < 3)]
-  norm_num
   ring
 
 theorem moving_click_one_betaPrior :
@@ -1614,17 +1864,238 @@ def k32Field : List Candidate := [⟨1, 1⟩, ⟨2, 1⟩, ⟨3, 1⟩]
 /-- Giraffe found P12 ready with two one-step unblocks; the other two tasks
 were not ready. -/
 def k32Facts : Target → GiraffeFacts
-  | 1 => ⟨true, 2, 2⟩
-  | 2 => ⟨false, 0, 0⟩
-  | 3 => ⟨false, 0, 0⟩
-  | _ => ⟨false, 0, 0⟩
+  | 1 => ⟨ReadinessStatus.ready, 2, 2⟩
+  | 2 => ⟨ReadinessStatus.notReady, 0, 0⟩
+  | 3 => ⟨ReadinessStatus.notReady, 0, 0⟩
+  | _ => ⟨ReadinessStatus.notReady, 0, 0⟩
 
 example : cascadePick whatOthersWaitOnFirst k32Facts k32Field = some ⟨1, 1⟩ := by
-  norm_num [cascadePick, whatOthersWaitOnFirst, applySelectionCascade,
-    applySelectionStep, k32Facts, k32Field, List.insertionSort]
+  rfl
+
+/-! Explicit slice-3d outer-score examples, independent of `step`. -/
+
+def outerExampleC : CTauClassPreference.Distribution := fun _ => 1 / 5
+
+theorem outerExampleC_probability : CTauClassPreference.ProbabilityDistribution outerExampleC := by
+  constructor
+  · intro; norm_num [outerExampleC]
+  · norm_num [outerExampleC, CTauClassPreference.totalMass]
+
+def outerExampleStateCounts : ReadinessStatus → TaskState → ℚ := fun _ _ => 1
+theorem outerExampleStateCounts_pos : ∀ status state, 0 < outerExampleStateCounts status state := by
+  intros; norm_num [outerExampleStateCounts]
+
+def outerExampleGainCounts : ReadyGain → ℚ := fun _ => 1
+theorem outerExampleGainCounts_pos : ∀ gain, 0 < outerExampleGainCounts gain := by
+  intro; norm_num [outerExampleGainCounts]
+
+def outerExampleRelation : Target → Target → TargetRelation := fun _ _ => .focus
+def outerCascadeOne : SelectionCascade := [.gate (fun candidate => decide (candidate.target = 1))]
+def outerCascadeTwo : SelectionCascade := [.gate (fun candidate => decide (candidate.target = 2))]
+def outerAmbiguityField : List Candidate := [⟨1, 1⟩, ⟨2, 1 / 2⟩]
+def outerAmbiguityFacts : Target → GiraffeFacts := fun _ => ⟨.ready, 0, 0⟩
+
+theorem outerCascadeOne_reach_valid : ∀ candidate : Candidate,
+    cascadePick outerCascadeOne outerAmbiguityFacts outerAmbiguityField = some candidate →
+      0 ≤ candidate.reach ∧ candidate.reach ≤ 1 := by
+  intro candidate picked
+  norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeOne,
+    outerAmbiguityField] at picked
+  subst candidate
+  norm_num
+
+theorem outerCascadeTwo_reach_valid : ∀ candidate : Candidate,
+    cascadePick outerCascadeTwo outerAmbiguityFacts outerAmbiguityField = some candidate →
+      0 ≤ candidate.reach ∧ candidate.reach ≤ 1 := by
+  intro candidate picked
+  norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeTwo,
+    outerAmbiguityField] at picked
+  subst candidate
+  norm_num
+
+theorem outerAmbiguityModelOne :
+    outerModel 0 outerExampleRelation outerAmbiguityFacts outerAmbiguityField
+      outerExampleStateCounts outerExampleStateCounts_pos outerCascadeOne =
+    (outerCountKernel (outerExampleStateCounts .ready) (outerExampleStateCounts_pos .ready),
+      pickedOuterKernel (.focused, .none) 1) := by
+  have picked : cascadePick outerCascadeOne outerAmbiguityFacts outerAmbiguityField =
+      some (⟨1, 1⟩ : Candidate) := by
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeOne,
+      outerAmbiguityField]
+  norm_num [outerModel, outerCascadeOne, outerAmbiguityFacts, outerAmbiguityField,
+    outerExampleRelation, cascadePick, applySelectionCascade, applySelectionStep,
+    R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass, readyGain, picked]
+
+theorem outerAmbiguityModelTwo :
+    outerModel 0 outerExampleRelation outerAmbiguityFacts outerAmbiguityField
+      outerExampleStateCounts outerExampleStateCounts_pos outerCascadeTwo =
+    (outerCountKernel (outerExampleStateCounts .ready) (outerExampleStateCounts_pos .ready),
+      pickedOuterKernel (.focused, .none) (1 / 2)) := by
+  have picked : cascadePick outerCascadeTwo outerAmbiguityFacts outerAmbiguityField =
+      some (⟨2, 1 / 2⟩ : Candidate) := by
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeTwo,
+      outerAmbiguityField]
+  norm_num [outerModel, outerCascadeTwo, outerAmbiguityFacts, outerAmbiguityField,
+    outerExampleRelation, cascadePick, applySelectionCascade, applySelectionStep,
+    R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass, readyGain, picked]
+
+theorem outer_ambiguity_matters :
+    outerScore 0 outerExampleRelation outerAmbiguityFacts outerAmbiguityField
+        outerExampleStateCounts outerExampleStateCounts_pos outerExampleC
+        outerExampleC_probability outerExampleGainCounts outerExampleGainCounts_pos
+        outerCascadeOne <
+      outerScore 0 outerExampleRelation outerAmbiguityFacts outerAmbiguityField
+        outerExampleStateCounts outerExampleStateCounts_pos outerExampleC
+        outerExampleC_probability outerExampleGainCounts outerExampleGainCounts_pos
+        outerCascadeTwo := by
+  simp only [outerScore]
+  rw [outerAmbiguityModelOne, outerAmbiguityModelTwo]
+  have admitted (q : ProbabilityKernel Unit OuterOutcome) :
+      PreferenceRiskSeparation.riskAdmissible q
+        (outerPreferenceKernel outerExampleC outerExampleC_probability
+          outerExampleGainCounts outerExampleGainCounts_pos) := by
+    intro _ outcome _ _
+    exact outerPreferenceKernel_mass_pos _ _ (by intro; norm_num [outerExampleC])
+      _ outerExampleGainCounts_pos outcome
+  split_ifs with h1 h2
+  all_goals try { exact (h1 (admitted _)).elim }
+  all_goals try { exact (h2 (admitted _)).elim }
+  simp only [EReal.coe_lt_coe_iff]
+  unfold CascadeEFE.stepG CascadeEFE.risk CascadeEFE.ambiguity CascadeEFE.entropy
+    CascadeEFE.klTerm
+  simp [outerPreferenceKernel, outerCountKernel,
+    pickedOuterKernel, CascadeEFE.finiteKernel, CascadeEFE.push, CascadeEFE.stepG,
+    CascadeEFE.risk, CascadeEFE.ambiguity, CascadeEFE.entropy, CascadeEFE.klTerm,
+    PreferenceRiskSeparation.riskAdmissible, boundedReach,
+    outerExampleRelation, outerAmbiguityFacts, outerAmbiguityField,
+    outerExampleStateCounts, outerExampleGainCounts, outerExampleC,
+    outerCascadeOne, outerCascadeTwo, cascadePick, applySelectionCascade,
+    applySelectionStep, readyGain, R15StrategicTarget.outcomeClass,
+    CTauClassPreference.scorerClass, R15InjuryTier.sum_endingClass,
+    Fintype.sum_prod_type, sum_taskState, sum_readyGain, card_taskState, card_readyGain,
+    reduceCtorEq]
+  norm_num
+  rw [Real.log_div (by norm_num : (15 : ℝ) ≠ 0) (by norm_num : (2 : ℝ) ≠ 0)]
+  rw [Real.log_div (by norm_num : (15 : ℝ) ≠ 0) (by norm_num : (4 : ℝ) ≠ 0)]
+  rw [Real.log_div (by norm_num : (45 : ℝ) ≠ 0) (by norm_num : (4 : ℝ) ≠ 0)]
+  rw [Real.log_div (by norm_num : (1 : ℝ) ≠ 0) (by norm_num : (2 : ℝ) ≠ 0)]
+  have log15 : Real.log 15 = Real.log 3 + Real.log 5 := by
+    rw [show (15 : ℝ) = 3 * 5 by norm_num, Real.log_mul (by norm_num) (by norm_num)]
+  have log45 : Real.log 45 = 2 * Real.log 3 + Real.log 5 := by
+    rw [show (45 : ℝ) = 3 * (3 * 5) by norm_num,
+      Real.log_mul (by norm_num) (by norm_num),
+      Real.log_mul (by norm_num) (by norm_num)]
+    ring
+  have log4 : Real.log 4 = 2 * Real.log 2 := by
+    rw [show (4 : ℝ) = 2 * 2 by norm_num, Real.log_mul (by norm_num) (by norm_num)]
+    ring
+  rw [log15, log45, log4, Real.log_one]
+  have log_two_pos : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  have log_two_lt_three : Real.log 2 < Real.log 3 :=
+    Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
+  linarith
+
+def outerGainField : List Candidate := [⟨1, 1⟩, ⟨2, 1⟩]
+def outerGainFacts : Target → GiraffeFacts
+  | 1 => ⟨.ready, 0, 0⟩
+  | 2 => ⟨.ready, 2, 0⟩
+  | _ => ⟨.ready, 0, 0⟩
+def outerFavoursGain : ReadyGain → ℚ
+  | .none => 1
+  | .one => 1
+  | .several => 2
+theorem outerFavoursGain_pos : ∀ gain, 0 < outerFavoursGain gain := by
+  intro gain; cases gain <;> norm_num [outerFavoursGain]
+
+theorem outerGainCascadeOne_reach_valid : ∀ candidate : Candidate,
+    cascadePick outerCascadeOne outerGainFacts outerGainField = some candidate →
+      0 ≤ candidate.reach ∧ candidate.reach ≤ 1 := by
+  intro candidate picked
+  norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeOne,
+    outerGainField] at picked
+  subst candidate
+  norm_num
+
+theorem outerGainCascadeTwo_reach_valid : ∀ candidate : Candidate,
+    cascadePick outerCascadeTwo outerGainFacts outerGainField = some candidate →
+      0 ≤ candidate.reach ∧ candidate.reach ≤ 1 := by
+  intro candidate picked
+  norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeTwo,
+    outerGainField] at picked
+  subst candidate
+  norm_num
+
+theorem outerGainModelOne :
+    outerModel 0 outerExampleRelation outerGainFacts outerGainField outerExampleStateCounts
+      outerExampleStateCounts_pos outerCascadeOne =
+    (outerCountKernel (outerExampleStateCounts .ready) (outerExampleStateCounts_pos .ready),
+      pickedOuterKernel (.focused, .none) 1) := by
+  have picked : cascadePick outerCascadeOne outerGainFacts outerGainField =
+      some (⟨1, 1⟩ : Candidate) := by
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeOne,
+      outerGainField]
+  norm_num [outerModel, outerCascadeOne, outerGainFacts, outerGainField, outerExampleRelation,
+    cascadePick, applySelectionCascade, applySelectionStep,
+    R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass, readyGain, picked]
+
+theorem outerGainModelTwo :
+    outerModel 0 outerExampleRelation outerGainFacts outerGainField outerExampleStateCounts
+      outerExampleStateCounts_pos outerCascadeTwo =
+    (outerCountKernel (outerExampleStateCounts .ready) (outerExampleStateCounts_pos .ready),
+      pickedOuterKernel (.focused, .several) 1) := by
+  have picked : cascadePick outerCascadeTwo outerGainFacts outerGainField =
+      some (⟨2, 1⟩ : Candidate) := by
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep, outerCascadeTwo,
+      outerGainField]
+  norm_num [outerModel, outerCascadeTwo, outerGainFacts, outerGainField, outerExampleRelation,
+    cascadePick, applySelectionCascade, applySelectionStep,
+    R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass, readyGain, picked]
+
+theorem outer_ready_gain_matters :
+    outerScore 0 outerExampleRelation outerGainFacts outerGainField
+        outerExampleStateCounts outerExampleStateCounts_pos outerExampleC
+        outerExampleC_probability outerFavoursGain outerFavoursGain_pos
+        outerCascadeTwo <
+      outerScore 0 outerExampleRelation outerGainFacts outerGainField
+        outerExampleStateCounts outerExampleStateCounts_pos outerExampleC
+        outerExampleC_probability outerFavoursGain outerFavoursGain_pos
+        outerCascadeOne := by
+  simp only [outerScore]
+  rw [outerGainModelOne, outerGainModelTwo]
+  have admitted (q : ProbabilityKernel Unit OuterOutcome) :
+      PreferenceRiskSeparation.riskAdmissible q
+        (outerPreferenceKernel outerExampleC outerExampleC_probability
+          outerFavoursGain outerFavoursGain_pos) := by
+    intro _ outcome _ _
+    exact outerPreferenceKernel_mass_pos _ _ (by intro; norm_num [outerExampleC])
+      _ outerFavoursGain_pos outcome
+  split_ifs with h1 h2
+  all_goals try { exact (h1 (admitted _)).elim }
+  all_goals try { exact (h2 (admitted _)).elim }
+  simp only [EReal.coe_lt_coe_iff]
+  unfold CascadeEFE.stepG CascadeEFE.risk CascadeEFE.ambiguity CascadeEFE.entropy
+    CascadeEFE.klTerm
+  simp [outerPreferenceKernel, outerCountKernel,
+    pickedOuterKernel, CascadeEFE.finiteKernel, CascadeEFE.push, CascadeEFE.stepG,
+    CascadeEFE.risk, CascadeEFE.ambiguity, CascadeEFE.entropy, CascadeEFE.klTerm,
+    PreferenceRiskSeparation.riskAdmissible, boundedReach,
+    outerExampleRelation, outerGainFacts, outerGainField, outerFavoursGain,
+    outerExampleStateCounts, outerExampleC, outerCascadeOne, outerCascadeTwo,
+    cascadePick, applySelectionCascade, applySelectionStep, readyGain,
+    R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass,
+    R15InjuryTier.sum_endingClass, Fintype.sum_prod_type,
+    sum_taskState, sum_readyGain, card_taskState, card_readyGain, reduceCtorEq]
+  have log_two_pos : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  have log_five_lt_ten : Real.log 5 < Real.log 10 :=
+    Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
+  linarith
 
 #print axioms whatOthersWaitOnFirst_pick
 #print axioms whatOthersWaitOnFirst_none_of_no_ready
+
+#print axioms outerScore_eq_stepG_of_finite
+#print axioms outer_ambiguity_matters
+#print axioms outer_ready_gain_matters
 
 #print axioms learned_selection_click_zero
 #print axioms learned_selection_click_one
