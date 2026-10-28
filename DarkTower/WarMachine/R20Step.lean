@@ -12,7 +12,8 @@ the preference-count update described by Smith, Friston & Whyte 2022.
 
 Precision follows Friston 2017 equation 2.7's fixed-count numerical iteration;
 valence follows the update cited by `R20Run` from Hesp et al. 2021, pp. 286–288.
-`Click` has no outside candidate list, menu, or selection field.
+The candidate field and Giraffe facts arrive as observations; `Click` records
+only the selection computed from them.
 -/
 
 namespace DarkTower.WarMachine.R20Step
@@ -32,28 +33,57 @@ abbrev TargetRelation := CTauClassPreference.TargetRelation
 
 variable {Policy : Type} [DecidableEq Policy] [Fintype Policy] [Nonempty Policy]
 
-/-- Gates and orders are the two roles in the task-selection README: gates
-filter candidates and orders stably put the least key first. -/
+/-- Facts recomputed each click by `futon3c.giraffe.pass`: readiness from need
+edges, one-step unblocks, and the transitive dependency cone.  Readiness is
+never stored on the task (M-giraffe; Joe, 2026-10-26). -/
+structure GiraffeFacts where
+  ready : Bool
+  unblocks : ℕ
+  cone : ℕ
+
+/-- Gates and orders are the roles in the task-selection README.  The named
+constructors express `only-what-can-start-now` and
+`what-others-wait-on-first`. -/
 inductive SelectionStep where
+  /-- A general task-selection README gate. -/
   | gate (keep : Candidate → Bool)
+  /-- A general task-selection README stable ascending order. -/
   | order (key : Candidate → ℚ)
+  /-- `only-what-can-start-now`: retain Giraffe-ready candidates. -/
+  | readyGate
+  /-- `what-others-wait-on-first`: most direct unblocks first. -/
+  | byUnblocks
+  /-- `what-others-wait-on-first`: largest transitive cone first. -/
+  | byCone
 
 /-- A task-selection policy is a cascade of gates and stable orders. -/
 abbrev SelectionCascade := List SelectionStep
 
-/-- Apply one task-selection step. -/
-noncomputable def applySelectionStep (field : List Candidate) : SelectionStep → List Candidate
+/-- Apply one task-selection step using the current Giraffe pass. -/
+noncomputable def applySelectionStep (facts : Target → GiraffeFacts)
+    (field : List Candidate) : SelectionStep → List Candidate
   | .gate keep => field.filter keep
   | .order key => field.insertionSort (fun a b => key a ≤ key b)
+  | .readyGate => field.filter (fun candidate => (facts candidate.target).ready)
+  | .byUnblocks => field.insertionSort
+      (fun a b => (facts b.target).unblocks ≤ (facts a.target).unblocks)
+  | .byCone => field.insertionSort
+      (fun a b => (facts b.target).cone ≤ (facts a.target).cone)
 
 /-- Apply a task-selection cascade from left to right. -/
 noncomputable def applySelectionCascade (cascade : SelectionCascade)
-    (field : List Candidate) : List Candidate :=
-  cascade.foldl applySelectionStep field
+    (facts : Target → GiraffeFacts) (field : List Candidate) : List Candidate :=
+  cascade.foldl (applySelectionStep facts) field
 
 /-- The task selected by a cascade, if its gates leave any candidate. -/
-noncomputable def cascadePick (cascade : SelectionCascade) (field : List Candidate) : Option Candidate :=
-  (applySelectionCascade cascade field).head?
+noncomputable def cascadePick (cascade : SelectionCascade) (facts : Target → GiraffeFacts)
+    (field : List Candidate) : Option Candidate :=
+  (applySelectionCascade cascade facts field).head?
+
+/-- Ready candidates first; among them most one-step unblocks first, with cone
+as the stable secondary key.  `byUnblocks` is last because the last stable
+sort is the primary key. -/
+def whatOthersWaitOnFirst : SelectionCascade := [.readyGate, .byCone, .byUnblocks]
 
 /-- Total rational Beta counts.  Totality makes Smith, Friston & Whyte 2022
 §4 Eqs. 34 and 37 forgetting reach keys absent from a finite slow-state list. -/
@@ -144,6 +174,8 @@ structure Observation (Policy : Type) where
   F : Policy → ℝ
   /-- Candidate field supplied externally in this slice; producing it is later work. -/
   field : List Candidate
+  /-- Giraffe facts supplied externally in this slice and recomputed for this click. -/
+  facts : Target → GiraffeFacts
 
 /-- Rows produced by one computed click.  Evidence uses Friston 2017,
 equation 2.7; `C` is the normalized Smith, Friston & Whyte 2022 preference
@@ -194,9 +226,10 @@ def normalizeC (c : CCounts) : CTauClassPreference.Distribution := fun ending =>
 /-- A cascade predicts its picked target's terminal class and reach.  Missing
 picks or unknown classes put all mass on stop-the-line. -/
 noncomputable def cascadePrediction (focus : Target)
-    (relation : Target → Target → TargetRelation) (field : List Candidate)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (field : List Candidate)
     (cascade : SelectionCascade) : CTauClassPreference.Distribution :=
-  match cascadePick cascade field with
+  match cascadePick cascade facts field with
   | some candidate =>
       match R15StrategicTarget.outcomeClass focus relation (some candidate.target) with
       | some ending => R15InjuryTier.candidatePrediction ending candidate.reach
@@ -205,9 +238,10 @@ noncomputable def cascadePrediction (focus : Target)
 
 /-- Score one task-selection cascade against the learned C carried in state. -/
 noncomputable def cascadeScore (focus : Target)
-    (relation : Target → Target → TargetRelation) (field : List Candidate)
+    (relation : Target → Target → TargetRelation) (facts : Target → GiraffeFacts)
+    (field : List Candidate)
     (C : CTauClassPreference.Distribution) (cascade : SelectionCascade) : EReal :=
-  CTauClassPreference.classRisk (cascadePrediction focus relation field cascade) C
+  CTauClassPreference.classRisk (cascadePrediction focus relation facts field cascade) C
 
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 /-- The indexed cascade menu used to retain menu-order tie breaking. -/
@@ -224,10 +258,10 @@ not a selection rule. -/
 noncomputable def chosenCascadeEntry (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) : SelectionCascade × Nat :=
   (indexedCascades m).argmin
-    (fun entry => cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1) |>.get
+    (fun entry => cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1) |>.get
       (by
         cases h : (indexedCascades m).argmin
-          (fun entry => cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1) with
+          (fun entry => cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1) with
         | none => exact False.elim (indexedCascades_nonempty m (List.argmin_eq_none.mp h))
         | some _ => rfl)
 
@@ -235,7 +269,7 @@ omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem chosenCascadeEntry_mem_argmin (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) :
     chosenCascadeEntry m s o ∈ (indexedCascades m).argmin
-      (fun entry => cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1) := by
+      (fun entry => cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1) := by
   unfold chosenCascadeEntry
   exact Option.some_get _ |>.symm
 
@@ -244,18 +278,25 @@ theorem chosenCascadeEntry_mem (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) : chosenCascadeEntry m s o ∈ indexedCascades m :=
   List.argmin_mem (chosenCascadeEntry_mem_argmin m s o)
 
-theorem applySelectionStep_mem {field : List Candidate} {step : SelectionStep} {c : Candidate}
-    (present : c ∈ applySelectionStep field step) : c ∈ field := by
+theorem applySelectionStep_mem {facts : Target → GiraffeFacts} {field : List Candidate}
+    {step : SelectionStep} {c : Candidate}
+    (present : c ∈ applySelectionStep facts field step) : c ∈ field := by
   cases step with
   | gate keep => exact (List.mem_filter.mp (by simpa [applySelectionStep] using present)).1
   | order key => simpa [applySelectionStep, List.mem_insertionSort] using present
+  | readyGate =>
+      exact (show c ∈ field ∧ (facts c.target).ready = true by
+        simpa [applySelectionStep] using present).1
+  | byUnblocks => simpa [applySelectionStep, List.mem_insertionSort] using present
+  | byCone => simpa [applySelectionStep, List.mem_insertionSort] using present
 
-theorem applySelectionCascade_mem {cascade : SelectionCascade} {field : List Candidate}
-    {c : Candidate} (present : c ∈ applySelectionCascade cascade field) : c ∈ field := by
+theorem applySelectionCascade_mem {cascade : SelectionCascade} {facts : Target → GiraffeFacts}
+    {field : List Candidate} {c : Candidate}
+    (present : c ∈ applySelectionCascade cascade facts field) : c ∈ field := by
   induction cascade generalizing field with
   | nil => simpa [applySelectionCascade] using present
   | cons step cascade ih =>
-      apply applySelectionStep_mem (step := step)
+      apply applySelectionStep_mem (facts := facts) (step := step)
       apply ih
       simpa [applySelectionCascade] using present
 
@@ -341,8 +382,8 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
     (R20Run.valenceUpdate m.L s.valence betaPrior betaPosterior)
   let chosen := chosenCascadeEntry m s o
   let scores := m.cascades.map
-    (cascadeScore o.focus m.relation o.field (normalizeC s.c))
-  let selection := (cascadePick chosen.1 o.field).map fun candidate =>
+    (cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c))
+  let selection := (cascadePick chosen.1 o.facts o.field).map fun candidate =>
     ({ candidates := o.field, selected := candidate } : R20FocusedSelection.OuterSelection)
   ({ d := s.d
      evidence := ⟨prior, m.A, o.observation, posterior⟩
@@ -371,8 +412,9 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
 theorem chosenCascade_score_le (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) {cascade : SelectionCascade} (present : cascade ∈ m.cascades) :
-    cascadeScore o.focus m.relation o.field (normalizeC s.c) (chosenCascadeEntry m s o).1 ≤
-      cascadeScore o.focus m.relation o.field (normalizeC s.c) cascade := by
+    cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c)
+        (chosenCascadeEntry m s o).1 ≤
+      cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) cascade := by
   obtain ⟨index, at_index⟩ := List.get_of_mem present
   have entry_present : (cascade, index.val) ∈ indexedCascades m := by
     let zippedIndex : Fin (indexedCascades m).length :=
@@ -383,17 +425,69 @@ theorem chosenCascade_score_le (m : Makeup Policy) (s : State Policy)
       zero_add, Prod.mk.injEq, and_true]
     simpa only [List.get_eq_getElem] using at_index
   let scoreEntry := fun entry : SelectionCascade × Nat =>
-    cascadeScore o.focus m.relation o.field (normalizeC s.c) entry.1
+    cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c) entry.1
   change scoreEntry (chosenCascadeEntry m s o) ≤ scoreEntry (cascade, index.val)
   exact List.le_of_mem_argmin (f := scoreEntry) entry_present
     (chosenCascadeEntry_mem_argmin m s o)
 
-theorem cascadePick_some_mem {cascade : SelectionCascade} {field : List Candidate}
-    {candidate : Candidate} (picked : cascadePick cascade field = some candidate) :
+theorem cascadePick_some_mem {cascade : SelectionCascade} {facts : Target → GiraffeFacts}
+    {field : List Candidate} {candidate : Candidate}
+    (picked : cascadePick cascade facts field = some candidate) :
     candidate ∈ field := by
   apply applySelectionCascade_mem
   apply List.mem_of_mem_head?
   simpa [cascadePick, Option.mem_def] using picked
+
+/-- `what-others-wait-on-first` keeps only ready tasks and chooses a maximum
+one-step unblock count; cone is the stable tie-breaker. -/
+theorem whatOthersWaitOnFirst_pick {facts : Target → GiraffeFacts}
+    {field : List Candidate} {candidate : Candidate}
+    (picked : cascadePick whatOthersWaitOnFirst facts field = some candidate) :
+    (facts candidate.target).ready = true ∧
+      ∀ other ∈ field, (facts other.target).ready = true →
+        (facts other.target).unblocks ≤ (facts candidate.target).unblocks := by
+  let ready := field.filter (fun c => (facts c.target).ready)
+  let coned := ready.insertionSort
+    (fun a b => (facts b.target).cone ≤ (facts a.target).cone)
+  let ranked := coned.insertionSort
+    (fun a b => (facts b.target).unblocks ≤ (facts a.target).unblocks)
+  have picked' : ranked.head? = some candidate := by
+    simpa [cascadePick, applySelectionCascade, applySelectionStep,
+      whatOthersWaitOnFirst, ready, coned, ranked] using picked
+  have candidate_ranked : candidate ∈ ranked := List.mem_of_mem_head? picked'
+  have candidate_ready : candidate ∈ ready := by
+    simpa [ranked, coned, List.mem_insertionSort] using candidate_ranked
+  have candidate_ready' := candidate_ready
+  simp [ready] at candidate_ready'
+  refine ⟨candidate_ready'.2, ?_⟩
+  intro other other_field other_ready
+  have other_in_ready : other ∈ ready := by
+    simp [ready, other_field, other_ready]
+  have other_in_ranked : other ∈ ranked := by
+    simp [ranked, coned, List.mem_insertionSort, other_in_ready]
+  have sorted : ranked.Pairwise
+      (fun a b => (facts b.target).unblocks ≤ (facts a.target).unblocks) := by
+    exact List.pairwise_insertionSort _ _
+  cases hranked : ranked with
+  | nil => simp [hranked] at picked'
+  | cons head tail =>
+      have head_eq : head = candidate := by simpa [hranked] using picked'
+      subst head
+      simpa [hranked] using sorted.rel_head other_in_ranked
+
+/-- If Giraffe reports no ready task, the readiness gate leaves no pick. -/
+theorem whatOthersWaitOnFirst_none_of_no_ready {facts : Target → GiraffeFacts}
+    {field : List Candidate}
+    (none_ready : ∀ candidate ∈ field, (facts candidate.target).ready = false) :
+    cascadePick whatOthersWaitOnFirst facts field = none := by
+  have filtered : field.filter (fun c => (facts c.target).ready) = [] := by
+    by_contra nonempty
+    obtain ⟨candidate, present⟩ := List.exists_mem_of_ne_nil _ nonempty
+    have retained := List.mem_filter.mp present
+    rw [none_ready candidate retained.1] at retained
+    exact Bool.noConfusion retained.2
+  simp [cascadePick, applySelectionCascade, applySelectionStep,
+    whatOthersWaitOnFirst, filtered]
 
 omit [Nonempty Policy] in
 theorem step_selection_some (m : Makeup Policy) (s : State Policy) (o : Observation Policy)
@@ -401,7 +495,7 @@ theorem step_selection_some (m : Makeup Policy) (s : State Policy) (o : Observat
     (selected : (step m s o).1.selection = some selection) :
     selection.selected ∈ o.field ∧ selection.candidates = o.field := by
   simp only [step] at selected
-  cases picked : cascadePick (chosenCascadeEntry m s o).1 o.field with
+  cases picked : cascadePick (chosenCascadeEntry m s o).1 o.facts o.field with
   | none => simp [picked] at selected
   | some candidate =>
       simp [picked] at selected
@@ -411,14 +505,14 @@ theorem step_selection_some (m : Makeup Policy) (s : State Policy) (o : Observat
 omit [Nonempty Policy] in
 theorem step_selection_none_iff (m : Makeup Policy) (s : State Policy) (o : Observation Policy) :
     (step m s o).1.selection = none ↔
-      cascadePick (chosenCascadeEntry m s o).1 o.field = none := by
+      cascadePick (chosenCascadeEntry m s o).1 o.facts o.field = none := by
   simp [step]
 
 omit [Nonempty Policy] in
 theorem step_scores_read_carried_C (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) :
     (step m s o).1.cascadeScores = m.cascades.map
-      (cascadeScore o.focus m.relation o.field (normalizeC s.c)) := by
+      (cascadeScore o.focus m.relation o.facts o.field (normalizeC s.c)) := by
   rfl
 
 /-- Fold `step` from a supplied state, returning the computed clicks and final
@@ -1067,6 +1161,7 @@ def exampleObservation (ending : EndingClass) (focus : Nat) : Observation Unit w
   G := fun _ => 1
   F := fun _ => 0
   field := []
+  facts := fun _ => ⟨false, 0, 0⟩
 
 example :
     let clicks := run exampleMakeup
@@ -1132,6 +1227,7 @@ def precisionExampleObservation (ending : EndingClass) (focus : Nat) :
   G := fun | .a => 0 | .b => 1
   F := fun _ => 0
   field := []
+  facts := fun _ => ⟨false, 0, 0⟩
 
 example :
     let clicks := run precisionExampleMakeup
@@ -1163,6 +1259,7 @@ noncomputable def movingPrecisionObservation (ending : EndingClass) (focus : Nat
   G := fun | .a => 0 | .b => 5 / 4 * Real.log 3
   F := fun | .a => 0 | .b => -Real.log 3
   field := []
+  facts := fun _ => ⟨false, 0, 0⟩
 
 /-- The exact first-click expected-G displacement. -/
 noncomputable def movingX : ℝ := 5 / 16 * Real.log 3
@@ -1258,14 +1355,14 @@ example :
       click.cascadeScores = [selectionExampleScore, selectionExampleScore] ∧
       click.selection = some
         { candidates := selectionExampleObservation.field, selected := selectionCandidateTwo } := by
-  have scoreA : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.field
+  have scoreA : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.facts selectionExampleObservation.field
       (normalizeC (init selectionExampleMakeup).c) selectionExampleCascadeA = selectionExampleScore := by
     norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
       applySelectionStep, selectionExampleCascadeA, selectionExampleMakeup,
       selectionExampleObservation, selectionCandidateOne, selectionCandidateTwo,
       selectionCandidateThree, selectionExampleScore, init, normalize_initialC,
       R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
-  have scoreB : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.field
+  have scoreB : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.facts selectionExampleObservation.field
       (normalizeC (init selectionExampleMakeup).c) selectionExampleCascadeB = selectionExampleScore := by
     norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
       applySelectionStep, selectionExampleCascadeB, selectionExampleMakeup,
@@ -1277,7 +1374,7 @@ example :
     unfold chosenCascadeEntry
     change (([(selectionExampleCascadeA, 0), (selectionExampleCascadeB, 1)]).argmin
       (fun entry => cascadeScore 7 selectionExampleMakeup.relation
-        selectionExampleObservation.field (normalizeC (init selectionExampleMakeup).c)
+        selectionExampleObservation.facts selectionExampleObservation.field (normalizeC (init selectionExampleMakeup).c)
         entry.1)).get _ = (selectionExampleCascadeA, 0)
     simp [List.argmin, List.argAux, scoreA, scoreB]
   simp only [step]
@@ -1397,16 +1494,16 @@ theorem learned_selection_click_one_C :
 not needed to choose cascade A and target 1. -/
 theorem learned_selection_click_zero :
     cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
+        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
         learnedSelectionCascadeA <
       cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
+        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
         learnedSelectionCascadeB ∧
     learnedSelectionClick0.cascadeIndex = 0 ∧
     learnedSelectionClick0.selection = some
       { candidates := learnedSelectionObservation.field, selected := selectionCandidateOne } := by
   have scoreA : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
+      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
       learnedSelectionCascadeA =
         CTauClassPreference.classRisk
           (R15InjuryTier.candidatePrediction .focused (1 / 2)) kit := by
@@ -1416,7 +1513,7 @@ theorem learned_selection_click_zero :
       learnedSelectionState0, init, normalize_initialC,
       R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
   have scoreB : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
+      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
       learnedSelectionCascadeB =
         CTauClassPreference.classRisk
           (R15InjuryTier.candidatePrediction .related (1 / 2)) kit := by
@@ -1426,10 +1523,10 @@ theorem learned_selection_click_zero :
       learnedSelectionState0, init, normalize_initialC,
       R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
   have strict : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
+      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
       learnedSelectionCascadeA <
         cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-          learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
+          learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
           learnedSelectionCascadeB := by
     rw [scoreA, scoreB]
     exact initial_focused_risk_lt_related
@@ -1438,7 +1535,7 @@ theorem learned_selection_click_zero :
     unfold chosenCascadeEntry
     change (([(learnedSelectionCascadeA, 0), (learnedSelectionCascadeB, 1)]).argmin
       (fun entry => cascadeScore learnedSelectionObservation.focus
-        learnedSelectionMakeup.relation learnedSelectionObservation.field
+        learnedSelectionMakeup.relation learnedSelectionObservation.facts learnedSelectionObservation.field
         (normalizeC learnedSelectionState0.c) entry.1)).get _ =
           (learnedSelectionCascadeA, 0)
     have not_reverse := not_lt_of_ge (le_of_lt strict)
@@ -1455,16 +1552,16 @@ theorem learned_selection_click_zero :
 target 3 therefore win independently of menu order. -/
 theorem learned_selection_click_one :
     cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
+        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
         learnedSelectionCascadeB <
       cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
+        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
         learnedSelectionCascadeA ∧
     learnedSelectionClick1.cascadeIndex = 1 ∧
     learnedSelectionClick1.selection = some
       { candidates := learnedSelectionObservation.field, selected := learnedSelectionCandidateThree } := by
   have scoreA : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
+      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
       learnedSelectionCascadeA =
         CTauClassPreference.classRisk
           (R15InjuryTier.candidatePrediction .focused (1 / 2)) learnedSelectionC := by
@@ -1474,7 +1571,7 @@ theorem learned_selection_click_one :
       learnedSelectionObservation, selectionCandidateOne, learnedSelectionCandidateThree,
       R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
   have scoreB : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
+      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
       learnedSelectionCascadeB =
         CTauClassPreference.classRisk
           (R15InjuryTier.candidatePrediction .related (1 / 2)) learnedSelectionC := by
@@ -1484,10 +1581,10 @@ theorem learned_selection_click_one :
       learnedSelectionObservation, selectionCandidateOne, learnedSelectionCandidateThree,
       R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
   have strict : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
+      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
       learnedSelectionCascadeB <
         cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-          learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
+          learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
           learnedSelectionCascadeA := by
     rw [scoreB, scoreA]
     exact learned_related_risk_lt_focused
@@ -1496,7 +1593,7 @@ theorem learned_selection_click_one :
     unfold chosenCascadeEntry
     change (([(learnedSelectionCascadeA, 0), (learnedSelectionCascadeB, 1)]).argmin
       (fun entry => cascadeScore learnedSelectionObservation.focus
-        learnedSelectionMakeup.relation learnedSelectionObservation.field
+        learnedSelectionMakeup.relation learnedSelectionObservation.facts learnedSelectionObservation.field
         (normalizeC learnedSelectionState1.c) entry.1)).get _ =
           (learnedSelectionCascadeB, 1)
     simp [List.argmin, List.argAux, strict]
@@ -1507,6 +1604,27 @@ theorem learned_selection_click_one :
     norm_num [cascadePick, applySelectionCascade, applySelectionStep,
       learnedSelectionCascadeB, learnedSelectionObservation,
       selectionCandidateOne, learnedSelectionCandidateThree]
+
+/-! Event K3.2 from `M-象-2000.md`: Giraffe readiness and unblock facts. -/
+
+/-- Target 1 is P12 “core system working end to end”; target 2 is “edge
+cases: provisional withdrawal”; target 3 is “countersigned voids”. -/
+def k32Field : List Candidate := [⟨1, 1⟩, ⟨2, 1⟩, ⟨3, 1⟩]
+
+/-- Giraffe found P12 ready with two one-step unblocks; the other two tasks
+were not ready. -/
+def k32Facts : Target → GiraffeFacts
+  | 1 => ⟨true, 2, 2⟩
+  | 2 => ⟨false, 0, 0⟩
+  | 3 => ⟨false, 0, 0⟩
+  | _ => ⟨false, 0, 0⟩
+
+example : cascadePick whatOthersWaitOnFirst k32Facts k32Field = some ⟨1, 1⟩ := by
+  norm_num [cascadePick, whatOthersWaitOnFirst, applySelectionCascade,
+    applySelectionStep, k32Facts, k32Field, List.insertionSort]
+
+#print axioms whatOthersWaitOnFirst_pick
+#print axioms whatOthersWaitOnFirst_none_of_no_ready
 
 #print axioms learned_selection_click_zero
 #print axioms learned_selection_click_one
