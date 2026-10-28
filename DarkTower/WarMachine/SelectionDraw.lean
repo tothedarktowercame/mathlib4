@@ -20,8 +20,7 @@ click's inputs, because the draw is not among them.
 Clause: the selection step is a function of its sealed inputs.  A tie-break is
 admitted only through a sealed entropy input, a draw carried in the step's input
 record; a step whose output depends on a value not in its input record is not a
-valid step.  Companion to R3's recomputability (`IncrementalTaskFrontier`): a Q8
-recomputation must reproduce the tie-break from the record.
+valid step. Recomputing the selection must reproduce the tie-break from the record.
 
 Encoding.  `expectedOutput` is the selection law as a function of
 `SelectionInputs`; `SelectionStep.Valid` says the step's output *is*

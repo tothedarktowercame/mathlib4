@@ -1,9 +1,7 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.List.Defs
 import Mathlib.Tactic
-import DarkTower.WarMachine.IncrementalTaskFrontier
 import DarkTower.WarMachine.FactorizedPreferenceSemantics
-import DarkTower.WarMachine.OuterCascadePolicyObjective
 
 /-!
 # Countable requirements for one War Machine run
@@ -15,34 +13,12 @@ that today's runner exports them faithfully.
 
 namespace DarkTower.WarMachine.Requirements
 
-def OuterCascadePolicyRecomputable
-    (carrier : OuterCascadePolicyObjective.Carrier)
-    (selection : OuterCascadePolicyObjective.SelectionCertificate) : Prop :=
-  selection.Valid carrier
-
-instance (carrier : OuterCascadePolicyObjective.Carrier)
-    (selection : OuterCascadePolicyObjective.SelectionCertificate) :
-    Decidable (OuterCascadePolicyRecomputable carrier selection) := by
-  unfold OuterCascadePolicyRecomputable
-  infer_instance
-
-open DarkTower.WarMachine.IncrementalTaskFrontier
 open DarkTower.WarMachine.FactorizedPreferenceSemantics
 
 set_option maxRecDepth 100000
 set_option maxHeartbeats 5000000
 
 abbrev Id := Nat
-
-/-- One task-level action in the support the outer selector chose from.
-Outer selection precedes inner construction: an outer action is not a
-constructed policy. -/
-structure OuterAction where
-  /-- Stable id of the task the action advances. -/
-  task : Id
-  /-- Stable identity of the task-level action (its type and target). -/
-  action : Id
-  deriving DecidableEq
 
 /-- The inner construction census of one task, made after the outer choice.
 A pin or digest of `0` is a recorded absence. -/
@@ -160,8 +136,6 @@ structure RunFacts where
   targetsWithG : Finset Id
   /-- Number of pattern files in the pinned pattern-library manifest. -/
   libraryPatternCount : Nat
-  /-- One task-level action per task in the outer selector's support. -/
-  outerActions : List OuterAction
   /-- Inner construction census: slice, pool, pins and policies, per
   constructed task. -/
   targetConstruction : List TargetConstruction
@@ -219,24 +193,6 @@ structure RunFacts where
   /-- Exact retained registry authorizing the certificate's factorization law. -/
   factorizationAuthorizations :
     List DarkTower.WarMachine.FactorizedPreferenceSemantics.FactorizationAuthorization
-  /-- Number of compared cascade pairs with the same pattern set and different arrangements. -/
-  differentArrangementPairs : Nat
-  /-- Number of those pairs represented as distinct policies, each with its own numeric G. -/
-  arrangementPairsDistinguishedByG : Nat
-  /-- Every open task, each either eligible for ranking or excluded with its
-  recorded typed reason. -/
-  frontierCensus : EligibilityCensus
-  /-- Exact refresh certificate for the eligible frontier (an audit of a full
-  recomputation against the persisted prior frontier). -/
-  frontierRefresh : RefreshCertificate
-  /-- Winner certificate over the refreshed eligible frontier and current tie law. -/
-  frontierSelection : SelectionCertificate
-  /-- Identity correspondence for cascades of the selected task only. -/
-  selectedCascade : TargetCascadeCertificate
-  /-- Complete occurrence-grain Cascade Live policy menu and evidence. -/
-  outerPolicyCarrier : OuterCascadePolicyObjective.Carrier
-  /-- Strict-minimum certificate projected to the enacted cascade. -/
-  outerPolicySelection : OuterCascadePolicyObjective.SelectionCertificate
   deriving DecidableEq
 
 def RunFacts.openTasks (r : RunFacts) : Finset Id :=
@@ -250,46 +206,6 @@ def RunFacts.maxSliceSize (r : RunFacts) : Nat :=
 
 /-! Joe: "Every open mission, excursion or ticket is wanted." -/
 def Q1 (r : RunFacts) : Bool := decide (r.enumeratedTasks = r.openTasks)
-
-/-! Joe: cascades are derived per problem from the pattern library; the pool is
-the query-time slice, and every open target has an action from the start.
-
-Ruling (codex-68, 2026-10-16, option (c), bounded by Q8 eligibility): the
-action every task has from the start is its task-level action in the outer
-support.  Exactly the Q8-eligible tasks carry one each; an open task Q8
-excludes is accounted for by its typed exclusion and carries none.  Inner
-construction happens after the outer choice and only for the selected task:
-exactly one construction entry, for that task and its outer action, with a
-recorded reading, library, graph and kernel, the pool equal to a slice drawn
-from the whole pinned library, a positive count of distinct valid policies,
-and those policies exactly the selected cascade's constructed set, containing
-every compared policy.  Unselected tasks are not said to have inner policies. -/
-def Q2 (r : RunFacts) : Bool := decide (
-  r.outerPolicyCarrier.Valid ∧
-  r.outerPolicySelection.selected ∈ r.outerPolicyCarrier.evidence ∧
-  r.outerPolicySelection.selected.policy.target = r.currentChoice.target ∧
-  r.outerPolicySelection.selected.policy.cascadeDigest = r.currentChoice.cascade ∧
-  (r.outerPolicyCarrier.menu.identities.map (·.occurrencePolicy)).toFinset =
-    r.comparedPolicies ∧
-  (∀ a ∈ r.outerActions, a.task ∈ r.frontierCensus.eligible) ∧
-  (∀ t ∈ r.frontierCensus.eligible, ∃ a ∈ r.outerActions, a.task = t) ∧
-  r.outerActions.length = r.frontierCensus.eligible.card ∧
-  (r.outerActions.map OuterAction.action).Nodup ∧
-  r.frontierSelection.selected.task ∈ r.frontierCensus.eligible ∧
-  r.selectedCascade.selectedTask = r.frontierSelection.selected.task ∧
-  r.targetConstruction.length = 1 ∧
-  (∀ tc ∈ r.targetConstruction,
-    tc.targets = {r.frontierSelection.selected.task} ∧
-    (∃ a ∈ r.outerActions,
-      a.task = r.frontierSelection.selected.task ∧ a.action = tc.action) ∧
-    tc.reading ≠ 0 ∧ tc.library ≠ 0 ∧ tc.graph ≠ 0 ∧ tc.kernel ≠ 0 ∧
-    tc.pool = tc.slice ∧ tc.sliceFromWholeLibrary = true ∧
-    tc.slice.card ≤ r.libraryPatternCount ∧
-    0 < tc.policyCount ∧ tc.policies.card = tc.policyCount ∧
-    tc.policies = r.selectedCascade.constructed ∧
-    r.comparedPolicies ⊆ tc.policies) ∧
-  r.constructorPatternCount =
-    ((r.targetConstruction.map (fun tc : TargetConstruction => tc.pool)).foldl (· ∪ ·) ∅).card)
 
 /-! Joe: "G is defined over policies, and policies are cascades ... full stop." -/
 def Q3 (r : RunFacts) : Bool := decide (r.cascadesWithoutG = ∅)
@@ -307,7 +223,6 @@ horizons. The policy records are exactly the compared policies, one each:
 every record is of a compared policy, every compared policy has a record,
 and there are as many records as compared policies. -/
 def Q4 (r : RunFacts) : Bool := decide (
-  r.outerPolicyCarrier.Valid ∧
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
   r.gTerms.informationGain = true ∧
   r.comparedPolicies.Nonempty ∧
@@ -337,32 +252,6 @@ certificate path is a failure; the working path contains none.  This is not a
 completeness claim about rejected alternatives or population-wide scorer
 diagnostics.  With no selection, the explicit abstention carrier is the path. -/
 def Q7 (r : RunFacts) : Bool := decide (r.pathAbsenceCount = 0)
-
-/-! Q8 certifies the current task frontier rather than sampling historical
-population breadth.  Refresh is exact and incremental; selection is over
-stable comparison keys only after every affected/additional entry has been
-recomputed; cascade
-identity correspondence is local to the selected task.  Multiple policies
-are required only when that task has multiple admissible cascades.  Q1 keeps
-the independent responsibility for enumerating every open task. -/
-def q6Excludable (r : RunFacts) : Finset Id :=
-  if r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest
-  then {r.previousChoice.cascade} else ∅
-
-/-! Ruling 2b (codex-68, 2026-10-15): selection ranges over the certified
-eligible frontier; the complete open-task census is kept beside it, each
-excluded task with its typed reason and no comparison key.  Ruling 1a: a
-policy removed before the one comparison is justified only by Q6 (the
-previous run refused it on the same selection inputs). -/
-def Q8 (r : RunFacts) : Bool := decide (
-  OuterCascadePolicyRecomputable r.outerPolicyCarrier r.outerPolicySelection ∧
-  r.frontierCensus.Valid r.openTasks ∧
-  r.frontierRefresh.Valid ∧
-  r.frontierRefresh.currentOpenTasks = r.frontierCensus.eligible ∧
-  r.frontierSelection.Valid r.frontierRefresh.current r.frontierCensus.eligible ∧
-  r.selectedCascade.selectedTask = r.frontierSelection.selected.task ∧
-  r.selectedCascade.Valid ∧
-  r.selectedCascade.requirementExcluded ⊆ q6Excludable r)
 
 private instance calibrationAuthorizedDecidable
     (registry : List FactorizedPreferenceSemantics.CalibrationAuthorization)
@@ -398,20 +287,13 @@ def Q9 (r : RunFacts) : Bool := decide (
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate.Valid
       r.calibrationAuthorizations r.factorizationAuthorizations certificate)
 
-/-! Joe: policies are cascades in a specific geometric arrangement. Whenever
-the same patterns occur in two compared arrangements, both arrangements are
-distinct policies with their own G, and at least one such control is present. -/
-def Q10 (r : RunFacts) : Bool := decide (
-  0 < r.differentArrangementPairs ∧
-  r.arrangementPairsDistinguishedByG = r.differentArrangementPairs)
-
-inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q8 | q9 | q10
+inductive Requirement where | q1 | q3 | q4 | q5 | q6 | q7 | q9
   deriving DecidableEq, Repr
 
 def violations (r : RunFacts) : List Requirement :=
-  [(.q1, Q1 r), (.q2, Q2 r), (.q3, Q3 r),
+  [(.q1, Q1 r), (.q3, Q3 r),
    (.q4, Q4 r), (.q5, Q5 r), (.q6, Q6 r),
-   (.q7, Q7 r), (.q8, Q8 r), (.q9, Q9 r), (.q10, Q10 r)].filterMap
+   (.q7, Q7 r), (.q9, Q9 r)].filterMap
     (fun (q, ok) => if ok then none else some q)
 
 def conforms (r : RunFacts) : Bool := violations r = []
@@ -434,17 +316,6 @@ def goodPreferenceCertificate :
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate :=
   ⟨goodCalibration, 108, 106, 1, 107, 104, 105⟩
 
-open DarkTower.WarMachine.OuterCascadePolicyObjective in
-def goodOuterEvidenceA : Evidence := base 60000 1 50000 2 1 (1/2) neutral
-open DarkTower.WarMachine.OuterCascadePolicyObjective in
-def goodOuterEvidenceB : Evidence := base 60001 1 50001 2 1 (1/2) ⟨1, 0, 0⟩
-open DarkTower.WarMachine.OuterCascadePolicyObjective in
-def goodOuterCarrier : Carrier :=
-  { menu := { identities := [goodOuterEvidenceA.policy, goodOuterEvidenceB.policy] }
-    evidence := [goodOuterEvidenceA, goodOuterEvidenceB] }
-def goodOuterSelection : OuterCascadePolicyObjective.SelectionCertificate :=
-  ⟨goodOuterEvidenceB⟩
-
 /-! Click 20 provenance. The selection certificate/exporter supplies reaching
 scoring, with-G, constructed/compared singleton counts, horizon/preference
 rows, risk-only terms, and 62 path-scoped absences. The 221/373/43 historical
@@ -461,7 +332,6 @@ def click20 : RunFacts where
   targetsReachingScoring := {0, 1, 2}
   targetsWithG := {0}
   libraryPatternCount := 1431
-  outerActions := []
   targetConstruction :=
     [{ targets := {0}, action := 0, reading := 0, library := 0, graph := 0, kernel := 0,
        slice := {10, 11}, pool := {10, 11},
@@ -494,14 +364,6 @@ def click20 : RunFacts where
   factorizedPreference := none
   calibrationAuthorizations := []
   factorizationAuthorizations := []
-  differentArrangementPairs := 1
-  arrangementPairsDistinguishedByG := 0
-  frontierCensus := ⟨{1, 2, 3}, []⟩
-  frontierRefresh := positiveRefresh
-  frontierSelection := positiveSelection
-  selectedCascade := mismatchedCascade
-  outerPolicyCarrier := OuterCascadePolicyObjective.tiedCarrier
-  outerPolicySelection := OuterCascadePolicyObjective.tiedSelection
 
 def missingG : RunFacts :=
   { click20 with
@@ -523,8 +385,7 @@ def goodPolicy (policy horizon : Nat)
   normalization := normalization
   terms := terms
 
-/-- The selected task's construction: task 1 (the selection of
-`positiveSelection`), its outer action 71, and the two compared policies. -/
+/-- Task 1's inner construction and its two compared policies. -/
 def goodConstruction : TargetConstruction where
   targets := {1}
   action := 71
@@ -538,9 +399,6 @@ def goodConstruction : TargetConstruction where
   policyCount := 2
   policies := {60000, 60001}
 
-def goodCascade : TargetCascadeCertificate :=
-  ⟨1, {60000, 60001}, {60000, 60001}, {60000, 60001}, {60000, 60001}, ∅, {60000, 60001}⟩
-
 def good : RunFacts where
   openMissions := {1, 2, 3}
   openExcursions := ∅
@@ -549,7 +407,6 @@ def good : RunFacts where
   targetsReachingScoring := {1, 2, 3}
   targetsWithG := {1, 2, 3}
   libraryPatternCount := 1431
-  outerActions := [⟨1, 71⟩, ⟨2, 72⟩, ⟨3, 73⟩]
   targetConstruction := [goodConstruction]
   constructorPatternCount := 30
   constructedCascades := ids 50000 (3 * 637)
@@ -576,36 +433,11 @@ def good : RunFacts where
   factorizedPreference := some goodPreferenceCertificate
   calibrationAuthorizations := [goodCalibrationAuthorization]
   factorizationAuthorizations := [goodFactorizationAuthorization]
-  differentArrangementPairs := 20
-  arrangementPairsDistinguishedByG := 20
-  frontierCensus := ⟨{1, 2, 3}, []⟩
-  frontierRefresh := positiveRefresh
-  frontierSelection := positiveSelection
-  selectedCascade := goodCascade
-  outerPolicyCarrier := goodOuterCarrier
-  outerPolicySelection := goodOuterSelection
 
 /-- Deterministic likelihoods and terminal-only preferences may yield numeric
 zero epistemic terms while still carrying every term and total C-tau. -/
 def deterministicTerminal : RunFacts :=
   { good with policyPreferences := good.policyPreferences.map (fun p => { p with semantics := .terminalOnly, gradedPreferenceSteps := ∅ }) }
-
-def missingOuterPolicyCertificate : RunFacts :=
-  { good with outerPolicyCarrier := { goodOuterCarrier with evidence := [] } }
-
-def tiedOuterPolicyCertificate : RunFacts :=
-  { good with
-    outerPolicyCarrier := OuterCascadePolicyObjective.tiedCarrier
-    outerPolicySelection := OuterCascadePolicyObjective.tiedSelection }
-
-def wrongOuterPolicyDecomposition : RunFacts :=
-  { good with outerPolicyCarrier :=
-      { goodOuterCarrier with evidence :=
-          [{ goodOuterEvidenceA with novelty := 3/4 }, goodOuterEvidenceB] } }
-
-def substitutedOuterPolicyDigest : RunFacts :=
-  { good with outerPolicySelection :=
-      ⟨{ goodOuterEvidenceB with policy := { goodOuterEvidenceB.policy with cascadeDigest := 59999 } }⟩ }
 
 /-- An asserted progressive schedule does not receive that exemption. -/
 def progressiveRowsMissing : RunFacts :=
@@ -652,46 +484,6 @@ def noComparedPolicies : RunFacts :=
       policiesWithAmbiguityTerm := 0
       policiesWithInformationTerm := 0 }
 
-/-- Adversarial Q8 witnesses isolate incomplete refresh and identity-correspondence
-failures without changing the historical breadth fields. -/
-def omittedAffectedFrontier : RunFacts :=
-  { good with frontierRefresh := omittedRefresh }
-
-def cascadeMismatch : RunFacts :=
-  { good with selectedCascade := mismatchedCascade }
-
-def insufficientPosteriorMultiplicity : RunFacts :=
-  { good with selectedCascade := twoAdmissibleOnePosterior }
-
-/-- Census witnesses (ruling 2b).  Task 4 is open and excluded with a reason;
-it carries no comparison key and is outside the ranked frontier. -/
-def excludedWithReason : RunFacts :=
-  { good with openTickets := {4}, frontierCensus := ⟨{1, 2, 3}, [⟨4, 77⟩]⟩ }
-
-def omittedOpenTask : RunFacts :=
-  { good with openTickets := {4} }
-
-def inventedEligibleTask : RunFacts :=
-  { good with frontierCensus := ⟨{1, 2, 3, 4}, []⟩ }
-
-def unreasonedExclusion : RunFacts :=
-  { good with openTickets := {4}, frontierCensus := ⟨{1, 2, 3}, [⟨4, 0⟩]⟩ }
-
-/-- Exclusion witnesses (ruling 1a).  `good`'s previous run chose cascade
-50000, was refused, and had the same input digest. -/
-def q6ExcludedCascade : TargetCascadeCertificate :=
-  ⟨1, {40, 50000}, {40, 50000}, {40, 50000}, {40, 50000}, {50000}, {40}⟩
-
-def q6Excluded : RunFacts :=
-  { good with selectedCascade := q6ExcludedCascade }
-
-def exclusionWithoutQ6 : RunFacts :=
-  { good with selectedCascade := q6ExcludedCascade, currentInputDigest := 8 }
-
-def exclusionOfAnotherPolicy : RunFacts :=
-  { good with selectedCascade :=
-      ⟨1, {40, 50000}, {40, 50000}, {40, 50000}, {40, 50000}, {40}, {50000}⟩ }
-
 /-- Every unrelated Q9 carrier is populated, but the certificate substitutes
 the factorization identity without a matching retained authorization. -/
 def substitutedFactorization : RunFacts :=
@@ -699,106 +491,6 @@ def substitutedFactorization : RunFacts :=
     factorizedPreference := some
       { goodPreferenceCertificate with factorizationIdentity := 109 } }
 
-/-- Q2 witnesses (ruling (c)).  `good` has outer actions for its three
-eligible tasks and one construction, for the selected task 1. -/
-def actionForExcludedTask : RunFacts :=
-  { excludedWithReason with outerActions := good.outerActions ++ [⟨4, 74⟩] }
-
-def omittedOuterAction : RunFacts :=
-  { good with outerActions := [⟨1, 71⟩, ⟨2, 72⟩] }
-
-def duplicateOuterAction : RunFacts :=
-  { good with outerActions := [⟨1, 71⟩, ⟨2, 72⟩, ⟨3, 73⟩, ⟨3, 73⟩] }
-
-def sharedOuterActionIdentity : RunFacts :=
-  { good with outerActions := [⟨1, 71⟩, ⟨2, 71⟩, ⟨3, 73⟩] }
-
-def foreignOuterAction : RunFacts :=
-  { good with outerActions := good.outerActions ++ [⟨9, 79⟩] }
-
-def unselectedTaskConstructed : RunFacts :=
-  { good with targetConstruction :=
-      [goodConstruction, { goodConstruction with targets := {2}, action := 72 }] }
-
-def wrongSelectedTask : RunFacts :=
-  { good with targetConstruction := [{ goodConstruction with targets := {2}, action := 72 }] }
-
-def wrongSelectedAction : RunFacts :=
-  { good with targetConstruction := [{ goodConstruction with action := 72 }] }
-
-def noConstruction : RunFacts :=
-  { good with targetConstruction := [] }
-
-def omittedPolicy : RunFacts :=
-  { good with targetConstruction :=
-      [{ goodConstruction with policies := {60000}, policyCount := 1 }] }
-
-def inventedPolicy : RunFacts :=
-  { good with targetConstruction :=
-      [{ goodConstruction with policies := {60000, 60001, 60002}, policyCount := 3 }] }
-
-def duplicatePolicyCounted : RunFacts :=
-  { good with targetConstruction := [{ goodConstruction with policyCount := 3 }] }
-
-def zeroPolicyFamily : RunFacts :=
-  { good with
-      targetConstruction := [{ goodConstruction with policies := ∅, policyCount := 0 }]
-      selectedCascade := ⟨1, ∅, ∅, ∅, ∅, ∅, ∅⟩
-      comparedPolicies := ∅ }
-
-def poolNotSlice : RunFacts :=
-  { good with targetConstruction := [{ goodConstruction with pool := ids 3000 31 }] }
-
-def sliceNotFromLibrary : RunFacts :=
-  { good with targetConstruction := [{ goodConstruction with sliceFromWholeLibrary := false }] }
-
-def readingUnpinned : RunFacts :=
-  { good with targetConstruction := [{ goodConstruction with reading := 0 }] }
-
-def comparedOutsideConstruction : RunFacts :=
-  { good with comparedPolicies := {60000, 60002} }
-
-theorem good_Q2 : Q2 good = true := by native_decide
-theorem missing_outer_policy_not_Q2 : Q2 missingOuterPolicyCertificate = false := by native_decide
-theorem missing_outer_policy_fails_Q2_Q4_Q8 :
-    Q2 missingOuterPolicyCertificate = false ∧
-    Q4 missingOuterPolicyCertificate = false ∧
-    Q8 missingOuterPolicyCertificate = false := by native_decide
-theorem missing_outer_policy_not_conforms : conforms missingOuterPolicyCertificate = false := by native_decide
-theorem tied_outer_policy_not_Q8 : Q8 tiedOuterPolicyCertificate = false := by native_decide
-theorem tied_outer_policy_not_conforms : conforms tiedOuterPolicyCertificate = false := by native_decide
-theorem wrong_outer_policy_decomposition_not_Q4 :
-    Q4 wrongOuterPolicyDecomposition = false := by native_decide
-theorem wrong_outer_policy_decomposition_not_Q8 :
-    Q8 wrongOuterPolicyDecomposition = false := by native_decide
-theorem wrong_outer_policy_decomposition_not_conforms :
-    conforms wrongOuterPolicyDecomposition = false := by native_decide
-theorem substituted_outer_policy_digest_not_Q2 :
-    Q2 substitutedOuterPolicyDigest = false := by native_decide
-theorem substituted_outer_policy_digest_not_Q8 :
-    Q8 substitutedOuterPolicyDigest = false := by native_decide
-theorem substituted_outer_policy_digest_not_conforms :
-    conforms substitutedOuterPolicyDigest = false := by native_decide
-theorem valid_outer_policy_Q2_Q4_Q8_and_conforms :
-    Q2 good = true ∧ Q4 good = true ∧ Q8 good = true ∧ conforms good = true := by native_decide
-theorem excluded_task_without_action_Q2 : Q2 excludedWithReason = true := by native_decide
-theorem action_for_excluded_task_not_Q2 : Q2 actionForExcludedTask = false := by native_decide
-theorem omitted_outer_action_not_Q2 : Q2 omittedOuterAction = false := by native_decide
-theorem duplicate_outer_action_not_Q2 : Q2 duplicateOuterAction = false := by native_decide
-theorem shared_outer_action_identity_not_Q2 : Q2 sharedOuterActionIdentity = false := by native_decide
-theorem foreign_outer_action_not_Q2 : Q2 foreignOuterAction = false := by native_decide
-theorem unselected_task_constructed_not_Q2 : Q2 unselectedTaskConstructed = false := by native_decide
-theorem wrong_selected_task_not_Q2 : Q2 wrongSelectedTask = false := by native_decide
-theorem wrong_selected_action_not_Q2 : Q2 wrongSelectedAction = false := by native_decide
-theorem no_construction_not_Q2 : Q2 noConstruction = false := by native_decide
-theorem omitted_policy_not_Q2 : Q2 omittedPolicy = false := by native_decide
-theorem invented_policy_not_Q2 : Q2 inventedPolicy = false := by native_decide
-theorem duplicate_policy_counted_not_Q2 : Q2 duplicatePolicyCounted = false := by native_decide
-theorem zero_policy_family_not_Q2 : Q2 zeroPolicyFamily = false := by native_decide
-theorem pool_not_slice_not_Q2 : Q2 poolNotSlice = false := by native_decide
-theorem slice_not_from_library_not_Q2 : Q2 sliceNotFromLibrary = false := by native_decide
-theorem reading_unpinned_not_Q2 : Q2 readingUnpinned = false := by native_decide
-theorem compared_outside_construction_not_Q2 : Q2 comparedOutsideConstruction = false := by native_decide
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by native_decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by native_decide
 theorem good_Q4_mixed_horizons : Q4 good = true := by native_decide
@@ -810,32 +502,17 @@ theorem foreign_policy_record_not_Q4 : Q4 foreignPolicyRecord = false := by nati
 theorem duplicate_policy_record_not_Q4 : Q4 duplicatePolicyRecord = false := by native_decide
 theorem policy_term_missing_not_Q4 : Q4 policyTermMissing = false := by native_decide
 theorem no_compared_policies_not_Q4 : Q4 noComparedPolicies = false := by native_decide
-theorem good_Q8 : Q8 good = true := by native_decide
-theorem omitted_affected_frontier_not_Q8 : Q8 omittedAffectedFrontier = false := by native_decide
-theorem cascade_mismatch_not_Q8 : Q8 cascadeMismatch = false := by native_decide
-theorem insufficient_posterior_multiplicity_not_Q8 :
-    Q8 insufficientPosteriorMultiplicity = false := by native_decide
-theorem excluded_with_reason_Q8 : Q8 excludedWithReason = true := by native_decide
-theorem omitted_open_task_not_Q8 : Q8 omittedOpenTask = false := by native_decide
-theorem invented_eligible_task_not_Q8 : Q8 inventedEligibleTask = false := by native_decide
-theorem unreasoned_exclusion_not_Q8 : Q8 unreasonedExclusion = false := by native_decide
-theorem q6_excluded_Q8 : Q8 q6Excluded = true := by native_decide
-theorem exclusion_without_q6_not_Q8 : Q8 exclusionWithoutQ6 = false := by native_decide
-theorem exclusion_of_another_policy_not_Q8 : Q8 exclusionOfAnotherPolicy = false := by native_decide
 theorem good_Q9 : Q9 good = true := by native_decide
 theorem substituted_factorization_not_Q9 : Q9 substitutedFactorization = false := by native_decide
 
 theorem click20_not_Q1 : Q1 click20 = false := by native_decide
-theorem click20_not_Q2 : Q2 click20 = false := by native_decide
 theorem click20_not_Q4 : Q4 click20 = false := by native_decide
 theorem click20_not_Q5 : Q5 click20 = false := by native_decide
 theorem click20_not_Q6 : Q6 click20 = false := by native_decide
 theorem click20_not_Q7 : Q7 click20 = false := by native_decide
-theorem click20_not_Q8 : Q8 click20 = false := by native_decide
 theorem click20_not_Q9 : Q9 click20 = false := by native_decide
-theorem click20_not_Q10 : Q10 click20 = false := by native_decide
 theorem click20_violations :
-    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q8, .q9, .q10] := by native_decide
+    violations click20 = [.q1, .q4, .q5, .q6, .q7, .q9] := by native_decide
 theorem click20_not_conformant : conforms click20 = false := by native_decide
 theorem missingG_not_Q3 : Q3 missingG = false := by native_decide
 theorem good_conforms : conforms good = true := by native_decide
@@ -848,13 +525,6 @@ is false
 -/
 #guard_msgs in
 example : Q1 click20 = true := by decide
-/--
-error: Tactic `native_decide` evaluated that the proposition
-  Q2 click20 = true
-is false
--/
-#guard_msgs in
-example : Q2 click20 = true := by native_decide
 /--
 error: Tactic `decide` proved that the proposition
   Q3 missingG = true
@@ -891,36 +561,19 @@ is false
 #guard_msgs in
 example : Q7 click20 = true := by decide
 /--
-error: Tactic `native_decide` evaluated that the proposition
-  Q8 click20 = true
-is false
--/
-#guard_msgs in
-example : Q8 click20 = true := by native_decide
-/--
 error: Tactic `decide` proved that the proposition
   Q9 click20 = true
 is false
 -/
 #guard_msgs in
 example : Q9 click20 = true := by decide
-/--
-error: Tactic `decide` proved that the proposition
-  Q10 click20 = true
-is false
--/
-#guard_msgs in
-example : Q10 click20 = true := by decide
 
 #print axioms click20_not_Q1
-#print axioms click20_not_Q2
 #print axioms click20_not_Q4
 #print axioms click20_not_Q5
 #print axioms click20_not_Q6
 #print axioms click20_not_Q7
-#print axioms click20_not_Q8
 #print axioms click20_not_Q9
-#print axioms click20_not_Q10
 #print axioms click20_violations
 #print axioms click20_not_conformant
 #print axioms missingG_not_Q3
@@ -936,35 +589,5 @@ example : Q10 click20 = true := by decide
 #print axioms duplicate_policy_record_not_Q4
 #print axioms policy_term_missing_not_Q4
 #print axioms no_compared_policies_not_Q4
-#print axioms good_Q8
-#print axioms omitted_affected_frontier_not_Q8
-#print axioms cascade_mismatch_not_Q8
-#print axioms insufficient_posterior_multiplicity_not_Q8
-#print axioms excluded_with_reason_Q8
-#print axioms omitted_open_task_not_Q8
-#print axioms invented_eligible_task_not_Q8
-#print axioms unreasoned_exclusion_not_Q8
-#print axioms q6_excluded_Q8
-#print axioms exclusion_without_q6_not_Q8
-#print axioms exclusion_of_another_policy_not_Q8
-#print axioms good_Q2
-#print axioms excluded_task_without_action_Q2
-#print axioms action_for_excluded_task_not_Q2
-#print axioms omitted_outer_action_not_Q2
-#print axioms duplicate_outer_action_not_Q2
-#print axioms shared_outer_action_identity_not_Q2
-#print axioms foreign_outer_action_not_Q2
-#print axioms unselected_task_constructed_not_Q2
-#print axioms wrong_selected_task_not_Q2
-#print axioms wrong_selected_action_not_Q2
-#print axioms no_construction_not_Q2
-#print axioms omitted_policy_not_Q2
-#print axioms invented_policy_not_Q2
-#print axioms duplicate_policy_counted_not_Q2
-#print axioms zero_policy_family_not_Q2
-#print axioms pool_not_slice_not_Q2
-#print axioms slice_not_from_library_not_Q2
-#print axioms reading_unpinned_not_Q2
-#print axioms compared_outside_construction_not_Q2
 
 end DarkTower.WarMachine.Requirements

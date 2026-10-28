@@ -269,7 +269,7 @@ def preparationBudget : Nat := 3
 
 /-- R1.  With unmet reading needs the batch ran, attempted at least one, spent
 at most the budget, and deferred only once the budget was spent
-(`SelectionPreparation.lean`, amended: a refusal spends a slot; `:refused` is
+(a refusal spends a slot; `:refused` is
 a subset of `:attempted` in the C4a projection, so `attempted` is the spent
 count). -/
 def r1Holds (r : ClickRecord) : Bool :=
@@ -284,8 +284,7 @@ def r1Holds (r : ClickRecord) : Bool :=
 def r2Holds (r : ClickRecord) : Bool := r.preparation.isSome
 
 /-- R3.  The Q8 carrier is the Q8a outer frontier, it is recomputable, and its
-ranked and unranked tasks together are the eligible census
-(`IncrementalTaskFrontier.lean`, `FrontierCoverage.Valid`). -/
+ranked and unranked tasks together are the eligible census. -/
 def r3Holds (r : ClickRecord) : Bool :=
   r.frontierSchema == .outerV1 && r.frontierStatus != .notRecomputable &&
     r.frontierRanked + r.frontierUnranked == r.frontierEligible
@@ -515,7 +514,7 @@ theorem refusals_spend_the_budget :
     Predicted { predictedRecord with preparation := some (.ran 3 3 98) } := by decide
 
 /-- A frontier whose ranked and unranked tasks do not exhaust the census is
-the uncovered frontier `IncrementalTaskFrontier` refuses. -/
+rejected by the recorded frontier-coverage check. -/
 theorem uncovered_frontier_not_predicted :
     ¬ Predicted { predictedRecord with frontierUnranked := 104 } := by decide
 
