@@ -26,6 +26,16 @@ abbrev PatternIdentity := R20Run.PatternIdentity
 
 variable {Policy : Type} [DecidableEq Policy]
 
+/-- Total rational Beta counts.  Totality makes Smith, Friston & Whyte 2022
+§4 Eqs. 34 and 37 forgetting reach keys absent from a finite slow-state list. -/
+abbrev RatedCounts (Key : Type) := Key → ℚ × ℚ
+
+/-- Embed the existing integer R15 prior kit into total rational counts. -/
+def ofSlowState {Key : Type} [DecidableEq Key]
+    (s : R15TemporalHierarchy.SlowState Key) : RatedCounts Key := fun key =>
+  ((R15TemporalHierarchy.countsFor s key).alpha,
+   (R15TemporalHierarchy.countsFor s key).beta)
+
 /-- Fixed makeup for one run.  `d₀` is the initial evidence concentration
 (Friston 2017, equation 2.7); `κ` is the preference-count strength used by the
 Smith, Friston & Whyte 2022 preference update. -/
@@ -37,6 +47,34 @@ structure Makeup (Policy : Type) where
   theta₀ : SlowState PatternIdentity
   kappa : ℚ
   kappa_pos : 0 < kappa
+  /-- Evidence learning rate η_d; Smith, Friston & Whyte 2022 §4 Eq. 34. -/
+  etaD : ℝ
+  etaD_pos : 0 < etaD
+  /-- Evidence forgetting rate ω_d; Smith, Friston & Whyte 2022 §4 Eq. 34. -/
+  omegaD : ℝ
+  omegaD_pos : 0 < omegaD
+  omegaD_le_one : omegaD ≤ 1
+  /-- Preference learning rate η_c; Smith, Friston & Whyte 2022 §4 Eq. 37. -/
+  etaC : ℚ
+  etaC_pos : 0 < etaC
+  /-- Preference forgetting rate ω_c; Smith, Friston & Whyte 2022 §4 Eq. 37. -/
+  omegaC : ℚ
+  omegaC_pos : 0 < omegaC
+  omegaC_le_one : omegaC ≤ 1
+  /-- Habit learning rate η_h; Smith, Friston & Whyte 2022 §4 Eq. 37. -/
+  etaHabit : ℚ
+  etaHabit_pos : 0 < etaHabit
+  /-- Habit forgetting rate ω_h; Smith, Friston & Whyte 2022 §4 Eq. 37. -/
+  omegaHabit : ℚ
+  omegaHabit_pos : 0 < omegaHabit
+  omegaHabit_le_one : omegaHabit ≤ 1
+  /-- Pattern learning rate η_θ; Smith, Friston & Whyte 2022 §4 Eq. 37. -/
+  etaTheta : ℚ
+  etaTheta_pos : 0 < etaTheta
+  /-- Pattern forgetting rate ω_θ; Smith, Friston & Whyte 2022 §4 Eq. 37. -/
+  omegaTheta : ℚ
+  omegaTheta_pos : 0 < omegaTheta
+  omegaTheta_le_one : omegaTheta ≤ 1
   initialFocus : Nat
 
 /-- State carried from one click to the next.  `d` is the concentration from
@@ -44,8 +82,8 @@ Friston 2017, equation 2.7; `c` is the learned preference concentration from
 Smith, Friston & Whyte 2022. -/
 structure State (Policy : Type) where
   d : Hidden → ℝ
-  habit : SlowState Policy
-  theta : SlowState PatternIdentity
+  habit : RatedCounts Policy
+  theta : RatedCounts PatternIdentity
   c : CCounts
   previousFocus : Nat
   runId : Nat
@@ -66,10 +104,10 @@ count. -/
 structure Click (Policy : Type) where
   d : Hidden → ℝ
   evidence : R20Certificate.EvidenceRow
-  habitBefore : SlowState Policy
-  habitAfter : SlowState Policy
-  thetaBefore : SlowState PatternIdentity
-  thetaAfter : SlowState PatternIdentity
+  habitBefore : RatedCounts Policy
+  habitAfter : RatedCounts Policy
+  thetaBefore : RatedCounts PatternIdentity
+  thetaAfter : RatedCounts PatternIdentity
   c : CCounts
   C : CTauClassPreference.Distribution
   previousFocus : Nat
@@ -93,6 +131,10 @@ ending.  `notYetEvaluated` is not a terminal outcome and adds nothing. -/
 def addEnding (c : CCounts) (observed : EndingClass) : CCounts := fun ending =>
   c ending + if observed = ending ∧ ending ≠ .notYetEvaluated then 1 else 0
 
+/-- One Smith, Friston & Whyte 2022 preference-count observation. -/
+def endingDelta (observed : EndingClass) : CCounts := fun ending =>
+  if observed = ending ∧ ending ≠ .notYetEvaluated then 1 else 0
+
 /-- Normalize learned Smith, Friston & Whyte 2022 preference counts. -/
 def normalizeC (c : CCounts) : CTauClassPreference.Distribution := fun ending =>
   c ending / CTauClassPreference.totalMass c
@@ -102,12 +144,47 @@ def learnedClassPreference (C : CTauClassPreference.Distribution)
     (horizon tau : Nat) : CTauClassPreference.Distribution :=
   if tau = horizon then C else CTauClassPreference.waitingPreference
 
+/-- Decay every total Beta count by ω once.  The rate is the forgetting rate
+of Smith, Friston & Whyte 2022 §4 Eqs. 34 and 37. -/
+def decayRated {Key : Type} (omega : ℚ) (counts : RatedCounts Key) : RatedCounts Key :=
+  fun key => (omega * (counts key).1, omega * (counts key).2)
+
+/-- Add η to one total Beta count after decay.  η is the learning rate of
+Smith, Friston & Whyte 2022 §4 Eqs. 34 and 37. -/
+def addRated {Key : Type} [DecidableEq Key] (eta : ℚ) (counts : RatedCounts Key)
+    (key : Key) (succeeded : Bool) : RatedCounts Key := fun query =>
+  if query = key then
+    if succeeded then ((counts query).1 + eta, (counts query).2)
+    else ((counts query).1, (counts query).2 + eta)
+  else counts query
+
+/-- Habit update with explicit Smith, Friston & Whyte 2022 §4 Eqs. 34 and 37
+learning η and forgetting ω: decay all policies, then count the observation. -/
+def advanceRated {Key : Type} [DecidableEq Key] (eta omega : ℚ)
+    (before : RatedCounts Key) (outcome : FastOutcome Key) : RatedCounts Key :=
+  addRated eta (decayRated omega before) outcome.policy outcome.succeeded
+
+/-- Pattern update with explicit Smith, Friston & Whyte 2022 §4 Eqs. 34 and 37
+rates: decay all keys once, then add η for each witnessed matching outcome in
+the same order as `PatternTheta.advanceWitnessed`. -/
+def advanceWitnessedRated (eta omega : ℚ) (pattern : PatternIdentity)
+    (before : RatedCounts PatternIdentity) (outcomes : List (FastOutcome PatternIdentity)) :
+    RatedCounts PatternIdentity :=
+  (PatternTheta.witnessedOutcomes pattern outcomes).foldl
+    (fun counts succeeded => addRated eta counts pattern succeeded)
+    (decayRated omega before)
+
+/-- Preference update with explicit Smith, Friston & Whyte 2022 §4 Eqs. 34
+and 37 learning η and forgetting ω. -/
+def advanceC (eta omega : ℚ) (before : CCounts) (ending : EndingClass) : CCounts :=
+  omega • before + eta • endingDelta ending
+
 /-- Initial carried state.  Evidence concentration follows Friston 2017,
 equation 2.7; preference concentration follows Smith, Friston & Whyte 2022. -/
 def init (m : Makeup Policy) : State Policy where
   d := m.d₀
-  habit := m.habit₀
-  theta := m.theta₀
+  habit := ofSlowState m.habit₀
+  theta := ofSlowState m.theta₀
   c := initialC m
   previousFocus := m.initialFocus
   runId := 0
@@ -123,9 +200,9 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
     Click Policy × State Policy :=
   let prior := evidencePrior s
   let posterior := EvidenceFromTheProcess.posterior prior m.A o.observation
-  let habitAfter := R15TemporalHierarchy.advance s.habit o.habitOutcome
-  let thetaAfter := PatternTheta.advanceWitnessed m.pattern s.theta o.thetaOutcomes
-  let cAfter := addEnding s.c o.endingClass
+  let habitAfter := advanceRated m.etaHabit m.omegaHabit s.habit o.habitOutcome
+  let thetaAfter := advanceWitnessedRated m.etaTheta m.omegaTheta m.pattern s.theta o.thetaOutcomes
+  let cAfter := advanceC m.etaC m.omegaC s.c o.endingClass
   ({ d := s.d
      evidence := ⟨prior, m.A, o.observation, posterior⟩
      habitBefore := s.habit
@@ -137,7 +214,7 @@ noncomputable def step (m : Makeup Policy) (s : State Policy) (o : Observation P
      previousFocus := s.previousFocus
      focus := o.focus
      runId := s.runId },
-   { d := s.d + posterior
+   { d := m.omegaD • s.d + m.etaD • posterior
      habit := habitAfter
      theta := thetaAfter
      c := cAfter
@@ -164,10 +241,6 @@ noncomputable def run (m : Makeup Policy) (obs : List (Observation Policy)) :
 noncomputable def stateAfter (m : Makeup Policy) (obs : List (Observation Policy)) :
     State Policy := (runFrom m (init m) obs).2
 
-/-- One Smith, Friston & Whyte 2022 preference-count observation. -/
-def endingDelta (observed : EndingClass) : CCounts := fun ending =>
-  if observed = ending ∧ ending ≠ .notYetEvaluated then 1 else 0
-
 /-- Smith, Friston & Whyte 2022 preference counts contributed by a prefix. -/
 def endingCounts : List (Observation Policy) → CCounts
   | [] => 0
@@ -190,6 +263,13 @@ def sumBeliefs : List (Hidden → ℝ) → Hidden → ℝ
   | [] => 0
   | p :: ps => p + sumBeliefs ps
 
+theorem posteriorHistoryFrom_length (m : Makeup Policy) (s : State Policy)
+    (obs : List (Observation Policy)) :
+    (posteriorHistoryFrom m s obs).length = obs.length := by
+  induction obs generalizing s with
+  | nil => rfl
+  | cons o obs ih => simp [posteriorHistoryFrom, ih]
+
 theorem addEnding_eq_add (c : CCounts) (ending : EndingClass) :
     addEnding c ending = c + endingDelta ending := by
   rfl
@@ -202,13 +282,30 @@ theorem runFrom_append_one (m : Makeup Policy) (s : State Policy)
   | nil => simp [runFrom]
   | cons x xs ih => simp [runFrom, ih]
 
+/-- The power-weighted Smith, Friston & Whyte 2022 ending increments. -/
+def geometricEndings (omega : ℚ) : List (Observation Policy) → CCounts
+  | [] => 0
+  | o :: obs => omega ^ obs.length • endingDelta o.endingClass + geometricEndings omega obs
+
+/-- The power-weighted Friston 2017 equation 2.7 posterior increments. -/
+def geometricBeliefs (omega : ℝ) : List (Hidden → ℝ) → Hidden → ℝ
+  | [] => 0
+  | p :: ps => omega ^ ps.length • p + geometricBeliefs omega ps
+
 theorem stateAfterFrom_c (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
-    (runFrom m s obs).2.c = obs.foldl (fun c o => addEnding c o.endingClass) s.c := by
+    (runFrom m s obs).2.c =
+      m.omegaC ^ obs.length • s.c + m.etaC • geometricEndings m.omegaC obs := by
   induction obs generalizing s with
-  | nil => simp [runFrom]
-  | cons o obs ih => simpa [runFrom, step] using ih (step m s o).2
+  | nil => simp [runFrom, geometricEndings]
+  | cons o obs ih =>
+      rw [show (runFrom m s (o :: obs)).2 = (runFrom m (step m s o).2 obs).2 by rfl, ih]
+      simp only [step, geometricEndings, List.length_cons, pow_succ]
+      funext ending
+      simp [advanceC]
+      ring
 
+omit [DecidableEq Policy] in
 theorem fold_addEnding (base : CCounts) (obs : List (Observation Policy)) :
     obs.foldl (fun c o => addEnding c o.endingClass) base = base + endingCounts obs := by
   induction obs generalizing base with
@@ -222,14 +319,16 @@ theorem fold_addEnding (base : CCounts) (obs : List (Observation Policy)) :
       ring
 
 theorem stateAfter_c (m : Makeup Policy) (obs : List (Observation Policy)) :
-    (stateAfter m obs).c = initialC m + endingCounts obs := by
-  rw [stateAfter, stateAfterFrom_c, fold_addEnding]
-  rfl
+    (stateAfter m obs).c =
+      m.omegaC ^ obs.length • initialC m + m.etaC • geometricEndings m.omegaC obs := by
+  simpa [stateAfter, init] using stateAfterFrom_c m (init m) obs
 
 theorem click_c_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     let click := (step m (stateAfter m pre) o).1
-    click.c = initialC m + endingCounts pre ∧ click.C = normalizeC click.c := by
+    click.c = m.omegaC ^ pre.length • initialC m +
+        m.etaC • geometricEndings m.omegaC pre ∧
+      click.C = normalizeC click.c := by
   simp [step, stateAfter_c]
 
 theorem click_zero_C_kit (m : Makeup Policy) (o : Observation Policy) :
@@ -239,48 +338,56 @@ theorem click_zero_C_kit (m : Makeup Policy) (o : Observation Policy) :
 
 theorem stateAfterFrom_d (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
-    (runFrom m s obs).2.d = s.d + sumBeliefs (posteriorHistoryFrom m s obs) := by
+    (runFrom m s obs).2.d = m.omegaD ^ obs.length • s.d +
+      m.etaD • geometricBeliefs m.omegaD (posteriorHistoryFrom m s obs) := by
   induction obs generalizing s with
-  | nil => simp [runFrom, posteriorHistoryFrom, sumBeliefs]
+  | nil => simp [runFrom, posteriorHistoryFrom, geometricBeliefs]
   | cons o obs ih =>
-      simp only [runFrom]
-      rw [ih]
-      simp [posteriorHistoryFrom, sumBeliefs, step]
-      abel
+      rw [show (runFrom m s (o :: obs)).2 = (runFrom m (step m s o).2 obs).2 by rfl, ih]
+      simp only [posteriorHistoryFrom, geometricBeliefs, List.length_cons, step, pow_succ]
+      funext hidden
+      simp [posteriorHistoryFrom_length]
+      ring
 
 theorem stateAfter_d (m : Makeup Policy) (obs : List (Observation Policy)) :
-    (stateAfter m obs).d = m.d₀ + sumBeliefs (posteriorHistory m obs) := by
+    (stateAfter m obs).d = m.omegaD ^ obs.length • m.d₀ +
+      m.etaD • geometricBeliefs m.omegaD (posteriorHistory m obs) := by
   simpa [stateAfter, posteriorHistory, init] using stateAfterFrom_d m (init m) obs
 
 theorem click_d_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.d =
-      m.d₀ + sumBeliefs (posteriorHistory m pre) := by
+      m.omegaD ^ pre.length • m.d₀ +
+        m.etaD • geometricBeliefs m.omegaD (posteriorHistory m pre) := by
   simp [step, stateAfter_d]
 
 theorem stateAfterFrom_habit (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.habit =
-      obs.foldl (fun habit o => R15TemporalHierarchy.advance habit o.habitOutcome) s.habit := by
+      obs.foldl (fun habit o => advanceRated m.etaHabit m.omegaHabit habit o.habitOutcome)
+        s.habit := by
   induction obs generalizing s with
   | nil => simp [runFrom]
   | cons o obs ih => simpa [runFrom, step] using ih (step m s o).2
 
 theorem stateAfter_habit (m : Makeup Policy) (obs : List (Observation Policy)) :
     (stateAfter m obs).habit =
-      obs.foldl (fun habit o => R15TemporalHierarchy.advance habit o.habitOutcome) m.habit₀ := by
+      obs.foldl (fun habit o => advanceRated m.etaHabit m.omegaHabit habit o.habitOutcome)
+        (ofSlowState m.habit₀) := by
   simpa [stateAfter, init] using stateAfterFrom_habit m (init m) obs
 
 theorem click_habit_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.habitBefore =
-      pre.foldl (fun habit x => R15TemporalHierarchy.advance habit x.habitOutcome) m.habit₀ := by
+      pre.foldl (fun habit x => advanceRated m.etaHabit m.omegaHabit habit x.habitOutcome)
+        (ofSlowState m.habit₀) := by
   simp [step, stateAfter_habit]
 
 theorem stateAfterFrom_theta (m : Makeup Policy) (s : State Policy)
     (obs : List (Observation Policy)) :
     (runFrom m s obs).2.theta =
-      obs.foldl (fun theta o => PatternTheta.advanceWitnessed m.pattern theta o.thetaOutcomes)
+      obs.foldl (fun theta o => advanceWitnessedRated m.etaTheta m.omegaTheta
+        m.pattern theta o.thetaOutcomes)
         s.theta := by
   induction obs generalizing s with
   | nil => simp [runFrom]
@@ -288,16 +395,86 @@ theorem stateAfterFrom_theta (m : Makeup Policy) (s : State Policy)
 
 theorem stateAfter_theta (m : Makeup Policy) (obs : List (Observation Policy)) :
     (stateAfter m obs).theta =
-      obs.foldl (fun theta o => PatternTheta.advanceWitnessed m.pattern theta o.thetaOutcomes)
-        m.theta₀ := by
+      obs.foldl (fun theta o => advanceWitnessedRated m.etaTheta m.omegaTheta
+        m.pattern theta o.thetaOutcomes) (ofSlowState m.theta₀) := by
   simpa [stateAfter, init] using stateAfterFrom_theta m (init m) obs
 
 theorem click_theta_at (m : Makeup Policy) (pre : List (Observation Policy))
     (o : Observation Policy) :
     (step m (stateAfter m pre) o).1.thetaBefore =
       pre.foldl
-        (fun theta x => PatternTheta.advanceWitnessed m.pattern theta x.thetaOutcomes) m.theta₀ := by
+        (fun theta x => advanceWitnessedRated m.etaTheta m.omegaTheta
+          m.pattern theta x.thetaOutcomes) (ofSlowState m.theta₀) := by
   simp [step, stateAfter_theta]
+
+/-- With η = ω = 1, the rated habit update is exactly the existing R15 update. -/
+theorem advanceRated_one {Key : Type} [DecidableEq Key]
+    (s : SlowState Key) (o : FastOutcome Key) :
+    advanceRated 1 1 (ofSlowState s) o = ofSlowState (R15TemporalHierarchy.advance s o) := by
+  funext query
+  by_cases h : query = o.policy
+  · subst query
+    simp [advanceRated, decayRated, addRated, ofSlowState, R15TemporalHierarchy.advance,
+      R15TemporalHierarchy.countsFor_setCounts_same, R15TemporalHierarchy.updatedCounts]
+    split <;> simp
+  · simp [advanceRated, decayRated, addRated, ofSlowState, R15TemporalHierarchy.advance, h,
+      R15TemporalHierarchy.countsFor_setCounts_other _ _ _ _ h]
+
+theorem decayRated_one {Key : Type} (counts : RatedCounts Key) :
+    decayRated 1 counts = counts := by
+  funext key
+  simp [decayRated]
+
+theorem fold_addRated_one_ofSlowState {Key : Type} [DecidableEq Key]
+    (key : Key) (s : SlowState Key) (xs : List Bool) :
+    xs.foldl (fun counts succeeded => addRated 1 counts key succeeded) (ofSlowState s) =
+      ofSlowState (PatternTheta.foldFires key s xs) := by
+  induction xs generalizing s with
+  | nil => rfl
+  | cons succeeded xs ih =>
+      rw [List.foldl_cons]
+      have one_step :
+          addRated 1 (ofSlowState s) key succeeded =
+            ofSlowState (R15TemporalHierarchy.advance s ⟨key, true, succeeded⟩) := by
+        simpa [advanceRated, decayRated_one] using
+          advanceRated_one s (⟨key, true, succeeded⟩ : FastOutcome Key)
+      rw [one_step, ih]
+      rfl
+
+/-- With η = ω = 1, the rated witnessed-pattern update is exactly PatternTheta's update. -/
+theorem advanceWitnessedRated_one (pattern : PatternIdentity)
+    (s : SlowState PatternIdentity) (outcomes : List (FastOutcome PatternIdentity)) :
+    advanceWitnessedRated 1 1 pattern (ofSlowState s) outcomes =
+      ofSlowState (PatternTheta.advanceWitnessed pattern s outcomes) := by
+  rw [advanceWitnessedRated, decayRated_one]
+  simp [PatternTheta.advanceWitnessed,
+    fold_addRated_one_ofSlowState]
+
+omit [DecidableEq Policy] in
+theorem geometricEndings_one (obs : List (Observation Policy)) :
+    geometricEndings 1 obs = endingCounts obs := by
+  induction obs with
+  | nil => rfl
+  | cons o obs ih => simp [geometricEndings, endingCounts, ih]
+
+omit [DecidableEq Policy] in
+theorem geometricBeliefs_one (ps : List (Hidden → ℝ)) :
+    geometricBeliefs 1 ps = sumBeliefs ps := by
+  induction ps with
+  | nil => rfl
+  | cons p ps ih => simp [geometricBeliefs, sumBeliefs, ih]
+
+theorem stateAfter_c_unit_rates (m : Makeup Policy) (obs : List (Observation Policy))
+    (heta : m.etaC = 1) (homega : m.omegaC = 1) :
+    (stateAfter m obs).c = initialC m + endingCounts obs := by
+  rw [stateAfter_c, heta, homega, geometricEndings_one]
+  simp
+
+theorem stateAfter_d_unit_rates (m : Makeup Policy) (obs : List (Observation Policy))
+    (heta : m.etaD = 1) (homega : m.omegaD = 1) :
+    (stateAfter m obs).d = m.d₀ + sumBeliefs (posteriorHistory m obs) := by
+  rw [stateAfter_d, heta, homega, geometricBeliefs_one]
+  simp
 
 theorem click_evidence_conforms (m : Makeup Policy) (s : State Policy)
     (o : Observation Policy) :
@@ -359,11 +536,13 @@ theorem click_previousFocus_at (m : Makeup Policy) (pre : List (Observation Poli
 theorem kit_total : CTauClassPreference.totalMass kit = 1 := by
   norm_num [CTauClassPreference.totalMass, kit]
 
+omit [DecidableEq Policy] in
 theorem initialC_total (m : Makeup Policy) :
     CTauClassPreference.totalMass (initialC m) = m.kappa := by
   simp [CTauClassPreference.totalMass, initialC, kit]
   ring
 
+omit [DecidableEq Policy] in
 theorem normalize_initialC (m : Makeup Policy) : normalizeC (initialC m) = kit := by
   funext ending
   unfold normalizeC
@@ -375,6 +554,7 @@ theorem click_zero_C_is_kit (m : Makeup Policy) (o : Observation Policy) :
     (step m (init m) o).1.C = kit := by
   simp [step, init, normalize_initialC]
 
+omit [DecidableEq Policy] in
 theorem initialC_nonnegative (m : Makeup Policy) :
     CTauClassPreference.Nonnegative (initialC m) := by
   intro ending
@@ -388,6 +568,7 @@ theorem addEnding_nonnegative {c : CCounts} (hc : CTauClassPreference.Nonnegativ
   · linarith [hc x]
   · simpa using hc x
 
+omit [DecidableEq Policy] in
 theorem fold_addEnding_nonnegative {c : CCounts}
     (hc : CTauClassPreference.Nonnegative c) (obs : List (Observation Policy)) :
     CTauClassPreference.Nonnegative
@@ -398,17 +579,41 @@ theorem fold_addEnding_nonnegative {c : CCounts}
       simp only [List.foldl_cons]
       exact ih (addEnding_nonnegative hc _)
 
+theorem advanceC_nonnegative {c : CCounts} (hc : CTauClassPreference.Nonnegative c)
+    (eta omega : ℚ) (heta : 0 ≤ eta) (homega : 0 ≤ omega) (ending : EndingClass) :
+    CTauClassPreference.Nonnegative (advanceC eta omega c ending) := by
+  intro x
+  simp only [advanceC, Pi.add_apply, Pi.smul_apply, smul_eq_mul]
+  have hdelta : 0 ≤ endingDelta ending x := by
+    by_cases h : ending = x ∧ x ≠ .notYetEvaluated <;> simp [endingDelta, h]
+  nlinarith [hc x]
+
+theorem runFrom_c_nonnegative (m : Makeup Policy) (s : State Policy)
+    (hs : CTauClassPreference.Nonnegative s.c) (obs : List (Observation Policy)) :
+    CTauClassPreference.Nonnegative (runFrom m s obs).2.c := by
+  induction obs generalizing s with
+  | nil => simpa [runFrom]
+  | cons o obs ih =>
+      apply ih
+      simpa [step] using advanceC_nonnegative hs m.etaC m.omegaC
+        m.etaC_pos.le m.omegaC_pos.le o.endingClass
+
 theorem stateAfter_c_nonnegative (m : Makeup Policy) (obs : List (Observation Policy)) :
     CTauClassPreference.Nonnegative (stateAfter m obs).c := by
-  unfold stateAfter
-  rw [stateAfterFrom_c]
-  exact fold_addEnding_nonnegative (initialC_nonnegative m) obs
+  exact runFrom_c_nonnegative m (init m) (by simpa [init] using initialC_nonnegative m) obs
 
 theorem addEnding_total (c : CCounts) (ending : EndingClass) :
     CTauClassPreference.totalMass (addEnding c ending) =
       CTauClassPreference.totalMass c + if ending = .notYetEvaluated then 0 else 1 := by
   fin_cases ending <;> simp [CTauClassPreference.totalMass, addEnding] <;> ring
 
+theorem advanceC_total (eta omega : ℚ) (c : CCounts) (ending : EndingClass) :
+    CTauClassPreference.totalMass (advanceC eta omega c ending) =
+      omega * CTauClassPreference.totalMass c +
+        eta * if ending = .notYetEvaluated then 0 else 1 := by
+  fin_cases ending <;> simp [CTauClassPreference.totalMass, advanceC, endingDelta] <;> ring
+
+omit [DecidableEq Policy] in
 theorem fold_addEnding_total_positive {c : CCounts}
     (hc : 0 < CTauClassPreference.totalMass c) (obs : List (Observation Policy)) :
     0 < CTauClassPreference.totalMass
@@ -423,9 +628,18 @@ theorem fold_addEnding_total_positive {c : CCounts}
 
 theorem stateAfter_c_total_positive (m : Makeup Policy) (obs : List (Observation Policy)) :
     0 < CTauClassPreference.totalMass (stateAfter m obs).c := by
-  unfold stateAfter
-  rw [stateAfterFrom_c]
-  apply fold_addEnding_total_positive
+  have aux : ∀ (s : State Policy) (xs : List (Observation Policy)),
+      0 < CTauClassPreference.totalMass s.c →
+        0 < CTauClassPreference.totalMass (runFrom m s xs).2.c := by
+    intro s xs hs
+    induction xs generalizing s with
+    | nil => simpa [runFrom]
+    | cons o xs ih =>
+        apply ih
+        simp only [step]
+        rw [advanceC_total]
+        split <;> nlinarith [m.omegaC_pos, m.etaC_pos]
+  apply aux (init m) obs
   simpa [init, initialC_total] using m.kappa_pos
 
 theorem normalizeC_probability {c : CCounts}
@@ -455,6 +669,23 @@ theorem click_C_probability (m : Makeup Policy) (pre : List (Observation Policy)
 
 /-! A concrete two-click preference update. -/
 
+/-- Example η_d is 1 so the example isolates preference forgetting. -/
+def exampleEtaD : ℝ := 1
+/-- Example ω_d is 1 so the example isolates preference forgetting. -/
+def exampleOmegaD : ℝ := 1
+/-- Example η_c is 1 to add one focused terminal observation. -/
+def exampleEtaC : ℚ := 1
+/-- Example ω_c is 9/10 to exhibit a nontrivial forgetting step. -/
+def exampleOmegaC : ℚ := 9 / 10
+/-- Example η_h is 1 because habit rates are not the demonstrated quantity. -/
+def exampleEtaHabit : ℚ := 1
+/-- Example ω_h is 1 because habit rates are not the demonstrated quantity. -/
+def exampleOmegaHabit : ℚ := 1
+/-- Example η_θ is 1 because pattern rates are not the demonstrated quantity. -/
+def exampleEtaTheta : ℚ := 1
+/-- Example ω_θ is 1 because pattern rates are not the demonstrated quantity. -/
+def exampleOmegaTheta : ℚ := 1
+
 /-- Concrete makeup for the Friston 2017 / Smith, Friston & Whyte 2022 example. -/
 def exampleMakeup : Makeup Unit where
   A := fun _ _ => 1
@@ -464,6 +695,26 @@ def exampleMakeup : Makeup Unit where
   theta₀ := []
   kappa := 100
   kappa_pos := by norm_num
+  etaD := exampleEtaD
+  etaD_pos := by norm_num [exampleEtaD]
+  omegaD := exampleOmegaD
+  omegaD_pos := by norm_num [exampleOmegaD]
+  omegaD_le_one := by norm_num [exampleOmegaD]
+  etaC := exampleEtaC
+  etaC_pos := by norm_num [exampleEtaC]
+  omegaC := exampleOmegaC
+  omegaC_pos := by norm_num [exampleOmegaC]
+  omegaC_le_one := by norm_num [exampleOmegaC]
+  etaHabit := exampleEtaHabit
+  etaHabit_pos := by norm_num [exampleEtaHabit]
+  omegaHabit := exampleOmegaHabit
+  omegaHabit_pos := by norm_num [exampleOmegaHabit]
+  omegaHabit_le_one := by norm_num [exampleOmegaHabit]
+  etaTheta := exampleEtaTheta
+  etaTheta_pos := by norm_num [exampleEtaTheta]
+  omegaTheta := exampleOmegaTheta
+  omegaTheta_pos := by norm_num [exampleOmegaTheta]
+  omegaTheta_le_one := by norm_num [exampleOmegaTheta]
   initialFocus := 7
 
 /-- One R15 outcome used in the sourced-update example. -/
@@ -480,15 +731,17 @@ def exampleObservation (ending : EndingClass) (focus : Nat) : Observation Unit w
 example :
     let clicks := run exampleMakeup
       [exampleObservation .focused 8, exampleObservation .related 9]
-    clicks.map (fun click => click.c .focused) = [55, 56] := by
+    clicks.map (fun click => click.c .focused) = [55, 101 / 2] := by
   have h : CTauClassPreference.EndingClass.focused ≠ .notYetEvaluated := by decide
   norm_num [run, runFrom, step, init, initialC, kit, normalizeC,
     evidencePrior, EvidenceFromTheProcess.posterior, EvidenceFromTheProcess.evidence,
-    exampleMakeup, exampleObservation, exampleOutcome, addEnding,
-    R15TemporalHierarchy.advance, PatternTheta.advanceWitnessed, h]
+    exampleMakeup, exampleObservation, exampleOutcome, advanceC, endingDelta,
+    exampleEtaD, exampleOmegaD, exampleEtaC, exampleOmegaC, exampleEtaHabit,
+    exampleOmegaHabit, exampleEtaTheta, exampleOmegaTheta, decayRated, addRated,
+    advanceRated, advanceWitnessedRated, h]
 
-#print axioms click_c_at
+#print axioms stateAfter_c
 #print axioms stateAfter_d
-#print axioms click_evidence_conforms
+#print axioms advanceRated_one
 
 end DarkTower.WarMachine.R20Step
