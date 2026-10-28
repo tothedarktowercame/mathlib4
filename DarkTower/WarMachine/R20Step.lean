@@ -1653,10 +1653,8 @@ theorem moving_click_one_betaPrior_moved :
 
 /-! A concrete outer task-selection menu.
 
-The slice-3a/3b numerical examples below are retained as source while their
-outer-G arithmetic is recomputed in the follow-up example packet. -/
-
-/-
+The examples below score the same candidate field with outer expected free
+energy. -/
 
 def selectionCandidateOne : Candidate := ⟨1, 1 / 2⟩
 def selectionCandidateTwo : Candidate := ⟨2, 1 / 2⟩
@@ -1684,8 +1682,8 @@ noncomputable def selectionExampleObservation : Observation ExamplePolicy :=
     field := [selectionCandidateOne, selectionCandidateTwo, selectionCandidateThree] }
 
 noncomputable def selectionExampleScore : EReal :=
-  CTauClassPreference.classRisk
-    (R15InjuryTier.candidatePrediction .focused (1 / 2)) kit
+  carriedOuterScore selectionExampleMakeup (init selectionExampleMakeup)
+    selectionExampleObservation selectionExampleCascadeA
 
 /-- The 3a example deliberately ties: it checks menu-order tie breaking, not
 evidence-based selection. -/
@@ -1696,37 +1694,34 @@ example :
       click.cascadeScores = [selectionExampleScore, selectionExampleScore] ∧
       click.selection = some
         { candidates := selectionExampleObservation.field, selected := selectionCandidateTwo } := by
-  have scoreA : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.facts selectionExampleObservation.field
-      (normalizeC (init selectionExampleMakeup).c) selectionExampleCascadeA = selectionExampleScore := by
-    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
-      applySelectionStep, selectionExampleCascadeA, selectionExampleMakeup,
-      selectionExampleObservation, selectionCandidateOne, selectionCandidateTwo,
-      selectionCandidateThree, selectionExampleScore, init, normalize_initialC,
-      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
-  have scoreB : cascadeScore 7 selectionExampleMakeup.relation selectionExampleObservation.facts selectionExampleObservation.field
-      (normalizeC (init selectionExampleMakeup).c) selectionExampleCascadeB = selectionExampleScore := by
-    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
-      applySelectionStep, selectionExampleCascadeB, selectionExampleMakeup,
-      selectionExampleObservation, selectionCandidateOne, selectionCandidateTwo,
-      selectionCandidateThree, selectionExampleScore, init, normalize_initialC,
-      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
+  have scoreA : carriedOuterScore selectionExampleMakeup (init selectionExampleMakeup)
+      selectionExampleObservation selectionExampleCascadeA = selectionExampleScore := rfl
+  have scoreB : carriedOuterScore selectionExampleMakeup (init selectionExampleMakeup)
+      selectionExampleObservation selectionExampleCascadeB = selectionExampleScore := by
+    rw [selectionExampleScore]
+    unfold carriedOuterScore
+    split_ifs <;> try rfl
   have chosen : chosenCascadeEntry selectionExampleMakeup (init selectionExampleMakeup)
       selectionExampleObservation = (selectionExampleCascadeA, 0) := by
     unfold chosenCascadeEntry
     change (([(selectionExampleCascadeA, 0), (selectionExampleCascadeB, 1)]).argmin
-      (fun entry => cascadeScore 7 selectionExampleMakeup.relation
-        selectionExampleObservation.facts selectionExampleObservation.field (normalizeC (init selectionExampleMakeup).c)
-        entry.1)).get _ = (selectionExampleCascadeA, 0)
+      (fun entry => carriedOuterScore selectionExampleMakeup (init selectionExampleMakeup)
+        selectionExampleObservation entry.1)).get _ = (selectionExampleCascadeA, 0)
     simp [List.argmin, List.argAux, scoreA, scoreB]
-  simp only [step]
-  rw [chosen]
-  norm_num [selectionExampleMakeup,
-    selectionExampleCascades, selectionExampleObservation, precisionExampleObservation,
-    precisionExampleMakeup, init, cascadeScore, cascadePrediction, cascadePick,
-    applySelectionCascade, applySelectionStep, selectionExampleScore,
-    selectionExampleCascadeA, selectionExampleCascadeB, scoreA, scoreB, chosen,
-    selectionCandidateOne, selectionCandidateTwo, selectionCandidateThree,
-    normalize_initialC, R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
+  refine ⟨by simp [step, chosen], ?_, ?_⟩
+  · rw [step_scores_read_carried_C]
+    change [carriedOuterScore selectionExampleMakeup (init selectionExampleMakeup)
+        selectionExampleObservation selectionExampleCascadeA,
+      carriedOuterScore selectionExampleMakeup (init selectionExampleMakeup)
+        selectionExampleObservation selectionExampleCascadeB] =
+      [selectionExampleScore, selectionExampleScore]
+    simp only [scoreA, scoreB]
+  · simp only [step]
+    rw [chosen]
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep,
+      selectionExampleCascadeA, selectionExampleObservation,
+      precisionExampleObservation, selectionCandidateOne, selectionCandidateTwo,
+      selectionCandidateThree]
 
 /-! Learned C changes the outer selection on the next click. -/
 
@@ -1834,50 +1829,53 @@ theorem learned_selection_click_one_C :
 /-- At click zero the kit prefers the focused pick strictly; menu order is
 not needed to choose cascade A and target 1. -/
 theorem learned_selection_click_zero :
-    cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
-        learnedSelectionCascadeA <
-      cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
-        learnedSelectionCascadeB ∧
+    carriedOuterScore learnedSelectionMakeup learnedSelectionState0
+        learnedSelectionObservation learnedSelectionCascadeA <
+      carriedOuterScore learnedSelectionMakeup learnedSelectionState0
+        learnedSelectionObservation learnedSelectionCascadeB ∧
     learnedSelectionClick0.cascadeIndex = 0 ∧
     learnedSelectionClick0.selection = some
       { candidates := learnedSelectionObservation.field, selected := selectionCandidateOne } := by
-  have scoreA : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
-      learnedSelectionCascadeA =
-        CTauClassPreference.classRisk
-          (R15InjuryTier.candidatePrediction .focused (1 / 2)) kit := by
-    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
-      applySelectionStep, learnedSelectionCascadeA, learnedSelectionMakeup,
-      learnedSelectionObservation, selectionCandidateOne, learnedSelectionCandidateThree,
-      learnedSelectionState0, init, normalize_initialC,
-      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
-  have scoreB : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
-      learnedSelectionCascadeB =
-        CTauClassPreference.classRisk
-          (R15InjuryTier.candidatePrediction .related (1 / 2)) kit := by
-    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
-      applySelectionStep, learnedSelectionCascadeB, learnedSelectionMakeup,
-      learnedSelectionObservation, selectionCandidateOne, learnedSelectionCandidateThree,
-      learnedSelectionState0, init, normalize_initialC,
-      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
-  have strict : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
-      learnedSelectionCascadeA <
-        cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-          learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState0.c)
-          learnedSelectionCascadeB := by
-    rw [scoreA, scoreB]
-    exact initial_focused_risk_lt_related
+  have strict : carriedOuterScore learnedSelectionMakeup learnedSelectionState0
+      learnedSelectionObservation learnedSelectionCascadeA <
+        carriedOuterScore learnedSelectionMakeup learnedSelectionState0
+          learnedSelectionObservation learnedSelectionCascadeB := by
+    change carriedOuterScore learnedSelectionMakeup (stateAfter learnedSelectionMakeup [])
+        learnedSelectionObservation learnedSelectionCascadeA <
+      carriedOuterScore learnedSelectionMakeup (stateAfter learnedSelectionMakeup [])
+        learnedSelectionObservation learnedSelectionCascadeB
+    rw [carriedOuterScore_stateAfter_eq_outerScore,
+      carriedOuterScore_stateAfter_eq_outerScore]
+    simp only [outerScore]
+    split_ifs <;> simp [learnedSelectionMakeup, selectionExampleMakeup, precisionExampleMakeup,
+      learnedSelectionObservation, precisionExampleObservation, stateAfter, runFrom, init,
+      normalize_initialC, outerModel,
+      outerPreferenceKernel, outerCountKernel, pickedOuterKernel, CascadeEFE.finiteKernel,
+      CascadeEFE.push, CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity,
+      CascadeEFE.entropy, CascadeEFE.klTerm, PreferenceRiskSeparation.riskAdmissible,
+      boundedReach, learnedSelectionCascadeA, learnedSelectionCascadeB,
+      selectionCandidateOne, learnedSelectionCandidateThree, cascadePick,
+      applySelectionCascade, applySelectionStep, readyGain,
+      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass,
+      R15InjuryTier.sum_endingClass, Fintype.sum_prod_type,
+      sum_taskState, sum_readyGain, card_taskState, card_readyGain, reduceCtorEq] at *
+    all_goals try
+      rcases ‹∃ _ _, _› with ⟨ending, gain, positive, zero⟩
+      fin_cases ending <;> fin_cases gain <;> simp [kit] at positive zero <;>
+        norm_num at positive zero
+    all_goals try norm_num [kit] at *
+    all_goals try
+      have logs : Real.log ((35 : ℝ) / 11) < Real.log 5 :=
+        Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
+      norm_num at *
+      norm_cast at *
+      linarith
   have chosen : chosenCascadeEntry learnedSelectionMakeup learnedSelectionState0
       learnedSelectionObservation = (learnedSelectionCascadeA, 0) := by
     unfold chosenCascadeEntry
     change (([(learnedSelectionCascadeA, 0), (learnedSelectionCascadeB, 1)]).argmin
-      (fun entry => cascadeScore learnedSelectionObservation.focus
-        learnedSelectionMakeup.relation learnedSelectionObservation.facts learnedSelectionObservation.field
-        (normalizeC learnedSelectionState0.c) entry.1)).get _ =
+      (fun entry => carriedOuterScore learnedSelectionMakeup learnedSelectionState0
+        learnedSelectionObservation entry.1)).get _ =
           (learnedSelectionCascadeA, 0)
     have not_reverse := not_lt_of_ge (le_of_lt strict)
     simp [List.argmin, List.argAux, not_reverse]
@@ -1892,50 +1890,56 @@ theorem learned_selection_click_zero :
 /-- At click one learned C prefers the related pick strictly; cascade B and
 target 3 therefore win independently of menu order. -/
 theorem learned_selection_click_one :
-    cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
-        learnedSelectionCascadeB <
-      cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-        learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
-        learnedSelectionCascadeA ∧
+    carriedOuterScore learnedSelectionMakeup learnedSelectionState1
+        learnedSelectionObservation learnedSelectionCascadeB <
+      carriedOuterScore learnedSelectionMakeup learnedSelectionState1
+        learnedSelectionObservation learnedSelectionCascadeA ∧
     learnedSelectionClick1.cascadeIndex = 1 ∧
     learnedSelectionClick1.selection = some
       { candidates := learnedSelectionObservation.field, selected := learnedSelectionCandidateThree } := by
-  have scoreA : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
-      learnedSelectionCascadeA =
-        CTauClassPreference.classRisk
-          (R15InjuryTier.candidatePrediction .focused (1 / 2)) learnedSelectionC := by
-    rw [learned_selection_click_one_C]
-    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
-      applySelectionStep, learnedSelectionCascadeA, learnedSelectionMakeup,
-      learnedSelectionObservation, selectionCandidateOne, learnedSelectionCandidateThree,
-      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
-  have scoreB : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
-      learnedSelectionCascadeB =
-        CTauClassPreference.classRisk
-          (R15InjuryTier.candidatePrediction .related (1 / 2)) learnedSelectionC := by
-    rw [learned_selection_click_one_C]
-    norm_num [cascadeScore, cascadePrediction, cascadePick, applySelectionCascade,
-      applySelectionStep, learnedSelectionCascadeB, learnedSelectionMakeup,
-      learnedSelectionObservation, selectionCandidateOne, learnedSelectionCandidateThree,
-      R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
-  have strict : cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-      learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
-      learnedSelectionCascadeB <
-        cascadeScore learnedSelectionObservation.focus learnedSelectionMakeup.relation
-          learnedSelectionObservation.facts learnedSelectionObservation.field (normalizeC learnedSelectionState1.c)
-          learnedSelectionCascadeA := by
-    rw [scoreB, scoreA]
-    exact learned_related_risk_lt_focused
+  have strict : carriedOuterScore learnedSelectionMakeup learnedSelectionState1
+      learnedSelectionObservation learnedSelectionCascadeB <
+        carriedOuterScore learnedSelectionMakeup learnedSelectionState1
+          learnedSelectionObservation learnedSelectionCascadeA := by
+    change carriedOuterScore learnedSelectionMakeup
+        (stateAfter learnedSelectionMakeup [learnedSelectionObservation])
+        learnedSelectionObservation learnedSelectionCascadeB <
+      carriedOuterScore learnedSelectionMakeup
+        (stateAfter learnedSelectionMakeup [learnedSelectionObservation])
+        learnedSelectionObservation learnedSelectionCascadeA
+    rw [carriedOuterScore_stateAfter_eq_outerScore,
+      carriedOuterScore_stateAfter_eq_outerScore]
+    simp only [outerScore]
+    split_ifs <;> simp [learnedSelectionMakeup, selectionExampleMakeup,
+      precisionExampleMakeup, learnedSelectionObservation, precisionExampleObservation,
+      stateAfter, runFrom, step, init, normalizeC, advanceC, initialC, endingDelta,
+      kit, CTauClassPreference.totalMass, outerModel, outerPreferenceKernel,
+      outerCountKernel, pickedOuterKernel, CascadeEFE.finiteKernel, CascadeEFE.push,
+      CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity, CascadeEFE.entropy,
+      CascadeEFE.klTerm, PreferenceRiskSeparation.riskAdmissible, boundedReach,
+      learnedSelectionCascadeA, learnedSelectionCascadeB, selectionCandidateOne,
+      learnedSelectionCandidateThree, cascadePick, applySelectionCascade,
+      applySelectionStep, readyGain, R15StrategicTarget.outcomeClass,
+      CTauClassPreference.scorerClass, R15InjuryTier.sum_endingClass,
+      Fintype.sum_prod_type, sum_taskState, sum_readyGain, card_taskState,
+      card_readyGain, reduceCtorEq] at *
+    all_goals try
+      rcases ‹∃ _ _, _› with ⟨ending, gain, positive, zero⟩
+      fin_cases ending <;> fin_cases gain <;> simp [learnedSelectionC, kit] at positive zero <;>
+        norm_num at positive zero
+    all_goals try norm_num [learnedSelectionC, kit] at *
+    all_goals try
+      have logs : Real.log ((665 : ℝ) / 263) < Real.log ((665 : ℝ) / 99) :=
+        Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
+      norm_num at *
+      norm_cast at *
+      linarith
   have chosen : chosenCascadeEntry learnedSelectionMakeup learnedSelectionState1
       learnedSelectionObservation = (learnedSelectionCascadeB, 1) := by
     unfold chosenCascadeEntry
     change (([(learnedSelectionCascadeA, 0), (learnedSelectionCascadeB, 1)]).argmin
-      (fun entry => cascadeScore learnedSelectionObservation.focus
-        learnedSelectionMakeup.relation learnedSelectionObservation.facts learnedSelectionObservation.field
-        (normalizeC learnedSelectionState1.c) entry.1)).get _ =
+      (fun entry => carriedOuterScore learnedSelectionMakeup learnedSelectionState1
+        learnedSelectionObservation entry.1)).get _ =
           (learnedSelectionCascadeB, 1)
     simp [List.argmin, List.argAux, strict]
   refine ⟨strict, ?_, ?_⟩
@@ -1945,8 +1949,6 @@ theorem learned_selection_click_one :
     norm_num [cascadePick, applySelectionCascade, applySelectionStep,
       learnedSelectionCascadeB, learnedSelectionObservation,
       selectionCandidateOne, learnedSelectionCandidateThree]
-
--/
 
 /-! Event K3.2 from `M-象-2000.md`: Giraffe readiness and unblock facts. -/
 
@@ -2189,6 +2191,9 @@ theorem outer_ready_gain_matters :
 #print axioms outerScore_eq_stepG_of_finite
 #print axioms outer_ambiguity_matters
 #print axioms outer_ready_gain_matters
+
+#print axioms learned_selection_click_zero
+#print axioms learned_selection_click_one
 
 #print axioms moving_click_one_betaPrior
 #print axioms moving_click_one_betaPrior_moved
