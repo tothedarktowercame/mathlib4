@@ -133,7 +133,14 @@ def preferenceWeight (o : MetaOutcome) : ℚ :=
   if preferred o then 4 else if dispreferred o then 1 else 2
 
 theorem preferenceWeight_sum_rat : ∑ o, preferenceWeight o = 22 := by
-  native_decide
+  rw [show (Finset.univ : Finset MetaOutcome) =
+      {.closure, .groundedProgress, .usefulBlockerDiscovery, .downstreamUnblocking,
+       .informationGain, .elapsedMs, .tokenUse, .repeatedTarget, .abstention,
+       .unreviewableOutput, .injuryPersistence} by
+        ext o
+        fin_cases o <;> simp]
+  repeat' rw [Finset.sum_insert (by decide)]
+  norm_num [preferenceWeight, preferred, dispreferred]
 
 theorem preferenceWeight_sum : ∑ o, (preferenceWeight o : ℝ) = 22 := by
   exact_mod_cast preferenceWeight_sum_rat
