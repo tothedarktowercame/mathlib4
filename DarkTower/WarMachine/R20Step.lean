@@ -1950,6 +1950,240 @@ theorem learned_selection_click_one :
       learnedSelectionCascadeB, learnedSelectionObservation,
       selectionCandidateOne, learnedSelectionCandidateThree]
 
+/-! Ambiguity reverses a risk-only task choice. -/
+
+def ambiguityChoiceCascadeX : SelectionCascade :=
+  [.gate (fun candidate => decide (candidate.target = 1))]
+
+def ambiguityChoiceCascadeY : SelectionCascade :=
+  [.gate (fun candidate => decide (candidate.target = 2))]
+
+def ambiguityChoiceField : List Candidate := [⟨1, 1 / 2⟩, ⟨2, 1⟩]
+
+def ambiguityChoiceFacts : Target → GiraffeFacts
+  | 1 | 2 => ⟨.ready, 0, 0⟩
+  | _ => ⟨.notReady, 0, 0⟩
+
+def ambiguityChoiceC : CTauClassPreference.Distribution
+  | .focused => 1 / 2
+  | .related => 1 / 5
+  | .stopTheLine => 3 / 10
+  | .unrelated | .notYetEvaluated => 0
+
+theorem ambiguityChoiceC_probability :
+    CTauClassPreference.ProbabilityDistribution ambiguityChoiceC := by
+  constructor
+  · intro ending; fin_cases ending <;> norm_num [ambiguityChoiceC]
+  · norm_num [CTauClassPreference.totalMass, ambiguityChoiceC]
+
+theorem ambiguityChoiceNormalizedC_probability :
+    CTauClassPreference.ProbabilityDistribution (normalizeC ambiguityChoiceC) := by
+  constructor
+  · intro ending; fin_cases ending <;>
+      norm_num [normalizeC, CTauClassPreference.totalMass, ambiguityChoiceC]
+  · norm_num [normalizeC, CTauClassPreference.totalMass, ambiguityChoiceC]
+
+def ambiguityChoiceStateCounts : ReadinessStatus → TaskState → ℚ := fun _ _ => 1
+theorem ambiguityChoiceStateCounts_pos :
+    ∀ status state, 0 < ambiguityChoiceStateCounts status state := by
+  intros; norm_num [ambiguityChoiceStateCounts]
+
+def ambiguityChoiceGainCounts : ReadyGain → ℚ := fun _ => 1
+theorem ambiguityChoiceGainCounts_pos : ∀ gain, 0 < ambiguityChoiceGainCounts gain := by
+  intro; norm_num [ambiguityChoiceGainCounts]
+
+noncomputable def ambiguityChoiceMakeup : Makeup ExamplePolicy :=
+  { precisionExampleMakeup with
+    cascades := [ambiguityChoiceCascadeX, ambiguityChoiceCascadeY]
+    cascades_nonempty := by simp
+    stateKit := ambiguityChoiceStateCounts
+    stateKit_pos := ambiguityChoiceStateCounts_pos
+    gainKit := ambiguityChoiceGainCounts
+    gainKit_pos := ambiguityChoiceGainCounts_pos
+    relation := fun _ target => if target = 1 then .focus else
+      if target = 2 then .associated else .other 0 }
+
+noncomputable def ambiguityChoiceState : State ExamplePolicy :=
+  { init ambiguityChoiceMakeup with
+    c := ambiguityChoiceC
+    stateCounts := ambiguityChoiceStateCounts
+    gainCounts := ambiguityChoiceGainCounts }
+
+noncomputable def ambiguityChoiceObservation : Observation ExamplePolicy :=
+  { precisionExampleObservation .focused 0 with
+    field := ambiguityChoiceField
+    facts := ambiguityChoiceFacts }
+
+noncomputable def ambiguityChoiceQ : ProbabilityKernel Unit TaskState :=
+  outerCountKernel (ambiguityChoiceStateCounts .ready)
+    (ambiguityChoiceStateCounts_pos .ready)
+
+noncomputable def ambiguityChoiceAX : ProbabilityKernel TaskState OuterOutcome :=
+  pickedOuterKernel (.focused, .none) (1 / 2)
+
+noncomputable def ambiguityChoiceAY : ProbabilityKernel TaskState OuterOutcome :=
+  pickedOuterKernel (.related, .none) 1
+
+noncomputable def ambiguityChoicePreference : ProbabilityKernel Unit OuterOutcome :=
+  outerPreferenceKernel (normalizeC ambiguityChoiceC) ambiguityChoiceNormalizedC_probability
+    ambiguityChoiceGainCounts ambiguityChoiceGainCounts_pos
+
+theorem ambiguityChoiceModelX (positive :
+    ∀ status state, 0 < ambiguityChoiceStateCounts status state) :
+    outerModel 0 ambiguityChoiceMakeup.relation ambiguityChoiceFacts ambiguityChoiceField
+      ambiguityChoiceStateCounts positive ambiguityChoiceCascadeX =
+      (ambiguityChoiceQ, ambiguityChoiceAX) := by
+  norm_num [outerModel, ambiguityChoiceMakeup, ambiguityChoiceFacts,
+    ambiguityChoiceField, ambiguityChoiceCascadeX, ambiguityChoiceQ,
+    ambiguityChoiceAX, cascadePick, applySelectionCascade, applySelectionStep,
+    readyGain, R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
+
+theorem ambiguityChoiceModelY (positive :
+    ∀ status state, 0 < ambiguityChoiceStateCounts status state) :
+    outerModel 0 ambiguityChoiceMakeup.relation ambiguityChoiceFacts ambiguityChoiceField
+      ambiguityChoiceStateCounts positive ambiguityChoiceCascadeY =
+      (ambiguityChoiceQ, ambiguityChoiceAY) := by
+  norm_num [outerModel, ambiguityChoiceMakeup, ambiguityChoiceFacts,
+    ambiguityChoiceField, ambiguityChoiceCascadeY, ambiguityChoiceQ,
+    ambiguityChoiceAY, cascadePick, applySelectionCascade, applySelectionStep,
+    readyGain, R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass]
+
+theorem ambiguityChoiceX_admissible : PreferenceRiskSeparation.riskAdmissible
+    (push ambiguityChoiceQ ambiguityChoiceAX) ambiguityChoicePreference := by
+  intro _ outcome positive zero
+  rcases outcome with ⟨ending, gain⟩
+  fin_cases ending <;> fin_cases gain <;>
+    simp [ambiguityChoiceQ, ambiguityChoiceAX, ambiguityChoicePreference,
+      outerPreferenceKernel, outerCountKernel, pickedOuterKernel, finiteKernel,
+      CascadeEFE.push, ambiguityChoiceC, ambiguityChoiceStateCounts,
+      ambiguityChoiceGainCounts, boundedReach, sum_taskState, card_taskState,
+      card_readyGain, normalizeC, CTauClassPreference.totalMass] at positive zero ⊢ <;>
+    norm_num at *
+
+theorem ambiguityChoiceY_admissible : PreferenceRiskSeparation.riskAdmissible
+    (push ambiguityChoiceQ ambiguityChoiceAY) ambiguityChoicePreference := by
+  intro _ outcome positive zero
+  rcases outcome with ⟨ending, gain⟩
+  fin_cases ending <;> fin_cases gain <;>
+    simp [ambiguityChoiceQ, ambiguityChoiceAY, ambiguityChoicePreference,
+      outerPreferenceKernel, outerCountKernel, pickedOuterKernel, finiteKernel,
+      CascadeEFE.push, ambiguityChoiceC, ambiguityChoiceStateCounts,
+      ambiguityChoiceGainCounts, boundedReach, sum_taskState, card_taskState,
+      card_readyGain, normalizeC, CTauClassPreference.totalMass] at positive zero ⊢ <;>
+    norm_num at *
+
+/-- Risk alone chooses the uncertain focused task X, but its ambiguity cost
+reverses full outer G, so `step` chooses the certain related task Y. -/
+theorem ambiguity_changes_outer_choice :
+    CascadeEFE.risk (push ambiguityChoiceQ ambiguityChoiceAX) ambiguityChoicePreference
+        ambiguityChoiceX_admissible <
+      CascadeEFE.risk (push ambiguityChoiceQ ambiguityChoiceAY) ambiguityChoicePreference
+        ambiguityChoiceY_admissible ∧
+    carriedOuterScore ambiguityChoiceMakeup ambiguityChoiceState ambiguityChoiceObservation
+        ambiguityChoiceCascadeY <
+      carriedOuterScore ambiguityChoiceMakeup ambiguityChoiceState ambiguityChoiceObservation
+        ambiguityChoiceCascadeX ∧
+    (step ambiguityChoiceMakeup ambiguityChoiceState ambiguityChoiceObservation).1.cascadeIndex = 1 ∧
+    (step ambiguityChoiceMakeup ambiguityChoiceState ambiguityChoiceObservation).1.selection =
+      some { candidates := ambiguityChoiceField, selected := (⟨2, 1⟩ : Candidate) } := by
+  have riskStrict :
+      CascadeEFE.risk (push ambiguityChoiceQ ambiguityChoiceAX) ambiguityChoicePreference
+          ambiguityChoiceX_admissible <
+        CascadeEFE.risk (push ambiguityChoiceQ ambiguityChoiceAY) ambiguityChoicePreference
+          ambiguityChoiceY_admissible := by
+    simp [CascadeEFE.risk, CascadeEFE.klTerm, ambiguityChoiceQ, ambiguityChoiceAX,
+      ambiguityChoiceAY, ambiguityChoicePreference, outerPreferenceKernel,
+      outerCountKernel, pickedOuterKernel, finiteKernel, CascadeEFE.push,
+      ambiguityChoiceC, ambiguityChoiceStateCounts, ambiguityChoiceGainCounts,
+      boundedReach, R15InjuryTier.sum_endingClass, Fintype.sum_prod_type,
+      sum_taskState, sum_readyGain, card_taskState, card_readyGain, normalizeC,
+      CTauClassPreference.totalMass]
+    norm_num
+    have combine : Real.log (3 / 2 : ℝ) + Real.log (15 / 2 : ℝ) =
+        Real.log (45 / 4 : ℝ) := by
+      rw [← Real.log_mul (by norm_num : (3 / 2 : ℝ) ≠ 0) (by norm_num : (15 / 2 : ℝ) ≠ 0)]
+      norm_num
+    have twice : 2 * Real.log (5 : ℝ) = Real.log (25 : ℝ) := by
+      rw [show (25 : ℝ) = 5 * 5 by norm_num, Real.log_mul (by norm_num) (by norm_num)]
+      ring
+    have logs : Real.log (45 / 4 : ℝ) < Real.log (25 : ℝ) :=
+      Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
+    linarith
+  have fullStrict :
+      carriedOuterScore ambiguityChoiceMakeup ambiguityChoiceState ambiguityChoiceObservation
+          ambiguityChoiceCascadeY <
+        carriedOuterScore ambiguityChoiceMakeup ambiguityChoiceState ambiguityChoiceObservation
+          ambiguityChoiceCascadeX := by
+    unfold carriedOuterScore
+    simp only [ambiguityChoiceState, init]
+    rw [dif_pos ambiguityChoiceStateCounts_pos, dif_pos ambiguityChoiceStateCounts_pos]
+    have normalize_eq : normalizeC ambiguityChoiceC = ambiguityChoiceC := by
+      funext ending
+      fin_cases ending <;>
+        norm_num [normalizeC, CTauClassPreference.totalMass, ambiguityChoiceC]
+    have C_probability : CTauClassPreference.ProbabilityDistribution
+        (normalizeC ambiguityChoiceC) := by
+      rw [normalize_eq]
+      exact ambiguityChoiceC_probability
+    rw [dif_pos C_probability, dif_pos ambiguityChoiceGainCounts_pos,
+      dif_pos C_probability, dif_pos ambiguityChoiceGainCounts_pos]
+    simp only [ambiguityChoiceObservation, precisionExampleObservation]
+    change outerScore 0 ambiguityChoiceMakeup.relation ambiguityChoiceFacts
+        ambiguityChoiceField ambiguityChoiceStateCounts _ (normalizeC ambiguityChoiceC) _
+        ambiguityChoiceGainCounts _ ambiguityChoiceCascadeY <
+      outerScore 0 ambiguityChoiceMakeup.relation ambiguityChoiceFacts
+        ambiguityChoiceField ambiguityChoiceStateCounts _ (normalizeC ambiguityChoiceC) _
+        ambiguityChoiceGainCounts _ ambiguityChoiceCascadeX
+    simp only [outerScore]
+    rw [ambiguityChoiceModelY, ambiguityChoiceModelX]
+    split_ifs with hY hX
+    · simp only [EReal.coe_lt_coe_iff]
+      simp [CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity,
+        CascadeEFE.entropy, CascadeEFE.klTerm, ambiguityChoiceQ,
+        ambiguityChoiceAX, ambiguityChoiceAY, ambiguityChoicePreference,
+        outerPreferenceKernel, outerCountKernel, pickedOuterKernel, finiteKernel,
+        CascadeEFE.push, ambiguityChoiceC, ambiguityChoiceStateCounts,
+        ambiguityChoiceGainCounts, boundedReach, R15InjuryTier.sum_endingClass,
+        Fintype.sum_prod_type, sum_taskState, sum_readyGain, card_taskState,
+        card_readyGain, normalizeC, CTauClassPreference.totalMass]
+      norm_num
+      have combine : Real.log (3 / 2 : ℝ) + Real.log (15 / 2 : ℝ) =
+          Real.log (45 / 4 : ℝ) := by
+        rw [← Real.log_mul (by norm_num : (3 / 2 : ℝ) ≠ 0)
+          (by norm_num : (15 / 2 : ℝ) ≠ 0)]
+        norm_num
+      have twiceFive : 2 * Real.log (5 : ℝ) = Real.log (25 : ℝ) := by
+        rw [show (25 : ℝ) = 5 * 5 by norm_num, Real.log_mul (by norm_num) (by norm_num)]
+        ring
+      have twiceTwo : 2 * Real.log (2 : ℝ) = Real.log (4 : ℝ) := by
+        rw [show (4 : ℝ) = 2 * 2 by norm_num, Real.log_mul (by norm_num) (by norm_num)]
+        ring
+      have halfLog : Real.log (1 / 2 : ℝ) = -Real.log 2 := by
+        rw [show (1 / 2 : ℝ) = (2 : ℝ)⁻¹ by norm_num, Real.log_inv]
+      have lift : Real.log (45 / 4 : ℝ) + Real.log 4 = Real.log 45 := by
+        rw [← Real.log_mul (by norm_num : (45 / 4 : ℝ) ≠ 0) (by norm_num : (4 : ℝ) ≠ 0)]
+        norm_num
+      have logs : Real.log (25 : ℝ) < Real.log (45 : ℝ) :=
+        Real.strictMonoOn_log (by norm_num) (by norm_num) (by norm_num)
+      linarith
+    · exact (hX ambiguityChoiceX_admissible).elim
+    · exact (hY ambiguityChoiceY_admissible).elim
+    · exact (hY ambiguityChoiceY_admissible).elim
+  have chosen : chosenCascadeEntry ambiguityChoiceMakeup ambiguityChoiceState
+      ambiguityChoiceObservation = (ambiguityChoiceCascadeY, 1) := by
+    unfold chosenCascadeEntry
+    change (([(ambiguityChoiceCascadeX, 0), (ambiguityChoiceCascadeY, 1)]).argmin
+      (fun entry => carriedOuterScore ambiguityChoiceMakeup ambiguityChoiceState
+        ambiguityChoiceObservation entry.1)).get _ = (ambiguityChoiceCascadeY, 1)
+    simp [List.argmin, List.argAux, fullStrict]
+  refine ⟨riskStrict, fullStrict, ?_, ?_⟩
+  · simp [step, chosen]
+  · simp only [step]
+    rw [chosen]
+    norm_num [cascadePick, applySelectionCascade, applySelectionStep,
+      ambiguityChoiceCascadeY, ambiguityChoiceObservation, ambiguityChoiceField,
+      precisionExampleObservation]
+
 /-! Event K3.2 from `M-象-2000.md`: Giraffe readiness and unblock facts. -/
 
 /-- Target 1 is P12 “core system working end to end”; target 2 is “edge
@@ -2194,6 +2428,7 @@ theorem outer_ready_gain_matters :
 
 #print axioms learned_selection_click_zero
 #print axioms learned_selection_click_one
+#print axioms ambiguity_changes_outer_choice
 
 #print axioms moving_click_one_betaPrior
 #print axioms moving_click_one_betaPrior_moved
