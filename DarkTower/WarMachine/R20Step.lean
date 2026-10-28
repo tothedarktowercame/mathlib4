@@ -527,7 +527,8 @@ theorem outerKernelNovelty_reach_half_lt_one :
     sum_readyGain, focused_ne_stop, one_ne_none, several_ne_none, reduceCtorEq] <;>
     split_ifs <;> norm_num <;> simp_all
 
-/-- Outer expected free energy.  As with `classRisk`, inadmissibility is `⊤`. -/
+/-- Outer expected free energy: risk plus ambiguity minus expected parameter
+information gain.  As with `classRisk`, inadmissibility is `⊤`. -/
 noncomputable def outerScore (focus : Target) (relation : Target → Target → TargetRelation)
     (facts : Target → GiraffeFacts) (field : List Candidate)
     (stateCounts : ReadinessStatus → TaskState → ℚ)
@@ -540,7 +541,8 @@ noncomputable def outerScore (focus : Target) (relation : Target → Target → 
   let model := outerModel focus relation facts field stateCounts stateCounts_pos cascade
   let preference := outerPreferenceKernel C C_probability gainCounts gainCounts_pos
   exact if h : PreferenceRiskSeparation.riskAdmissible (push model.1 model.2) preference then
-    (stepG model.1 model.2 preference h : ℝ)
+    ((stepG model.1 model.2 preference h -
+      outerNovelty focus relation facts field stateCounts cascade : ℝ) : EReal)
   else ⊤
 
 theorem outerScore_eq_stepG_of_finite (focus : Target)
@@ -559,10 +561,11 @@ theorem outerScore_eq_stepG_of_finite (focus : Target)
         (outerPreferenceKernel C C_probability gainCounts gainCounts_pos),
       outerScore focus relation facts field stateCounts stateCounts_pos C C_probability
           gainCounts gainCounts_pos cascade =
-        (stepG
+        ((stepG
           (outerModel focus relation facts field stateCounts stateCounts_pos cascade).1
           (outerModel focus relation facts field stateCounts stateCounts_pos cascade).2
-          (outerPreferenceKernel C C_probability gainCounts gainCounts_pos) h : ℝ) := by
+          (outerPreferenceKernel C C_probability gainCounts gainCounts_pos) h -
+          outerNovelty focus relation facts field stateCounts cascade : ℝ) : EReal) := by
   classical
   simp only [outerScore] at finite ⊢
   split_ifs with h
@@ -625,7 +628,7 @@ theorem carriedOuterScore_eq_of_cascadePick_eq (m : Makeup Policy) (s : State Po
     (same : cascadePick left o.facts o.field = cascadePick right o.facts o.field) :
     carriedOuterScore m s o left = carriedOuterScore m s o right := by
   classical
-  unfold carriedOuterScore outerScore outerModel
+  unfold carriedOuterScore outerScore outerModel outerNovelty
   split_ifs <;> simp_all
 
 omit [DecidableEq Policy] [Fintype Policy] [Nonempty Policy] in
@@ -2211,7 +2214,7 @@ theorem learned_selection_click_zero :
     simp only [outerScore]
     split_ifs <;> simp [learnedSelectionMakeup, selectionExampleMakeup, precisionExampleMakeup,
       learnedSelectionObservation, precisionExampleObservation, stateAfter, runFrom, init,
-      normalize_initialC, outerModel,
+      normalize_initialC, outerModel, outerNovelty, outerKernelNovelty,
       outerPreferenceKernel, outerCountKernel, pickedOuterKernel, CascadeEFE.finiteKernel,
       CascadeEFE.push, CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity,
       CascadeEFE.entropy, CascadeEFE.klTerm, PreferenceRiskSeparation.riskAdmissible,
@@ -2343,7 +2346,8 @@ theorem learned_selection_click_one :
         learnedSelectionObservation learnedSelectionCascadeA
     rw [score_eq, score_eq]
     simp only [outerScore]
-    split_ifs <;> simp [learnedSelectionMakeup, selectionExampleMakeup,
+    split_ifs <;> simp [outerNovelty, outerKernelNovelty,
+      learnedSelectionMakeup, selectionExampleMakeup,
       precisionExampleMakeup, learnedSelectionState0, learnedSelectionObservation,
       precisionExampleObservation,
       stateAfter, runFrom, step, init, advanceGainCounts, normalizeC, advanceC, initialC, endingDelta,
@@ -2572,12 +2576,17 @@ theorem ambiguity_changes_outer_choice :
     rw [ambiguityChoiceModelY, ambiguityChoiceModelX]
     split_ifs with hY hX
     · simp only [EReal.coe_lt_coe_iff]
-      simp [CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity,
+      simp [outerNovelty, outerKernelNovelty,
+        CascadeEFE.stepG, CascadeEFE.risk, CascadeEFE.ambiguity,
         CascadeEFE.entropy, CascadeEFE.klTerm, ambiguityChoiceQ,
         ambiguityChoiceAX, ambiguityChoiceAY, ambiguityChoicePreference,
         outerPreferenceKernel, outerCountKernel, pickedOuterKernel, finiteKernel,
         CascadeEFE.push, ambiguityChoiceC, ambiguityChoiceStateCounts,
-        ambiguityChoiceGainCounts, boundedReach, R15InjuryTier.sum_endingClass,
+        ambiguityChoiceGainCounts, ambiguityChoiceMakeup, ambiguityChoiceFacts,
+        ambiguityChoiceField, ambiguityChoiceCascadeX, ambiguityChoiceCascadeY,
+        cascadePick, applySelectionCascade, applySelectionStep, readyGain,
+        R15StrategicTarget.outcomeClass, CTauClassPreference.scorerClass,
+        boundedReach, R15InjuryTier.sum_endingClass,
         Fintype.sum_prod_type, sum_taskState, sum_readyGain, card_taskState,
         card_readyGain, normalizeC, CTauClassPreference.totalMass]
       norm_num
@@ -2726,7 +2735,7 @@ theorem outer_ambiguity_matters :
   simp only [EReal.coe_lt_coe_iff]
   unfold CascadeEFE.stepG CascadeEFE.risk CascadeEFE.ambiguity CascadeEFE.entropy
     CascadeEFE.klTerm
-  simp [outerPreferenceKernel, outerCountKernel,
+  simp [outerNovelty, outerKernelNovelty, outerPreferenceKernel, outerCountKernel,
     pickedOuterKernel, CascadeEFE.finiteKernel, CascadeEFE.push, CascadeEFE.stepG,
     CascadeEFE.risk, CascadeEFE.ambiguity, CascadeEFE.entropy, CascadeEFE.klTerm,
     PreferenceRiskSeparation.riskAdmissible, boundedReach,
@@ -2838,7 +2847,7 @@ theorem outer_ready_gain_matters :
   simp only [EReal.coe_lt_coe_iff]
   unfold CascadeEFE.stepG CascadeEFE.risk CascadeEFE.ambiguity CascadeEFE.entropy
     CascadeEFE.klTerm
-  simp [outerPreferenceKernel, outerCountKernel,
+  simp [outerNovelty, outerKernelNovelty, outerPreferenceKernel, outerCountKernel,
     pickedOuterKernel, CascadeEFE.finiteKernel, CascadeEFE.push, CascadeEFE.stepG,
     CascadeEFE.risk, CascadeEFE.ambiguity, CascadeEFE.entropy, CascadeEFE.klTerm,
     PreferenceRiskSeparation.riskAdmissible, boundedReach,
