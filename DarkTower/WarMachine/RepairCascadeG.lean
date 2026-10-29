@@ -4,7 +4,13 @@ import Mathlib.Tactic
 
 /-! Repair cascades use the existing finite-cascade G. Patterns are interpreted
 in precedence order; `CascadeEFE.stepG` is used directly and admitted pattern
-novelty is subtracted at selection sites. There is no repair-specific scorer. -/
+novelty is subtracted at selection sites. There is no repair-specific scorer.
+
+The summed per-pattern novelty grows with the number of admitted patterns. It
+can therefore reward a full repair cascade even after reproduction establishes
+that the injury was never a defect. The exact threshold below records this
+property of applying the existing novelty term here; S4 must account for it.
+-/
 
 namespace DarkTower.WarMachine.RepairCascadeG
 open scoped BigOperators
@@ -293,23 +299,155 @@ theorem existing_G_reads_composition (C : AdmittedPreference) (counts : PatternC
   have hn := reproduce_first_larger_novelty counts .realDefect hpos
   linarith
 
-/-- After either reproduction result, the ordinary argmin flips. The margin
-hypotheses are over learned C and learned per-pattern novelty, not literals. -/
-theorem reproduction_flips_argmin (C : AdmittedPreference) (counts : PatternCounts)
-    (hreal :
-      stepG (point .realDefect) (predictedKernel genuineRepair) C.kernel
-          (riskAdmissible C (point .realDefect) genuineRepair) -
-          cascadeNovelty counts .realDefect genuineRepair <
-      stepG (point .realDefect) (predictedKernel historicalMisclassification) C.kernel
-          (riskAdmissible C (point .realDefect) historicalMisclassification) -
-          cascadeNovelty counts .realDefect historicalMisclassification)
-    (hhistorical :
-      stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
+/-- The pragmatic `stepG` part alone prefers genuine repair for a real defect. -/
+theorem realDefect_risk_prefers_genuine (C : AdmittedPreference) :
+    stepG (point .realDefect) (predictedKernel genuineRepair) C.kernel
+        (riskAdmissible C (point .realDefect) genuineRepair) <
+    stepG (point .realDefect) (predictedKernel historicalMisclassification) C.kernel
+        (riskAdmissible C (point .realDefect) historicalMisclassification) := by
+  rw [stepG_point_repair, stepG_point_repair]
+  simp only [recorded_cascade_predictions]
+  have h := C.preferred_gt_dispreferred .closure .injuryPersistence (by rfl) (by rfl)
+  exact neg_lt_neg (Real.strictMonoOn_log (C.positive _) (C.positive _) h)
+
+/-- The pragmatic `stepG` part alone prefers historical correction when the
+injury was never a defect. -/
+theorem neverDefect_risk_prefers_historical (C : AdmittedPreference) :
+    stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
+        (riskAdmissible C (point .neverDefect) historicalMisclassification) <
+    stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
+        (riskAdmissible C (point .neverDefect) genuineRepair) := by
+  rw [stepG_point_repair, stepG_point_repair]
+  simp only [recorded_cascade_predictions]
+  have h := C.preferred_gt_dispreferred .closure .tokenUse (by rfl) (by rfl)
+  exact neg_lt_neg (Real.strictMonoOn_log (C.positive _) (C.positive _) h)
+
+/-- Exact condition under which novelty does not reverse the never-defect risk
+ordering. -/
+theorem neverDefect_flip_survives_iff (C : AdmittedPreference) (counts : PatternCounts) :
+    (stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
           (riskAdmissible C (point .neverDefect) historicalMisclassification) -
           cascadeNovelty counts .neverDefect historicalMisclassification <
       stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
           (riskAdmissible C (point .neverDefect) genuineRepair) -
-          cascadeNovelty counts .neverDefect genuineRepair) :
+          cascadeNovelty counts .neverDefect genuineRepair) ↔
+    cascadeNovelty counts .neverDefect genuineRepair -
+        cascadeNovelty counts .neverDefect historicalMisclassification <
+      stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
+          (riskAdmissible C (point .neverDefect) genuineRepair) -
+        stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
+          (riskAdmissible C (point .neverDefect) historicalMisclassification) := by
+  constructor <;> intro h <;> linarith
+
+/-- If novelty exceeds that risk gap, the full genuine-repair cascade wins on
+a never-defect injury. -/
+theorem excessive_novelty_prefers_genuine (C : AdmittedPreference) (counts : PatternCounts)
+    (h :
+      stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
+          (riskAdmissible C (point .neverDefect) genuineRepair) -
+        stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
+          (riskAdmissible C (point .neverDefect) historicalMisclassification) <
+      cascadeNovelty counts .neverDefect genuineRepair -
+        cascadeNovelty counts .neverDefect historicalMisclassification) :
+    stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
+          (riskAdmissible C (point .neverDefect) genuineRepair) -
+          cascadeNovelty counts .neverDefect genuineRepair <
+      stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
+          (riskAdmissible C (point .neverDefect) historicalMisclassification) -
+          cascadeNovelty counts .neverDefect historicalMisclassification := by
+  linarith
+
+/-- A concrete learned C used only to witness that the threshold is inhabited. -/
+def exampleWeight (o : MetaOutcome) : ℚ :=
+  if preferred o then 4 else if dispreferred o then 1 else 2
+
+theorem exampleWeight_sum_rat : ∑ o, exampleWeight o = 22 := by
+  rw [show (Finset.univ : Finset MetaOutcome) =
+      {.closure, .groundedProgress, .usefulBlockerDiscovery, .downstreamUnblocking,
+       .informationGain, .elapsedMs, .tokenUse, .repeatedTarget, .abstention,
+       .unreviewableOutput, .injuryPersistence} by
+        ext o; fin_cases o <;> simp]
+  repeat' rw [Finset.sum_insert (by decide)]
+  norm_num [exampleWeight, preferred, dispreferred]
+
+def examplePreferenceKernel : ProbabilityKernel Unit MetaOutcome :=
+  finiteKernel (fun _ o => (exampleWeight o : ℝ) / 22)
+    (by intro _ o; fin_cases o <;> norm_num [exampleWeight, preferred, dispreferred])
+    (by intro
+        rw [← Finset.sum_div]
+        norm_num [show ∑ o, (exampleWeight o : ℝ) = 22 by exact_mod_cast exampleWeight_sum_rat])
+
+def examplePreference : AdmittedPreference where
+  kernel := examplePreferenceKernel
+  positive := by
+    intro o; fin_cases o <;>
+      norm_num [examplePreferenceKernel, finiteKernel, exampleWeight, preferred, dispreferred]
+  preferred_gt_dispreferred := by
+    intro p d hp hd
+    fin_cases p <;> fin_cases d <;>
+      simp_all [examplePreferenceKernel, finiteKernel, exampleWeight, preferred, dispreferred]
+    all_goals norm_num
+
+def exampleRiskGap : ℝ :=
+  stepG (point .neverDefect) (predictedKernel genuineRepair) examplePreference.kernel
+      (riskAdmissible examplePreference (point .neverDefect) genuineRepair) -
+    stepG (point .neverDefect) (predictedKernel historicalMisclassification)
+      examplePreference.kernel
+      (riskAdmissible examplePreference (point .neverDefect) historicalMisclassification)
+
+theorem exampleRiskGap_pos : 0 < exampleRiskGap := by
+  unfold exampleRiskGap
+  exact sub_pos.mpr (neverDefect_risk_prefers_historical examplePreference)
+
+/-- Concrete positive counts, scaled by the actual learned-C risk gap. -/
+def exampleCounts : PatternCounts := fun _ => (100 / exampleRiskGap, 100 / exampleRiskGap)
+
+theorem exampleCounts_pos (p : RepairPattern) :
+    0 < (exampleCounts p).1 ∧ 0 < (exampleCounts p).2 := by
+  constructor <;> exact div_pos (by norm_num) exampleRiskGap_pos
+
+/-- The concrete C and counts lie strictly below the novelty threshold. -/
+theorem example_flip_survives :
+    cascadeNovelty exampleCounts .neverDefect genuineRepair -
+        cascadeNovelty exampleCounts .neverDefect historicalMisclassification < exampleRiskGap := by
+  simp [cascadeNovelty, cascadeNoveltyFrom, genuineRepair, historicalMisclassification,
+    initialRepairState, guard, effect, exampleCounts]
+  have hg := exampleRiskGap_pos
+  have hn := PatternThetaNovelty.novelty_eq (100 / exampleRiskGap)
+    (100 / exampleRiskGap) (div_pos (by norm_num) hg) (div_pos (by norm_num) hg)
+  rw [hn]
+  field_simp
+  nlinarith
+
+theorem realDefect_genuine_has_more_novelty (counts : PatternCounts)
+    (hpos : ∀ p, 0 < (counts p).1 ∧ 0 < (counts p).2) :
+    cascadeNovelty counts .realDefect historicalMisclassification <
+      cascadeNovelty counts .realDefect genuineRepair := by
+  simp [cascadeNovelty, cascadeNoveltyFrom, genuineRepair, historicalMisclassification,
+    initialRepairState, guard, effect]
+  have hn (p) := PatternThetaNovelty.novelty_nonneg (counts p).1 (counts p).2
+    (hpos p).1 (hpos p).2
+  rw [PatternThetaNovelty.novelty_eq _ _ (hpos .recordFinding).1
+    (hpos .recordFinding).2]
+  have hden : 0 < 2 * ((counts .recordFinding).1 + (counts .recordFinding).2) := by
+    nlinarith [(hpos .recordFinding).1, (hpos .recordFinding).2]
+  have hrecord : 0 < 1 / (2 * ((counts .recordFinding).1 +
+      (counts .recordFinding).2)) := one_div_pos.mpr hden
+  nlinarith [hn .locateProducer, hn .correctRefusalIsNotDefect,
+    hn .redBeforeRepair, hn .repairProducer, hn .witnessPath,
+    hn .differentSeatReviews, hn .retireLedger]
+
+/-- After either reproduction result, the ordinary argmin flips exactly while
+the never-defect novelty difference remains below its pragmatic risk gap. -/
+theorem reproduction_flips_argmin (C : AdmittedPreference) (counts : PatternCounts)
+    (hpos : ∀ p, 0 < (counts p).1 ∧ 0 < (counts p).2)
+    (hthreshold :
+      cascadeNovelty counts .neverDefect genuineRepair -
+          cascadeNovelty counts .neverDefect historicalMisclassification <
+        stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
+            (riskAdmissible C (point .neverDefect) genuineRepair) -
+          stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
+            (riskAdmissible C (point .neverDefect) historicalMisclassification)) :
     ([genuineRepair, historicalMisclassification].argmin (fun c =>
       stepG (point .realDefect) (predictedKernel c) C.kernel
         (riskAdmissible C (point .realDefect) c) - cascadeNovelty counts .realDefect c) =
@@ -318,6 +456,16 @@ theorem reproduction_flips_argmin (C : AdmittedPreference) (counts : PatternCoun
       stepG (point .neverDefect) (predictedKernel c) C.kernel
         (riskAdmissible C (point .neverDefect) c) - cascadeNovelty counts .neverDefect c) =
         some historicalMisclassification) := by
+  have hrisk := realDefect_risk_prefers_genuine C
+  have hnovelty := realDefect_genuine_has_more_novelty counts hpos
+  have hreal :
+      stepG (point .realDefect) (predictedKernel genuineRepair) C.kernel
+          (riskAdmissible C (point .realDefect) genuineRepair) -
+          cascadeNovelty counts .realDefect genuineRepair <
+      stepG (point .realDefect) (predictedKernel historicalMisclassification) C.kernel
+          (riskAdmissible C (point .realDefect) historicalMisclassification) -
+          cascadeNovelty counts .realDefect historicalMisclassification := by linarith
+  have hhistorical := (neverDefect_flip_survives_iff C counts).2 hthreshold
   constructor
   · simp [List.argmin, List.argAux, not_lt_of_ge (le_of_lt hreal)]
   · simp [List.argmin, List.argAux, hhistorical]
