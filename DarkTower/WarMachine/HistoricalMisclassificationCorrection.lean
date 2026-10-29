@@ -299,6 +299,184 @@ theorem medicProcess_preserves_history :
   split <;> try rfl
   split <;> rfl
 
+/-! ## Cause reattribution
+
+A cause reattribution is not a non-injury ruling.  It removes one exact active
+occurrence from the injury to which a coarse wrapper assigned it and appends an
+active occurrence for the checked replacement cause.  The two changes are one
+operation: a bookkeeping correction can never erase the occurrence without
+also recording its true cause. -/
+
+structure CauseReattributionPayload where
+  occurrence : Occurrence
+  predecessor : EntryId
+  originalRecord : RecordId
+  originalPin : Pin
+  rejectedCause : Pin
+  replacement : InjuryEntry
+  replacementCause : Pin
+  failureKind : Nat
+  failureStage : Nat
+  evaluator : Principal
+  reviewer : Principal
+  evidencePin : Pin
+  deriving DecidableEq, Repr
+
+structure CauseReattributionEvidence where
+  occurrence : Occurrence
+  predecessor : EntryId
+  originalRecord : RecordId
+  originalPin : Pin
+  rejectedCause : Pin
+  replacement : InjuryEntry
+  replacementCause : Pin
+  failureKind : Nat
+  failureStage : Nat
+  evaluator : Principal
+  reviewer : Principal
+  evidencePin : Pin
+  deriving DecidableEq, Repr
+
+abbrev CauseReattributionAdmission :=
+  InjuryEntry → CauseReattributionPayload → CauseReattributionEvidence → Bool
+
+def exactCauseReattributionBinding (payload : CauseReattributionPayload)
+    (evidence : CauseReattributionEvidence) : Bool := decide (payload = {
+  occurrence := evidence.occurrence
+  predecessor := evidence.predecessor
+  originalRecord := evidence.originalRecord
+  originalPin := evidence.originalPin
+  rejectedCause := evidence.rejectedCause
+  replacement := evidence.replacement
+  replacementCause := evidence.replacementCause
+  failureKind := evidence.failureKind
+  failureStage := evidence.failureStage
+  evaluator := evidence.evaluator
+  reviewer := evidence.reviewer
+  evidencePin := evidence.evidencePin })
+
+def causeReattributionQualified (admit : CauseReattributionAdmission)
+    (current : InjuryEntry) (payload : CauseReattributionPayload)
+    (evidence : CauseReattributionEvidence) : Bool :=
+  current.active && decide (current.occurrence = payload.occurrence) &&
+  decide (current.predecessor = payload.predecessor) &&
+  decide (current.causeRecord = payload.originalRecord) &&
+  decide (current.causePin = payload.originalPin) &&
+  payload.replacement.active &&
+  decide (payload.replacement.injury ≠ current.injury) &&
+  decide (payload.replacement.causeRecord = payload.originalRecord) &&
+  decide (payload.replacement.causePin = payload.originalPin) &&
+  decide (payload.replacementCause ≠ payload.rejectedCause) &&
+  decide (payload.evaluator ≠ payload.reviewer) &&
+  exactCauseReattributionBinding payload evidence && admit current payload evidence
+
+structure CauseReattributionState where
+  medic : MedicState
+  reattributions : List CauseReattributionPayload
+  deriving DecidableEq, Repr
+
+structure CauseReattributionResult where
+  outcome : Outcome
+  state : CauseReattributionState
+  deriving DecidableEq, Repr
+
+def causeReattribute (admit : CauseReattributionAdmission)
+    (evidence : Option CauseReattributionEvidence) (state : CauseReattributionState)
+    (payload : CauseReattributionPayload) : CauseReattributionResult :=
+  match latestFor state.medic.history payload.occurrence.injury, evidence with
+  | some current, some proof =>
+      if !causeReattributionQualified admit current payload proof then
+        ⟨.refused, state⟩
+      else if payload ∈ state.reattributions then
+        ⟨.duplicate, state⟩
+      else if state.reattributions.any (fun old => old.occurrence = payload.occurrence) then
+        ⟨.conflict, state⟩
+      else
+        ⟨.appended, { state with
+          medic := { state.medic with history := state.medic.history ++ [payload.replacement] }
+          reattributions := state.reattributions ++ [payload] }⟩
+  | _, _ => ⟨.refused, state⟩
+
+def causeReattributionEffectiveActiveOccurrences
+    (state : CauseReattributionState) : List Occurrence :=
+  let corrected := state.medic.corrections.map MedicCorrection.occurrence ++
+    state.reattributions.map (·.occurrence)
+  (latestEntries state.medic.history).filter (·.active) |>.map (·.occurrence) |>.filter
+    (fun occurrence => occurrence ∉ corrected)
+
+theorem causeReattribute_appends_iff_checked_exact_distinct
+    (hcurrent : latestFor state.medic.history payload.occurrence.injury = some current)
+    (hevidence : evidence = some proof) :
+    (causeReattribute admit evidence state payload).outcome = .appended ↔
+      causeReattributionQualified admit current payload proof = true ∧
+      payload ∉ state.reattributions ∧
+      ¬ state.reattributions.any (fun old => old.occurrence = payload.occurrence) := by
+  subst evidence
+  simp only [causeReattribute, hcurrent]
+  split <;> simp_all
+  split <;> simp_all
+  split <;> simp_all
+
+theorem causeReattribute_missing_evidence_inert :
+    causeReattribute admit none state payload = ⟨.refused, state⟩ := by
+  simp [causeReattribute]
+
+theorem causeReattribute_bad_evidence_inert
+    (hcurrent : latestFor state.medic.history payload.occurrence.injury = some current)
+    (hbad : causeReattributionQualified admit current payload proof = false) :
+    causeReattribute admit (some proof) state payload = ⟨.refused, state⟩ := by
+  simp [causeReattribute, hcurrent, hbad]
+
+theorem causeReattribute_preserves_prior_corrections
+    (h : (causeReattribute admit evidence state payload).outcome = .appended) :
+    (causeReattribute admit evidence state payload).state.medic.corrections =
+      state.medic.corrections := by
+  unfold causeReattribute at h ⊢
+  split <;> try simp_all
+  split <;> try simp_all
+  split <;> try simp_all
+  split <;> simp_all
+
+theorem causeReattribute_appends_only_replacement_history
+    (h : (causeReattribute admit evidence state payload).outcome = .appended) :
+    (causeReattribute admit evidence state payload).state.medic.history =
+      state.medic.history ++ [payload.replacement] := by
+  unfold causeReattribute at h ⊢
+  split <;> try simp_all
+  split <;> try simp_all
+  split <;> try simp_all
+  split <;> simp_all
+
+def reattributionOldEntry : InjuryEntry := ⟨41, 117, 18, 700, 701, true⟩
+def reattributionPriorRepair : GenuineRepairPayload :=
+  ⟨⟨41, 18⟩, 0, 600, 601, 610, 611, 612, 613, 614, 615, 21, 22, true⟩
+def reattributionReplacement : InjuryEntry := ⟨99, 118, 0, 700, 701, true⟩
+def reattributionPayload : CauseReattributionPayload :=
+  ⟨reattributionOldEntry.occurrence, 18, 700, 701, 800,
+    reattributionReplacement, 801, 1, 2, 31, 32, 900⟩
+def reattributionEvidence : CauseReattributionEvidence :=
+  ⟨reattributionOldEntry.occurrence, 18, 700, 701, 800,
+    reattributionReplacement, 801, 1, 2, 31, 32, 900⟩
+def admitReattribution : CauseReattributionAdmission := fun current payload evidence =>
+  decide (current = reattributionOldEntry ∧ payload = reattributionPayload ∧
+    evidence = reattributionEvidence)
+def reattributionInitial : CauseReattributionState :=
+  ⟨⟨[reattributionOldEntry], [.genuineDefect reattributionPriorRepair]⟩, []⟩
+
+theorem causeReattribute_swaps_only_misattributed_occurrence :
+    let result := causeReattribute admitReattribution (some reattributionEvidence)
+      reattributionInitial reattributionPayload
+    result.outcome = .appended ∧
+      causeReattributionEffectiveActiveOccurrences result.state = [⟨99, 118⟩] := by
+  decide
+
+theorem causeReattribute_preserves_prior_repair_credit :
+    let result := causeReattribute admitReattribution (some reattributionEvidence)
+      reattributionInitial reattributionPayload
+    result.state.medic.corrections = [.genuineDefect reattributionPriorRepair] := by
+  decide
+
+
 theorem missing_evidence_refuses :
     medicProcess misclassification genuine none state candidate = ⟨.refused, state⟩ := by
   simp [medicProcess]
