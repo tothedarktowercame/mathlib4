@@ -399,7 +399,46 @@ def exampleCost : CostModel where
   w_nonneg := by norm_num
   total_le_one := by norm_num
 
-def exampleCounts : PatternCounts := fun _ => (100, 100)
+def exampleWeight (o : MetaOutcome) : ℚ :=
+  if preferred o then 4 else if dispreferred o then 1 else 2
+
+theorem exampleWeight_sum : ∑ o, exampleWeight o = 22 := by
+  rw [show (Finset.univ : Finset MetaOutcome) =
+      {.closure, .groundedProgress, .usefulBlockerDiscovery, .downstreamUnblocking,
+       .informationGain, .elapsedMs, .tokenUse, .repeatedTarget, .abstention,
+       .unreviewableOutput, .injuryPersistence} by
+        ext o; fin_cases o <;> simp]
+  repeat' rw [Finset.sum_insert (by decide)]
+  norm_num [exampleWeight, preferred, dispreferred]
+
+def examplePreferenceKernel : ProbabilityKernel Unit MetaOutcome :=
+  finiteKernel (fun _ o => (exampleWeight o : ℝ) / 22)
+    (by intro _ o; fin_cases o <;> norm_num [exampleWeight, preferred, dispreferred])
+    (by intro
+        rw [← Finset.sum_div]
+        norm_num [show ∑ o, (exampleWeight o : ℝ) = 22 by
+          exact_mod_cast exampleWeight_sum])
+
+def examplePreference : AdmittedPreference where
+  kernel := examplePreferenceKernel
+  positive := by
+    intro o; fin_cases o <;>
+      norm_num [examplePreferenceKernel, finiteKernel, exampleWeight, preferred, dispreferred]
+  preferred_gt_dispreferred := by
+    intro p d hp hd
+    fin_cases p <;> fin_cases d <;>
+      simp_all [examplePreferenceKernel, finiteKernel, exampleWeight, preferred, dispreferred]
+    all_goals norm_num
+
+def exampleCostGap : ℝ :=
+  neverDefectCostGap examplePreference exampleCost (by decide) (by decide)
+
+theorem exampleCostGap_pos : 0 < exampleCostGap := by
+  exact neverDefect_cost_gap_positive examplePreference exampleCost
+    (by decide) (by decide) (by norm_num [exampleCost])
+
+def exampleCounts : PatternCounts := fun _ =>
+  (100 / exampleCostGap, 100 / exampleCostGap)
 
 theorem example_flip_instance (C : AdmittedPreference) :
     neverDefectCostGap C exampleCost (by decide) (by decide) =
@@ -408,15 +447,29 @@ theorem example_flip_instance (C : AdmittedPreference) :
   rw [neverDefect_cost_gap_eq]
   norm_num [exampleCost]
 
-theorem example_flip_iff (C : AdmittedPreference) :
-    (cascadeG C exampleCost (boundedHistorical exampleCost (by decide)) .neverDefect -
+theorem example_novelty_below_cost_gap :
+    cascadeNovelty exampleCounts .neverDefect genuineRepair -
+        cascadeNovelty exampleCounts .neverDefect historicalMisclassification <
+      exampleCostGap := by
+  simp [cascadeNovelty, cascadeNoveltyFrom, genuineRepair, historicalMisclassification,
+    initialRepairState, guard, effect, exampleCounts]
+  have hg := exampleCostGap_pos
+  have hn := PatternThetaNovelty.novelty_eq (100 / exampleCostGap)
+    (100 / exampleCostGap) (div_pos (by norm_num) hg) (div_pos (by norm_num) hg)
+  rw [hn]
+  field_simp
+  nlinarith
+
+theorem example_flip :
+    cascadeG examplePreference exampleCost
+          (boundedHistorical exampleCost (by decide)) .neverDefect -
           cascadeNovelty exampleCounts .neverDefect historicalMisclassification <
-        cascadeG C exampleCost (boundedGenuine exampleCost (by decide)) .neverDefect -
-          cascadeNovelty exampleCounts .neverDefect genuineRepair) ↔
-      cascadeNovelty exampleCounts .neverDefect genuineRepair -
-          cascadeNovelty exampleCounts .neverDefect historicalMisclassification <
-        neverDefectCostGap C exampleCost (by decide) (by decide) := by
-  exact neverDefect_flip_iff C exampleCost (by decide) (by decide) exampleCounts
+      cascadeG examplePreference exampleCost
+          (boundedGenuine exampleCost (by decide)) .neverDefect -
+          cascadeNovelty exampleCounts .neverDefect genuineRepair := by
+  apply (neverDefect_flip_iff examplePreference exampleCost
+    (by decide) (by decide) exampleCounts).2
+  exact example_novelty_below_cost_gap
 
 #print axioms recorded_cascade_guard_check
 #print axioms costKernel
@@ -427,7 +480,7 @@ theorem example_flip_iff (C : AdmittedPreference) :
 #print axioms realDefect_flip_from_preference
 #print axioms order_changes_prediction
 #print axioms order_changes_G
-#print axioms example_flip_iff
+#print axioms example_flip
 
 end
 end DarkTower.WarMachine.RepairCascadeG
