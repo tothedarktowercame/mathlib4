@@ -39,18 +39,26 @@ def selectedHistory {Key : Type*} [DecidableEq Key] (makeup : Makeup) (key : Key
     (history : List (RetainedTick Key)) : List (RetainedTick Key) :=
   ((history.filter fun tick => tick.key = key).reverse.take makeup.historyWindow).reverse
 
-/-- The compact runtime history is complete when it is the ordered projection
-of all retained class ticks.  Coverage includes order because the Makeup
-window selects the most recent matching ticks. -/
+/-- Coverage is set equality of retained and indexed ticks.  Observation order
+is the index's publication order and is deliberately not part of coverage. -/
 def HistoryIndexComplete {Key : Type*}
-    (retained indexed : List (RetainedTick Key)) : Prop := indexed = retained
+    (retained indexed : List (RetainedTick Key)) : Prop :=
+  ∀ tick, tick ∈ retained ↔ tick ∈ indexed
 
 theorem selectedHistory_empty_of_complete_index {Key : Type*} [DecidableEq Key]
     (makeup : Makeup) (key : Key) (retained indexed : List (RetainedTick Key))
     (complete : HistoryIndexComplete retained indexed)
-    (empty : selectedHistory makeup key indexed = []) :
+    (empty : indexed.filter (fun tick => tick.key = key) = []) :
     selectedHistory makeup key retained = [] := by
-  simpa [HistoryIndexComplete] using complete ▸ empty
+  have retainedEmpty : retained.filter (fun tick => tick.key = key) = [] := by
+    apply List.filter_eq_nil_iff.mpr
+    intro tick member
+    by_contra keyEq
+    have indexedMember : tick ∈ indexed := (complete tick).mp member
+    have : tick ∈ indexed.filter (fun item => item.key = key) :=
+      List.mem_filter.mpr ⟨indexedMember, keyEq⟩
+    simpa [empty] using this
+  simp [selectedHistory, retainedEmpty]
 
 theorem mem_selectedHistory_key {Key : Type*} [DecidableEq Key] (makeup : Makeup)
     (key : Key) (history : List (RetainedTick Key)) (tick : RetainedTick Key)
