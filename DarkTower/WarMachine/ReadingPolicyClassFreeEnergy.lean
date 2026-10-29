@@ -94,6 +94,14 @@ theorem zero_evidence_tick_impossible {Key S : Type*} [Fintype S]
       .observationImpossible ⟨tick, tickEvidence model tick, hz⟩ := by
   simp [evaluateTicks, hz]
 
+/-- A policy whose retained observation has zero evidence receives zero
+posterior mass.  This is the typed-impossibility branch's posterior meaning;
+it is not represented by choosing an arbitrary large finite free energy. -/
+theorem impossible_policy_posterior_zero {wa wb eb : ℝ}
+    (_hwb : 0 < wb) (_heb : 0 < eb) :
+    PrecisionFromObservation.binaryPosterior wa wb 0 eb = 0 := by
+  simp [PrecisionFromObservation.binaryPosterior]
+
 /-- On every finite tick, the exact posterior VFE is its surprisal.  This is
 the existing B.2 equality theorem, instantiated with the retained class and
 the unchanged class observation kernel. -/
