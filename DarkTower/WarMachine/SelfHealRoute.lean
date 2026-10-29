@@ -1715,6 +1715,47 @@ theorem phaseReplay_receiptDischargesIffChecked (receipt : PhaseReplayReceipt) :
       by_cases h : pathWitness = entryVar <;>
       simp [PhaseReplayReceipt.outcome, PhaseReplayOutcome.closing, h]
 
+/-- Replay of an admitted acceptance test does not rerun old code.  Its
+before-observation is the retained admission run, and `admissionSourceIdentity`
+ties that observation to the exact test source executed now. -/
+structure PinnedAdmissionReplayReceipt where
+  replay : PhaseReplayReceipt
+  admissionRunPin : String
+  admissionSourceIdentity : String
+  currentSourceIdentity : String
+  deriving DecidableEq, Repr
+
+/-- A retained admission run is usable only when it has a pin and its test
+source has the same identity as the current acceptance test. -/
+def PinnedAdmissionReplayReceipt.outcome
+    (receipt : PinnedAdmissionReplayReceipt) : PhaseReplayOutcome :=
+  if receipt.admissionRunPin.isEmpty then .inputUnavailable
+  else if receipt.admissionSourceIdentity != receipt.currentSourceIdentity then
+    .inputUnavailable
+  else receipt.replay.outcome
+
+/-- An enacted repair discharges from a retained admission observation exactly
+when the pin is present, the admitted and current test sources agree, the test
+runner witnessed the admitted entrypoint, admission failed, and the current run
+passes. -/
+theorem pinnedAdmissionReplay_receiptDischargesIffChecked
+    (receipt : PinnedAdmissionReplayReceipt) :
+    receipt.outcome.closing = .discharged ↔
+      receipt.admissionRunPin.isEmpty = false ∧
+      receipt.admissionSourceIdentity = receipt.currentSourceIdentity ∧
+      receipt.replay.inputAvailable = true ∧
+      receipt.replay.pathWitness = receipt.replay.entryVar ∧
+      receipt.replay.beforePredicate = .failing ∧
+      receipt.replay.afterPredicate = .passing := by
+  by_cases hp : receipt.admissionRunPin.isEmpty = true
+  · simp [PinnedAdmissionReplayReceipt.outcome, PhaseReplayOutcome.closing, hp]
+  · have hp' : receipt.admissionRunPin.isEmpty = false := by
+      cases h : receipt.admissionRunPin.isEmpty <;> simp_all
+    by_cases hs : receipt.admissionSourceIdentity = receipt.currentSourceIdentity
+    · simp [PinnedAdmissionReplayReceipt.outcome, hp', hs,
+        phaseReplay_receiptDischargesIffChecked]
+    · simp [PinnedAdmissionReplayReceipt.outcome, PhaseReplayOutcome.closing, hp', hs]
+
 /-- The ledger can discharge a phase replay exactly when it consumes a repaired
 receipt. -/
 theorem phaseReplay_dischargesIffRepaired (o : PhaseReplayOutcome) :
