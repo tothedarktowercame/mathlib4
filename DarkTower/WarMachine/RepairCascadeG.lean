@@ -48,7 +48,7 @@ def genuineRepair : RepairCascade :=
    .witnessPath, .differentSeatReviews, .retireLedger]
 
 def historicalMisclassification : RepairCascade :=
-  [.reproduceRetained, .correctRefusalIsNotDefect, .retireLedger]
+  [.locateProducer, .reproduceRetained, .correctRefusalIsNotDefect, .retireLedger]
 
 /-- Exactly META's outcome vocabulary. -/
 inductive MetaOutcome
@@ -137,17 +137,17 @@ def admittedCountFrom : RepairState → RepairCascade → ℕ
 def admittedCount (i : InjuryState) (c : RepairCascade) : ℕ :=
   admittedCountFrom (initialRepairState i) c
 
-/-- The guard facts used below. The historical cascade has only two admitted
-steps: its decision guard requires a producer location that it does not contain. -/
+/-- The guard facts used below. The corrected historical cascade includes the
+producer location witnessed before the not-a-defect decision. -/
 theorem recorded_cascade_guard_check :
     admittedCount .neverDefect genuineRepair = 5 ∧
-    admittedCount .neverDefect historicalMisclassification = 2 ∧
+    admittedCount .neverDefect historicalMisclassification = 4 ∧
     predictedOutcome (applyCascade genuineRepair (initialRepairState .neverDefect)) = .closure ∧
     predictedOutcome (applyCascade historicalMisclassification
       (initialRepairState .neverDefect)) = .closure ∧
     predictedOutcome (applyCascade genuineRepair (initialRepairState .realDefect)) = .closure ∧
     predictedOutcome (applyCascade historicalMisclassification
-      (initialRepairState .realDefect)) = .injuryPersistence := by decide
+      (initialRepairState .realDefect)) = .usefulBlockerDiscovery := by decide
 
 /-- Cost parameters are bounded so every permitted cascade leaves nonnegative
 mass for its terminal outcome. -/
@@ -306,7 +306,7 @@ theorem neverDefect_cost_gap_eq (C : AdmittedPreference) (m : CostModel)
     (hg : genuineRepair.length ≤ m.maxLength)
     (hh : historicalMisclassification.length ≤ m.maxLength) :
     neverDefectCostGap C m hg hh =
-      3 * m.w * (Real.log (C.kernel.mass () .closure) -
+      m.w * (Real.log (C.kernel.mass () .closure) -
         Real.log (C.kernel.mass () .tokenUse)) := by
   unfold neverDefectCostGap
   rw [cascadeG_eq, cascadeG_eq]
@@ -323,7 +323,7 @@ theorem neverDefect_cost_gap_positive (C : AdmittedPreference) (m : CostModel)
   positivity
 
 theorem neverDefect_cost_gap_strictMono (C : AdmittedPreference) :
-    StrictMono (fun w : ℝ => 3 * w * (Real.log (C.kernel.mass () .closure) -
+    StrictMono (fun w : ℝ => w * (Real.log (C.kernel.mass () .closure) -
       Real.log (C.kernel.mass () .tokenUse))) := by
   have hp := C.preferred_gt_dispreferred .closure .tokenUse (by rfl) (by rfl)
   have hl := Real.strictMonoOn_log (C.positive _) (C.positive _) hp
@@ -382,14 +382,15 @@ theorem order_changes_G (C : AdmittedPreference) (m : CostModel)
 theorem realDefect_flip_from_preference (C : AdmittedPreference) (m : CostModel)
     (hg : genuineRepair.length ≤ m.maxLength)
     (hh : historicalMisclassification.length ≤ m.maxLength)
-    (hw : m.w = 0) :
+    (hw : m.w = 0)
+    (hclosure : C.kernel.mass () .usefulBlockerDiscovery <
+      C.kernel.mass () .closure) :
     cascadeG C m (boundedGenuine m hg) .realDefect <
       cascadeG C m (boundedHistorical m hh) .realDefect := by
   rw [cascadeG_eq, cascadeG_eq]
   simp only [boundedGenuine, boundedHistorical, recorded_cascade_guard_check]
   simp [hw]
-  have hp := C.preferred_gt_dispreferred .closure .injuryPersistence (by rfl) (by rfl)
-  have hl := Real.strictMonoOn_log (C.positive _) (C.positive _) hp
+  have hl := Real.strictMonoOn_log (C.positive _) (C.positive _) hclosure
   linarith
 
 /-- Concrete parameters occur only in this example. -/
@@ -442,7 +443,7 @@ def exampleCounts : PatternCounts := fun _ =>
 
 theorem example_flip_instance (C : AdmittedPreference) :
     neverDefectCostGap C exampleCost (by decide) (by decide) =
-      3 / 10 * (Real.log (C.kernel.mass () .closure) -
+      1 / 10 * (Real.log (C.kernel.mass () .closure) -
         Real.log (C.kernel.mass () .tokenUse)) := by
   rw [neverDefect_cost_gap_eq]
   norm_num [exampleCost]
