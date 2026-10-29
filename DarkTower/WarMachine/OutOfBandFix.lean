@@ -69,4 +69,45 @@ theorem outOfBandFix_conflictRefused (r : OutOfBandFixReceipt)
     (h : r.conflictFree = false) : discharges r = false := by
   simp [discharges, counterfactualChecked, h]
 
+/-! An open injury consults retained out-of-band evidence before diagnosis.
+Absence preserves the ordinary route. A presented artifact never falls
+through: malformed, mismatched, or unchecked evidence holds for inspection. -/
+
+inductive OpenArtifact where
+  | absent
+  | malformed
+  | mismatched
+  | checked (receipt : OutOfBandFixReceipt)
+  deriving DecidableEq, Repr
+
+inductive OpenRoute where
+  | diagnosis
+  | hold
+  | medicDischarge
+  deriving DecidableEq, Repr
+
+def routeOpen : OpenArtifact → OpenRoute
+  | .absent => .diagnosis
+  | .malformed => .hold
+  | .mismatched => .hold
+  | .checked receipt => if discharges receipt then .medicDischarge else .hold
+
+theorem openInjury_medicDischargesIffChecked (r : OutOfBandFixReceipt) :
+    routeOpen (.checked r) = .medicDischarge ↔
+      historicalChecked r ∧ currentChecked r ∧ counterfactualChecked r := by
+  simp [routeOpen, outOfBandFix_dischargesIffChecked]
+
+theorem malformedArtifact_holdsBeforeDiagnosis :
+    routeOpen .malformed = .hold := rfl
+
+theorem mismatchedArtifact_holdsBeforeDiagnosis :
+    routeOpen .mismatched = .hold := rfl
+
+theorem missingArtifact_preservesDiagnosis :
+    routeOpen .absent = .diagnosis := rfl
+
+theorem uncheckedArtifact_holdsBeforeDiagnosis (r : OutOfBandFixReceipt)
+    (h : discharges r = false) : routeOpen (.checked r) = .hold := by
+  simp [routeOpen, h]
+
 end DarkTower.WarMachine.OutOfBandFix
