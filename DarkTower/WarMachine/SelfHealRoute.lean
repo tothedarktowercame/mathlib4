@@ -1532,20 +1532,23 @@ inductive PhaseReplayOutcome where
   | repaired (receipt : PhaseReplayReceipt)
   | sameFailure
   | differentFailure
+  | notReproduced
   | inputUnavailable
   | phaseMismatch
   deriving DecidableEq, Repr
 
 /-- Classify a serving-JVM phase replay.  Unavailable input is decided first;
 then the witnessed path must name the specification's entry var; only an exact
-failing-to-passing turn can construct `repaired`. -/
+failing-to-passing turn can construct `repaired`.  A passing before-predicate is
+`notReproduced`: the frozen input did not reproduce the diagnosed failure on the
+pre-repair code, so it is an inconclusive replay rather than a different failure. -/
 def PhaseReplayReceipt.outcome (receipt : PhaseReplayReceipt) : PhaseReplayOutcome :=
   if receipt.inputAvailable = false then .inputUnavailable
   else if receipt.pathWitness != receipt.entryVar then .phaseMismatch
   else match receipt.beforePredicate, receipt.afterPredicate with
     | .failing, .passing => .repaired receipt
     | .failing, .failing => .sameFailure
-    | _, _ => .differentFailure
+    | .passing, _ => .notReproduced
 
 /-- A path witness that does not name the replay specification's entrypoint can
 never produce a repaired outcome. -/
@@ -1570,6 +1573,23 @@ def PhaseReplayOutcome.closing : PhaseReplayOutcome → ClosingStatus
   | .repaired _ => .discharged
   | .sameFailure => .reopened
   | _ => .retryInconclusive
+
+/-- The theorem the runtime ledger consumes.  Runtime code builds phase replay
+outcomes only through `PhaseReplayReceipt.outcome`, rather than constructing
+`PhaseReplayOutcome.repaired` directly, so discharge is tied to all four checked
+claims in the receipt. -/
+theorem phaseReplay_receiptDischargesIffChecked (receipt : PhaseReplayReceipt) :
+    receipt.outcome.closing = .discharged ↔
+      receipt.inputAvailable = true ∧
+      receipt.pathWitness = receipt.entryVar ∧
+      receipt.beforePredicate = .failing ∧
+      receipt.afterPredicate = .passing := by
+    cases receipt with
+  | mk injuryId repairId patchSha phaseId entryVar frozenInputPin loadedSourceIdentity
+      pathWitness inputAvailable beforePredicate afterPredicate =>
+    cases inputAvailable <;> cases beforePredicate <;> cases afterPredicate <;>
+      by_cases h : pathWitness = entryVar <;>
+      simp [PhaseReplayReceipt.outcome, PhaseReplayOutcome.closing, h]
 
 /-- The ledger can discharge a phase replay exactly when it consumes a repaired
 receipt. -/
