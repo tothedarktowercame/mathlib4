@@ -1380,6 +1380,12 @@ inductive RetryClickOutcome where
   failure kind and an outcome in `successful-outcomes`; `integrate` then appends
   `(T integrate :discharged)` for the enacted entry. -/
   | successfulTaskOutcome
+  /-- `:producer-qualified-already-satisfied`: the retained producer fields agree
+  that the author wait closed because the grounded commit already exists.  The
+  qualification is carried here as the producer's repository and commit SHA, rather
+  than erased into a bare outcome label.  Joe approved this specification change on
+  2026-10-29: "the Discharge change seems warranted." -/
+  | producerQualifiedAlreadySatisfied (groundedRepo groundedSha : String)
   /-- `:injury` with the enacted entry's injury id: `(L append-retry-result)`.
   The retry failed for the same cause.
   Rev 13 anchor (futon2 `9d3026e1a`, T unchanged since `d0a890f22`): `(T integrate ledger/append-retry-result)`, the arm
@@ -1457,11 +1463,13 @@ inductive RetryClickOutcome where
   | recordUnreadable
   deriving DecidableEq, Repr
 
-/-- The closing law. Only a successful task outcome discharges. The same injury reopens,
+/-- The closing law. A successful task outcome or producer-qualified already-satisfied
+discharges. The same injury reopens,
 or is abandoned when the next attempt would exceed `:attempt-limit` (`(L append-retry-result :attempt-limit-exhausted)`; this is
 the `budgetSpent` parameter). Everything else is inconclusive for the enacted injury. -/
 def RetryClickOutcome.closing (budgetSpent : Bool) : RetryClickOutcome → ClosingStatus
   | .successfulTaskOutcome => .discharged
+  | .producerQualifiedAlreadySatisfied _ _ => .discharged
   | .sameInjury => if budgetSpent then .abandoned else .reopened
   | _ => .retryInconclusive
 
@@ -1478,10 +1486,15 @@ def RetryClickOutcome.closingBefore83f72ba1e (budgetSpent : Bool) :
   | .recordUnreadable => .retryInconclusive
   | _ => .discharged
 
-/-- Only a successful task outcome discharges, under either budget. -/
+/-- Exactly the two successful retry outcomes discharge, under either budget. -/
+def RetryClickOutcome.isSuccessful : RetryClickOutcome → Bool
+  | .successfulTaskOutcome => true
+  | .producerQualifiedAlreadySatisfied _ _ => true
+  | _ => false
+
 theorem closing_dischargesOnlyOnSuccess (b : Bool) (o : RetryClickOutcome) :
-    o.closing b = .discharged ↔ o = .successfulTaskOutcome := by
-  cases b <;> cases o <;> decide
+    o.closing b = .discharged ↔ o.isSuccessful = true := by
+  cases b <;> cases o <;> simp [RetryClickOutcome.closing, RetryClickOutcome.isSuccessful]
 
 /-- **The reason M10a existed.** `integrate` at `343b60ef3` (`(T integrate)`), given `classify`'s
 abstention (`(T classify)`, `(T abstention-reason)`), recorded an abstained retry as `:discharged`; the law
@@ -1498,7 +1511,8 @@ theorem retryClose_disagreement (b : Bool) (o : RetryClickOutcome) :
     o.closingBefore83f72ba1e b ≠ o.closing b ↔
       o ∈ [.ordinarySelectionAbstention, .evaluatedNoAction, .partialFrontierContinuation,
            .operatorCancelled, .declaredNoWork, .diagnosticOnly, .absentTerminalFailure] := by
-  cases b <;> cases o <;> decide
+  cases b <;> cases o <;>
+    simp [RetryClickOutcome.closingBefore83f72ba1e, RetryClickOutcome.closing]
 
 /-- An inconclusive close is placed at `enacted`, like the other closings. -/
 theorem retryInconclusive_placedAtEnacted :
@@ -1516,6 +1530,7 @@ theorem retryInconclusive_placedAtEnacted :
 * no record reaches `integrate` at all. -/
 def RetryClickOutcome.closingToday (budgetSpent : Bool) : RetryClickOutcome → ClosingStatus
   | .successfulTaskOutcome => .discharged
+  | .producerQualifiedAlreadySatisfied _ _ => .discharged
   | .sameInjury => if budgetSpent then .abandoned else .reopened
   | .otherInjury => .retryInconclusive
   | .otherInjuryRefused => .retryInconclusive
@@ -1531,7 +1546,8 @@ def RetryClickOutcome.closingToday (budgetSpent : Bool) : RetryClickOutcome → 
 /-- The code now meets the closing law, case by case. -/
 theorem closingToday_eq_closing (b : Bool) (o : RetryClickOutcome) :
     o.closingToday b = o.closing b := by
-  cases b <;> cases o <;> decide
+  cases b <;> cases o <;>
+    simp [RetryClickOutcome.closingToday, RetryClickOutcome.closing]
 
 /-- Why an injury was abandoned. -/
 inductive AbandonReason where
@@ -2021,7 +2037,7 @@ inductive OrdinaryClose where
   | abstained | noSelection
   deriving DecidableEq, Repr
 
-/-- Which of them `(T classify :successful-task-outcome)` counts as success:
+/-- Which unqualified closes `(T classify :successful-task-outcome)` counts as success:
 `(T successful-outcomes)` is `#{:success :closed :grounded-change :cohort-complete}`, and
 of the ordinary closes only `:grounded-change` is in it. -/
 def OrdinaryClose.successfulForT : OrdinaryClose → Bool
@@ -2038,6 +2054,17 @@ the finding, and the repair is to `(T successful-outcomes)`. -/
 theorem retryClose_onlyGroundedChangeDischarges (o : OrdinaryClose) :
     o.successfulForT = true ↔ o = .groundedChange := by
   cases o <;> decide
+
+/-- Producer qualification changes the retry outcome, not the meaning of the bare
+`:already-satisfied` close.  The qualified record discharges with its retained grounding
+data; the unqualified ordinary close remains outside `successfulTaskOutcome` and is
+therefore inconclusive. -/
+theorem retryClose_qualifiedAlreadySatisfiedDischarges :
+    (RetryClickOutcome.producerQualifiedAlreadySatisfied "repo" "sha").closing false =
+        .discharged ∧
+      OrdinaryClose.alreadySatisfied.successfulForT = false ∧
+      RetryClickOutcome.ordinarySelectionAbstention.closing false = .retryInconclusive := by
+  decide
 
 /-- What `(L state-defects :review/evidence)` and `(C coordinate :coordinator/review-patch-substitution)`
 read of a review answer: `:status :succeeded`, the payload's `:patch-sha` equal to the author's,

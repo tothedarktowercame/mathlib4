@@ -225,7 +225,7 @@ theorem inactive_latest_not_effective
 
 theorem retry_closing_law_unchanged (b : Bool) (o : SelfHealRoute.RetryClickOutcome) :
     o.closing b = SelfHealRoute.ClosingStatus.discharged ↔
-      o = .successfulTaskOutcome :=
+      o.isSuccessful = true :=
   SelfHealRoute.closing_dischargesOnlyOnSuccess b o
 
 /-! Concrete controls use full ledger entries and complete medic payloads. -/

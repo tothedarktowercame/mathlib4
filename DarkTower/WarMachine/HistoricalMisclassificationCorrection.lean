@@ -590,11 +590,11 @@ theorem entry45_later_reopening_remains_active :
 #print axioms entry45_correction_qualifies_with_successful_close_replay
 #print axioms entry45_later_reopening_remains_active
 
-/-- The proposal does not modify the established retry closing law. -/
-theorem medic_preserves_success_only_retry_law (b : Bool)
+/-- The proposal preserves the retry closing law, including qualified already-satisfied. -/
+theorem medic_preserves_retry_law (b : Bool)
     (o : SelfHealRoute.RetryClickOutcome) :
     o.closing b = SelfHealRoute.ClosingStatus.discharged ↔
-      o = SelfHealRoute.RetryClickOutcome.successfulTaskOutcome :=
+      o.isSuccessful = true :=
   SelfHealRoute.closing_dischargesOnlyOnSuccess b o
 
 end DarkTower.WarMachine.HistoricalMisclassificationCorrection
