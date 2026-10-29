@@ -39,6 +39,19 @@ def selectedHistory {Key : Type*} [DecidableEq Key] (makeup : Makeup) (key : Key
     (history : List (RetainedTick Key)) : List (RetainedTick Key) :=
   ((history.filter fun tick => tick.key = key).reverse.take makeup.historyWindow).reverse
 
+/-- The compact runtime history is complete when it is the ordered projection
+of all retained class ticks.  Coverage includes order because the Makeup
+window selects the most recent matching ticks. -/
+def HistoryIndexComplete {Key : Type*}
+    (retained indexed : List (RetainedTick Key)) : Prop := indexed = retained
+
+theorem selectedHistory_empty_of_complete_index {Key : Type*} [DecidableEq Key]
+    (makeup : Makeup) (key : Key) (retained indexed : List (RetainedTick Key))
+    (complete : HistoryIndexComplete retained indexed)
+    (empty : selectedHistory makeup key indexed = []) :
+    selectedHistory makeup key retained = [] := by
+  simpa [HistoryIndexComplete] using complete ▸ empty
+
 theorem mem_selectedHistory_key {Key : Type*} [DecidableEq Key] (makeup : Makeup)
     (key : Key) (history : List (RetainedTick Key)) (tick : RetainedTick Key)
     (member : tick ∈ selectedHistory makeup key history) : tick.key = key := by
