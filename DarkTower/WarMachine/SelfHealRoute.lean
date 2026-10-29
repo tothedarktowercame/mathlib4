@@ -1496,6 +1496,97 @@ theorem closing_dischargesOnlyOnSuccess (b : Bool) (o : RetryClickOutcome) :
     o.closing b = .discharged ↔ o.isSuccessful = true := by
   cases b <;> cases o <;> simp [RetryClickOutcome.closing, RetryClickOutcome.isSuccessful]
 
+/-! ## Phase-local replay of an enacted repair -/
+
+/-- The predicate observed on the diagnosed phase's retained input, before and
+after enactment.  The two values are data in the receipt rather than conclusions
+supplied by the caller. -/
+inductive PhaseReplayPredicate where
+  | failing
+  | passing
+  deriving DecidableEq, Repr
+
+/-- The serving-JVM receipt for a replay of exactly the diagnosed phase on its
+frozen input.  In Joe's words (2026-10-29), "retry only the repaired phase sounds
+suitable, at least for testing ... running it, freezing results and then running
+again."  `entryVar` is the entrypoint named by the replay specification;
+`pathWitness` is the entrypoint the serving path witnessed. -/
+structure PhaseReplayReceipt where
+  injuryId : String
+  repairId : String
+  patchSha : String
+  phaseId : String
+  entryVar : String
+  frozenInputPin : String
+  loadedSourceIdentity : String
+  pathWitness : String
+  inputAvailable : Bool
+  beforePredicate : PhaseReplayPredicate
+  afterPredicate : PhaseReplayPredicate
+  deriving DecidableEq, Repr
+
+/-- A phase replay is distinct from an ordinary retry child.  The repaired case
+carries the complete receipt whose claims are checked by `PhaseReplayReceipt.outcome`;
+the other constructors preserve why the replay did not establish the repair. -/
+inductive PhaseReplayOutcome where
+  | repaired (receipt : PhaseReplayReceipt)
+  | sameFailure
+  | differentFailure
+  | inputUnavailable
+  | phaseMismatch
+  deriving DecidableEq, Repr
+
+/-- Classify a serving-JVM phase replay.  Unavailable input is decided first;
+then the witnessed path must name the specification's entry var; only an exact
+failing-to-passing turn can construct `repaired`. -/
+def PhaseReplayReceipt.outcome (receipt : PhaseReplayReceipt) : PhaseReplayOutcome :=
+  if receipt.inputAvailable = false then .inputUnavailable
+  else if receipt.pathWitness != receipt.entryVar then .phaseMismatch
+  else match receipt.beforePredicate, receipt.afterPredicate with
+    | .failing, .passing => .repaired receipt
+    | .failing, .failing => .sameFailure
+    | _, _ => .differentFailure
+
+/-- A path witness that does not name the replay specification's entrypoint can
+never produce a repaired outcome. -/
+theorem phaseReplay_pathMismatch_notRepaired (receipt : PhaseReplayReceipt)
+    (h : receipt.pathWitness ≠ receipt.entryVar) :
+    ∀ repairedReceipt, receipt.outcome ≠ PhaseReplayOutcome.repaired repairedReceipt := by
+  intro repairedReceipt
+  cases hi : receipt.inputAvailable <;>
+    simp [PhaseReplayReceipt.outcome, hi, h]
+
+/-- Missing or unverifiable frozen input is represented as absence, never as a
+failed or successful predicate value. -/
+theorem phaseReplay_unavailableInput (receipt : PhaseReplayReceipt)
+    (h : receipt.inputAvailable = false) :
+    receipt.outcome = .inputUnavailable := by
+  simp [PhaseReplayReceipt.outcome, h]
+
+/-- The local closing law.  A witnessed repaired phase discharges; persistence
+of the diagnosed failure reopens; every non-judgment is inconclusive.  Retry
+budget and requeue policy remain outside this outcome, as for `RetryClickOutcome`. -/
+def PhaseReplayOutcome.closing : PhaseReplayOutcome → ClosingStatus
+  | .repaired _ => .discharged
+  | .sameFailure => .reopened
+  | _ => .retryInconclusive
+
+/-- The ledger can discharge a phase replay exactly when it consumes a repaired
+receipt. -/
+theorem phaseReplay_dischargesIffRepaired (o : PhaseReplayOutcome) :
+    o.closing = .discharged ↔ ∃ receipt, o = .repaired receipt := by
+  cases o <;> simp [PhaseReplayOutcome.closing]
+
+/-- Documented ledger projection for phase replay: this is deliberately the
+local closing law itself.  Thus repaired discharges, same failure reopens, and
+all other outcomes are inconclusive; budget/requeue remains a later decision. -/
+def PhaseReplayOutcome.ledgerClosing : PhaseReplayOutcome → ClosingStatus :=
+  PhaseReplayOutcome.closing
+
+theorem phaseReplay_ledgerClosingLaw (o : PhaseReplayOutcome) :
+    o.ledgerClosing = .discharged ↔ ∃ receipt, o = .repaired receipt := by
+  exact phaseReplay_dischargesIffRepaired o
+
 /-- **The reason M10a existed.** `integrate` at `343b60ef3` (`(T integrate)`), given `classify`'s
 abstention (`(T classify)`, `(T abstention-reason)`), recorded an abstained retry as `:discharged`; the law
 records it as `retryInconclusive`. The two differed, so the repair was recorded as healed
