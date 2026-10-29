@@ -1031,6 +1031,27 @@ theorem unsatisfiableAcceptance_reproposesAndReviews
 theorem ordinaryAuthorFailure_spendsAttempt (attempt : Nat) :
     AuthorResult.failed.nextAttempt attempt = attempt + 1 := rfl
 
+/-- The declared `:acceptance-return-limit` chooses whether a retained claim
+may reach a fresh proposal or must remain held for outside repair. -/
+def acceptanceReturnState (returns limit : Nat) : RouteState :=
+  if returns < limit then acceptanceReconsidered else coordinationHeld
+
+theorem acceptanceReturn_bounded_beforeLimit
+    (returns limit : Nat) (h : returns < limit) :
+    acceptanceReturnState returns limit = acceptanceReconsidered ∧
+      edge acceptanceReconsidered admissionRun = true := by
+  constructor
+  · simp [acceptanceReturnState, h]
+  · decide
+
+theorem acceptanceReturn_held_atLimit
+    (returns limit : Nat) (h : ¬ returns < limit) :
+    acceptanceReturnState returns limit = coordinationHeld ∧
+      edge coordinationHeld terminalRecord = true := by
+  constructor
+  · simp [acceptanceReturnState, h]
+  · decide
+
 /-- `:held` reasons (`(C held!)`). The port answered and the transaction waits. -/
 inductive HeldReason where
   /-- `(C coordinate :author-failed)`. Rev 21 (futon2 `4e7b31cdc`, F26): the hold is the
