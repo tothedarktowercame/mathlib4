@@ -3,13 +3,11 @@ import DarkTower.WarMachine.PatternThetaNovelty
 import Mathlib.Tactic
 
 /-! Repair cascades use the existing finite-cascade G. Patterns are interpreted
-in precedence order; `CascadeEFE.stepG` is used directly and admitted pattern
-novelty is subtracted at selection sites. There is no repair-specific scorer.
-
-The summed per-pattern novelty grows with the number of admitted patterns. It
-can therefore reward a full repair cascade even after reproduction establishes
-that the injury was never a defect. The exact threshold below records this
-property of applying the existing novelty term here; S4 must account for it.
+in precedence order and admitted pattern novelty is subtracted at selection
+sites. A bounded cost model now assigns `w` token-use mass per admitted step
+and the remaining mass to the cascade's terminal outcome. This removes the old
+terminal token-use special case and makes the length bias an explicit part of
+the predictive model rather than an outcome-label workaround.
 -/
 
 namespace DarkTower.WarMachine.RepairCascadeG
@@ -94,7 +92,7 @@ def guard : RepairPattern → RepairState → Bool
   | .locateProducer, s => s.recorded
   | .reproduceRetained, s => s.recorded
   | .correctRefusalIsNotDefect, s => s.producerLocated && s.reproduced
-  | .redBeforeRepair, s => s.reproduced && s.decisionMade
+  | .redBeforeRepair, s => s.reproduced && s.decisionMade && s.injury == .realDefect
   | .repairProducer, s => s.producerLocated && s.decisionMade && s.redBoundary
   | .witnessPath, s => s.producerFixed
   | .differentSeatReviews, s => s.redBoundary && s.pathWitnessed
@@ -126,16 +124,93 @@ def applyCascade (c : RepairCascade) (s : RepairState) : RepairState :=
   c.foldl applyPattern s
 
 def predictedOutcome (s : RepairState) : MetaOutcome :=
-  if s.retired && s.injury == .neverDefect && s.producerLocated then .tokenUse
-  else if s.retired || (s.producerFixed && s.pathWitnessed) then .closure
+  if s.retired || (s.producerFixed && s.pathWitnessed) then .closure
   else if s.reproduced && s.decisionMade then .usefulBlockerDiscovery
   else .injuryPersistence
 
-/-- The outcome kernel is computed from the cascade's composition. -/
-def predictedKernel (c : RepairCascade) : ProbabilityKernel InjuryState MetaOutcome :=
-  finiteKernel (fun i o =>
-      if o = predictedOutcome (applyCascade c (initialRepairState i)) then 1 else 0)
-    (by intros; split_ifs <;> norm_num) (by intro; simp)
+def admittedCountFrom : RepairState → RepairCascade → ℕ
+  | _, [] => 0
+  | s, p :: ps =>
+      if guard p s then 1 + admittedCountFrom (effect p s) ps
+      else admittedCountFrom s ps
+
+def admittedCount (i : InjuryState) (c : RepairCascade) : ℕ :=
+  admittedCountFrom (initialRepairState i) c
+
+/-- The guard facts used below. The historical cascade has only two admitted
+steps: its decision guard requires a producer location that it does not contain. -/
+theorem recorded_cascade_guard_check :
+    admittedCount .neverDefect genuineRepair = 5 ∧
+    admittedCount .neverDefect historicalMisclassification = 2 ∧
+    predictedOutcome (applyCascade genuineRepair (initialRepairState .neverDefect)) = .closure ∧
+    predictedOutcome (applyCascade historicalMisclassification
+      (initialRepairState .neverDefect)) = .closure ∧
+    predictedOutcome (applyCascade genuineRepair (initialRepairState .realDefect)) = .closure ∧
+    predictedOutcome (applyCascade historicalMisclassification
+      (initialRepairState .realDefect)) = .injuryPersistence := by decide
+
+/-- Cost parameters are bounded so every permitted cascade leaves nonnegative
+mass for its terminal outcome. -/
+structure CostModel where
+  maxLength : ℕ
+  w : ℝ
+  w_nonneg : 0 ≤ w
+  total_le_one : w * maxLength ≤ 1
+
+structure BoundedCascade (m : CostModel) where
+  patterns : RepairCascade
+  length_le : patterns.length ≤ m.maxLength
+
+theorem admittedCount_le_length (s : RepairState) (c : RepairCascade) :
+    admittedCountFrom s c ≤ c.length := by
+  induction c generalizing s with
+  | nil => simp [admittedCountFrom]
+  | cons p ps ih =>
+      simp only [admittedCountFrom, List.length_cons]
+      split
+      · have h := ih (effect p s); omega
+      · have h := ih s; omega
+
+theorem predictedOutcome_ne_tokenUse (s : RepairState) :
+    predictedOutcome s ≠ .tokenUse := by
+  unfold predictedOutcome
+  split_ifs <;> decide
+
+def costMass (m : CostModel) (c : BoundedCascade m) (i : InjuryState)
+    (o : MetaOutcome) : ℝ :=
+  if o = .tokenUse then m.w * admittedCount i c.patterns
+  else if o = predictedOutcome (applyCascade c.patterns (initialRepairState i)) then
+    1 - m.w * admittedCount i c.patterns
+  else 0
+
+theorem costMass_nonnegative (m : CostModel) (c : BoundedCascade m)
+    (i : InjuryState) (o : MetaOutcome) : 0 ≤ costMass m c i o := by
+  have hn : (admittedCount i c.patterns : ℝ) ≤ m.maxLength := by
+    exact_mod_cast (le_trans (admittedCount_le_length _ _) c.length_le)
+  have hw : m.w * admittedCount i c.patterns ≤ 1 :=
+    le_trans (mul_le_mul_of_nonneg_left hn m.w_nonneg) m.total_le_one
+  unfold costMass
+  split_ifs
+  · exact mul_nonneg m.w_nonneg (by positivity)
+  · linarith
+  · norm_num
+
+/-- Per-step token cost plus the residual terminal mass is a probability kernel. -/
+def costKernel (m : CostModel) (c : BoundedCascade m) :
+    ProbabilityKernel InjuryState MetaOutcome :=
+  finiteKernel (costMass m c) (costMass_nonnegative m c) (by
+    intro i
+    unfold costMass
+    unfold predictedOutcome
+    split_ifs <;>
+      rw [show (Finset.univ : Finset MetaOutcome) =
+        {.closure, .groundedProgress, .usefulBlockerDiscovery, .downstreamUnblocking,
+         .informationGain, .elapsedMs, .tokenUse, .repeatedTarget, .abstention,
+         .unreviewableOutput, .injuryPersistence} by
+          ext o; fin_cases o <;> simp] <;>
+      repeat' rw [Finset.sum_insert (by decide)] <;> simp_all <;> ring)
+
+/-! The remaining theorems are stated below after the kernel API. -/
 
 /-- Learned preference parameter with only META's stated ordering. -/
 structure AdmittedPreference where
@@ -144,331 +219,215 @@ structure AdmittedPreference where
   preferred_gt_dispreferred : ∀ p d,
     preferred p = true → dispreferred d = true → kernel.mass () d < kernel.mass () p
 
-theorem riskAdmissible (C : AdmittedPreference) (q : ProbabilityKernel Unit InjuryState)
-    (c : RepairCascade) :
-    PreferenceRiskSeparation.riskAdmissible (push q (predictedKernel c)) C.kernel := by
+theorem costRiskAdmissible (C : AdmittedPreference) (q : ProbabilityKernel Unit InjuryState)
+    (m : CostModel) (c : BoundedCascade m) :
+    PreferenceRiskSeparation.riskAdmissible (push q (costKernel m c)) C.kernel := by
   intro _ o _ _
   exact C.positive o
 
+def cascadeG (C : AdmittedPreference) (m : CostModel) (c : BoundedCascade m)
+    (i : InjuryState) : ℝ :=
+  stepG (point i) (costKernel m c) C.kernel
+    (costRiskAdmissible C (point i) m c)
+
+theorem point_information_zero (i : InjuryState) (a : ProbabilityKernel InjuryState MetaOutcome) :
+    information (point i) a = 0 := by
+  rw [information_entropy_identity]
+  have hpush : (push (point i) a).mass () = a.mass i := by
+    funext o
+    simp [push, point, finiteKernel]
+  rw [hpush]
+  unfold CascadeEFE.ambiguity
+  simp only [point, finiteKernel, ite_mul, one_mul, zero_mul]
+  rw [Finset.sum_eq_single i]
+  · simp
+  · intro x _ hx; simp [hx]
+  · simp
+
+theorem cascadeG_eq (C : AdmittedPreference) (m : CostModel) (c : BoundedCascade m)
+    (i : InjuryState) :
+    cascadeG C m c i =
+      -(1 - m.w * admittedCount i c.patterns) *
+          Real.log (C.kernel.mass ()
+            (predictedOutcome (applyCascade c.patterns (initialRepairState i)))) -
+        (m.w * admittedCount i c.patterns) * Real.log (C.kernel.mass () .tokenUse) := by
+  rw [cascadeG, step_decomposition, point_information_zero, sub_zero]
+  have hpush (o : MetaOutcome) :
+      (push (point i) (costKernel m c)).mass () o = costMass m c i o := by
+    simp [push, point, costKernel, finiteKernel]
+  unfold pragmaticCost
+  simp_rw [hpush]
+  let t := predictedOutcome (applyCascade c.patterns (initialRepairState i))
+  let f := fun o : MetaOutcome =>
+    if costMass m c i o = 0 then 0
+    else costMass m c i o * Real.log (C.kernel.mass () o)
+  have hne : t ≠ .tokenUse := predictedOutcome_ne_tokenUse _
+  have ht : t ∈ (Finset.univ.erase (.tokenUse : MetaOutcome)) := by simp [hne]
+  have ht' : t ∈ (Finset.univ \ {(.tokenUse : MetaOutcome)}) := by simp [hne]
+  rw [Finset.sum_eq_add_sum_diff_singleton .tokenUse f (by simp)]
+  rw [Finset.sum_eq_add_sum_diff_singleton_of_mem ht' f]
+  have hz : ∑ o ∈ (Finset.univ \ {(.tokenUse : MetaOutcome)}) \ {t}, f o = 0 := by
+    apply Finset.sum_eq_zero
+    intro o ho
+    have ho' := Finset.mem_sdiff.mp ho
+    have hot : o ≠ .tokenUse := by
+      simpa using (Finset.mem_sdiff.mp ho'.1).2
+    have hoterm : o ≠ t := by simpa using ho'.2
+    simp [f, costMass, hot, hoterm, t]
+  rw [hz]
+  simp only [add_zero]
+  have hzero (p q : ℝ) : (if p = 0 then 0 else p * Real.log q) = p * Real.log q := by
+    by_cases hp : p = 0 <;> simp [hp]
+  simp only [f, hzero]
+  simp [costMass, t, hne]
+  ring
+
+def boundedGenuine (m : CostModel) (h : genuineRepair.length ≤ m.maxLength) :
+    BoundedCascade m := ⟨genuineRepair, h⟩
+
+def boundedHistorical (m : CostModel) (h : historicalMisclassification.length ≤ m.maxLength) :
+    BoundedCascade m := ⟨historicalMisclassification, h⟩
+
+theorem neverDefect_stepG_equal_at_zero (C : AdmittedPreference) (m : CostModel)
+    (hg : genuineRepair.length ≤ m.maxLength)
+    (hh : historicalMisclassification.length ≤ m.maxLength) (hw : m.w = 0) :
+    cascadeG C m (boundedGenuine m hg) .neverDefect =
+      cascadeG C m (boundedHistorical m hh) .neverDefect := by
+  rw [cascadeG_eq, cascadeG_eq]
+  simp [boundedGenuine, boundedHistorical, hw, recorded_cascade_guard_check]
+
+def neverDefectCostGap (C : AdmittedPreference) (m : CostModel)
+    (hg : genuineRepair.length ≤ m.maxLength)
+    (hh : historicalMisclassification.length ≤ m.maxLength) : ℝ :=
+  cascadeG C m (boundedGenuine m hg) .neverDefect -
+    cascadeG C m (boundedHistorical m hh) .neverDefect
+
+theorem neverDefect_cost_gap_eq (C : AdmittedPreference) (m : CostModel)
+    (hg : genuineRepair.length ≤ m.maxLength)
+    (hh : historicalMisclassification.length ≤ m.maxLength) :
+    neverDefectCostGap C m hg hh =
+      3 * m.w * (Real.log (C.kernel.mass () .closure) -
+        Real.log (C.kernel.mass () .tokenUse)) := by
+  unfold neverDefectCostGap
+  rw [cascadeG_eq, cascadeG_eq]
+  simp [boundedGenuine, boundedHistorical, recorded_cascade_guard_check]
+  ring
+
+theorem neverDefect_cost_gap_positive (C : AdmittedPreference) (m : CostModel)
+    (hg : genuineRepair.length ≤ m.maxLength)
+    (hh : historicalMisclassification.length ≤ m.maxLength) (hw : 0 < m.w) :
+    0 < neverDefectCostGap C m hg hh := by
+  rw [neverDefect_cost_gap_eq]
+  have hp := C.preferred_gt_dispreferred .closure .tokenUse (by rfl) (by rfl)
+  have hl := Real.strictMonoOn_log (C.positive _) (C.positive _) hp
+  positivity
+
+theorem neverDefect_cost_gap_strictMono (C : AdmittedPreference) :
+    StrictMono (fun w : ℝ => 3 * w * (Real.log (C.kernel.mass () .closure) -
+      Real.log (C.kernel.mass () .tokenUse))) := by
+  have hp := C.preferred_gt_dispreferred .closure .tokenUse (by rfl) (by rfl)
+  have hl := Real.strictMonoOn_log (C.positive _) (C.positive _) hp
+  intro a b hab
+  nlinarith
+
 abbrev PatternCounts := RepairPattern → ℝ × ℝ
 
-/-- Only admitted (guard-true) patterns contribute their existing novelty term. -/
 def cascadeNoveltyFrom (counts : PatternCounts) : RepairState → RepairCascade → ℝ
   | _, [] => 0
   | s, p :: ps =>
-      if guard p s then
-        PatternThetaNovelty.novelty (counts p).1 (counts p).2 +
-          cascadeNoveltyFrom counts (effect p s) ps
+      if guard p s then PatternThetaNovelty.novelty (counts p).1 (counts p).2 +
+        cascadeNoveltyFrom counts (effect p s) ps
       else cascadeNoveltyFrom counts s ps
 
 def cascadeNovelty (counts : PatternCounts) (i : InjuryState) (c : RepairCascade) : ℝ :=
   cascadeNoveltyFrom counts (initialRepairState i) c
 
-/-- Existing `stepG` at the cascade-computed point outcome. -/
-theorem stepG_point_repair (C : AdmittedPreference) (i : InjuryState)
-    (c : RepairCascade) :
-    stepG (point i) (predictedKernel c) C.kernel (riskAdmissible C (point i) c) =
-      -Real.log (C.kernel.mass ()
-        (predictedOutcome (applyCascade c (initialRepairState i)))) := by
-  let out := predictedOutcome (applyCascade c (initialRepairState i))
-  have hpush : ∀ o, (push (point i) (predictedKernel c)).mass () o =
-      if o = out then 1 else 0 := by
-    intro o
-    simp only [push, point, finiteKernel, predictedKernel, mul_ite, mul_one, mul_zero]
-    rw [Finset.sum_eq_single i]
-    · simp [out]
-    · intro x _ hx; simp [hx]
-    · simp
-  have hamb : CascadeEFE.ambiguity (point i) (predictedKernel c) = 0 := by
-    simp only [CascadeEFE.ambiguity, point, finiteKernel, ite_mul, one_mul, zero_mul]
-    rw [Finset.sum_eq_single i]
-    · simp only [entropy, predictedKernel, finiteKernel]
-      simp [Finset.sum_ite_eq']
-    · intro x _ hx; simp [hx]
-    · simp
-  simp only [stepG, risk, hamb, add_zero, hpush]
-  rw [Finset.sum_eq_single out]
-  · simp [klTerm, out]
-  · intro o _ ho; simp [ho, klTerm]
-  · simp
+theorem neverDefect_flip_iff (C : AdmittedPreference) (m : CostModel)
+    (hg : genuineRepair.length ≤ m.maxLength)
+    (hh : historicalMisclassification.length ≤ m.maxLength) (counts : PatternCounts) :
+    (cascadeG C m (boundedHistorical m hh) .neverDefect -
+          cascadeNovelty counts .neverDefect historicalMisclassification <
+        cascadeG C m (boundedGenuine m hg) .neverDefect -
+          cascadeNovelty counts .neverDefect genuineRepair) ↔
+      cascadeNovelty counts .neverDefect genuineRepair -
+          cascadeNovelty counts .neverDefect historicalMisclassification <
+        neverDefectCostGap C m hg hh := by
+  unfold neverDefectCostGap
+  constructor <;> intro h <;> linarith
 
-/-- Same patterns, but repair is attempted before reproduction enables the
-decision and red-boundary guards. -/
 def fixThenReproduce : RepairCascade :=
   [.recordFinding, .locateProducer, .correctRefusalIsNotDefect, .redBeforeRepair,
    .repairProducer, .reproduceRetained, .witnessPath]
 
-/-- The same bag in the order required by its guards. -/
 def reproduceThenFix : RepairCascade :=
   [.recordFinding, .locateProducer, .reproduceRetained, .correctRefusalIsNotDefect,
    .redBeforeRepair, .repairProducer, .witnessPath]
 
-set_option maxHeartbeats 800000 in
 theorem order_changes_prediction :
     predictedOutcome (applyCascade reproduceThenFix (initialRepairState .realDefect)) = .closure ∧
     predictedOutcome (applyCascade fixThenReproduce (initialRepairState .realDefect)) =
       .injuryPersistence := by decide
 
-/-- The two recorded cascades predict opposite preferred/dispreferred outcomes
-after the reproduction result. -/
-theorem recorded_cascade_predictions :
-    predictedOutcome (applyCascade genuineRepair (initialRepairState .realDefect)) = .closure ∧
-    predictedOutcome (applyCascade historicalMisclassification
-      (initialRepairState .realDefect)) = .injuryPersistence ∧
-    predictedOutcome (applyCascade genuineRepair (initialRepairState .neverDefect)) = .tokenUse ∧
-    predictedOutcome (applyCascade historicalMisclassification
-      (initialRepairState .neverDefect)) = .closure := by decide
-
-/-- G is not composition-blind: the same two patterns in a different order
-produce different G whenever learned C prefers closure to injury persistence. -/
-theorem G_reads_composition (C : AdmittedPreference) :
-    stepG (point .realDefect) (predictedKernel reproduceThenFix) C.kernel
-        (riskAdmissible C (point .realDefect) reproduceThenFix) <
-    stepG (point .realDefect) (predictedKernel fixThenReproduce) C.kernel
-        (riskAdmissible C (point .realDefect) fixThenReproduce) := by
-  rw [stepG_point_repair, stepG_point_repair]
-  simp only [order_changes_prediction]
-  have h := C.preferred_gt_dispreferred .closure .injuryPersistence (by rfl) (by rfl)
-  exact neg_lt_neg (Real.strictMonoOn_log (C.positive _) (C.positive _) h)
-
-/-- Reproduction-first enables the repair pattern and therefore contributes
-its per-pattern novelty; repair-first does not. -/
-theorem reproduce_first_larger_novelty (counts : PatternCounts) (i : InjuryState)
-    (hpos : ∀ p, 0 < (counts p).1 ∧ 0 < (counts p).2) :
-    cascadeNovelty counts i fixThenReproduce <
-      cascadeNovelty counts i reproduceThenFix := by
-  simp [cascadeNovelty, cascadeNoveltyFrom, fixThenReproduce, reproduceThenFix,
-    initialRepairState,
-    guard, effect]
-  rw [PatternThetaNovelty.novelty_eq _ _ (hpos .repairProducer).1
-    (hpos .repairProducer).2]
-  have hdecision := PatternThetaNovelty.novelty_nonneg
-    (counts .correctRefusalIsNotDefect).1 (counts .correctRefusalIsNotDefect).2
-    (hpos _).1 (hpos _).2
-  have hred := PatternThetaNovelty.novelty_nonneg
-    (counts .redBeforeRepair).1 (counts .redBeforeRepair).2 (hpos _).1 (hpos _).2
-  have hwitness := PatternThetaNovelty.novelty_nonneg
-    (counts .witnessPath).1 (counts .witnessPath).2 (hpos _).1 (hpos _).2
-  have ha := (hpos .repairProducer).1
-  have hb := (hpos .repairProducer).2
-  have hden : 0 < 2 * ((counts .repairProducer).1 + (counts .repairProducer).2) := by
-    nlinarith
-  positivity
-
-/-- Before reproduction, belief remains non-point over the injury state. -/
-def beforeReproduction : ProbabilityKernel Unit InjuryState :=
-  finiteKernel (fun _ _ => 1 / 2) (by intros; norm_num)
-    (by intro
-        rw [show (Finset.univ : Finset InjuryState) = {.realDefect, .neverDefect} by
-          ext i; fin_cases i <;> simp]
-        rw [Finset.sum_insert (by decide)]
-        norm_num)
-
-/-- Expected existing pattern novelty under a hidden-state belief. -/
-def expectedCascadeNovelty (q : ProbabilityKernel Unit InjuryState)
-    (counts : PatternCounts) (c : RepairCascade) : ℝ :=
-  ∑ i, q.mass () i * cascadeNovelty counts i c
-
-/-- With the non-point pre-reproduction belief, putting reproduction first
-admits strictly more epistemic value. -/
-theorem before_reproduction_prefers_epistemic_order (counts : PatternCounts)
-    (hpos : ∀ p, 0 < (counts p).1 ∧ 0 < (counts p).2) :
-    expectedCascadeNovelty beforeReproduction counts fixThenReproduce <
-      expectedCascadeNovelty beforeReproduction counts reproduceThenFix := by
-  have hr := reproduce_first_larger_novelty counts .realDefect hpos
-  have hn := reproduce_first_larger_novelty counts .neverDefect hpos
-  unfold expectedCascadeNovelty beforeReproduction
-  simp only [finiteKernel]
-  rw [show (Finset.univ : Finset InjuryState) = {.realDefect, .neverDefect} by
-    ext i; fin_cases i <;> simp]
-  repeat' rw [Finset.sum_insert (by decide)]
-  simp
+theorem order_changes_G (C : AdmittedPreference) (m : CostModel)
+    (hfix : fixThenReproduce.length ≤ m.maxLength)
+    (hreproduce : reproduceThenFix.length ≤ m.maxLength) (hw : m.w = 0) :
+    cascadeG C m ⟨reproduceThenFix, hreproduce⟩ .realDefect <
+      cascadeG C m ⟨fixThenReproduce, hfix⟩ .realDefect := by
+  rw [cascadeG_eq, cascadeG_eq]
+  simp [hw, order_changes_prediction]
+  have hp := C.preferred_gt_dispreferred .closure .injuryPersistence (by rfl) (by rfl)
+  have hl := Real.strictMonoOn_log (C.positive _) (C.positive _) hp
   linarith
 
-/-- The complete existing G expression (`stepG - novelty`) distinguishes the
-same pattern bag in different orders. -/
-theorem existing_G_reads_composition (C : AdmittedPreference) (counts : PatternCounts)
-    (hpos : ∀ p, 0 < (counts p).1 ∧ 0 < (counts p).2) :
-    stepG (point .realDefect) (predictedKernel reproduceThenFix) C.kernel
-        (riskAdmissible C (point .realDefect) reproduceThenFix) -
-        cascadeNovelty counts .realDefect reproduceThenFix <
-    stepG (point .realDefect) (predictedKernel fixThenReproduce) C.kernel
-        (riskAdmissible C (point .realDefect) fixThenReproduce) -
-        cascadeNovelty counts .realDefect fixThenReproduce := by
-  have hG := G_reads_composition C
-  have hn := reproduce_first_larger_novelty counts .realDefect hpos
+theorem realDefect_flip_from_preference (C : AdmittedPreference) (m : CostModel)
+    (hg : genuineRepair.length ≤ m.maxLength)
+    (hh : historicalMisclassification.length ≤ m.maxLength)
+    (hw : m.w = 0) :
+    cascadeG C m (boundedGenuine m hg) .realDefect <
+      cascadeG C m (boundedHistorical m hh) .realDefect := by
+  rw [cascadeG_eq, cascadeG_eq]
+  simp only [boundedGenuine, boundedHistorical, recorded_cascade_guard_check]
+  simp [hw]
+  have hp := C.preferred_gt_dispreferred .closure .injuryPersistence (by rfl) (by rfl)
+  have hl := Real.strictMonoOn_log (C.positive _) (C.positive _) hp
   linarith
 
-/-- The pragmatic `stepG` part alone prefers genuine repair for a real defect. -/
-theorem realDefect_risk_prefers_genuine (C : AdmittedPreference) :
-    stepG (point .realDefect) (predictedKernel genuineRepair) C.kernel
-        (riskAdmissible C (point .realDefect) genuineRepair) <
-    stepG (point .realDefect) (predictedKernel historicalMisclassification) C.kernel
-        (riskAdmissible C (point .realDefect) historicalMisclassification) := by
-  rw [stepG_point_repair, stepG_point_repair]
-  simp only [recorded_cascade_predictions]
-  have h := C.preferred_gt_dispreferred .closure .injuryPersistence (by rfl) (by rfl)
-  exact neg_lt_neg (Real.strictMonoOn_log (C.positive _) (C.positive _) h)
+/-- Concrete parameters occur only in this example. -/
+def exampleCost : CostModel where
+  maxLength := 9
+  w := 1 / 10
+  w_nonneg := by norm_num
+  total_le_one := by norm_num
 
-/-- The pragmatic `stepG` part alone prefers historical correction when the
-injury was never a defect. -/
-theorem neverDefect_risk_prefers_historical (C : AdmittedPreference) :
-    stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
-        (riskAdmissible C (point .neverDefect) historicalMisclassification) <
-    stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
-        (riskAdmissible C (point .neverDefect) genuineRepair) := by
-  rw [stepG_point_repair, stepG_point_repair]
-  simp only [recorded_cascade_predictions]
-  have h := C.preferred_gt_dispreferred .closure .tokenUse (by rfl) (by rfl)
-  exact neg_lt_neg (Real.strictMonoOn_log (C.positive _) (C.positive _) h)
+def exampleCounts : PatternCounts := fun _ => (100, 100)
 
-/-- Exact condition under which novelty does not reverse the never-defect risk
-ordering. -/
-theorem neverDefect_flip_survives_iff (C : AdmittedPreference) (counts : PatternCounts) :
-    (stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
-          (riskAdmissible C (point .neverDefect) historicalMisclassification) -
-          cascadeNovelty counts .neverDefect historicalMisclassification <
-      stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
-          (riskAdmissible C (point .neverDefect) genuineRepair) -
-          cascadeNovelty counts .neverDefect genuineRepair) ↔
-    cascadeNovelty counts .neverDefect genuineRepair -
-        cascadeNovelty counts .neverDefect historicalMisclassification <
-      stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
-          (riskAdmissible C (point .neverDefect) genuineRepair) -
-        stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
-          (riskAdmissible C (point .neverDefect) historicalMisclassification) := by
-  constructor <;> intro h <;> linarith
+theorem example_flip_instance (C : AdmittedPreference) :
+    neverDefectCostGap C exampleCost (by decide) (by decide) =
+      3 / 10 * (Real.log (C.kernel.mass () .closure) -
+        Real.log (C.kernel.mass () .tokenUse)) := by
+  rw [neverDefect_cost_gap_eq]
+  norm_num [exampleCost]
 
-/-- If novelty exceeds that risk gap, the full genuine-repair cascade wins on
-a never-defect injury. -/
-theorem excessive_novelty_prefers_genuine (C : AdmittedPreference) (counts : PatternCounts)
-    (h :
-      stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
-          (riskAdmissible C (point .neverDefect) genuineRepair) -
-        stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
-          (riskAdmissible C (point .neverDefect) historicalMisclassification) <
-      cascadeNovelty counts .neverDefect genuineRepair -
-        cascadeNovelty counts .neverDefect historicalMisclassification) :
-    stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
-          (riskAdmissible C (point .neverDefect) genuineRepair) -
-          cascadeNovelty counts .neverDefect genuineRepair <
-      stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
-          (riskAdmissible C (point .neverDefect) historicalMisclassification) -
-          cascadeNovelty counts .neverDefect historicalMisclassification := by
-  linarith
+theorem example_flip_iff (C : AdmittedPreference) :
+    (cascadeG C exampleCost (boundedHistorical exampleCost (by decide)) .neverDefect -
+          cascadeNovelty exampleCounts .neverDefect historicalMisclassification <
+        cascadeG C exampleCost (boundedGenuine exampleCost (by decide)) .neverDefect -
+          cascadeNovelty exampleCounts .neverDefect genuineRepair) ↔
+      cascadeNovelty exampleCounts .neverDefect genuineRepair -
+          cascadeNovelty exampleCounts .neverDefect historicalMisclassification <
+        neverDefectCostGap C exampleCost (by decide) (by decide) := by
+  exact neverDefect_flip_iff C exampleCost (by decide) (by decide) exampleCounts
 
-/-- A concrete learned C used only to witness that the threshold is inhabited. -/
-def exampleWeight (o : MetaOutcome) : ℚ :=
-  if preferred o then 4 else if dispreferred o then 1 else 2
-
-theorem exampleWeight_sum_rat : ∑ o, exampleWeight o = 22 := by
-  rw [show (Finset.univ : Finset MetaOutcome) =
-      {.closure, .groundedProgress, .usefulBlockerDiscovery, .downstreamUnblocking,
-       .informationGain, .elapsedMs, .tokenUse, .repeatedTarget, .abstention,
-       .unreviewableOutput, .injuryPersistence} by
-        ext o; fin_cases o <;> simp]
-  repeat' rw [Finset.sum_insert (by decide)]
-  norm_num [exampleWeight, preferred, dispreferred]
-
-def examplePreferenceKernel : ProbabilityKernel Unit MetaOutcome :=
-  finiteKernel (fun _ o => (exampleWeight o : ℝ) / 22)
-    (by intro _ o; fin_cases o <;> norm_num [exampleWeight, preferred, dispreferred])
-    (by intro
-        rw [← Finset.sum_div]
-        norm_num [show ∑ o, (exampleWeight o : ℝ) = 22 by exact_mod_cast exampleWeight_sum_rat])
-
-def examplePreference : AdmittedPreference where
-  kernel := examplePreferenceKernel
-  positive := by
-    intro o; fin_cases o <;>
-      norm_num [examplePreferenceKernel, finiteKernel, exampleWeight, preferred, dispreferred]
-  preferred_gt_dispreferred := by
-    intro p d hp hd
-    fin_cases p <;> fin_cases d <;>
-      simp_all [examplePreferenceKernel, finiteKernel, exampleWeight, preferred, dispreferred]
-    all_goals norm_num
-
-def exampleRiskGap : ℝ :=
-  stepG (point .neverDefect) (predictedKernel genuineRepair) examplePreference.kernel
-      (riskAdmissible examplePreference (point .neverDefect) genuineRepair) -
-    stepG (point .neverDefect) (predictedKernel historicalMisclassification)
-      examplePreference.kernel
-      (riskAdmissible examplePreference (point .neverDefect) historicalMisclassification)
-
-theorem exampleRiskGap_pos : 0 < exampleRiskGap := by
-  unfold exampleRiskGap
-  exact sub_pos.mpr (neverDefect_risk_prefers_historical examplePreference)
-
-/-- Concrete positive counts, scaled by the actual learned-C risk gap. -/
-def exampleCounts : PatternCounts := fun _ => (100 / exampleRiskGap, 100 / exampleRiskGap)
-
-theorem exampleCounts_pos (p : RepairPattern) :
-    0 < (exampleCounts p).1 ∧ 0 < (exampleCounts p).2 := by
-  constructor <;> exact div_pos (by norm_num) exampleRiskGap_pos
-
-/-- The concrete C and counts lie strictly below the novelty threshold. -/
-theorem example_flip_survives :
-    cascadeNovelty exampleCounts .neverDefect genuineRepair -
-        cascadeNovelty exampleCounts .neverDefect historicalMisclassification < exampleRiskGap := by
-  simp [cascadeNovelty, cascadeNoveltyFrom, genuineRepair, historicalMisclassification,
-    initialRepairState, guard, effect, exampleCounts]
-  have hg := exampleRiskGap_pos
-  have hn := PatternThetaNovelty.novelty_eq (100 / exampleRiskGap)
-    (100 / exampleRiskGap) (div_pos (by norm_num) hg) (div_pos (by norm_num) hg)
-  rw [hn]
-  field_simp
-  nlinarith
-
-theorem realDefect_genuine_has_more_novelty (counts : PatternCounts)
-    (hpos : ∀ p, 0 < (counts p).1 ∧ 0 < (counts p).2) :
-    cascadeNovelty counts .realDefect historicalMisclassification <
-      cascadeNovelty counts .realDefect genuineRepair := by
-  simp [cascadeNovelty, cascadeNoveltyFrom, genuineRepair, historicalMisclassification,
-    initialRepairState, guard, effect]
-  have hn (p) := PatternThetaNovelty.novelty_nonneg (counts p).1 (counts p).2
-    (hpos p).1 (hpos p).2
-  rw [PatternThetaNovelty.novelty_eq _ _ (hpos .recordFinding).1
-    (hpos .recordFinding).2]
-  have hden : 0 < 2 * ((counts .recordFinding).1 + (counts .recordFinding).2) := by
-    nlinarith [(hpos .recordFinding).1, (hpos .recordFinding).2]
-  have hrecord : 0 < 1 / (2 * ((counts .recordFinding).1 +
-      (counts .recordFinding).2)) := one_div_pos.mpr hden
-  nlinarith [hn .locateProducer, hn .correctRefusalIsNotDefect,
-    hn .redBeforeRepair, hn .repairProducer, hn .witnessPath,
-    hn .differentSeatReviews, hn .retireLedger]
-
-/-- After either reproduction result, the ordinary argmin flips exactly while
-the never-defect novelty difference remains below its pragmatic risk gap. -/
-theorem reproduction_flips_argmin (C : AdmittedPreference) (counts : PatternCounts)
-    (hpos : ∀ p, 0 < (counts p).1 ∧ 0 < (counts p).2)
-    (hthreshold :
-      cascadeNovelty counts .neverDefect genuineRepair -
-          cascadeNovelty counts .neverDefect historicalMisclassification <
-        stepG (point .neverDefect) (predictedKernel genuineRepair) C.kernel
-            (riskAdmissible C (point .neverDefect) genuineRepair) -
-          stepG (point .neverDefect) (predictedKernel historicalMisclassification) C.kernel
-            (riskAdmissible C (point .neverDefect) historicalMisclassification)) :
-    ([genuineRepair, historicalMisclassification].argmin (fun c =>
-      stepG (point .realDefect) (predictedKernel c) C.kernel
-        (riskAdmissible C (point .realDefect) c) - cascadeNovelty counts .realDefect c) =
-        some genuineRepair) ∧
-    ([genuineRepair, historicalMisclassification].argmin (fun c =>
-      stepG (point .neverDefect) (predictedKernel c) C.kernel
-        (riskAdmissible C (point .neverDefect) c) - cascadeNovelty counts .neverDefect c) =
-        some historicalMisclassification) := by
-  have hrisk := realDefect_risk_prefers_genuine C
-  have hnovelty := realDefect_genuine_has_more_novelty counts hpos
-  have hreal :
-      stepG (point .realDefect) (predictedKernel genuineRepair) C.kernel
-          (riskAdmissible C (point .realDefect) genuineRepair) -
-          cascadeNovelty counts .realDefect genuineRepair <
-      stepG (point .realDefect) (predictedKernel historicalMisclassification) C.kernel
-          (riskAdmissible C (point .realDefect) historicalMisclassification) -
-          cascadeNovelty counts .realDefect historicalMisclassification := by linarith
-  have hhistorical := (neverDefect_flip_survives_iff C counts).2 hthreshold
-  constructor
-  · simp [List.argmin, List.argAux, not_lt_of_ge (le_of_lt hreal)]
-  · simp [List.argmin, List.argAux, hhistorical]
+#print axioms recorded_cascade_guard_check
+#print axioms costKernel
+#print axioms neverDefect_stepG_equal_at_zero
+#print axioms neverDefect_cost_gap_positive
+#print axioms neverDefect_cost_gap_strictMono
+#print axioms neverDefect_flip_iff
+#print axioms realDefect_flip_from_preference
+#print axioms order_changes_prediction
+#print axioms order_changes_G
+#print axioms example_flip_iff
 
 end
 end DarkTower.WarMachine.RepairCascadeG
