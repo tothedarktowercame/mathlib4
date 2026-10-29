@@ -472,6 +472,10 @@ inductive RouteState where
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): `(C held! {:status :held})`, returned through `(P route! settle)`.
   The reasons are `HeldReason`'s. -/
   | coordinationHeld
+  /-- The author returned the typed claim `:acceptance-test-unsatisfiable` with
+  the exact assertion and reason. Production retains the claimed attempt and
+  invokes a fresh acceptance proposal/run/review; this is not `authorFailed`. -/
+  | acceptanceReconsidered
   /-- Rev 5: `coordinator/coordinate` refused, with or without a ledger.
   Rev 12 anchor (futon2 `3fe0a2b6d`, futon3c `c16a86952`): a `(C coordinate)` refusal returned through
   `(P route! settle)`. The reasons are `CoordinatorRefusal`'s. -/
@@ -569,6 +573,7 @@ def transitions : List (RouteState × RouteState) :=
     -- rev 5: the coordination stage (after M4a, futon2 `route!` ends on any
     -- non-checkpoint result).
     (routeEnacted, coordinationHeld),
+    (routeEnacted, acceptanceReconsidered),
     (routeEnacted, coordinationRefused),
     (routeEnacted, persistRefused),
     -- rev 24 (F31): a resumed transaction from an earlier attempt is retired before the
@@ -589,6 +594,9 @@ def transitions : List (RouteState × RouteState) :=
     (preparationRefused, terminalRecord),
     (bindingRefused, terminalRecord),
     (coordinationHeld, terminalRecord),
+    -- An unsatisfiable admitted pin returns to proposal/run/review at the same attempt.
+    (acceptanceReconsidered, proposalRefused),
+    (acceptanceReconsidered, admissionRun),
     (coordinationRefused, terminalRecord),
     (persistRefused, terminalRecord),
     (enacted, terminalRecord) ]
@@ -599,7 +607,7 @@ def allStates : List RouteState :=
     acceptanceUnavailable, proposalRefused, admissionRun, admissionRefused,
     reviewAccepted, reviewRefused, readinessReady, readinessRefused, ledgerUnreadable,
     routeEnacted, routeRefused, preparationRefused, bindingRefused, enacted,
-    coordinationHeld, coordinationRefused, persistRefused,
+    coordinationHeld, acceptanceReconsidered, coordinationRefused, persistRefused,
     transactionRetired, transactionRetireFailed,
     ordinarySelection, terminalRecord ]
 
@@ -979,6 +987,49 @@ inductive CoordinationPhase where
   | retry
   | final
   deriving DecidableEq, Repr
+
+/-- Data required from an author who claims that an admitted test cannot pass
+after any correct repair. The strings correspond to the retained
+`:evidence {:assertion ... :reason ...}` payload. -/
+structure UnsatisfiableAcceptanceEvidence where
+  assertion : String
+  reason : String
+  deriving DecidableEq, Repr
+
+/-- The author arm distinguishes a specification counterexample from an
+ordinary failed repair. -/
+inductive AuthorResult where
+  | succeeded
+  | failed
+  | acceptanceUnsatisfiable (evidence : UnsatisfiableAcceptanceEvidence)
+  deriving DecidableEq, Repr
+
+/-- Only an ordinary author failure spends the current attempt. -/
+def AuthorResult.nextAttempt (attempt : Nat) : AuthorResult → Nat
+  | .failed => attempt + 1
+  | .succeeded | .acceptanceUnsatisfiable _ => attempt
+
+/-- A specification counterexample routes to a fresh acceptance proposal and
+independent review, rather than the repair-review/enact phases. -/
+def AuthorResult.returnsToAcceptance : AuthorResult → Bool
+  | .acceptanceUnsatisfiable _ => true
+  | _ => false
+
+theorem unsatisfiableAcceptance_preservesAttempt
+    (attempt : Nat) (evidence : UnsatisfiableAcceptanceEvidence) :
+    (AuthorResult.acceptanceUnsatisfiable evidence).nextAttempt attempt = attempt := rfl
+
+theorem unsatisfiableAcceptance_reproposesAndReviews
+    (evidence : UnsatisfiableAcceptanceEvidence) :
+    (AuthorResult.acceptanceUnsatisfiable evidence).returnsToAcceptance = true ∧
+      edge acceptanceReconsidered admissionRun = true ∧
+      edge admissionRun reviewAccepted = true := by
+  constructor
+  · rfl
+  · decide
+
+theorem ordinaryAuthorFailure_spendsAttempt (attempt : Nat) :
+    AuthorResult.failed.nextAttempt attempt = attempt + 1 := rfl
 
 /-- `:held` reasons (`(C held!)`). The port answered and the transaction waits. -/
 inductive HeldReason where
