@@ -1117,6 +1117,58 @@ def CoordinationOutcome.state : CoordinationOutcome → RouteState
   | .persistFailed _ => persistRefused
   | .closed _ => enacted
 
+/-! ## Rev 43: authored repair isolation
+
+An authored commit is evidence, not an integration.  It remains in the attempt's
+worktree until the enact port has received an approval for that exact commit. -/
+
+/-- The repository in which an authored repair commit is reachable. -/
+inductive PatchLocation where
+  | isolated
+  | canonical
+  deriving DecidableEq, Repr
+
+/-- The coordinator evidence available to the repository transition. -/
+inductive RepairRepositoryStep where
+  | authored (patchSha : String)
+  | authorFailed
+  | abandoned
+  | reviewRejected (patchSha : String)
+  | enactFailed (patchSha reviewedSha : String)
+  | enacted (patchSha reviewedSha integrationSha : String)
+  deriving DecidableEq, Repr
+
+/-- Only enactment of the exact commit approved by review changes canonical main. -/
+def repairPatchLocation : RepairRepositoryStep → PatchLocation
+  | .enacted patchSha reviewedSha _ =>
+      if patchSha = reviewedSha then .canonical else .isolated
+  | _ => .isolated
+
+/-- Authorship alone leaves the repair outside canonical main. -/
+theorem authored_patch_remains_isolated (patchSha : String) :
+    repairPatchLocation (.authored patchSha) = .isolated := by
+  rfl
+
+/-- Failed and abandoned attempts do not change canonical main. -/
+theorem failed_or_abandoned_leaves_canonical_unchanged (patchSha reviewedSha : String) :
+    repairPatchLocation .authorFailed = .isolated ∧
+      repairPatchLocation .abandoned = .isolated ∧
+      repairPatchLocation (.reviewRejected patchSha) = .isolated ∧
+      repairPatchLocation (.enactFailed patchSha reviewedSha) = .isolated := by
+  simp [repairPatchLocation]
+
+/-- A successful enact of the SHA approved by review is the sole transition to canonical main. -/
+theorem canonical_iff_successful_same_sha_enact (step : RepairRepositoryStep) :
+    repairPatchLocation step = .canonical ↔
+      ∃ patchSha integrationSha, step = .enacted patchSha patchSha integrationSha := by
+  cases step <;> simp [repairPatchLocation, eq_comm]
+
+/-- Integration may mint a new commit while retaining the authored SHA as evidence. -/
+theorem enact_preserves_authored_identity
+    (patchSha integrationSha : String) :
+    repairPatchLocation (.enacted patchSha patchSha integrationSha) = .canonical := by
+  simp [repairPatchLocation]
+
 /-- Rev 24 (futon2 `16be63148`, F32): why the loop did not go on after an attempt held
 `:author-failed` with both writes `:persisted`. P puts it on the held result as
 `(P route! :continuation)`; it is beside the path, like `CoordinationOutcome`, and the click
