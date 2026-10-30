@@ -32,6 +32,14 @@ theorem ranked_mem_reduced (cascade : SelectionCascade) (facts : Target → Gira
     c ∈ field ∧ c.target ≠ target :=
   unchanged_excludes field target digest (applySelectionCascade_mem h)
 
+theorem pick_mem_reduced (cascade : SelectionCascade) (facts : Target → GiraffeFacts)
+    (field : List Candidate) (target : Target) (digest : String) {c : Candidate}
+    (h : cascadePick cascade facts (reducedField field target true digest digest) = some c) :
+    c ∈ field ∧ c.target ≠ target := by
+  apply ranked_mem_reduced cascade facts field target digest
+  exact List.mem_of_mem_head? (show c ∈
+    (applySelectionCascade cascade facts (reducedField field target true digest digest)).head? from h)
+
 /-- Click 50's refusal digest, retained by the click-51 preview. -/
 def click50Digest : String :=
   "c1801780489bea4ed72638a53cca7b1e0d55c0b1d97357c00b9659f41eb6d315"
