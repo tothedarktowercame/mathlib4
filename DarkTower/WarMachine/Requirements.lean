@@ -237,8 +237,9 @@ structure RunFacts where
   halts conformance for every later run until the line is retired or re-sealed
   by a medic route.  Fail-closed knowingly (claude-2, 2026-11-01, L5-2L-3 review). -/
   refusalHistoryUnsealed : Nat
-  /-- Previous run's decision. -/
-  previousDecision : Decision
+  /-- Previous run's decision.  A refused predecessor may have reached no
+  decision; that is a typed `none`, not missing evidence. -/
+  previousDecision : Option Decision
   /-- Previous run's typed terminal outcome. -/
   previousOutcome : RunOutcome
   /-- Digest of all inputs on which the previous choice depended. -/
@@ -306,7 +307,7 @@ refused and the inputs are unchanged.  Otherwise none. -/
 def RunFacts.refusedCascade (r : RunFacts) : Option Id :=
   if r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest then
     match r.previousDecision with
-    | .pick _ cascade => some cascade
+    | some (.pick _ cascade) => some cascade
     | _ => none
   else none
 
@@ -428,7 +429,7 @@ decides admissibility, so the run does not conform until it is repaired.  Abstai
 on a repeat is not refused here. -/
 def Q6 (r : RunFacts) : Bool := decide (
   (r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest →
-    r.previousDecision ≠ r.currentDecision) ∧
+    r.previousDecision ≠ some r.currentDecision) ∧
   (∀ cascade ∈ r.refusedCascade, (cascade, r.currentInputDigest) ∈ r.refusalHistory) ∧
   r.refusalHistoryUnsealed = 0 ∧
   ∀ cascade ∈ r.pickedCascade, cascade ∉ r.forbidden)
@@ -630,7 +631,7 @@ def click20 : RunFacts where
   selectionPath := none
   refusalHistory := []
   refusalHistoryUnsealed := 0
-  previousDecision := .pick 0 20
+  previousDecision := some (.pick 0 20)
   previousOutcome := .refused
   previousInputDigest := 99
   currentDecision := .pick 0 20
@@ -707,7 +708,7 @@ def good : RunFacts where
   selectionPath := none
   refusalHistory := []
   refusalHistoryUnsealed := 0
-  previousDecision := .pick 0 50000
+  previousDecision := some (.pick 0 50000)
   previousOutcome := .refused
   previousInputDigest := 7
   currentDecision := .pick 1 60001
@@ -822,7 +823,7 @@ def selectionRun (tc : TargetConstruction) (compared : List Id) : RunFacts :=
     policiesWithRiskTerm := compared.length
     policiesWithAmbiguityTerm := compared.length
     policiesWithInformationTerm := compared.length
-    previousDecision := .pick 0 70001
+    previousDecision := some (.pick 0 70001)
     currentDecision := .pick 1 70000 }
 
 def selectionGood : RunFacts :=
@@ -1212,8 +1213,28 @@ def afterRefusal (r : RunFacts) (refused : Id) : RunFacts :=
   { r with
     previousOutcome := .refused
     previousInputDigest := r.currentInputDigest
-    previousDecision := .pick 1 refused
+    previousDecision := some (.pick 1 refused)
     refusalHistory := [(refused, r.currentInputDigest)] }
+
+/-- A refusal before any choice is a known absence of a predecessor decision. -/
+def refusedWithoutDecisionSameDigest : RunFacts :=
+  { good with
+    previousOutcome := .refused
+    previousInputDigest := good.currentInputDigest
+    previousDecision := none }
+
+def refusedWithoutDecisionDifferentDigest : RunFacts :=
+  { refusedWithoutDecisionSameDigest with previousInputDigest := good.currentInputDigest + 1 }
+
+def chosenPredecessorRepeatsSameDecision : RunFacts :=
+  { good with
+    previousOutcome := .refused
+    previousInputDigest := good.currentInputDigest
+    previousDecision := some good.currentDecision }
+
+#eval Q6 refusedWithoutDecisionSameDigest
+#eval Q6 refusedWithoutDecisionDifferentDigest
+#eval Q6 chosenPredecessorRepeatsSameDecision
 
 /-- `good` with a third compared policy, 60002, whose prediction digest is given. -/
 def threePolicies (g0 g1 g2 : ℚ) (digest2 : Id) : RunFacts :=
