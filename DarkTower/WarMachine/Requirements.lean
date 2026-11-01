@@ -353,7 +353,9 @@ digest, and nothing else has.  The chosen G is strictly below every other
 compared policy's G and strictly below abstention's: a tie at the minimum means
 G did not choose, whatever broke it.  Ties among the policies not chosen are
 allowed.  Two or more compared policies do not all predict the same thing.  The
-constructed cascades are exactly the construction's policies. -/
+constructed cascades are exactly the construction's policies, and the compared
+policies are exactly the constructed cascades: a cascade built and then left out
+of the comparison is a restricted domain, whatever the record says about G. -/
 def Q11 (r : RunFacts) : Bool := decide (
   r.currentChoice.cascade ∈ r.comparedPolicies ∧
   (r.kind = .selection → r.currentChoice.target ∈ r.enumeratedTasks) ∧
@@ -367,7 +369,8 @@ def Q11 (r : RunFacts) : Bool := decide (
     ∀ other ∈ r.policyG, other.1 ≠ chosen.1 → chosen.2 < other.2) ∧
   (2 ≤ r.comparedPolicies.card →
     1 < (r.policyPrediction.map Prod.snd).toFinset.card) ∧
-  r.targetConstruction.map (·.policies) = [r.constructedCascades])
+  r.targetConstruction.map (·.policies) = [r.constructedCascades] ∧
+  r.comparedPolicies = r.constructedCascades)
 
 inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q9 | q11
   deriving DecidableEq, Repr
@@ -765,6 +768,18 @@ def foreignPolicyG : RunFacts :=
 def constructedNotPolicies : RunFacts :=
   { selectionGood with constructedCascades := {70000, 70001, 70002, 70003} }
 
+/-- Three cascades constructed, two compared, and the record asserts that
+nothing lacks G.  Before 2026-11-01 this conformed (claude-2's review probe). -/
+def constructedNotCompared : RunFacts :=
+  { selectionGood with
+    comparedPolicies := {70000, 70001}
+    policyPreferences := [goodPolicy 70000 1, goodPolicy 70001 1]
+    policyG := [(70000, 29949 / 10000), (70001, 34841 / 10000)]
+    policyPrediction := [(70000, 170000), (70001, 170001)]
+    policiesWithRiskTerm := 2
+    policiesWithAmbiguityTerm := 2
+    policiesWithInformationTerm := 2 }
+
 /-- The work-kind counterparts: the same requirement binds the inner run. -/
 def workTieAtMinimum : RunFacts :=
   { good with policyG := [(60000, 3/2), (60001, 3/2)] }
@@ -793,6 +808,7 @@ theorem missing_policy_G_not_Q11 : Q11 missingPolicyG = false := by native_decid
 theorem duplicate_policy_G_not_Q11 : Q11 duplicatePolicyG = false := by native_decide
 theorem foreign_policy_G_not_Q11 : Q11 foreignPolicyG = false := by native_decide
 theorem constructed_not_policies_not_Q11 : Q11 constructedNotPolicies = false := by native_decide
+theorem constructed_not_compared_not_Q11 : Q11 constructedNotCompared = false := by native_decide
 theorem work_tie_at_minimum_not_Q11 : Q11 workTieAtMinimum = false := by native_decide
 theorem work_chosen_equals_abstention_not_Q11 :
     Q11 workChosenEqualsAbstention = false := by native_decide
@@ -810,6 +826,7 @@ theorem strict_minimum_negatives_fail_only_Q11 :
     violations allPredictionsEqual = [.q11] ∧
     violations missingPolicyG = [.q11] ∧
     violations constructedNotPolicies = [.q11] ∧
+    violations constructedNotCompared = [.q11] ∧
     violations workTieAtMinimum = [.q11] := by native_decide
 
 theorem selection_good_Q2 : Q2 selectionGood = true := by native_decide
