@@ -17,6 +17,7 @@ inductive Outcome where | holds | violated | unverifiable
 
 structure PartialRunFacts where
   q1 : Evidence RunFacts
+  q2 : Evidence RunFacts
   q3 : Evidence RunFacts
   q4 : Evidence RunFacts
   q5 : Evidence RunFacts
@@ -29,7 +30,7 @@ def assess (check : RunFacts → Bool) : Evidence RunFacts → Outcome
   | .nr _ => .unverifiable
 
 def outcomes (p : PartialRunFacts) : List (Requirement × Outcome) :=
-  [(.q1, assess Q1 p.q1),
+  [(.q1, assess Q1 p.q1), (.q2, assess Q2 p.q2),
    (.q3, assess Q3 p.q3), (.q4, assess Q4 p.q4),
    (.q5, assess Q5 p.q5), (.q6, assess Q6 p.q6),
    (.q7, assess Q7 p.q7),

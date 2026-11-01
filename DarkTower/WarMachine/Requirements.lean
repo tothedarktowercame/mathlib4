@@ -20,12 +20,22 @@ set_option maxHeartbeats 5000000
 
 abbrev Id := Nat
 
-/-- The inner construction census of one task, made after the outer choice.
-A pin or digest of `0` is a recorded absence. -/
+/-- Which of a click's two runs a `RunFacts` describes.  One loop, one set of
+requirements: a `selection` run's policies are task-selection cascades and its
+field is the open tasks; a `work` run's policies are tactical cascades for the
+task the selection run chose.  The kind fixes what the construction serves and
+how many policies a comparison needs (`Q2`); it exempts a run from nothing else. -/
+inductive RunKind where
+  | selection | work
+  deriving DecidableEq, Repr
+
+/-- The construction census of one run: the slice, pool, pins and policies the
+run compared.  A selection run has one, for its whole field; a work run has one,
+for the task selected.  A pin or digest of `0` is a recorded absence. -/
 structure TargetConstruction where
   /-- Stable ids of the tasks this construction serves. -/
   targets : Finset Id
-  /-- Stable identity of the outer action the construction serves. -/
+  /-- Stable identity of the action the construction serves. -/
   action : Id
   /-- Digest of the current reading (excerpt and analysis) the family was built from. -/
   reading : Id
@@ -122,6 +132,8 @@ instance (p : PolicyPreference) : Decidable p.Valid := by
   infer_instance
 
 structure RunFacts where
+  /-- Which of the click's two runs these facts describe. -/
+  kind : RunKind
   /-- Canonical ids of open missions; counted from the pinned mission registry. -/
   openMissions : Finset Id
   /-- Canonical ids of open excursions; counted from the pinned excursion registry. -/
@@ -136,8 +148,7 @@ structure RunFacts where
   targetsWithG : Finset Id
   /-- Number of pattern files in the pinned pattern-library manifest. -/
   libraryPatternCount : Nat
-  /-- Inner construction census: slice, pool, pins and policies, per
-  constructed task. -/
+  /-- Construction census: slice, pool, pins and policies. -/
   targetConstruction : List TargetConstruction
   /-- Number of distinct patterns across pools the constructor could draw on. -/
   constructorPatternCount : Nat
@@ -204,8 +215,45 @@ def RunFacts.totalPolicies (r : RunFacts) : Nat :=
 def RunFacts.maxSliceSize (r : RunFacts) : Nat :=
   (r.targetConstruction.map (·.slice.card)).foldl max 0
 
+/-- The tasks a run's construction must serve: the whole enumerated field for a
+selection run, the selected task for a work run. -/
+def RunFacts.constructionTargets (r : RunFacts) : Finset Id :=
+  match r.kind with
+  | .selection => r.enumeratedTasks
+  | .work => {r.currentChoice.target}
+
+/-- The fewest compared policies that make a run's comparison a comparison.  A
+selection between one cascade and nothing else chooses nothing.  A work run may
+have one admissible cascade for its task. -/
+def RunFacts.comparisonFloor (r : RunFacts) : Nat :=
+  match r.kind with
+  | .selection => 2
+  | .work => 1
+
 /-! Joe: "Every open mission, excursion or ticket is wanted." -/
 def Q1 (r : RunFacts) : Bool := decide (r.enumeratedTasks = r.openTasks)
+
+/-! Joe: cascades are derived per problem from the pattern library; the pool is
+the query-time slice.  Joe, 2026-11-01: task selection is the same loop and meets
+the same requirements.
+
+A run has exactly one construction, with a recorded reading, library, graph and
+kernel, the pool equal to a non-empty slice drawn from the whole pinned library,
+a positive count of distinct policies, and every compared policy among them.  A
+selection run's construction serves the whole field and compares at least two
+cascades; a work run's serves the selected task.  A menu listed by hand has no
+library pin and no slice, so it fails here however its G values come out. -/
+def Q2 (r : RunFacts) : Bool := decide (
+  r.targetConstruction.length = 1 ∧
+  (∀ tc ∈ r.targetConstruction,
+    tc.targets = r.constructionTargets ∧
+    tc.reading ≠ 0 ∧ tc.library ≠ 0 ∧ tc.graph ≠ 0 ∧ tc.kernel ≠ 0 ∧
+    tc.pool = tc.slice ∧ tc.pool.Nonempty ∧ tc.sliceFromWholeLibrary = true ∧
+    tc.slice.card ≤ r.libraryPatternCount ∧
+    0 < tc.policyCount ∧ tc.policies.card = tc.policyCount ∧
+    r.comparedPolicies ⊆ tc.policies ∧
+    r.constructorPatternCount = tc.pool.card) ∧
+  r.comparisonFloor ≤ r.comparedPolicies.card)
 
 /-! Joe: "G is defined over policies, and policies are cascades ... full stop." -/
 def Q3 (r : RunFacts) : Bool := decide (r.cascadesWithoutG = ∅)
@@ -287,11 +335,11 @@ def Q9 (r : RunFacts) : Bool := decide (
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate.Valid
       r.calibrationAuthorizations r.factorizationAuthorizations certificate)
 
-inductive Requirement where | q1 | q3 | q4 | q5 | q6 | q7 | q9
+inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q9
   deriving DecidableEq, Repr
 
 def violations (r : RunFacts) : List Requirement :=
-  [(.q1, Q1 r), (.q3, Q3 r),
+  [(.q1, Q1 r), (.q2, Q2 r), (.q3, Q3 r),
    (.q4, Q4 r), (.q5, Q5 r), (.q6, Q6 r),
    (.q7, Q7 r), (.q9, Q9 r)].filterMap
     (fun (q, ok) => if ok then none else some q)
@@ -325,6 +373,7 @@ the record cannot recompute them and the reader therefore marks the
 corresponding real-run requirements `unverifiable`. This closed witness keeps
 them only to exhibit the incident described by the combined sources. -/
 def click20 : RunFacts where
+  kind := .work
   openMissions := ids 0 221
   openExcursions := ids 221 373
   openTickets := ids 594 43
@@ -385,7 +434,7 @@ def goodPolicy (policy horizon : Nat)
   normalization := normalization
   terms := terms
 
-/-- Task 1's inner construction and its two compared policies. -/
+/-- Task 1's construction and its two compared policies. -/
 def goodConstruction : TargetConstruction where
   targets := {1}
   action := 71
@@ -400,6 +449,7 @@ def goodConstruction : TargetConstruction where
   policies := {60000, 60001}
 
 def good : RunFacts where
+  kind := .work
   openMissions := {1, 2, 3}
   openExcursions := ∅
   openTickets := ∅
@@ -491,6 +541,161 @@ def substitutedFactorization : RunFacts :=
     factorizedPreference := some
       { goodPreferenceCertificate with factorizationIdentity := 109 } }
 
+/-- The whole three-task field's construction: a slice of 7 patterns from the
+19-pattern task-selection library, arranged into 3 cascades. -/
+def selectionConstruction : TargetConstruction where
+  targets := {1, 2, 3}
+  action := 70
+  reading := 91
+  library := 92
+  graph := 93
+  kernel := 94
+  slice := ids 4000 7
+  pool := ids 4000 7
+  sliceFromWholeLibrary := true
+  policyCount := 3
+  policies := {70000, 70001, 70002}
+
+/-- A selection run comparing `compared`, from the construction `tc`.  The
+negatives below are built from it so that they keep the other requirements. -/
+def selectionRun (tc : TargetConstruction) (compared : List Id) : RunFacts :=
+  { good with
+    kind := .selection
+    libraryPatternCount := 19
+    targetConstruction := [tc]
+    constructorPatternCount := tc.pool.card
+    constructedCascades := tc.policies
+    comparedPolicies := compared.toFinset
+    policyPreferences := compared.map (fun c => goodPolicy c 1)
+    policiesWithRiskTerm := compared.length
+    policiesWithAmbiguityTerm := compared.length
+    policiesWithInformationTerm := compared.length
+    previousChoice := ⟨0, 70001⟩
+    currentChoice := ⟨1, 70000⟩ }
+
+def selectionGood : RunFacts :=
+  selectionRun selectionConstruction [70000, 70001, 70002]
+
+/-- `outer-makeup.edn`'s shape: three cascades listed in a file, over a pool of
+three pattern ids that is no retrieval slice, and no library pin. -/
+def handListedMenu : RunFacts :=
+  selectionRun
+    { selectionConstruction with
+      library := 0
+      slice := ids 4000 3
+      pool := ids 4000 3
+      sliceFromWholeLibrary := false }
+    [70000, 70001, 70002]
+
+def oneCascadeMenu : RunFacts :=
+  selectionRun
+    { selectionConstruction with policyCount := 1, policies := {70000} }
+    [70000]
+
+/-- A pool not drawn as the slice: it holds a pattern the slice lacks. -/
+def menuNotFromSlice : RunFacts :=
+  selectionRun { selectionConstruction with pool := ids 4001 7 }
+    [70000, 70001, 70002]
+
+def unpinnedGiraffe : RunFacts :=
+  selectionRun { selectionConstruction with reading := 0 } [70000, 70001, 70002]
+
+/-! One field of `selectionGood` wrong at a time, for the conjuncts the four
+named witnesses do not isolate. -/
+
+def libraryUnpinned : RunFacts :=
+  selectionRun { selectionConstruction with library := 0 } [70000, 70001, 70002]
+
+def graphUnpinned : RunFacts :=
+  selectionRun { selectionConstruction with graph := 0 } [70000, 70001, 70002]
+
+def kernelUnpinned : RunFacts :=
+  selectionRun { selectionConstruction with kernel := 0 } [70000, 70001, 70002]
+
+def sliceOutsideLibrary : RunFacts :=
+  selectionRun { selectionConstruction with sliceFromWholeLibrary := false }
+    [70000, 70001, 70002]
+
+def sliceLargerThanLibrary : RunFacts :=
+  selectionRun { selectionConstruction with slice := ids 4000 20, pool := ids 4000 20 }
+    [70000, 70001, 70002]
+
+/-- Three cascades over no patterns at all. -/
+def emptyPoolMenu : RunFacts :=
+  selectionRun { selectionConstruction with slice := ∅, pool := ∅ }
+    [70000, 70001, 70002]
+
+/-- Restricted domain: the construction serves part of the enumerated field. -/
+def restrictedField : RunFacts :=
+  selectionRun { selectionConstruction with targets := {1, 2} } [70000, 70001, 70002]
+
+def policyCountOverstated : RunFacts :=
+  selectionRun { selectionConstruction with policyCount := 4 } [70000, 70001, 70002]
+
+def comparedOutsideMenu : RunFacts :=
+  selectionRun selectionConstruction [70000, 70001, 70003]
+
+def noSelectionConstruction : RunFacts :=
+  { selectionGood with targetConstruction := [] }
+
+def twoSelectionConstructions : RunFacts :=
+  { selectionGood with targetConstruction := [selectionConstruction, selectionConstruction] }
+
+def patternCountMisreported : RunFacts :=
+  { selectionGood with constructorPatternCount := 19 }
+
+/-- Relabelling a selection run as a work run does not pass it: the construction
+then has to serve only the selected task. -/
+def selectionLabelledWork : RunFacts :=
+  { selectionGood with kind := .work }
+
+/-- The work-kind counterparts of the two clauses that depend on the kind. -/
+def workConstructionForOtherTask : RunFacts :=
+  { good with targetConstruction := [{ goodConstruction with targets := {2} }] }
+
+def workOneCascade : RunFacts :=
+  { good with
+    targetConstruction := [{ goodConstruction with policyCount := 1, policies := {60000} }]
+    comparedPolicies := {60000}
+    policyPreferences := [goodPolicy 60000 4]
+    policiesWithRiskTerm := 1
+    policiesWithAmbiguityTerm := 1
+    policiesWithInformationTerm := 1 }
+
+theorem good_Q2 : Q2 good = true := by native_decide
+theorem selection_good_Q2 : Q2 selectionGood = true := by native_decide
+theorem selection_good_conforms : conforms selectionGood = true := by native_decide
+theorem hand_listed_menu_not_Q2 : Q2 handListedMenu = false := by native_decide
+theorem one_cascade_menu_not_Q2 : Q2 oneCascadeMenu = false := by native_decide
+theorem menu_not_from_slice_not_Q2 : Q2 menuNotFromSlice = false := by native_decide
+theorem unpinned_giraffe_not_Q2 : Q2 unpinnedGiraffe = false := by native_decide
+theorem library_unpinned_not_Q2 : Q2 libraryUnpinned = false := by native_decide
+theorem graph_unpinned_not_Q2 : Q2 graphUnpinned = false := by native_decide
+theorem kernel_unpinned_not_Q2 : Q2 kernelUnpinned = false := by native_decide
+theorem slice_outside_library_not_Q2 : Q2 sliceOutsideLibrary = false := by native_decide
+theorem slice_larger_than_library_not_Q2 : Q2 sliceLargerThanLibrary = false := by native_decide
+theorem empty_pool_menu_not_Q2 : Q2 emptyPoolMenu = false := by native_decide
+theorem restricted_field_not_Q2 : Q2 restrictedField = false := by native_decide
+theorem policy_count_overstated_not_Q2 : Q2 policyCountOverstated = false := by native_decide
+theorem compared_outside_menu_not_Q2 : Q2 comparedOutsideMenu = false := by native_decide
+theorem no_selection_construction_not_Q2 : Q2 noSelectionConstruction = false := by native_decide
+theorem two_selection_constructions_not_Q2 : Q2 twoSelectionConstructions = false := by native_decide
+theorem pattern_count_misreported_not_Q2 : Q2 patternCountMisreported = false := by native_decide
+theorem selection_labelled_work_not_Q2 : Q2 selectionLabelledWork = false := by native_decide
+theorem work_construction_for_other_task_not_Q2 :
+    Q2 workConstructionForOtherTask = false := by native_decide
+theorem work_one_cascade_Q2 : Q2 workOneCascade = true := by native_decide
+
+/-- Every other requirement holds on each of these menus, so `Q2` is the only
+requirement that refuses them. -/
+theorem selection_negatives_fail_only_Q2 :
+    violations handListedMenu = [.q2] ∧
+    violations oneCascadeMenu = [.q2] ∧
+    violations menuNotFromSlice = [.q2] ∧
+    violations unpinnedGiraffe = [.q2] ∧
+    violations emptyPoolMenu = [.q2] ∧
+    violations restrictedField = [.q2] := by native_decide
+
 theorem deterministic_terminal_Q4 : Q4 deterministicTerminal = true := by native_decide
 theorem progressive_rows_missing_not_Q4 : Q4 progressiveRowsMissing = false := by native_decide
 theorem good_Q4_mixed_horizons : Q4 good = true := by native_decide
@@ -506,13 +711,14 @@ theorem good_Q9 : Q9 good = true := by native_decide
 theorem substituted_factorization_not_Q9 : Q9 substitutedFactorization = false := by native_decide
 
 theorem click20_not_Q1 : Q1 click20 = false := by native_decide
+theorem click20_not_Q2 : Q2 click20 = false := by native_decide
 theorem click20_not_Q4 : Q4 click20 = false := by native_decide
 theorem click20_not_Q5 : Q5 click20 = false := by native_decide
 theorem click20_not_Q6 : Q6 click20 = false := by native_decide
 theorem click20_not_Q7 : Q7 click20 = false := by native_decide
 theorem click20_not_Q9 : Q9 click20 = false := by native_decide
 theorem click20_violations :
-    violations click20 = [.q1, .q4, .q5, .q6, .q7, .q9] := by native_decide
+    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q9] := by native_decide
 theorem click20_not_conformant : conforms click20 = false := by native_decide
 theorem missingG_not_Q3 : Q3 missingG = false := by native_decide
 theorem good_conforms : conforms good = true := by native_decide
@@ -525,6 +731,13 @@ is false
 -/
 #guard_msgs in
 example : Q1 click20 = true := by decide
+/--
+error: Tactic `native_decide` evaluated that the proposition
+  Q2 click20 = true
+is false
+-/
+#guard_msgs in
+example : Q2 click20 = true := by native_decide
 /--
 error: Tactic `decide` proved that the proposition
   Q3 missingG = true
@@ -569,6 +782,7 @@ is false
 example : Q9 click20 = true := by decide
 
 #print axioms click20_not_Q1
+#print axioms click20_not_Q2
 #print axioms click20_not_Q4
 #print axioms click20_not_Q5
 #print axioms click20_not_Q6
@@ -589,5 +803,12 @@ example : Q9 click20 = true := by decide
 #print axioms duplicate_policy_record_not_Q4
 #print axioms policy_term_missing_not_Q4
 #print axioms no_compared_policies_not_Q4
+#print axioms good_Q2
+#print axioms selection_good_conforms
+#print axioms hand_listed_menu_not_Q2
+#print axioms one_cascade_menu_not_Q2
+#print axioms menu_not_from_slice_not_Q2
+#print axioms unpinned_giraffe_not_Q2
+#print axioms selection_negatives_fail_only_Q2
 
 end DarkTower.WarMachine.Requirements
