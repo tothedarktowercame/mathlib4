@@ -44,18 +44,19 @@ declared products were not mechanically verified closed.
 `grounded-progress-must-be-grounded` (`full_loop_cohort.clj`) ties the
 keyword to a grounding commit, as `grounded-change-must-be-grounded` does for
 `:grounded-change`.  The world changed by a commit in both cases; `changed` is
-the image of both.  No constructor is added to `Requirements.RunOutcome`, so
-this is not a specification change.
+the image of both.  This module adds no constructor to
+`Requirements.RunOutcome`; L3b (2026-11-01) added `abstained` there for the
+typed abstention decision, and `image` below does not yet use it.
 
 **The other images.**  `image` is total.  Four keywords are transcribed from
 `lean-outcomes` as the code already has them (`grounded-change`,
 `already-satisfied`, `grounded-no-change`, `guardrail-refusal`); the eleven
 the code sends to `:invalid` are kept at `invalid` here.  That is a
 transcription, not a decision: whether `:build-failed` or
-`:dispatch-failed` should read as `refused`, or `:abstained` needs a value
-outside `RunOutcome` (the Q6 terminal already records an abstaining
-decision as `:abstained`, outside the `RunOutcome` vocabulary), is not
-decided by this module.  `code_image_differs_exactly_at_groundedProgress`
+`:dispatch-failed` should read as `refused`, or whether `:abstained` should
+now map to `RunOutcome.abstained` (the constructor exists since L3b, and the
+Q6 terminal already records an abstaining decision as `:abstained`; here it
+still falls to `invalid`), is not decided by this module.  `code_image_differs_exactly_at_groundedProgress`
 says the only keyword on which this module and `typed-outcome` disagree is
 `:grounded-progress`.
 
