@@ -131,6 +131,34 @@ instance (p : PolicyPreference) : Decidable p.Valid := by
   unfold PolicyPreference.Valid
   infer_instance
 
+/-- Where a value on the selection path came from.  `observed` carries the digest
+of the receipt that measured it this run; a digest of `0` is an absence. -/
+inductive Provenance where
+  | observed (digest : Id)
+  /-- Supplied by a parameter file, e.g. outer-makeup `:default-reach`. -/
+  | defaulted
+  /-- Not supplied, status absent, or unknown. -/
+  | absent
+  deriving DecidableEq, Repr
+
+def Provenance.isObserved : Provenance → Bool
+  | .observed d => d ≠ 0
+  | _ => false
+
+/-- The selection run's path from field to chosen task. -/
+structure SelectionPath where
+  /-- The retained `:outer/selection` section. -/
+  receipt : Provenance
+  /-- Relation of the chosen target to the retained focus (classify-target receipt). -/
+  pickRelation : Provenance
+  /-- Reach of the chosen target over the field (Giraffe cone / unblocks). -/
+  pickReach : Provenance
+  /-- Runs consumed for learning, each with its classification receipt. -/
+  consumedRuns : List (Id × Provenance)
+  /-- `:outer/learning {:status :applied}`. -/
+  learningApplied : Bool
+  deriving DecidableEq, Repr
+
 structure RunFacts where
   /-- Which of the click's two runs these facts describe. -/
   kind : RunKind
@@ -180,6 +208,8 @@ structure RunFacts where
   /-- Count of all `absent`, `not-supplied`, `status missing`, and typed-refusal
   values on the selection-to-terminal-receipt path. -/
   pathAbsenceCount : Nat
+  /-- The typed selection path: present exactly on a selection run. -/
+  selectionPath : Option SelectionPath
   /-- Previous run's selected target and arranged cascade. -/
   previousChoice : Choice
   /-- Previous run's typed terminal outcome. -/
@@ -305,8 +335,22 @@ def Q6 (r : RunFacts) : Bool := decide (
 /-! Joe: an absence, refusal, or "not supplied" on the one selected/enacted
 certificate path is a failure; the working path contains none.  This is not a
 completeness claim about rejected alternatives or population-wide scorer
-diagnostics.  With no selection, the explicit abstention carrier is the path. -/
-def Q7 (r : RunFacts) : Bool := decide (r.pathAbsenceCount = 0)
+diagnostics.  With no selection, the explicit abstention carrier is the path.
+
+On a selection run the path is typed, not counted.  The receipt, the chosen
+target's relation and its reach are each observed: a value read from a file is
+`defaulted`, and no constructor tolerates that.  Learning is applied exactly when
+something was consumed and every consumed run has a classification receipt:
+applied without one is learning from nothing, and not applied with all of them
+is a refusal to learn. -/
+def Q7 (r : RunFacts) : Bool := decide (
+  r.pathAbsenceCount = 0 ∧
+  (r.kind = .selection ↔ r.selectionPath.isSome) ∧
+  (∀ p ∈ r.selectionPath,
+    p.receipt.isObserved ∧ p.pickRelation.isObserved ∧ p.pickReach.isObserved ∧
+    (p.consumedRuns.map Prod.fst).Nodup ∧
+    (p.learningApplied ↔
+      (p.consumedRuns ≠ [] ∧ ∀ c ∈ p.consumedRuns, c.2.isObserved))))
 
 private instance calibrationAuthorizedDecidable
     (registry : List FactorizedPreferenceSemantics.CalibrationAuthorization)
@@ -439,6 +483,7 @@ def click20 : RunFacts where
   policiesWithInformationTerm := 0
   interpretationOrder := .interpretationBeforeSelection
   pathAbsenceCount := 62
+  selectionPath := none
   previousChoice := ⟨0, 20⟩
   previousOutcome := .refused
   previousInputDigest := 99
@@ -512,6 +557,7 @@ def good : RunFacts where
   policiesWithInformationTerm := 2
   interpretationOrder := .selectionBeforeInterpretation
   pathAbsenceCount := 0
+  selectionPath := none
   previousChoice := ⟨0, 50000⟩
   previousOutcome := .refused
   previousInputDigest := 7
@@ -601,9 +647,17 @@ def selectionConstruction : TargetConstruction where
 
 /-- A selection run comparing `compared`, from the construction `tc`.  The
 negatives below are built from it so that they keep the other requirements. -/
+def goodSelectionPath : SelectionPath where
+  receipt := .observed 80001
+  pickRelation := .observed 80002
+  pickReach := .observed 80003
+  consumedRuns := [(80010, .observed 80011), (80012, .observed 80013)]
+  learningApplied := true
+
 def selectionRun (tc : TargetConstruction) (compared : List Id) : RunFacts :=
   { good with
     kind := .selection
+    selectionPath := some goodSelectionPath
     libraryPatternCount := 19
     targetConstruction := [tc]
     constructorPatternCount := tc.pool.card
@@ -789,6 +843,100 @@ def workChosenEqualsAbstention : RunFacts :=
 
 def workAllPredictionsEqual : RunFacts :=
   { good with policyPrediction := [(60000, 160000), (60001, 160000)] }
+
+/-! Q7 selection-path witnesses.  Each changes one thing in `goodSelectionPath`. -/
+
+def selectionWithPath (path : SelectionPath) : RunFacts :=
+  { selectionGood with selectionPath := some path }
+
+/-- The live `:outer-task-selection` shape: `:status :absent`. -/
+def receiptNotRetained : RunFacts :=
+  selectionWithPath { goodSelectionPath with receipt := .absent }
+
+/-- Click 12 and five others: `:relation :unknown`. -/
+def relationUnknown : RunFacts :=
+  selectionWithPath { goodSelectionPath with pickRelation := .absent }
+
+def relationStatedInFile : RunFacts :=
+  selectionWithPath { goodSelectionPath with pickRelation := .defaulted }
+
+/-- Every record to date: `:default-reach 1/2` from `outer-makeup.edn`. -/
+def reachDefaulted : RunFacts :=
+  selectionWithPath { goodSelectionPath with pickReach := .defaulted }
+
+def observedZeroDigest : RunFacts :=
+  selectionWithPath { goodSelectionPath with pickReach := .observed 0 }
+
+/-- The live shape: `:applied` beside `:classification-receipt-absent`. -/
+def learningWithoutObservation : RunFacts :=
+  selectionWithPath { goodSelectionPath with consumedRuns := [(80010, .absent), (80012, .absent)] }
+
+def learningAppliedNothingConsumed : RunFacts :=
+  selectionWithPath { goodSelectionPath with consumedRuns := [] }
+
+def learningRefusedWithObservations : RunFacts :=
+  selectionWithPath { goodSelectionPath with learningApplied := false }
+
+def duplicateConsumedRun : RunFacts :=
+  selectionWithPath { goodSelectionPath with consumedRuns := [(80010, .observed 80011), (80010, .observed 80011)] }
+
+def selectionRunWithoutPath : RunFacts :=
+  { selectionGood with selectionPath := none }
+
+def workRunWithSelectionPath : RunFacts :=
+  { good with selectionPath := selectionGood.selectionPath }
+
+/-- Applied with one consumed run classified and the other not. -/
+def learningPartlyClassified : RunFacts :=
+  selectionWithPath { goodSelectionPath with consumedRuns := [(80010, .observed 80011), (80012, .absent)] }
+
+/-- The first click: nothing to consume, nothing applied. -/
+def nothingYetConsumed : RunFacts :=
+  selectionWithPath { goodSelectionPath with consumedRuns := [], learningApplied := false }
+
+/-- Consumed without a classification, and not reported as applied.  `Q7` admits
+this: the clause binds `applied`, and a run that says `deferred` is not refused. -/
+def learningDeferredUnclassified : RunFacts :=
+  selectionWithPath { goodSelectionPath with consumedRuns := [(80010, .absent)], learningApplied := false }
+
+theorem selection_good_Q7 : Q7 selectionGood = true := by native_decide
+theorem good_Q7 : Q7 good = true := by native_decide
+theorem nothing_yet_consumed_Q7 : Q7 nothingYetConsumed = true := by native_decide
+theorem learning_deferred_unclassified_Q7 : Q7 learningDeferredUnclassified = true := by
+  native_decide
+theorem receipt_not_retained_not_Q7 : Q7 receiptNotRetained = false := by native_decide
+theorem relation_unknown_not_Q7 : Q7 relationUnknown = false := by native_decide
+theorem relation_stated_in_file_not_Q7 : Q7 relationStatedInFile = false := by native_decide
+theorem reach_defaulted_not_Q7 : Q7 reachDefaulted = false := by native_decide
+theorem observed_zero_digest_not_Q7 : Q7 observedZeroDigest = false := by native_decide
+theorem learning_without_observation_not_Q7 :
+    Q7 learningWithoutObservation = false := by native_decide
+theorem learning_applied_nothing_consumed_not_Q7 :
+    Q7 learningAppliedNothingConsumed = false := by native_decide
+theorem learning_refused_with_observations_not_Q7 :
+    Q7 learningRefusedWithObservations = false := by native_decide
+theorem duplicate_consumed_run_not_Q7 : Q7 duplicateConsumedRun = false := by native_decide
+theorem selection_run_without_path_not_Q7 : Q7 selectionRunWithoutPath = false := by native_decide
+theorem work_run_with_selection_path_not_Q7 :
+    Q7 workRunWithSelectionPath = false := by native_decide
+theorem learning_partly_classified_not_Q7 :
+    Q7 learningPartlyClassified = false := by native_decide
+
+/-- Every other requirement holds on each of these runs, so `Q7` is the only
+requirement that refuses them. -/
+theorem selection_absence_negatives_fail_only_Q7 :
+    violations receiptNotRetained = [.q7] ∧
+    violations relationUnknown = [.q7] ∧
+    violations relationStatedInFile = [.q7] ∧
+    violations reachDefaulted = [.q7] ∧
+    violations observedZeroDigest = [.q7] ∧
+    violations learningWithoutObservation = [.q7] ∧
+    violations learningAppliedNothingConsumed = [.q7] ∧
+    violations learningRefusedWithObservations = [.q7] ∧
+    violations duplicateConsumedRun = [.q7] ∧
+    violations selectionRunWithoutPath = [.q7] ∧
+    violations workRunWithSelectionPath = [.q7] ∧
+    violations learningPartlyClassified = [.q7] := by native_decide
 
 theorem good_Q2 : Q2 good = true := by native_decide
 theorem good_Q11 : Q11 good = true := by native_decide
@@ -986,5 +1134,7 @@ example : Q9 click20 = true := by decide
 #print axioms missing_policy_G_not_Q11
 #print axioms constructed_not_policies_not_Q11
 #print axioms strict_minimum_negatives_fail_only_Q11
+#print axioms selection_good_Q7
+#print axioms selection_absence_negatives_fail_only_Q7
 
 end DarkTower.WarMachine.Requirements
