@@ -227,6 +227,8 @@ structure RunFacts where
   /-- Every refused pick retained for this task, oldest first, as
   (cascade, input digest). -/
   refusalHistory : List (Id × Id)
+  /-- Retained refusals on this task whose terminal could not be verified. -/
+  refusalHistoryUnsealed : Nat
   /-- Previous run's decision. -/
   previousDecision : Decision
   /-- Previous run's typed terminal outcome. -/
@@ -404,12 +406,15 @@ cascade that predicts what the refused one predicted: e71c7380 was refused and
 d5b9b513 took another key with the same prediction and the same G.  "Again" runs
 over the whole retained history on these inputs, so a class stays forbidden after
 a later run, refused or not: A refused and then B refused does not free A.  The
-latest refusal must be in that history, or a producer could drop it.  Abstaining on
-a repeat is not refused here. -/
+latest refusal must be in that history, or a producer could drop it.  A refusal that
+cannot be verified is not a smaller history: it is an absence on the one path that
+decides admissibility, so the run does not conform until it is repaired.  Abstaining
+on a repeat is not refused here. -/
 def Q6 (r : RunFacts) : Bool := decide (
   (r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest →
     r.previousDecision ≠ r.currentDecision) ∧
   (∀ cascade ∈ r.refusedCascade, (cascade, r.currentInputDigest) ∈ r.refusalHistory) ∧
+  r.refusalHistoryUnsealed = 0 ∧
   ∀ cascade ∈ r.pickedCascade, cascade ∉ r.forbidden)
 
 /-! Joe: an absence, refusal, or "not supplied" on the one selected/enacted
@@ -597,6 +602,7 @@ def click20 : RunFacts where
   pathAbsenceCount := 62
   selectionPath := none
   refusalHistory := []
+  refusalHistoryUnsealed := 0
   previousDecision := .pick 0 20
   previousOutcome := .refused
   previousInputDigest := 99
@@ -673,6 +679,7 @@ def good : RunFacts where
   pathAbsenceCount := 0
   selectionPath := none
   refusalHistory := []
+  refusalHistoryUnsealed := 0
   previousDecision := .pick 0 50000
   previousOutcome := .refused
   previousInputDigest := 7
@@ -1288,6 +1295,17 @@ def rechoseOlderRefusedClass : RunFacts :=
     refusalHistory := [(60001, 8), (60000, 8)]
     currentDecision := .pick 1 60002 }
 
+/-- A refusal whose seal is broken, on a run that otherwise conforms. -/
+def unsealedRefusal : RunFacts :=
+  { goodAfterTwoRefusals with refusalHistoryUnsealed := 1 }
+
+def unsealedOnSelection : RunFacts :=
+  { selectionGood with refusalHistoryUnsealed := 1 }
+
+theorem unsealed_refusals_exact :
+    violations unsealedRefusal = [.q6] ∧
+    violations unsealedOnSelection = [.q6] := by native_decide
+
 theorem forbidden_is_every_class_refused_on_these_inputs :
     goodAfterTwoRefusals.forbidden = {60001, 60000} := by native_decide
 theorem stale_history_forbids_nothing : staleHistory.forbidden = ∅ := by native_decide
@@ -1574,6 +1592,7 @@ example : Q9 click20 = true := by decide
 #print axioms admissible_minimum_negatives_exact
 #print axioms good_after_two_refusals_conforms
 #print axioms refusal_history_negatives_exact
+#print axioms unsealed_refusals_exact
 #print axioms selection_absence_negatives_fail_only_Q7
 
 end DarkTower.WarMachine.Requirements
