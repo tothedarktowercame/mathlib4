@@ -160,6 +160,13 @@ structure RunFacts where
   cascadesWithoutG : Finset Id
   /-- One record per compared policy, each over its own horizon. -/
   policyPreferences : List PolicyPreference
+  /-- One G per compared policy.  Exact rationals, projected from the record. -/
+  policyG : List (Id × ℚ)
+  /-- G of choosing nothing: the stopped kernel, scored like any policy. -/
+  abstentionG : ℚ
+  /-- One digest of predicted outcome distribution per compared policy.  A
+  digest of `0` is a recorded absence. -/
+  policyPrediction : List (Id × Id)
   /-- Terms that contributed to every reported policy G. -/
   gTerms : GTerms
   /-- Compared policies carrying a separately recorded risk term. -/
@@ -335,13 +342,40 @@ def Q9 (r : RunFacts) : Bool := decide (
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate.Valid
       r.calibrationAuthorizations r.factorizationAuthorizations certificate)
 
-inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q9
+/-! Joe, 2026-11-01: the outer loop should be able to say what was selected and
+why, with reference to the minimising cascade; ties are a tripwire.  A G value
+for every policy says nothing if the choice did not come from them, so this
+states that it did, for both kinds of run.
+
+The chosen cascade is a compared policy, and a selection run's chosen task is in
+its field.  Every compared policy has exactly one G and one present prediction
+digest, and nothing else has.  The chosen G is strictly below every other
+compared policy's G and strictly below abstention's: a tie at the minimum means
+G did not choose, whatever broke it.  Ties among the policies not chosen are
+allowed.  Two or more compared policies do not all predict the same thing.  The
+constructed cascades are exactly the construction's policies. -/
+def Q11 (r : RunFacts) : Bool := decide (
+  r.currentChoice.cascade ∈ r.comparedPolicies ∧
+  (r.kind = .selection → r.currentChoice.target ∈ r.enumeratedTasks) ∧
+  (r.policyG.map Prod.fst).Nodup ∧
+  (r.policyG.map Prod.fst).toFinset = r.comparedPolicies ∧
+  (r.policyPrediction.map Prod.fst).Nodup ∧
+  (r.policyPrediction.map Prod.fst).toFinset = r.comparedPolicies ∧
+  (∀ p ∈ r.policyPrediction, p.2 ≠ 0) ∧
+  (∃ chosen ∈ r.policyG, chosen.1 = r.currentChoice.cascade ∧
+    chosen.2 < r.abstentionG ∧
+    ∀ other ∈ r.policyG, other.1 ≠ chosen.1 → chosen.2 < other.2) ∧
+  (2 ≤ r.comparedPolicies.card →
+    1 < (r.policyPrediction.map Prod.snd).toFinset.card) ∧
+  r.targetConstruction.map (·.policies) = [r.constructedCascades])
+
+inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q9 | q11
   deriving DecidableEq, Repr
 
 def violations (r : RunFacts) : List Requirement :=
   [(.q1, Q1 r), (.q2, Q2 r), (.q3, Q3 r),
    (.q4, Q4 r), (.q5, Q5 r), (.q6, Q6 r),
-   (.q7, Q7 r), (.q9, Q9 r)].filterMap
+   (.q7, Q7 r), (.q9, Q9 r), (.q11, Q11 r)].filterMap
     (fun (q, ok) => if ok then none else some q)
 
 def conforms (r : RunFacts) : Bool := violations r = []
@@ -393,6 +427,9 @@ def click20 : RunFacts where
     [{ policy := 30, horizon := 4, preferenceSteps := {3}, gradedPreferenceSteps := ∅,
        semantics := .terminalOnly, normalization := .rawCumulative,
        terms := ⟨true, false, false⟩ }]
+  policyG := []
+  abstentionG := 0
+  policyPrediction := []
   gTerms := ⟨true, false, false⟩
   policiesWithRiskTerm := 1
   policiesWithAmbiguityTerm := 0
@@ -459,10 +496,13 @@ def good : RunFacts where
   libraryPatternCount := 1431
   targetConstruction := [goodConstruction]
   constructorPatternCount := 30
-  constructedCascades := ids 50000 (3 * 637)
+  constructedCascades := {60000, 60001}
   comparedPolicies := {60000, 60001}
   cascadesWithoutG := ∅
   policyPreferences := [goodPolicy 60000 4, goodPolicy 60001 2]
+  policyG := [(60000, 2), (60001, 3/2)]
+  abstentionG := 3
+  policyPrediction := [(60000, 160000), (60001, 160001)]
   gTerms := ⟨true, true, true⟩
   policiesWithRiskTerm := 2
   policiesWithAmbiguityTerm := 2
@@ -472,7 +512,7 @@ def good : RunFacts where
   previousChoice := ⟨0, 50000⟩
   previousOutcome := .refused
   previousInputDigest := 7
-  currentChoice := ⟨1, 50001⟩
+  currentChoice := ⟨1, 60001⟩
   currentInputDigest := 7
   seatsAvailable := ids 0 56
   seatsUsed := ids 0 10
@@ -567,6 +607,10 @@ def selectionRun (tc : TargetConstruction) (compared : List Id) : RunFacts :=
     constructedCascades := tc.policies
     comparedPolicies := compared.toFinset
     policyPreferences := compared.map (fun c => goodPolicy c 1)
+    policyG := compared.map (fun c =>
+      (c, if c = 70000 then 29949 / 10000 else 34841 / 10000))
+    abstentionG := 47875 / 10000
+    policyPrediction := compared.map (fun c => (c, c + 100000))
     policiesWithRiskTerm := compared.length
     policiesWithAmbiguityTerm := compared.length
     policiesWithInformationTerm := compared.length
@@ -656,13 +700,118 @@ def workConstructionForOtherTask : RunFacts :=
 def workOneCascade : RunFacts :=
   { good with
     targetConstruction := [{ goodConstruction with policyCount := 1, policies := {60000} }]
+    constructedCascades := {60000}
     comparedPolicies := {60000}
     policyPreferences := [goodPolicy 60000 4]
+    policyG := [(60000, 2)]
+    policyPrediction := [(60000, 160000)]
     policiesWithRiskTerm := 1
     policiesWithAmbiguityTerm := 1
-    policiesWithInformationTerm := 1 }
+    policiesWithInformationTerm := 1
+    currentChoice := ⟨1, 60000⟩ }
+
+/-! Q11 witnesses.  Each changes `selectionGood` or `good` in one respect. -/
+
+/-- The 10-31 shape: every compared policy has the same G. -/
+def exactTieAtMinimum : RunFacts :=
+  { selectionGood with
+    policyG := [(70000, 29949 / 10000), (70001, 29949 / 10000), (70002, 29949 / 10000)] }
+
+/-- The other era-2 shape: two cascades share the minimum, the third is worse. -/
+def twoWayTieAtMinimum : RunFacts :=
+  { selectionGood with
+    policyG := [(70000, 29949 / 10000), (70001, 29949 / 10000), (70002, 34841 / 10000)] }
+
+/-- Menu order: the first cascade is chosen though another has the lower G. -/
+def chosenNotMinimum : RunFacts :=
+  { selectionGood with
+    policyG := [(70000, 34841 / 10000), (70001, 29949 / 10000), (70002, 34841 / 10000)] }
+
+def chosenOutsideMenu : RunFacts :=
+  { selectionGood with currentChoice := ⟨1, 70003⟩ }
+
+def chosenTargetOutsideField : RunFacts :=
+  { selectionGood with currentChoice := ⟨9, 70000⟩ }
+
+/-- The click-12 façade: choosing has the same G as choosing nothing. -/
+def chosenEqualsAbstention : RunFacts :=
+  { selectionGood with abstentionG := 29949 / 10000 }
+
+def abstentionBelowChosen : RunFacts :=
+  { selectionGood with abstentionG := 2 }
+
+def allPredictionsEqual : RunFacts :=
+  { selectionGood with
+    policyPrediction := [(70000, 170000), (70001, 170000), (70002, 170000)] }
+
+def predictionAbsent : RunFacts :=
+  { selectionGood with
+    policyPrediction := [(70000, 170000), (70001, 0), (70002, 170002)] }
+
+def missingPrediction : RunFacts :=
+  { selectionGood with policyPrediction := [(70000, 170000), (70001, 170001)] }
+
+def missingPolicyG : RunFacts :=
+  { selectionGood with
+    policyG := [(70000, 29949 / 10000), (70001, 34841 / 10000)] }
+
+/-- A second G for a compared policy, even an agreeing one. -/
+def duplicatePolicyG : RunFacts :=
+  { selectionGood with policyG := selectionGood.policyG ++ [(70002, 34841 / 10000)] }
+
+def foreignPolicyG : RunFacts :=
+  { selectionGood with policyG := selectionGood.policyG ++ [(70003, 34841 / 10000)] }
+
+def constructedNotPolicies : RunFacts :=
+  { selectionGood with constructedCascades := {70000, 70001, 70002, 70003} }
+
+/-- The work-kind counterparts: the same requirement binds the inner run. -/
+def workTieAtMinimum : RunFacts :=
+  { good with policyG := [(60000, 3/2), (60001, 3/2)] }
+
+def workChosenEqualsAbstention : RunFacts :=
+  { good with abstentionG := 3/2 }
+
+def workAllPredictionsEqual : RunFacts :=
+  { good with policyPrediction := [(60000, 160000), (60001, 160000)] }
 
 theorem good_Q2 : Q2 good = true := by native_decide
+theorem good_Q11 : Q11 good = true := by native_decide
+theorem selection_good_Q11 : Q11 selectionGood = true := by native_decide
+theorem work_one_cascade_conforms : conforms workOneCascade = true := by native_decide
+theorem exact_tie_at_minimum_not_Q11 : Q11 exactTieAtMinimum = false := by native_decide
+theorem two_way_tie_at_minimum_not_Q11 : Q11 twoWayTieAtMinimum = false := by native_decide
+theorem chosen_not_minimum_not_Q11 : Q11 chosenNotMinimum = false := by native_decide
+theorem chosen_outside_menu_not_Q11 : Q11 chosenOutsideMenu = false := by native_decide
+theorem chosen_target_outside_field_not_Q11 : Q11 chosenTargetOutsideField = false := by native_decide
+theorem chosen_equals_abstention_not_Q11 : Q11 chosenEqualsAbstention = false := by native_decide
+theorem abstention_below_chosen_not_Q11 : Q11 abstentionBelowChosen = false := by native_decide
+theorem all_predictions_equal_not_Q11 : Q11 allPredictionsEqual = false := by native_decide
+theorem prediction_absent_not_Q11 : Q11 predictionAbsent = false := by native_decide
+theorem missing_prediction_not_Q11 : Q11 missingPrediction = false := by native_decide
+theorem missing_policy_G_not_Q11 : Q11 missingPolicyG = false := by native_decide
+theorem duplicate_policy_G_not_Q11 : Q11 duplicatePolicyG = false := by native_decide
+theorem foreign_policy_G_not_Q11 : Q11 foreignPolicyG = false := by native_decide
+theorem constructed_not_policies_not_Q11 : Q11 constructedNotPolicies = false := by native_decide
+theorem work_tie_at_minimum_not_Q11 : Q11 workTieAtMinimum = false := by native_decide
+theorem work_chosen_equals_abstention_not_Q11 :
+    Q11 workChosenEqualsAbstention = false := by native_decide
+theorem work_all_predictions_equal_not_Q11 :
+    Q11 workAllPredictionsEqual = false := by native_decide
+
+/-- Every other requirement holds on each of these runs, so `Q11` is the only
+requirement that refuses them. -/
+theorem strict_minimum_negatives_fail_only_Q11 :
+    violations exactTieAtMinimum = [.q11] ∧
+    violations twoWayTieAtMinimum = [.q11] ∧
+    violations chosenNotMinimum = [.q11] ∧
+    violations chosenOutsideMenu = [.q11] ∧
+    violations chosenEqualsAbstention = [.q11] ∧
+    violations allPredictionsEqual = [.q11] ∧
+    violations missingPolicyG = [.q11] ∧
+    violations constructedNotPolicies = [.q11] ∧
+    violations workTieAtMinimum = [.q11] := by native_decide
+
 theorem selection_good_Q2 : Q2 selectionGood = true := by native_decide
 theorem selection_good_conforms : conforms selectionGood = true := by native_decide
 theorem hand_listed_menu_not_Q2 : Q2 handListedMenu = false := by native_decide
@@ -716,9 +865,10 @@ theorem click20_not_Q4 : Q4 click20 = false := by native_decide
 theorem click20_not_Q5 : Q5 click20 = false := by native_decide
 theorem click20_not_Q6 : Q6 click20 = false := by native_decide
 theorem click20_not_Q7 : Q7 click20 = false := by native_decide
+theorem click20_not_Q11 : Q11 click20 = false := by native_decide
 theorem click20_not_Q9 : Q9 click20 = false := by native_decide
 theorem click20_violations :
-    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q9] := by native_decide
+    violations click20 = [.q1, .q2, .q4, .q5, .q6, .q7, .q9, .q11] := by native_decide
 theorem click20_not_conformant : conforms click20 = false := by native_decide
 theorem missingG_not_Q3 : Q3 missingG = false := by native_decide
 theorem good_conforms : conforms good = true := by native_decide
@@ -788,6 +938,7 @@ example : Q9 click20 = true := by decide
 #print axioms click20_not_Q6
 #print axioms click20_not_Q7
 #print axioms click20_not_Q9
+#print axioms click20_not_Q11
 #print axioms click20_violations
 #print axioms click20_not_conformant
 #print axioms missingG_not_Q3
@@ -810,5 +961,13 @@ example : Q9 click20 = true := by decide
 #print axioms menu_not_from_slice_not_Q2
 #print axioms unpinned_giraffe_not_Q2
 #print axioms selection_negatives_fail_only_Q2
+#print axioms selection_good_Q11
+#print axioms exact_tie_at_minimum_not_Q11
+#print axioms chosen_outside_menu_not_Q11
+#print axioms chosen_equals_abstention_not_Q11
+#print axioms all_predictions_equal_not_Q11
+#print axioms missing_policy_G_not_Q11
+#print axioms constructed_not_policies_not_Q11
+#print axioms strict_minimum_negatives_fail_only_Q11
 
 end DarkTower.WarMachine.Requirements

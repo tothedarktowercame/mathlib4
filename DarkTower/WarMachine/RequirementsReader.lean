@@ -24,6 +24,8 @@ structure PartialRunFacts where
   q6 : Evidence RunFacts
   q7 : Evidence RunFacts
   q9 : Evidence RunFacts
+  /-- Absent from a projection that does not carry it: unverifiable, never holds. -/
+  q11 : Evidence RunFacts := .nr "policyG, abstentionG, policyPrediction not projected"
 
 def assess (check : RunFacts → Bool) : Evidence RunFacts → Outcome
   | .known facts => if check facts then .holds else .violated
@@ -34,7 +36,8 @@ def outcomes (p : PartialRunFacts) : List (Requirement × Outcome) :=
    (.q3, assess Q3 p.q3), (.q4, assess Q4 p.q4),
    (.q5, assess Q5 p.q5), (.q6, assess Q6 p.q6),
    (.q7, assess Q7 p.q7),
-   (.q9, assess Q9 p.q9)]
+   (.q9, assess Q9 p.q9),
+   (.q11, assess Q11 p.q11)]
 
 def alert (p : PartialRunFacts) : List (Requirement × Outcome) :=
   (outcomes p).filter (fun (_, result) => result != .holds)
@@ -47,6 +50,21 @@ theorem nr_is_unverifiable (check : RunFacts → Bool) (reason : String) :
 theorem unverifiable_alerts (q : Requirement) (reason : String) :
     (q, assess (fun _ => true) (.nr reason : Evidence RunFacts)) =
       (q, .unverifiable) := rfl
+
+/-- A projection predating the G carrier still elaborates, and Q11 then alerts
+as unverifiable rather than passing unread. -/
+def withoutGCarrier : PartialRunFacts where
+  q1 := .known good
+  q2 := .known good
+  q3 := .known good
+  q4 := .known good
+  q5 := .known good
+  q6 := .known good
+  q7 := .known good
+  q9 := .known good
+
+theorem absent_G_carrier_alerts :
+    (alert withoutGCarrier).map Prod.snd = [.unverifiable] := by native_decide
 
 #print axioms nr_is_unverifiable
 #print axioms unverifiable_alerts
