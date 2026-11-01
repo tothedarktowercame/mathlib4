@@ -147,12 +147,18 @@ def Provenance.isObserved : Provenance → Bool
 
 /-- The selection run's path from field to chosen task. -/
 structure SelectionPath where
-  /-- The retained `:outer/selection` section. -/
+  /-- The retained `:outer/selection` section, by digest.  The separate
+  `:outer-task-selection` key is the deleted selector's stub and is not this. -/
   receipt : Provenance
-  /-- Relation of the chosen target to the retained focus (classify-target receipt). -/
+  /-- Relation of the chosen target to the retained focus: a classify-target
+  receipt whose class is measured (not `:unknown`). -/
   pickRelation : Provenance
-  /-- Reach of the chosen target over the field (Giraffe cone / unblocks). -/
+  /-- Reach of the chosen target over the field, computed this run from pinned
+  retained records (Giraffe cones and unblocks, graph coverage, prior clicks). -/
   pickReach : Provenance
+  /-- The previous run found awaiting classification at the start of this run,
+  with its ending-class receipt; `none` on a first click. -/
+  pendingRun : Option (Id × Provenance)
   /-- Runs consumed for learning, each with its classification receipt. -/
   consumedRuns : List (Id × Provenance)
   /-- `:outer/learning {:status :applied}`. -/
@@ -339,18 +345,21 @@ diagnostics.  With no selection, the explicit abstention carrier is the path.
 
 On a selection run the path is typed, not counted.  The receipt, the chosen
 target's relation and its reach are each observed: a value read from a file is
-`defaulted`, and no constructor tolerates that.  Learning is applied exactly when
-something was consumed and every consumed run has a classification receipt:
-applied without one is learning from nothing, and not applied with all of them
-is a refusal to learn. -/
+`defaulted`, and no constructor tolerates that.  A run found pending and every
+run consumed has a classification receipt: a deferral on
+`:terminal-ending-class-absent` (15 of 27 era-2 records) is an absence on the
+path, not a status.  Learning is applied exactly when something was consumed:
+applied with nothing consumed is learning from nothing, and not applied with
+consumptions is a refusal to learn. -/
 def Q7 (r : RunFacts) : Bool := decide (
   r.pathAbsenceCount = 0 ∧
   (r.kind = .selection ↔ r.selectionPath.isSome) ∧
   (∀ p ∈ r.selectionPath,
     p.receipt.isObserved ∧ p.pickRelation.isObserved ∧ p.pickReach.isObserved ∧
+    (∀ pr ∈ p.pendingRun, pr.2.isObserved) ∧
     (p.consumedRuns.map Prod.fst).Nodup ∧
-    (p.learningApplied ↔
-      (p.consumedRuns ≠ [] ∧ ∀ c ∈ p.consumedRuns, c.2.isObserved))))
+    (∀ c ∈ p.consumedRuns, c.2.isObserved) ∧
+    (p.learningApplied ↔ p.consumedRuns ≠ [])))
 
 private instance calibrationAuthorizedDecidable
     (registry : List FactorizedPreferenceSemantics.CalibrationAuthorization)
@@ -651,6 +660,7 @@ def goodSelectionPath : SelectionPath where
   receipt := .observed 80001
   pickRelation := .observed 80002
   pickReach := .observed 80003
+  pendingRun := some (80012, .observed 80013)
   consumedRuns := [(80010, .observed 80011), (80012, .observed 80013)]
   learningApplied := true
 
@@ -890,20 +900,28 @@ def workRunWithSelectionPath : RunFacts :=
 def learningPartlyClassified : RunFacts :=
   selectionWithPath { goodSelectionPath with consumedRuns := [(80010, .observed 80011), (80012, .absent)] }
 
-/-- The first click: nothing to consume, nothing applied. -/
+/-- The first click: nothing pending, nothing to consume, nothing applied. -/
 def nothingYetConsumed : RunFacts :=
-  selectionWithPath { goodSelectionPath with consumedRuns := [], learningApplied := false }
+  selectionWithPath { goodSelectionPath with
+    pendingRun := none, consumedRuns := [], learningApplied := false }
 
-/-- Consumed without a classification, and not reported as applied.  `Q7` admits
-this: the clause binds `applied`, and a run that says `deferred` is not refused. -/
+/-- Listed as consumed without a classification, and not reported as applied. -/
 def learningDeferredUnclassified : RunFacts :=
   selectionWithPath { goodSelectionPath with consumedRuns := [(80010, .absent)], learningApplied := false }
+
+/-- The honest projection of `:outer/learning {:status :deferred, :reason
+:terminal-ending-class-absent}`: the previous run was pending, nothing was
+consumed, and it has no ending class. -/
+def pendingRunUnclassified : RunFacts :=
+  selectionWithPath { goodSelectionPath with
+    pendingRun := some (80020, .absent), consumedRuns := [], learningApplied := false }
 
 theorem selection_good_Q7 : Q7 selectionGood = true := by native_decide
 theorem good_Q7 : Q7 good = true := by native_decide
 theorem nothing_yet_consumed_Q7 : Q7 nothingYetConsumed = true := by native_decide
-theorem learning_deferred_unclassified_Q7 : Q7 learningDeferredUnclassified = true := by
-  native_decide
+theorem learning_deferred_unclassified_not_Q7 :
+    Q7 learningDeferredUnclassified = false := by native_decide
+theorem pending_run_unclassified_not_Q7 : Q7 pendingRunUnclassified = false := by native_decide
 theorem receipt_not_retained_not_Q7 : Q7 receiptNotRetained = false := by native_decide
 theorem relation_unknown_not_Q7 : Q7 relationUnknown = false := by native_decide
 theorem relation_stated_in_file_not_Q7 : Q7 relationStatedInFile = false := by native_decide
@@ -936,7 +954,9 @@ theorem selection_absence_negatives_fail_only_Q7 :
     violations duplicateConsumedRun = [.q7] ∧
     violations selectionRunWithoutPath = [.q7] ∧
     violations workRunWithSelectionPath = [.q7] ∧
-    violations learningPartlyClassified = [.q7] := by native_decide
+    violations learningPartlyClassified = [.q7] ∧
+    violations learningDeferredUnclassified = [.q7] ∧
+    violations pendingRunUnclassified = [.q7] := by native_decide
 
 theorem good_Q2 : Q2 good = true := by native_decide
 theorem good_Q11 : Q11 good = true := by native_decide
