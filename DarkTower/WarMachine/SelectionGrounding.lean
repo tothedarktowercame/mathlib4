@@ -10,10 +10,15 @@ namespace DarkTower.WarMachine.SelectionGrounding
 
 abbrev Id := Requirements.Id
 
+inductive Status where
+  | ready | notReady | undetermined
+  deriving DecidableEq, Repr
+
 structure FieldFact where
-  ready : Bool
+  status : Status
   cone : ℕ
   unblocks : ℕ
+  rank : ℕ
   pin : Id
   deriving DecidableEq, Repr
 
@@ -23,7 +28,8 @@ inductive FieldEntry where
   deriving DecidableEq, Repr
 
 inductive Step where
-  | readyGate | byCone | byUnblocks
+  | readyGate | byCone | byUnblocks | byRank
+  | statusGate (status : Status)
   | named (step : Id)
   deriving DecidableEq, Repr
 
@@ -61,7 +67,9 @@ instance : Repr Grounding where
     g.abstention, g.chosen) n
 
 def applyStep (field : List (Id × FieldFact)) : Step → Option (List (Id × FieldFact))
-  | .readyGate => some (field.filter fun x => x.2.ready)
+  | .readyGate => some (field.filter fun x => x.2.status == .ready)
+  | .statusGate s => some (field.filter fun x => x.2.status == s)
+  | .byRank => some (field.insertionSort fun a b => a.2.rank ≤ b.2.rank)
   | .byCone => some (field.insertionSort fun a b => b.2.cone ≤ a.2.cone)
   | .byUnblocks => some (field.insertionSort fun a b => b.2.unblocks ≤ a.2.unblocks)
   | .named _ => none
@@ -112,8 +120,8 @@ def grounded (g : Grounding) (r : Requirements.RunFacts) : Bool :=
 /-- Concrete fixture: the two stable ordering compositions select different tasks. -/
 def small : Grounding where
   enumerated := {1, 2, 3, 4, 5}
-  field := [.fact 1 ⟨true, 9, 1, 101⟩, .fact 2 ⟨true, 4, 8, 102⟩,
-    .fact 3 ⟨true, 4, 8, 103⟩, .fact 4 ⟨false, 99, 99, 104⟩, .excluded 5 7 105]
+  field := [.fact 1 ⟨.ready, 9, 1, 1, 101⟩, .fact 2 ⟨.ready, 4, 8, 2, 102⟩,
+    .fact 3 ⟨.ready, 4, 8, 3, 103⟩, .fact 4 ⟨.notReady, 99, 99, 4, 104⟩, .excluded 5 7 105]
   policies := [
     ⟨70000, [.readyGate, .byCone, .byUnblocks], some 2, 1/2, .associated,
       ⟨3, 5041/10000, 1/50⟩, 34841/10000⟩,
@@ -138,7 +146,7 @@ theorem small_chosen_minimum :
 
 def taskMissingFromField := { small with field := small.field.drop 1 }
 def duplicateTaskInField := { small with field := small.field ++ small.field.take 1 }
-def unpinnedFact := { small with field := .fact 1 ⟨true, 9, 1, 0⟩ :: small.field.drop 1 }
+def unpinnedFact := { small with field := .fact 1 ⟨.ready, 9, 1, 1, 0⟩ :: small.field.drop 1 }
 def exclusionWithoutReason : Grounding := { small with field := small.field.take 4 ++ [FieldEntry.excluded 5 0 105] }
 
 theorem taskMissingFromField_G1 : fieldConsidered taskMissingFromField = false := by native_decide
@@ -155,7 +163,7 @@ def menuOrderPick : Grounding :=
       if p.cascade = 70001 then { p with pick := some 2 } else p) }
 def pickFromEmptyGate : Grounding :=
   { small with field := small.field.map (fun e => match e with
-    | .fact t f => .fact t { f with ready := false }
+    | .fact t f => .fact t { f with status := .notReady }
     | e => e) }
 def namedStepUnverifiable := changeFirst fun p => { p with steps := [.named 99] }
 
