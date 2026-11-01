@@ -79,6 +79,9 @@ inductive RunOutcome where
 inductive InterpretationOrder where
   | selectionBeforeInterpretation
   | interpretationBeforeSelection
+  /-- The run ended before any interpretation (a selection refused after
+  scoring, an abstention, or a bypass); Q5 has nothing to forbid. -/
+  | noInterpretation
   deriving DecidableEq, Repr
 
 structure GTerms where
@@ -403,7 +406,15 @@ def Q4 (r : RunFacts) : Bool := decide (
 
 /-! Joe: "Go ahead and interpret a pattern, after you select it." -/
 def Q5 (r : RunFacts) : Bool :=
-  decide (r.interpretationOrder = .selectionBeforeInterpretation)
+  decide (r.interpretationOrder ≠ .interpretationBeforeSelection)
+
+/-- The broadened Q5 agrees with its former equality test on both constructors
+that existed before `noInterpretation`. -/
+theorem Q5_agrees_on_old_interpretation_orders (r : RunFacts)
+    (h : r.interpretationOrder = .selectionBeforeInterpretation ∨
+         r.interpretationOrder = .interpretationBeforeSelection) :
+    Q5 r = decide (r.interpretationOrder = .selectionBeforeInterpretation) := by
+  rcases h with h | h <;> simp [Q5, h]
 
 /-! Joe: a failure is a critical incident, never a non-event to be repeated.
 An unchanged refusal may not choose the same target/cascade pair again, nor a

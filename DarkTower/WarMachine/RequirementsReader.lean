@@ -66,6 +66,27 @@ def withoutGCarrier : PartialRunFacts where
 theorem absent_G_carrier_alerts :
     (alert withoutGCarrier).map Prod.snd = [.unverifiable] := by native_decide
 
+/-- A selection-only run has a known order and Q5 holds vacuously; the other
+requirements continue to read the same `RunFacts`. -/
+def noInterpretationRun : RunFacts :=
+  { good with interpretationOrder := .noInterpretation }
+
+def noInterpretationPartial : PartialRunFacts where
+  q1 := .known noInterpretationRun
+  q2 := .known noInterpretationRun
+  q3 := .known noInterpretationRun
+  q4 := .known noInterpretationRun
+  q5 := .known noInterpretationRun
+  q6 := .known noInterpretationRun
+  q7 := .known noInterpretationRun
+  q9 := .known noInterpretationRun
+  q11 := .known noInterpretationRun
+
+theorem no_interpretation_Q5_holds :
+    assess Q5 noInterpretationPartial.q5 = .holds := by native_decide
+
+#eval (Q5 noInterpretationRun, Q6 noInterpretationRun, Q11 noInterpretationRun)
+
 #print axioms nr_is_unverifiable
 #print axioms unverifiable_alerts
 
