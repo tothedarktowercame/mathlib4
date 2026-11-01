@@ -227,7 +227,11 @@ structure RunFacts where
   /-- Every refused pick retained for this task, oldest first, as
   (cascade, input digest). -/
   refusalHistory : List (Id × Id)
-  /-- Retained refusals on this task whose terminal could not be verified. -/
+  /-- Terminals in this task's run stream that could not be verified (a broken
+  seal), as the producer counts them: it cannot attribute a broken terminal to a
+  task or an outcome, so the count is over the stream, and one corrupt line
+  halts conformance for every later run until the line is retired or re-sealed
+  by a medic route.  Fail-closed knowingly (claude-2, 2026-11-01, L5-2L-3 review). -/
   refusalHistoryUnsealed : Nat
   /-- Previous run's decision. -/
   previousDecision : Decision
