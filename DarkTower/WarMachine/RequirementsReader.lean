@@ -23,6 +23,7 @@ structure PartialRunFacts where
   q6 : Evidence RunFacts
   q7 : Evidence RunFacts
   q9 : Evidence RunFacts
+  q10 : Evidence RunFacts
 
 def assess (check : RunFacts → Bool) : Evidence RunFacts → Outcome
   | .known facts => if check facts then .holds else .violated
@@ -33,7 +34,8 @@ def outcomes (p : PartialRunFacts) : List (Requirement × Outcome) :=
    (.q3, assess Q3 p.q3), (.q4, assess Q4 p.q4),
    (.q5, assess Q5 p.q5), (.q6, assess Q6 p.q6),
    (.q7, assess Q7 p.q7),
-   (.q9, assess Q9 p.q9)]
+   (.q9, assess Q9 p.q9),
+   (.q10, assess Q10 p.q10)]
 
 def alert (p : PartialRunFacts) : List (Requirement × Outcome) :=
   (outcomes p).filter (fun (_, result) => result != .holds)

@@ -121,6 +121,113 @@ instance (p : PolicyPreference) : Decidable p.Valid := by
   unfold PolicyPreference.Valid
   infer_instance
 
+/-! ## Outer selection (Q10)
+
+Joe, 2026-11-01: a selection loop that shows scores without really choosing
+is a façade, and Lean should prohibit it just as Q1 prohibits a whitelist of
+4 missions.  Every field below is a fact one run record either retained or
+did not; a `0` pattern id, an empty step list or `none` outer selection is a
+recorded absence, never a guess. -/
+
+/-- One retained step of a compared outer selection cascade.  `pattern` is
+the task-selection library pattern id the step enacts (0 is a recorded
+absence); `namedMapping` is true exactly when a R20Step named constructor
+(`readyGate`, `byUnblocks`, `byCone`) is retained with the library id it
+expresses; `narrowingRetained` is true exactly when the record retains what
+this step narrowed on the field it saw. -/
+structure OuterStep where
+  pattern : Id
+  namedMapping : Bool
+  narrowingRetained : Bool
+  deriving DecidableEq
+
+/-- One compared outer policy: a task-selection cascade as the run retained
+it.  `patterns` are the library pattern ids the cascade is composed from;
+`steps` are its retained steps; `pick` is the target the cascade picked on
+the compared field (0 is a recorded no-pick). -/
+structure OuterPolicy where
+  cascade : Id
+  patterns : Finset Id
+  steps : List OuterStep
+  pick : Id
+  deriving DecidableEq
+
+/-- Where a compared policy's standing was read from.  There is no
+`undeclared` constructor: a source the record does not show is not
+recomputable `RunFacts`. -/
+inductive OuterEvidenceSource where
+  | cascadeLive | fixedList
+  deriving DecidableEq, Repr
+
+/-- The outer selection of one run: the compared policies, the pinned
+task-selection library manifest, the shape of the comparison, and the
+obligations the outer G shares with the inner. -/
+structure OuterSelectionFacts where
+  /-- Compared outer policies, one record per compared cascade. -/
+  policies : List OuterPolicy
+  /-- Pinned ids of the task-selection library pattern manifest. -/
+  libraryPatterns : Finset Id
+  /-- Distinct G values among the compared policies. -/
+  distinctScores : Nat
+  /-- Distinct picks among the compared policies. -/
+  distinctPicks : Nat
+  /-- Scored picks whose reach was a default, not an observed value. -/
+  reachDefaulted : Nat
+  /-- Scored picks whose reach was observed. -/
+  reachObserved : Nat
+  /-- Unresolved knowledge-producer requests the scoring rested on. -/
+  unresolvedKnowledgeRequests : Nat
+  /-- The record retains why the chosen policy won. -/
+  chosenRationale : Bool
+  /-- Terms produced from retained inputs for every compared policy's G. -/
+  terms : GTerms
+  /-- Compared policies carrying a separately recorded risk term. -/
+  policiesWithRiskTerm : Nat
+  /-- Compared policies carrying a separately recorded ambiguity term. -/
+  policiesWithAmbiguityTerm : Nat
+  /-- Compared policies carrying a separately recorded information term. -/
+  policiesWithInformationTerm : Nat
+  /-- Where each compared policy's standing was read from. -/
+  evidence : OuterEvidenceSource
+  deriving DecidableEq
+
+/-- The outer twin of Q4: a real comparison, from the library, carrying the
+inner G's obligations, with a stated reason.
+
+- Provenance: every compared policy is a cascade whose steps are named
+  task-selection library patterns with their role, not constructors invented
+  in code; a step with no library identity violates.
+- Real comparison: distinct G values choose something; a single shared G
+  value is genuine only on complete evidence (no defaulted reach, no
+  unresolved knowledge request) with the reason retained — the identical G
+  of a degenerate kernel is a violation, and a genuine equality on real
+  evidence is not.
+- Same standard: risk, ambiguity and information gain each computed from
+  retained inputs; a term defaulted or unproduced counts as unmet.
+- Rationale: every step retains what it narrowed, and why the chosen policy
+  won is retained.
+- Evidence: standing is read from Cascade Live, not a fixed list. -/
+def OuterSelectionFacts.Valid (o : OuterSelectionFacts) : Prop :=
+  2 ≤ o.policies.length ∧
+  (∀ p ∈ o.policies, p.patterns.Nonempty ∧ p.patterns ⊆ o.libraryPatterns) ∧
+  (∀ p ∈ o.policies, p.steps ≠ [] ∧
+    ∀ s ∈ p.steps,
+      s.pattern ≠ 0 ∧ s.pattern ∈ p.patterns ∧
+      s.namedMapping = true ∧ s.narrowingRetained = true) ∧
+  (2 ≤ o.distinctScores ∨
+    (o.reachDefaulted = 0 ∧ o.unresolvedKnowledgeRequests = 0 ∧
+      o.chosenRationale = true)) ∧
+  o.terms = ⟨true, true, true⟩ ∧
+  o.policiesWithRiskTerm = o.policies.length ∧
+  o.policiesWithAmbiguityTerm = o.policies.length ∧
+  o.policiesWithInformationTerm = o.policies.length ∧
+  o.chosenRationale = true ∧
+  o.evidence = .cascadeLive
+
+instance (o : OuterSelectionFacts) : Decidable o.Valid := by
+  unfold OuterSelectionFacts.Valid
+  infer_instance
+
 structure RunFacts where
   /-- Canonical ids of open missions; counted from the pinned mission registry. -/
   openMissions : Finset Id
@@ -193,6 +300,8 @@ structure RunFacts where
   /-- Exact retained registry authorizing the certificate's factorization law. -/
   factorizationAuthorizations :
     List DarkTower.WarMachine.FactorizedPreferenceSemantics.FactorizationAuthorization
+  /-- The run's outer task selection, when the record retained one. -/
+  outerSelection : Option OuterSelectionFacts
   deriving DecidableEq
 
 def RunFacts.openTasks (r : RunFacts) : Finset Id :=
@@ -287,13 +396,23 @@ def Q9 (r : RunFacts) : Bool := decide (
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate.Valid
       r.calibrationAuthorizations r.factorizationAuthorizations certificate)
 
-inductive Requirement where | q1 | q3 | q4 | q5 | q6 | q7 | q9
+/-! Joe (2026-11-01): a selection loop that shows scores without really
+choosing is a façade; Lean prohibits it as Q1 prohibits a whitelist.  A run
+that retained no outer selection facts at all fails visibly here; the
+checker reports such a run's Q10 as `unverifiable` when the exporter could
+not recompute the facts. -/
+def Q10 (r : RunFacts) : Bool :=
+  match r.outerSelection with
+  | some o => decide (o.Valid)
+  | none => false
+
+inductive Requirement where | q1 | q3 | q4 | q5 | q6 | q7 | q9 | q10
   deriving DecidableEq, Repr
 
 def violations (r : RunFacts) : List Requirement :=
   [(.q1, Q1 r), (.q3, Q3 r),
    (.q4, Q4 r), (.q5, Q5 r), (.q6, Q6 r),
-   (.q7, Q7 r), (.q9, Q9 r)].filterMap
+   (.q7, Q7 r), (.q9, Q9 r), (.q10, Q10 r)].filterMap
     (fun (q, ok) => if ok then none else some q)
 
 def conforms (r : RunFacts) : Bool := violations r = []
@@ -364,6 +483,7 @@ def click20 : RunFacts where
   factorizedPreference := none
   calibrationAuthorizations := []
   factorizationAuthorizations := []
+  outerSelection := none
 
 def missingG : RunFacts :=
   { click20 with
@@ -399,6 +519,98 @@ def goodConstruction : TargetConstruction where
   policyCount := 2
   policies := {60000, 60001}
 
+/-- A library step: a task-selection pattern id with its R20Step named
+mapping retained and its narrowing retained. -/
+def libStep (pattern : Id) : OuterStep where
+  pattern := pattern
+  namedMapping := true
+  narrowingRetained := true
+
+/-- Library pattern ids (futon3/library/task-selection): 1 is
+`only-what-can-start-now` (R20Step `readyGate`), 2 is
+`what-others-wait-on-first` (R20Step `byUnblocks`/`byCone`), 3 is
+`find-out-before-building` (a README gate over undetermined readiness). -/
+def taskSelectionLibrary : Finset Id := {1, 2, 3}
+
+/-- The first policy of `goodOuter`, named so `singlePolicyMenu` needs no
+`Inhabited` instance. -/
+def goodOuterPolicyOne : OuterPolicy where
+  cascade := 10
+  patterns := {1, 2}
+  steps := [libStep 1, libStep 2, libStep 2]
+  pick := 1
+
+/-- A real outer comparison: two library cascades with distinct G values,
+observed reach, every term produced, a retained rationale per step and for
+the win, standing read from Cascade Live. -/
+def goodOuter : OuterSelectionFacts where
+  policies := [goodOuterPolicyOne, { cascade := 11, patterns := {1}, steps := [libStep 1], pick := 1 }]
+  libraryPatterns := taskSelectionLibrary
+  distinctScores := 2
+  distinctPicks := 1
+  reachDefaulted := 0
+  reachObserved := 2
+  unresolvedKnowledgeRequests := 0
+  chosenRationale := true
+  terms := ⟨true, true, true⟩
+  policiesWithRiskTerm := 2
+  policiesWithAmbiguityTerm := 2
+  policiesWithInformationTerm := 2
+  evidence := .cascadeLive
+
+/-- A genuine equality on real evidence: one shared G value, but observed
+reach, no unresolved knowledge request, and the reason retained. -/
+def genuineTie : OuterSelectionFacts :=
+  { goodOuter with distinctScores := 1 }
+
+/-- A degenerate kernel: the shared G value rests on a defaulted reach and
+unresolved knowledge requests, with no reason retained. -/
+def degenerateKernelTie : OuterSelectionFacts :=
+  { goodOuter with distinctScores := 1, reachDefaulted := 2, reachObserved := 0, unresolvedKnowledgeRequests := 17, chosenRationale := false }
+
+/-- Run ac5bc477 (2026-11-01) as its own facts state it: three cascades
+tied at G 3.2121207095955158 (picks E-comprehension-foundation twice and
+no-pick once), the selected reach 1/2 being the makeup default, 17
+unresolved knowledge-producer requests, no per-step library identity or
+narrowing retained, no stated reason the chosen cascade won, and the menu
+being the fixed list of data/wm-learning/outer-makeup.edn rather than
+standing read from Cascade Live.  Steps and patterns are the recorded
+absence the run retained. -/
+def ac5bc477Outer : OuterSelectionFacts where
+  policies :=
+    [{ cascade := 10, patterns := ∅, steps := [], pick := 1 },
+     { cascade := 11, patterns := ∅, steps := [], pick := 1 },
+     { cascade := 12, patterns := ∅, steps := [], pick := 0 }]
+  libraryPatterns := taskSelectionLibrary
+  distinctScores := 1
+  distinctPicks := 2
+  reachDefaulted := 3
+  reachObserved := 0
+  unresolvedKnowledgeRequests := 17
+  chosenRationale := false
+  terms := ⟨true, true, true⟩
+  policiesWithRiskTerm := 3
+  policiesWithAmbiguityTerm := 3
+  policiesWithInformationTerm := 3
+  evidence := .fixedList
+
+/-- A step with no library identity: an invented constructor retained with
+pattern 0. -/
+def inventedStep : OuterPolicy :=
+  { cascade := 13, patterns := {4}, steps := [{ pattern := 0, namedMapping := false, narrowingRetained := true }], pick := 1 }
+
+/-- Standing read from a fixed list rather than Cascade Live evidence. -/
+def fixedListStanding : OuterSelectionFacts :=
+  { goodOuter with evidence := .fixedList }
+
+/-- One compared policy's information term unproduced. -/
+def outerGainUnproduced : OuterSelectionFacts :=
+  { goodOuter with policiesWithInformationTerm := 1 }
+
+/-- A vacuous menu: one policy compared with itself. -/
+def singlePolicyMenu : OuterSelectionFacts :=
+  { goodOuter with policies := [goodOuterPolicyOne], policiesWithRiskTerm := 1, policiesWithAmbiguityTerm := 1, policiesWithInformationTerm := 1 }
+
 def good : RunFacts where
   openMissions := {1, 2, 3}
   openExcursions := ∅
@@ -433,6 +645,7 @@ def good : RunFacts where
   factorizedPreference := some goodPreferenceCertificate
   calibrationAuthorizations := [goodCalibrationAuthorization]
   factorizationAuthorizations := [goodFactorizationAuthorization]
+  outerSelection := some goodOuter
 
 /-- Deterministic likelihoods and terminal-only preferences may yield numeric
 zero epistemic terms while still carrying every term and total C-tau. -/
@@ -505,6 +718,32 @@ theorem no_compared_policies_not_Q4 : Q4 noComparedPolicies = false := by native
 theorem good_Q9 : Q9 good = true := by native_decide
 theorem substituted_factorization_not_Q9 : Q9 substitutedFactorization = false := by native_decide
 
+theorem good_Q10 : Q10 good = true := by native_decide
+/-- A real comparison meets the definition constructively. -/
+theorem genuine_tie_Q10 : Q10 ({ good with outerSelection := some genuineTie }) = true := by
+  native_decide
+/-- Identical G from a degenerate kernel is a violation. -/
+theorem degenerate_kernel_tie_not_Q10 :
+    Q10 ({ good with outerSelection := some degenerateKernelTie }) = false := by native_decide
+/-- The facts of real run ac5bc477 are a violation. -/
+theorem ac5bc477_not_Q10 : Q10 ({ good with outerSelection := some ac5bc477Outer }) = false := by
+  native_decide
+/-- A step with no library identity violates. -/
+theorem invented_step_not_Q10 :
+    Q10 ({ good with outerSelection := some { goodOuter with policies := goodOuter.policies ++ [inventedStep] } }) = false := by
+  native_decide
+/-- A fixed list of policies is not Cascade Live evidence. -/
+theorem fixed_list_standing_not_Q10 :
+    Q10 ({ good with outerSelection := some fixedListStanding }) = false := by native_decide
+/-- A term unproduced for one compared policy counts as unmet. -/
+theorem outer_gain_unproduced_not_Q10 :
+    Q10 ({ good with outerSelection := some outerGainUnproduced }) = false := by native_decide
+/-- A vacuous menu is not a comparison. -/
+theorem single_policy_menu_not_Q10 :
+    Q10 ({ good with outerSelection := some singlePolicyMenu }) = false := by native_decide
+/-- A run that retained no outer selection facts fails visibly. -/
+theorem absent_outer_selection_not_Q10 : Q10 click20 = false := by native_decide
+
 theorem click20_not_Q1 : Q1 click20 = false := by native_decide
 theorem click20_not_Q4 : Q4 click20 = false := by native_decide
 theorem click20_not_Q5 : Q5 click20 = false := by native_decide
@@ -512,7 +751,7 @@ theorem click20_not_Q6 : Q6 click20 = false := by native_decide
 theorem click20_not_Q7 : Q7 click20 = false := by native_decide
 theorem click20_not_Q9 : Q9 click20 = false := by native_decide
 theorem click20_violations :
-    violations click20 = [.q1, .q4, .q5, .q6, .q7, .q9] := by native_decide
+    violations click20 = [.q1, .q4, .q5, .q6, .q7, .q9, .q10] := by native_decide
 theorem click20_not_conformant : conforms click20 = false := by native_decide
 theorem missingG_not_Q3 : Q3 missingG = false := by native_decide
 theorem good_conforms : conforms good = true := by native_decide
@@ -589,5 +828,14 @@ example : Q9 click20 = true := by decide
 #print axioms duplicate_policy_record_not_Q4
 #print axioms policy_term_missing_not_Q4
 #print axioms no_compared_policies_not_Q4
+#print axioms good_Q10
+#print axioms genuine_tie_Q10
+#print axioms degenerate_kernel_tie_not_Q10
+#print axioms ac5bc477_not_Q10
+#print axioms invented_step_not_Q10
+#print axioms fixed_list_standing_not_Q10
+#print axioms outer_gain_unproduced_not_Q10
+#print axioms single_policy_menu_not_Q10
+#print axioms absent_outer_selection_not_Q10
 
 end DarkTower.WarMachine.Requirements
