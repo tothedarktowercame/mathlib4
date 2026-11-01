@@ -288,6 +288,39 @@ nothing is constructed or compared. -/
 def RunFacts.emptyField (r : RunFacts) : Bool :=
   decide (r.kind = .selection ∧ r.enumeratedTasks = ∅)
 
+/-- The cascade Q6 forbids this run: the previous run's cascade, when that run was
+refused and the inputs are unchanged.  Otherwise none. -/
+def RunFacts.refusedCascade (r : RunFacts) : Option Id :=
+  if r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest then
+    match r.previousDecision with
+    | .pick _ cascade => some cascade
+    | _ => none
+  else none
+
+/-- Prediction digest of a compared policy, if it has one. -/
+def RunFacts.predictionOf (r : RunFacts) (c : Id) : Option Id :=
+  (r.policyPrediction.find? (fun p => p.1 = c)).map (·.2)
+
+/-- The policies a refusal forbids: the refused cascade and every compared policy
+predicting what it predicted, since same-prediction variants are one policy under
+the model (Joe, 2026-11-01).  A refused cascade this run has no prediction for
+(the construction changed) forbids its own key alone.  Empty when nothing is
+refused. -/
+def RunFacts.forbidden (r : RunFacts) : Finset Id :=
+  match r.refusedCascade with
+  | none => ∅
+  | some refused =>
+    match r.predictionOf refused with
+    | none => {refused}
+    | some digest =>
+      insert refused (r.comparedPolicies.filter (fun p => r.predictionOf p = some digest))
+
+/-- The cascade this run picked, if it picked one. -/
+def RunFacts.pickedCascade (r : RunFacts) : Option Id :=
+  match r.currentDecision with
+  | .pick _ cascade => some cascade
+  | _ => none
+
 /-! Joe: "Every open mission, excursion or ticket is wanted." -/
 def Q1 (r : RunFacts) : Bool := decide (r.enumeratedTasks = r.openTasks)
 
@@ -354,10 +387,14 @@ def Q5 (r : RunFacts) : Bool :=
   decide (r.interpretationOrder = .selectionBeforeInterpretation)
 
 /-! Joe: a failure is a critical incident, never a non-event to be repeated.
-An unchanged refusal may not choose the same target/cascade pair again. -/
+An unchanged refusal may not choose the same target/cascade pair again, nor a
+cascade that predicts what the refused one predicted: e71c7380 was refused and
+d5b9b513 took another key with the same prediction and the same G.  Abstaining on a
+repeat is not refused here. -/
 def Q6 (r : RunFacts) : Bool := decide (
   r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest →
-    r.previousDecision ≠ r.currentDecision)
+    r.previousDecision ≠ r.currentDecision ∧
+    ∀ cascade ∈ r.pickedCascade, cascade ∉ r.forbidden)
 
 /-! Joe: an absence, refusal, or "not supplied" on the one selected/enacted
 certificate path is a failure; the working path contains none.  This is not a
@@ -451,7 +488,11 @@ of the comparison is a restricted domain, whatever the record says about G.
 Abstention is decided by the same comparison.  On a task, stopping is strictly
 below every compared cascade.  On any comparison, no compared cascade predicts
 what stopping predicts: a pick that predicts stopping is the click-12 façade seen
-through predictions.  Only an empty field abstains with no comparison. -/
+through predictions.  Only an empty field abstains with no comparison.
+
+A policy Q6 forbids stays compared, with its G and prediction (Joe, 2026-11-01),
+and the minimum is taken over the rest.  On a repeat the refused policy is the
+minimiser, so anything else chosen would otherwise fail here. -/
 def Q11 (r : RunFacts) : Bool :=
   match r.currentDecision with
   | .pick target cascade =>
@@ -460,12 +501,13 @@ def Q11 (r : RunFacts) : Bool :=
       (r.kind = .selection → target ∈ r.enumeratedTasks) ∧
       (∃ chosen ∈ r.policyG, chosen.1 = cascade ∧
         chosen.2 < r.abstentionG ∧
-        ∀ other ∈ r.policyG, other.1 ≠ chosen.1 → chosen.2 < other.2) ∧
+        ∀ other ∈ r.policyG, other.1 ≠ chosen.1 → other.1 ∉ r.forbidden →
+          chosen.2 < other.2) ∧
       (2 ≤ r.comparedPolicies.card →
         1 < (r.policyPrediction.map Prod.snd).toFinset.card))
   | .abstainOnTask _ =>
     r.comparisonRecorded && r.predictsOtherThanStopping && decide (
-      r.kind = .work ∧ ∀ g ∈ r.policyG, r.abstentionG < g.2)
+      r.kind = .work ∧ ∀ g ∈ r.policyG, g.1 ∉ r.forbidden → r.abstentionG < g.2)
   | .abstainEmptyField =>
     r.emptyField && decide (r.policyG = [] ∧ r.policyPrediction = [])
 
@@ -617,7 +659,7 @@ def good : RunFacts where
   previousOutcome := .refused
   previousInputDigest := 7
   currentDecision := .pick 1 60001
-  currentInputDigest := 7
+  currentInputDigest := 8
   seatsAvailable := ids 0 56
   seatsUsed := ids 0 10
   completionPreferencePairs := 12
@@ -1111,6 +1153,113 @@ def selectionNothingCompared : RunFacts :=
     policiesWithAmbiguityTerm := 0
     policiesWithInformationTerm := 0 }
 
+/-! Q6 repeats: the admissible set. -/
+
+/-- `r` as the run after a refused pick of `refused`, on unchanged inputs. -/
+def afterRefusal (r : RunFacts) (refused : Id) : RunFacts :=
+  { r with
+    previousOutcome := .refused
+    previousInputDigest := r.currentInputDigest
+    previousDecision := .pick 1 refused }
+
+/-- `good` with a third compared policy, 60002, whose prediction digest is given. -/
+def threePolicies (g0 g1 g2 : ℚ) (digest2 : Id) : RunFacts :=
+  { good with
+    targetConstruction :=
+      [{ goodConstruction with policyCount := 3, policies := {60000, 60001, 60002} }]
+    constructedCascades := {60000, 60001, 60002}
+    comparedPolicies := {60000, 60001, 60002}
+    policyPreferences := [goodPolicy 60000 4, goodPolicy 60001 2, goodPolicy 60002 2]
+    policyG := [(60000, g0), (60001, g1), (60002, g2)]
+    policyPrediction := [(60000, 160000), (60001, 160001), (60002, digest2)]
+    policiesWithRiskTerm := 3
+    policiesWithAmbiguityTerm := 3
+    policiesWithInformationTerm := 3 }
+
+/-- The minimiser 60001 was refused, so 60000 is the minimum among the admissible. -/
+def goodAfterRefusal : RunFacts :=
+  { afterRefusal good 60001 with currentDecision := .pick 1 60000 }
+
+def rechoseRefusedKey : RunFacts :=
+  afterRefusal good 60001
+
+/-- The 11-01 shape: another key, the same prediction, the same G. -/
+def rechoseRefusedClass : RunFacts :=
+  { afterRefusal (threePolicies 2 (3/2) (3/2) 160001) 60001 with
+    currentDecision := .pick 1 60002 }
+
+/-- What d5b9b513 should have done: leave the refused class. -/
+def choseOutsideRefusedClass : RunFacts :=
+  { rechoseRefusedClass with currentDecision := .pick 1 60000 }
+
+def ignoredForbiddenInMinimum : RunFacts :=
+  { afterRefusal (threePolicies 2 (3/2) (7/4) 160002) 60001 with
+    currentDecision := .pick 1 60000 }
+
+/-- The construction changed: the refused cascade is not compared, and its key alone
+is forbidden. -/
+def refusedNotCompared : RunFacts :=
+  afterRefusal good 60999
+
+def rechoseUncomparedRefused : RunFacts :=
+  { refusedNotCompared with currentDecision := .pick 1 60999 }
+
+/-- Forbidding applies only on a repeat. -/
+def noRepeatNoForbidding : RunFacts :=
+  { goodAfterRefusal with previousOutcome := .changed }
+
+def changedInputsNoForbidding : RunFacts :=
+  { goodAfterRefusal with previousInputDigest := 9 }
+
+/-- The refused cascade is the only one below abstention, so stopping is below every
+admissible cascade. -/
+def abstainWithForbiddenMinimiser : RunFacts :=
+  { afterRefusal good 60001 with
+    currentDecision := .abstainOnTask 1
+    abstentionG := 7/4 }
+
+def abstainAboveAdmissible : RunFacts :=
+  { afterRefusal (threePolicies 2 (3/2) (13/8) 160002) 60001 with
+    currentDecision := .abstainOnTask 1
+    abstentionG := 7/4 }
+
+/-- Every compared policy is forbidden, so no G binds abstention: `abstentionG` here
+is above the only cascade. -/
+def abstainWithEveryCascadeForbidden : RunFacts :=
+  { afterRefusal workOneCascade 60000 with
+    currentDecision := .abstainOnTask 1
+    abstentionG := 3 }
+
+theorem good_is_not_a_repeat : good.refusedCascade = none ∧ good.forbidden = ∅ := by native_decide
+theorem selection_good_is_not_a_repeat : selectionGood.forbidden = ∅ := by native_decide
+theorem forbidden_is_the_refused_key_when_predictions_differ :
+    goodAfterRefusal.forbidden = {60001} := by native_decide
+theorem forbidden_is_the_prediction_class :
+    rechoseRefusedClass.forbidden = {60001, 60002} := by native_decide
+theorem forbidden_is_the_key_when_not_compared :
+    refusedNotCompared.forbidden = {60999} := by native_decide
+theorem no_refusal_forbids_nothing :
+    noRepeatNoForbidding.forbidden = ∅ ∧ changedInputsNoForbidding.forbidden = ∅ := by
+  native_decide
+
+theorem good_after_refusal_conforms : conforms goodAfterRefusal = true := by native_decide
+theorem chose_outside_refused_class_conforms :
+    conforms choseOutsideRefusedClass = true := by native_decide
+theorem refused_not_compared_conforms : conforms refusedNotCompared = true := by native_decide
+theorem abstain_with_forbidden_minimiser_conforms :
+    conforms abstainWithForbiddenMinimiser = true := by native_decide
+theorem abstain_with_every_cascade_forbidden_conforms :
+    conforms abstainWithEveryCascadeForbidden = true := by native_decide
+
+theorem admissible_minimum_negatives_exact :
+    violations rechoseRefusedKey = [.q6] ∧
+    violations rechoseRefusedClass = [.q6] ∧
+    violations ignoredForbiddenInMinimum = [.q11] ∧
+    violations rechoseUncomparedRefused = [.q6, .q11] ∧
+    violations noRepeatNoForbidding = [.q11] ∧
+    violations changedInputsNoForbidding = [.q11] ∧
+    violations abstainAboveAdmissible = [.q11] := by native_decide
+
 theorem work_abstains_conforms : conforms workAbstains = true := by native_decide
 theorem selection_empty_field_conforms : conforms selectionEmptyField = true := by native_decide
 theorem selection_abstains_with_work_not_Q11 :
@@ -1351,6 +1500,8 @@ example : Q9 click20 = true := by decide
 #print axioms work_abstains_conforms
 #print axioms selection_empty_field_conforms
 #print axioms abstention_negatives_fail_only
+#print axioms good_after_refusal_conforms
+#print axioms admissible_minimum_negatives_exact
 #print axioms selection_absence_negatives_fail_only_Q7
 
 end DarkTower.WarMachine.Requirements
