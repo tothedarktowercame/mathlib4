@@ -58,15 +58,21 @@ structure TargetConstruction where
   policies : Finset Id
   deriving DecidableEq
 
-structure Choice where
-  /-- Stable id of the chosen open task. -/
-  target : Id
-  /-- Stable id/hash of the chosen arranged cascade. -/
-  cascade : Id
-  deriving DecidableEq
+/-- What a run decided.  Joe, 2026-11-01: abstention applies "when there is nothing
+left to do (outer) or when no action is available that progresses the work
+(inner). Both are appropriate stops."  A run picking nothing in any other
+circumstance fails `Q11`. -/
+inductive Decision where
+  /-- A task and an arranged cascade over it. -/
+  | pick (target cascade : Id)
+  /-- Work run: cascades over `target` were compared and none progresses it. -/
+  | abstainOnTask (target : Id)
+  /-- Selection run: no open task exists. -/
+  | abstainEmptyField
+  deriving DecidableEq, Repr
 
 inductive RunOutcome where
-  | changed | alreadySatisfied | question | refused | invalid | timedOut
+  | changed | alreadySatisfied | question | refused | invalid | timedOut | abstained
   deriving DecidableEq, Repr
 
 inductive InterpretationOrder where
@@ -201,6 +207,8 @@ structure RunFacts where
   /-- One digest of predicted outcome distribution per compared policy.  A
   digest of `0` is a recorded absence. -/
   policyPrediction : List (Id × Id)
+  /-- Digest of the stopped distribution.  `0` is a recorded absence. -/
+  abstentionPrediction : Id
   /-- Terms that contributed to every reported policy G. -/
   gTerms : GTerms
   /-- Compared policies carrying a separately recorded risk term. -/
@@ -216,14 +224,14 @@ structure RunFacts where
   pathAbsenceCount : Nat
   /-- The typed selection path: present exactly on a selection run. -/
   selectionPath : Option SelectionPath
-  /-- Previous run's selected target and arranged cascade. -/
-  previousChoice : Choice
+  /-- Previous run's decision. -/
+  previousDecision : Decision
   /-- Previous run's typed terminal outcome. -/
   previousOutcome : RunOutcome
   /-- Digest of all inputs on which the previous choice depended. -/
   previousInputDigest : Id
-  /-- Current run's selected target and arranged cascade. -/
-  currentChoice : Choice
+  /-- Current run's decision. -/
+  currentDecision : Decision
   /-- Digest of all inputs on which the current choice depended. -/
   currentInputDigest : Id
   /-- Stable ids of seats registered when selection ran. -/
@@ -261,9 +269,11 @@ def RunFacts.maxSliceSize (r : RunFacts) : Nat :=
 /-- The tasks a run's construction must serve: the whole enumerated field for a
 selection run, the selected task for a work run. -/
 def RunFacts.constructionTargets (r : RunFacts) : Finset Id :=
-  match r.kind with
-  | .selection => r.enumeratedTasks
-  | .work => {r.currentChoice.target}
+  match r.kind, r.currentDecision with
+  | .selection, _ => r.enumeratedTasks
+  | .work, .pick target _ => {target}
+  | .work, .abstainOnTask target => {target}
+  | .work, .abstainEmptyField => ∅
 
 /-- The fewest compared policies that make a run's comparison a comparison.  A
 selection between one cascade and nothing else chooses nothing.  A work run may
@@ -272,6 +282,11 @@ def RunFacts.comparisonFloor (r : RunFacts) : Nat :=
   match r.kind with
   | .selection => 2
   | .work => 1
+
+/-- A selection run over an empty field: nothing to construct cascades over, so
+nothing is constructed or compared. -/
+def RunFacts.emptyField (r : RunFacts) : Bool :=
+  decide (r.kind = .selection ∧ r.enumeratedTasks = ∅)
 
 /-! Joe: "Every open mission, excursion or ticket is wanted." -/
 def Q1 (r : RunFacts) : Bool := decide (r.enumeratedTasks = r.openTasks)
@@ -285,8 +300,14 @@ kernel, the pool equal to a non-empty slice drawn from the whole pinned library,
 a positive count of distinct policies, and every compared policy among them.  A
 selection run's construction serves the whole field and compares at least two
 cascades; a work run's serves the selected task.  A menu listed by hand has no
-library pin and no slice, so it fails here however its G values come out. -/
-def Q2 (r : RunFacts) : Bool := decide (
+library pin and no slice, so it fails here however its G values come out.
+
+A selection run over an empty field has no construction, and a construction
+there is a fixture, not a run. -/
+def Q2 (r : RunFacts) : Bool :=
+  if r.emptyField then
+    decide (r.targetConstruction = [] ∧ r.comparedPolicies = ∅ ∧ r.constructedCascades = ∅)
+  else decide (
   r.targetConstruction.length = 1 ∧
   (∀ tc ∈ r.targetConstruction,
     tc.targets = r.constructionTargets ∧
@@ -316,7 +337,7 @@ and there are as many records as compared policies. -/
 def Q4 (r : RunFacts) : Bool := decide (
   r.gTerms.risk = true ∧ r.gTerms.ambiguity = true ∧
   r.gTerms.informationGain = true ∧
-  r.comparedPolicies.Nonempty ∧
+  (r.comparedPolicies.Nonempty ∨ r.emptyField = true) ∧
   (∀ p ∈ r.policyPreferences, p.policy ∈ r.comparedPolicies) ∧
   (∀ c ∈ r.comparedPolicies, ∃ p ∈ r.policyPreferences, p.policy = c) ∧
   r.policyPreferences.length = r.comparedPolicies.card ∧
@@ -336,7 +357,7 @@ def Q5 (r : RunFacts) : Bool :=
 An unchanged refusal may not choose the same target/cascade pair again. -/
 def Q6 (r : RunFacts) : Bool := decide (
   r.previousOutcome = .refused ∧ r.previousInputDigest = r.currentInputDigest →
-    r.previousChoice ≠ r.currentChoice)
+    r.previousDecision ≠ r.currentDecision)
 
 /-! Joe: an absence, refusal, or "not supplied" on the one selected/enacted
 certificate path is a failure; the working path contains none.  This is not a
@@ -395,6 +416,23 @@ def Q9 (r : RunFacts) : Bool := decide (
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate.Valid
       r.calibrationAuthorizations r.factorizationAuthorizations certificate)
 
+/-- A comparison took place and its record is whole: at least one compared
+policy, one G and one present prediction digest for each, and the compared
+policies exactly the constructed cascades and the construction's policies. -/
+def RunFacts.comparisonRecorded (r : RunFacts) : Bool := decide (
+  r.comparedPolicies.Nonempty ∧
+  (r.policyG.map Prod.fst).Nodup ∧
+  (r.policyG.map Prod.fst).toFinset = r.comparedPolicies ∧
+  (r.policyPrediction.map Prod.fst).Nodup ∧
+  (r.policyPrediction.map Prod.fst).toFinset = r.comparedPolicies ∧
+  (∀ p ∈ r.policyPrediction, p.2 ≠ 0) ∧
+  r.targetConstruction.map (·.policies) = [r.constructedCascades] ∧
+  r.comparedPolicies = r.constructedCascades)
+
+/-- Stopping's prediction is present and no compared policy's prediction is it. -/
+def RunFacts.predictsOtherThanStopping (r : RunFacts) : Bool := decide (
+  r.abstentionPrediction ≠ 0 ∧ ∀ p ∈ r.policyPrediction, p.2 ≠ r.abstentionPrediction)
+
 /-! Joe, 2026-11-01: the outer loop should be able to say what was selected and
 why, with reference to the minimising cascade; ties are a tripwire.  A G value
 for every policy says nothing if the choice did not come from them, so this
@@ -408,22 +446,28 @@ G did not choose, whatever broke it.  Ties among the policies not chosen are
 allowed.  Two or more compared policies do not all predict the same thing.  The
 constructed cascades are exactly the construction's policies, and the compared
 policies are exactly the constructed cascades: a cascade built and then left out
-of the comparison is a restricted domain, whatever the record says about G. -/
-def Q11 (r : RunFacts) : Bool := decide (
-  r.currentChoice.cascade ∈ r.comparedPolicies ∧
-  (r.kind = .selection → r.currentChoice.target ∈ r.enumeratedTasks) ∧
-  (r.policyG.map Prod.fst).Nodup ∧
-  (r.policyG.map Prod.fst).toFinset = r.comparedPolicies ∧
-  (r.policyPrediction.map Prod.fst).Nodup ∧
-  (r.policyPrediction.map Prod.fst).toFinset = r.comparedPolicies ∧
-  (∀ p ∈ r.policyPrediction, p.2 ≠ 0) ∧
-  (∃ chosen ∈ r.policyG, chosen.1 = r.currentChoice.cascade ∧
-    chosen.2 < r.abstentionG ∧
-    ∀ other ∈ r.policyG, other.1 ≠ chosen.1 → chosen.2 < other.2) ∧
-  (2 ≤ r.comparedPolicies.card →
-    1 < (r.policyPrediction.map Prod.snd).toFinset.card) ∧
-  r.targetConstruction.map (·.policies) = [r.constructedCascades] ∧
-  r.comparedPolicies = r.constructedCascades)
+of the comparison is a restricted domain, whatever the record says about G.
+
+Abstention is decided by the same comparison.  On a task, stopping is strictly
+below every compared cascade.  On any comparison, no compared cascade predicts
+what stopping predicts: a pick that predicts stopping is the click-12 façade seen
+through predictions.  Only an empty field abstains with no comparison. -/
+def Q11 (r : RunFacts) : Bool :=
+  match r.currentDecision with
+  | .pick target cascade =>
+    r.comparisonRecorded && r.predictsOtherThanStopping && decide (
+      cascade ∈ r.comparedPolicies ∧
+      (r.kind = .selection → target ∈ r.enumeratedTasks) ∧
+      (∃ chosen ∈ r.policyG, chosen.1 = cascade ∧
+        chosen.2 < r.abstentionG ∧
+        ∀ other ∈ r.policyG, other.1 ≠ chosen.1 → chosen.2 < other.2) ∧
+      (2 ≤ r.comparedPolicies.card →
+        1 < (r.policyPrediction.map Prod.snd).toFinset.card))
+  | .abstainOnTask _ =>
+    r.comparisonRecorded && r.predictsOtherThanStopping && decide (
+      r.kind = .work ∧ ∀ g ∈ r.policyG, r.abstentionG < g.2)
+  | .abstainEmptyField =>
+    r.emptyField && decide (r.policyG = [] ∧ r.policyPrediction = [])
 
 inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q9 | q11
   deriving DecidableEq, Repr
@@ -486,6 +530,7 @@ def click20 : RunFacts where
   policyG := []
   abstentionG := 0
   policyPrediction := []
+  abstentionPrediction := 0
   gTerms := ⟨true, false, false⟩
   policiesWithRiskTerm := 1
   policiesWithAmbiguityTerm := 0
@@ -493,10 +538,10 @@ def click20 : RunFacts where
   interpretationOrder := .interpretationBeforeSelection
   pathAbsenceCount := 62
   selectionPath := none
-  previousChoice := ⟨0, 20⟩
+  previousDecision := .pick 0 20
   previousOutcome := .refused
   previousInputDigest := 99
-  currentChoice := ⟨0, 20⟩
+  currentDecision := .pick 0 20
   currentInputDigest := 99
   seatsAvailable := ids 0 56
   seatsUsed := {1, 2, 3}
@@ -560,6 +605,7 @@ def good : RunFacts where
   policyG := [(60000, 2), (60001, 3/2)]
   abstentionG := 3
   policyPrediction := [(60000, 160000), (60001, 160001)]
+  abstentionPrediction := 160999
   gTerms := ⟨true, true, true⟩
   policiesWithRiskTerm := 2
   policiesWithAmbiguityTerm := 2
@@ -567,10 +613,10 @@ def good : RunFacts where
   interpretationOrder := .selectionBeforeInterpretation
   pathAbsenceCount := 0
   selectionPath := none
-  previousChoice := ⟨0, 50000⟩
+  previousDecision := .pick 0 50000
   previousOutcome := .refused
   previousInputDigest := 7
-  currentChoice := ⟨1, 60001⟩
+  currentDecision := .pick 1 60001
   currentInputDigest := 7
   seatsAvailable := ids 0 56
   seatsUsed := ids 0 10
@@ -678,11 +724,12 @@ def selectionRun (tc : TargetConstruction) (compared : List Id) : RunFacts :=
       (c, if c = 70000 then 29949 / 10000 else 34841 / 10000))
     abstentionG := 47875 / 10000
     policyPrediction := compared.map (fun c => (c, c + 100000))
+    abstentionPrediction := 179999
     policiesWithRiskTerm := compared.length
     policiesWithAmbiguityTerm := compared.length
     policiesWithInformationTerm := compared.length
-    previousChoice := ⟨0, 70001⟩
-    currentChoice := ⟨1, 70000⟩ }
+    previousDecision := .pick 0 70001
+    currentDecision := .pick 1 70000 }
 
 def selectionGood : RunFacts :=
   selectionRun selectionConstruction [70000, 70001, 70002]
@@ -775,7 +822,7 @@ def workOneCascade : RunFacts :=
     policiesWithRiskTerm := 1
     policiesWithAmbiguityTerm := 1
     policiesWithInformationTerm := 1
-    currentChoice := ⟨1, 60000⟩ }
+    currentDecision := .pick 1 60000 }
 
 /-! Q11 witnesses.  Each changes `selectionGood` or `good` in one respect. -/
 
@@ -795,10 +842,10 @@ def chosenNotMinimum : RunFacts :=
     policyG := [(70000, 34841 / 10000), (70001, 29949 / 10000), (70002, 34841 / 10000)] }
 
 def chosenOutsideMenu : RunFacts :=
-  { selectionGood with currentChoice := ⟨1, 70003⟩ }
+  { selectionGood with currentDecision := .pick 1 70003 }
 
 def chosenTargetOutsideField : RunFacts :=
-  { selectionGood with currentChoice := ⟨9, 70000⟩ }
+  { selectionGood with currentDecision := .pick 9 70000 }
 
 /-- The click-12 façade: choosing has the same G as choosing nothing. -/
 def chosenEqualsAbstention : RunFacts :=
@@ -957,6 +1004,152 @@ theorem selection_absence_negatives_fail_only_Q7 :
     violations learningPartlyClassified = [.q7] ∧
     violations learningDeferredUnclassified = [.q7] ∧
     violations pendingRunUnclassified = [.q7] := by native_decide
+
+/-! Abstention witnesses. -/
+
+/-- Stopping wins strictly: the comparison stands, and task 1 is not progressed. -/
+def workAbstains : RunFacts :=
+  { good with
+    currentDecision := .abstainOnTask 1
+    previousOutcome := .changed
+    abstentionG := 1 }
+
+/-- Nothing is open.  `pickRelation` and `pickReach` are the receipt of the empty
+census: there was no pick to relate, and that census is what measured it. -/
+def selectionEmptyField : RunFacts :=
+  { good with
+    kind := .selection
+    openMissions := ∅
+    openExcursions := ∅
+    openTickets := ∅
+    enumeratedTasks := ∅
+    targetsReachingScoring := ∅
+    targetsWithG := ∅
+    targetConstruction := []
+    constructorPatternCount := 0
+    comparedPolicies := ∅
+    constructedCascades := ∅
+    policyPreferences := []
+    policyG := []
+    policyPrediction := []
+    policiesWithRiskTerm := 0
+    policiesWithAmbiguityTerm := 0
+    policiesWithInformationTerm := 0
+    currentDecision := .abstainEmptyField
+    selectionPath := some
+      { receipt := .observed 80001
+        pickRelation := .observed 80004
+        pickReach := .observed 80004
+        pendingRun := none
+        consumedRuns := []
+        learningApplied := false } }
+
+/-- The machine abstains while work remains. -/
+def selectionAbstainsWithWork : RunFacts :=
+  { selectionGood with currentDecision := .abstainEmptyField }
+
+/-- A construction over nothing, the fixture-in-production shape. -/
+def emptyFieldWithConstruction : RunFacts :=
+  { selectionEmptyField with
+    targetConstruction := [selectionConstruction]
+    comparedPolicies := selectionGood.comparedPolicies
+    constructedCascades := selectionGood.constructedCascades
+    policyPreferences := selectionGood.policyPreferences
+    policiesWithRiskTerm := 3
+    policiesWithAmbiguityTerm := 3
+    policiesWithInformationTerm := 3 }
+
+def workAbstainsWithoutComparison : RunFacts :=
+  { workAbstains with
+    comparedPolicies := ∅
+    policyG := []
+    policyPrediction := []
+    constructedCascades := ∅
+    targetConstruction := [] }
+
+/-- Stopping ties the better cascade. -/
+def workAbstainsNotMinimum : RunFacts :=
+  { workAbstains with abstentionG := 3/2 }
+
+/-- Stopping beats one cascade and not the other. -/
+def workAbstainsBelowOneOnly : RunFacts :=
+  { workAbstains with abstentionG := 7/4 }
+
+/-- A cascade predicts stopping, so the comparison did not offer an alternative. -/
+def workAbstainsAgainstStopping : RunFacts :=
+  { workAbstains with policyPrediction := [(60000, 160000), (60001, 160999)] }
+
+/-- The chosen policy predicts exactly what stopping predicts: click 12 seen
+through predictions. -/
+def pickPredictsStopping : RunFacts :=
+  { good with policyPrediction := [(60000, 160000), (60001, 160999)] }
+
+/-- A cascade not chosen predicts stopping.  `Q11` refuses this too. -/
+def rejectedCascadePredictsStopping : RunFacts :=
+  { good with policyPrediction := [(60000, 160999), (60001, 160001)] }
+
+def abstentionPredictionAbsent : RunFacts :=
+  { good with abstentionPrediction := 0 }
+
+def abstainOnTaskLabelledSelection : RunFacts :=
+  { workAbstains with kind := .selection }
+
+/-- A pick from a field with nothing in it. -/
+def pickFromEmptyField : RunFacts :=
+  { selectionEmptyField with currentDecision := .pick 1 70000 }
+
+/-- The empty-field decision on a work run. -/
+def workClaimsEmptyField : RunFacts :=
+  { good with currentDecision := .abstainEmptyField }
+
+/-- `Q4`'s exception is the empty field, not any selection run. -/
+def selectionNothingCompared : RunFacts :=
+  { selectionGood with
+    comparedPolicies := ∅
+    policyPreferences := []
+    policiesWithRiskTerm := 0
+    policiesWithAmbiguityTerm := 0
+    policiesWithInformationTerm := 0 }
+
+theorem work_abstains_conforms : conforms workAbstains = true := by native_decide
+theorem selection_empty_field_conforms : conforms selectionEmptyField = true := by native_decide
+theorem selection_abstains_with_work_not_Q11 :
+    Q11 selectionAbstainsWithWork = false := by native_decide
+theorem empty_field_with_construction_not_Q2 :
+    Q2 emptyFieldWithConstruction = false := by native_decide
+theorem work_abstains_without_comparison_not_Q11 :
+    Q11 workAbstainsWithoutComparison = false := by native_decide
+theorem work_abstains_not_minimum_not_Q11 : Q11 workAbstainsNotMinimum = false := by native_decide
+theorem work_abstains_below_one_only_not_Q11 :
+    Q11 workAbstainsBelowOneOnly = false := by native_decide
+theorem work_abstains_against_stopping_not_Q11 :
+    Q11 workAbstainsAgainstStopping = false := by native_decide
+theorem pick_predicts_stopping_not_Q11 : Q11 pickPredictsStopping = false := by native_decide
+theorem rejected_cascade_predicts_stopping_not_Q11 :
+    Q11 rejectedCascadePredictsStopping = false := by native_decide
+theorem abstention_prediction_absent_not_Q11 :
+    Q11 abstentionPredictionAbsent = false := by native_decide
+theorem abstain_on_task_labelled_selection_not_Q11 :
+    Q11 abstainOnTaskLabelledSelection = false := by native_decide
+theorem pick_from_empty_field_not_Q11 : Q11 pickFromEmptyField = false := by native_decide
+theorem work_claims_empty_field_not_Q11 : Q11 workClaimsEmptyField = false := by native_decide
+theorem selection_nothing_compared_not_Q4 :
+    Q4 selectionNothingCompared = false := by native_decide
+
+/-- The exact requirements each abstention negative fails.  A run without a
+comparison also fails `Q2` and `Q4`; a work record labelled selection also fails
+`Q2` and `Q7`. -/
+theorem abstention_negatives_fail_only :
+    violations selectionAbstainsWithWork = [.q11] ∧
+    violations emptyFieldWithConstruction = [.q2] ∧
+    violations workAbstainsWithoutComparison = [.q2, .q4, .q11] ∧
+    violations workAbstainsNotMinimum = [.q11] ∧
+    violations workAbstainsBelowOneOnly = [.q11] ∧
+    violations workAbstainsAgainstStopping = [.q11] ∧
+    violations pickPredictsStopping = [.q11] ∧
+    violations rejectedCascadePredictsStopping = [.q11] ∧
+    violations abstentionPredictionAbsent = [.q11] ∧
+    violations abstainOnTaskLabelledSelection = [.q2, .q7, .q11] := by native_decide
 
 theorem good_Q2 : Q2 good = true := by native_decide
 theorem good_Q11 : Q11 good = true := by native_decide
@@ -1155,6 +1348,9 @@ example : Q9 click20 = true := by decide
 #print axioms constructed_not_policies_not_Q11
 #print axioms strict_minimum_negatives_fail_only_Q11
 #print axioms selection_good_Q7
+#print axioms work_abstains_conforms
+#print axioms selection_empty_field_conforms
+#print axioms abstention_negatives_fail_only
 #print axioms selection_absence_negatives_fail_only_Q7
 
 end DarkTower.WarMachine.Requirements
