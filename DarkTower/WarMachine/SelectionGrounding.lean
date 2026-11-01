@@ -47,7 +47,7 @@ structure GroundedPolicy where
   g : ℚ
   deriving DecidableEq, Repr
 
-structure SelectionGrounding where
+structure Grounding where
   enumerated : Finset Id
   field : List FieldEntry
   policies : List GroundedPolicy
@@ -56,7 +56,7 @@ structure SelectionGrounding where
   deriving DecidableEq
 
 -- This toolchain's Finset Repr is unsafe; use a deterministic computable list.
-instance : Repr SelectionGrounding where
+instance : Repr Grounding where
   reprPrec g n := reprPrec (g.enumerated.sort (· ≤ ·), g.field, g.policies,
     g.abstention, g.chosen) n
 
@@ -66,12 +66,12 @@ def applyStep (field : List (Id × FieldFact)) : Step → Option (List (Id × Fi
   | .byUnblocks => some (field.insertionSort fun a b => b.2.unblocks ≤ a.2.unblocks)
   | .named _ => none
 
-def candidates (g : SelectionGrounding) : List (Id × FieldFact) :=
+def candidates (g : Grounding) : List (Id × FieldFact) :=
   g.field.filterMap fun e => match e with
     | .fact t f => some (t, f)
     | .excluded _ _ _ => none
 
-def recomputedPick (g : SelectionGrounding) (p : GroundedPolicy) : Option (Option Id) :=
+def recomputedPick (g : Grounding) (p : GroundedPolicy) : Option (Option Id) :=
   (p.steps.foldl (fun acc step => acc.bind fun xs => applyStep xs step)
     (some (candidates g))).map fun xs => xs.head?.map Prod.fst
 
@@ -79,7 +79,7 @@ def fieldTask : FieldEntry → Id
   | .fact t _ => t
   | .excluded t _ _ => t
 
-def fieldConsidered (g : SelectionGrounding) : Bool :=
+def fieldConsidered (g : Grounding) : Bool :=
   decide ((g.field.map fieldTask).Nodup ∧
     (g.field.map fieldTask).toFinset = g.enumerated) &&
   g.field.all (fun e => match e with
@@ -87,30 +87,30 @@ def fieldConsidered (g : SelectionGrounding) : Bool :=
     | .excluded _ reason pin => decide (reason ≠ 0 ∧ pin ≠ 0))
 
 /-- `none` means unverifiable, even if a different policy has a detectable mismatch. -/
-def prioritised (g : SelectionGrounding) : Option Bool :=
+def prioritised (g : Grounding) : Option Bool :=
   if g.policies.any (fun p => (recomputedPick g p).isNone) then none
   else some (g.policies.all fun p => decide (recomputedPick g p = some p.pick))
 
 def Terms.score (t : Terms) : ℚ := t.risk + t.ambiguity - t.novelty
 
-def scoredFromTerms (g : SelectionGrounding) : Bool :=
+def scoredFromTerms (g : Grounding) : Bool :=
   g.policies.all (fun p => decide (p.g = p.terms.score ∧ 0 ≤ p.reach ∧ p.reach ≤ 1 ∧
     (p.pick.isSome = true → p.relation ≠ .unknown))) &&
   decide (g.abstention.2 = g.abstention.1.score)
 
-def agreesWithRunFacts (g : SelectionGrounding) (r : Requirements.RunFacts) : Bool :=
+def agreesWithRunFacts (g : Grounding) (r : Requirements.RunFacts) : Bool :=
   (match r.currentDecision with
     | .pick _ c => decide (g.chosen = c)
     | _ => false) &&
   decide ((g.policies.map fun p => (p.cascade, p.g)).toFinset = r.policyG.toFinset ∧
     g.abstention.2 = r.abstentionG ∧ g.enumerated = r.enumeratedTasks)
 
-def grounded (g : SelectionGrounding) (r : Requirements.RunFacts) : Bool :=
+def grounded (g : Grounding) (r : Requirements.RunFacts) : Bool :=
   fieldConsidered g && (prioritised g == some true) && scoredFromTerms g &&
     agreesWithRunFacts g r
 
 /-- Concrete fixture: the two stable ordering compositions select different tasks. -/
-def small : SelectionGrounding where
+def small : Grounding where
   enumerated := {1, 2, 3, 4, 5}
   field := [.fact 1 ⟨true, 9, 1, 101⟩, .fact 2 ⟨true, 4, 8, 102⟩,
     .fact 3 ⟨true, 4, 8, 103⟩, .fact 4 ⟨false, 99, 99, 104⟩, .excluded 5 7 105]
@@ -139,21 +139,21 @@ theorem small_chosen_minimum :
 def taskMissingFromField := { small with field := small.field.drop 1 }
 def duplicateTaskInField := { small with field := small.field ++ small.field.take 1 }
 def unpinnedFact := { small with field := .fact 1 ⟨true, 9, 1, 0⟩ :: small.field.drop 1 }
-def exclusionWithoutReason : SelectionGrounding := { small with field := small.field.take 4 ++ [FieldEntry.excluded 5 0 105] }
+def exclusionWithoutReason : Grounding := { small with field := small.field.take 4 ++ [FieldEntry.excluded 5 0 105] }
 
 theorem taskMissingFromField_G1 : fieldConsidered taskMissingFromField = false := by native_decide
 theorem duplicateTaskInField_G1 : fieldConsidered duplicateTaskInField = false := by native_decide
 theorem unpinnedFact_G1 : fieldConsidered unpinnedFact = false := by native_decide
 theorem exclusionWithoutReason_G1 : fieldConsidered exclusionWithoutReason = false := by native_decide
 
-def changeFirst (f : GroundedPolicy → GroundedPolicy) : SelectionGrounding :=
+def changeFirst (f : GroundedPolicy → GroundedPolicy) : Grounding :=
   { small with policies := (small.policies.take 1).map f ++ small.policies.drop 1 }
 
 /-- The cone-first result should pick 1, not the lower-cone task 2. -/
-def menuOrderPick : SelectionGrounding :=
+def menuOrderPick : Grounding :=
   { small with policies := small.policies.map (fun p =>
       if p.cascade = 70001 then { p with pick := some 2 } else p) }
-def pickFromEmptyGate : SelectionGrounding :=
+def pickFromEmptyGate : Grounding :=
   { small with field := small.field.map (fun e => match e with
     | .fact t f => .fact t { f with ready := false }
     | e => e) }
@@ -177,6 +177,41 @@ theorem pickOnUnknownRelation_G3 : scoredFromTerms pickOnUnknownRelation = false
 def policyGDisagrees := { smallRun with policyG := [(70000, 0), (70001, 29949/10000),
   (70002, 34841/10000)] }
 theorem policyGDisagrees_G4 : agreesWithRunFacts small policyGDisagrees = false := by native_decide
+
+/-- A negative built by removing the typed exclusion, so the candidates and picks
+are untouched: G1 alone refuses it. -/
+def excludedTaskMissing : Grounding := { small with field := small.field.take 4 }
+/-- The terms no longer sum to G while G itself still agrees with `RunFacts`. -/
+def termsNotG := changeFirst fun p => { p with terms := { p.terms with novelty := 0 } }
+
+/-- Each negative refuses exactly one of G1–G4 and leaves the other three standing,
+so each requirement is a discriminator, not a passenger (claude-2, review). -/
+theorem grounding_negatives_isolate :
+    (fieldConsidered excludedTaskMissing = false ∧ prioritised excludedTaskMissing = some true ∧
+      scoredFromTerms excludedTaskMissing = true ∧ agreesWithRunFacts excludedTaskMissing smallRun = true) ∧
+    (fieldConsidered unpinnedFact = false ∧ prioritised unpinnedFact = some true ∧
+      scoredFromTerms unpinnedFact = true ∧ agreesWithRunFacts unpinnedFact smallRun = true) ∧
+    (fieldConsidered duplicateTaskInField = false ∧ prioritised duplicateTaskInField = some true ∧
+      scoredFromTerms duplicateTaskInField = true ∧ agreesWithRunFacts duplicateTaskInField smallRun = true) ∧
+    (fieldConsidered exclusionWithoutReason = false ∧ prioritised exclusionWithoutReason = some true ∧
+      scoredFromTerms exclusionWithoutReason = true ∧ agreesWithRunFacts exclusionWithoutReason smallRun = true) ∧
+    (fieldConsidered menuOrderPick = true ∧ prioritised menuOrderPick = some false ∧
+      scoredFromTerms menuOrderPick = true ∧ agreesWithRunFacts menuOrderPick smallRun = true) ∧
+    (fieldConsidered pickFromEmptyGate = true ∧ prioritised pickFromEmptyGate = some false ∧
+      scoredFromTerms pickFromEmptyGate = true ∧ agreesWithRunFacts pickFromEmptyGate smallRun = true) ∧
+    (fieldConsidered termsNotG = true ∧ prioritised termsNotG = some true ∧
+      scoredFromTerms termsNotG = false ∧ agreesWithRunFacts termsNotG smallRun = true) ∧
+    (fieldConsidered reachAboveOne = true ∧ prioritised reachAboveOne = some true ∧
+      scoredFromTerms reachAboveOne = false ∧ agreesWithRunFacts reachAboveOne smallRun = true) ∧
+    (fieldConsidered pickOnUnknownRelation = true ∧ prioritised pickOnUnknownRelation = some true ∧
+      scoredFromTerms pickOnUnknownRelation = false ∧ agreesWithRunFacts pickOnUnknownRelation smallRun = true) ∧
+    (fieldConsidered small = true ∧ prioritised small = some true ∧
+      scoredFromTerms small = true ∧ agreesWithRunFacts small policyGDisagrees = false) := by
+  native_decide
+
+/-- `gNotFromTerms` changes G itself, so it also disagrees with `RunFacts`: two
+requirements refuse it, which is right, and the isolating G3 negative is `termsNotG`. -/
+theorem gNotFromTerms_also_G4 : agreesWithRunFacts gNotFromTerms smallRun = false := by native_decide
 
 #print axioms small_witness_grounded
 end DarkTower.WarMachine.SelectionGrounding
