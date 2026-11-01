@@ -2,6 +2,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.List.Defs
 import Mathlib.Tactic
 import DarkTower.WarMachine.FactorizedPreferenceSemantics
+import DarkTower.WarMachine.OuterFactorizedPreference
 
 /-!
 # Countable requirements for one War Machine run
@@ -468,6 +469,17 @@ def Q9 (r : RunFacts) : Bool := decide (
   ∃ certificate, r.factorizedPreference = some certificate ∧
     DarkTower.WarMachine.FactorizedPreferenceSemantics.Certificate.Valid
       r.calibrationAuthorizations r.factorizationAuthorizations certificate)
+
+/-- The outer certificate retains the existing Q9 authorization requirements.
+The conditional-gain extension is validated by OuterFactorizedPreference.Certificate.Valid;
+Q9 consumes its authorized base, not an invented historical gain receipt. -/
+theorem outer_certificate_implies_Q9 (r : RunFacts)
+    (c : OuterFactorizedPreference.Certificate)
+    (hRecorded : r.factorizedPreference = some c.base)
+    (hValid : c.Valid r.calibrationAuthorizations r.factorizationAuthorizations) :
+    Q9 r = true := by
+  unfold Q9
+  exact decide_eq_true ⟨c.base, hRecorded, hValid.1⟩
 
 /-- A comparison took place and its record is whole: at least one compared
 policy, one G and one present prediction digest for each, and the compared
