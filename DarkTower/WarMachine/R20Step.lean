@@ -129,6 +129,24 @@ as the stable secondary key.  `byUnblocks` is last because the last stable
 sort is the primary key. -/
 def whatOthersWaitOnFirst : SelectionCascade := [.readyGate, .byCone, .byUnblocks]
 
+/-- `serves-a-way` (task-selection README row 7, 2026-11-02): keep the
+candidates whose placement record puts them under a cited way of working with
+an action that is work.  The placement is the ant-read record
+(`futon3c/holes/excursions/ant-reads/A1-placements.tsv`), attached to each
+target by `futon2.aif.placement-adapter`; `keep` is that record's test, so a
+target with no record is not kept.  An instance of the general gate: the
+Clojure step `:placed-gate` must be `field.filter keep` and nothing else. -/
+def placedGate (keep : Candidate → Bool) : SelectionStep := .gate keep
+
+theorem applySelectionStep_placedGate (facts : Target → GiraffeFacts)
+    (field : List Candidate) (keep : Candidate → Bool) :
+    applySelectionStep facts field (placedGate keep) = field.filter keep := rfl
+
+/-- README row 7: only-what-can-start-now → serves-a-way →
+what-others-wait-on-first, as executable steps. -/
+def servesAWay (keep : Candidate → Bool) : SelectionCascade :=
+  [.readyGate, placedGate keep, .byCone, .byUnblocks]
+
 /-- Total rational Beta counts.  Totality makes Smith, Friston & Whyte 2022
 §4 Eqs. 34 and 37 forgetting reach keys absent from a finite slow-state list. -/
 abbrev RatedCounts (Key : Type) := Key → ℚ × ℚ
