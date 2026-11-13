@@ -281,6 +281,11 @@ structure RunFacts where
   /-- Every constructed selection cascade's pick, fired patterns and G (`Q12`).
   Absent from a projection that does not carry it. -/
   cascadeComposition : List CascadeComposition := []
+  /-- One digest per compared policy of the parameter posterior it predicts:
+  the reliability of each task-selection pattern it fires (`Q11`).  Absent
+  (`[]`) from a projection that does not carry it, and from a pick-only record,
+  where every lookup is `0`. -/
+  policyParameters : List (Id × Id) := []
   deriving DecidableEq
 
 def RunFacts.openTasks (r : RunFacts) : Finset Id :=
@@ -531,6 +536,11 @@ def RunFacts.comparisonRecorded (r : RunFacts) : Bool := decide (
 def RunFacts.predictsOtherThanStopping (r : RunFacts) : Bool := decide (
   r.abstentionPrediction ≠ 0 ∧ ∀ p ∈ r.policyPrediction, p.2 ≠ r.abstentionPrediction)
 
+/-- The predicted parameter-posterior digest of compared policy `c`; `0` when
+the record carries none. -/
+def RunFacts.parametersOf (r : RunFacts) (c : Id) : Id :=
+  ((r.policyParameters.find? (fun p => p.1 = c)).map (·.2)).getD 0
+
 /-! Joe, 2026-11-01: the outer loop should be able to say what was selected and
 why, with reference to the minimising cascade; ties are a tripwire.  A G value
 for every policy says nothing if the choice did not come from them, so this
@@ -554,6 +564,18 @@ through predictions.  Only an empty field abstains with no comparison.
 A policy Q6 forbids stays compared, with its G and prediction (Joe, 2026-11-01),
 and the minimum is taken over the rest.  On a repeat the refused policy is the
 minimiser, so anything else chosen would otherwise fail here. -/
+/-! A policy's prediction is what it predicts about outcomes and what it predicts
+about its parameters (da Costa et al. 2020, expected free energy with parameter
+learning: the novelty term is information gain about the parameters, so two
+policies that fire different patterns predict different posteriors).  Under G
+over cascades (Q12) two cascades can predict the same outcomes and differ in G
+only by that novelty term, as on Lucy 2026-11-13 (wm-click-0d1dca09: ladder 08
+by `only-what-can-start-now`, ladder 09 by that and `serves-a-way`).  Q11's
+distinctness clause therefore reads the pair.  The stopping test
+(`predictsOtherThanStopping`) still reads outcomes alone: a pick that predicts
+stopping does not escape it by firing a pattern.  Parameters are per pattern,
+not per pattern and task, so two picks under the same patterns still collide,
+which is the click-12 façade this clause refuses. -/
 def Q11 (r : RunFacts) : Bool :=
   match r.currentDecision with
   | .pick target cascade =>
@@ -565,7 +587,7 @@ def Q11 (r : RunFacts) : Bool :=
         ∀ other ∈ r.policyG, other.1 ≠ chosen.1 → other.1 ∉ r.forbidden →
           chosen.2 < other.2) ∧
       (2 ≤ r.comparedPolicies.card →
-        1 < (r.policyPrediction.map Prod.snd).toFinset.card))
+        1 < (r.policyPrediction.map (fun p => (p.2, r.parametersOf p.1))).toFinset.card))
   | .abstainOnTask _ =>
     r.comparisonRecorded && r.predictsOtherThanStopping && decide (
       r.kind = .work ∧ ∀ g ∈ r.policyG, g.1 ∉ r.forbidden → r.abstentionG < g.2)
@@ -1699,5 +1721,25 @@ theorem q12_refuses_pick_only_g : Q12 q12PickOnly = false := by native_decide
 theorem q12_holds_over_cascades : Q12 q12OverCascades = true := by native_decide
 theorem q12_refuses_unprojected_selection : Q12 q12Unprojected = false := by native_decide
 theorem q12_work_run_holds : Q12 click20 = true := by native_decide
+
+/-! Q11 witnesses for predicted parameters (Lucy, 2026-11-13). -/
+def predictionsEqualParametersDiffer : RunFacts :=
+  { allPredictionsEqual with
+    policyParameters := [(70000, 180000), (70001, 180001), (70002, 180002)] }
+
+def predictionsEqualParametersEqual : RunFacts :=
+  { allPredictionsEqual with
+    policyParameters := [(70000, 180000), (70001, 180000), (70002, 180000)] }
+
+def pickPredictsStoppingParametersDiffer : RunFacts :=
+  { pickPredictsStopping with
+    policyParameters := [(70000, 180000), (70001, 180001), (70002, 180002)] }
+
+theorem predictions_equal_parameters_differ_Q11 :
+    Q11 predictionsEqualParametersDiffer = true := by native_decide
+theorem predictions_equal_parameters_equal_not_Q11 :
+    Q11 predictionsEqualParametersEqual = false := by native_decide
+theorem pick_predicts_stopping_parameters_differ_not_Q11 :
+    Q11 pickPredictsStoppingParametersDiffer = false := by native_decide
 
 end DarkTower.WarMachine.Requirements
