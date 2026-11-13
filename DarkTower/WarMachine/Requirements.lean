@@ -175,6 +175,15 @@ structure SelectionPath where
   learningApplied : Bool
   deriving DecidableEq, Repr
 
+/-- One constructed task-selection cascade of a selection run: its pick, the
+task-selection patterns that fire along its trajectory, and its G (`Q12`). -/
+structure CascadeComposition where
+  cascade : Id
+  pick : Id
+  fired : Finset Id
+  g : ℚ
+  deriving DecidableEq
+
 structure RunFacts where
   /-- Which of the click's two runs these facts describe. -/
   kind : RunKind
@@ -269,6 +278,9 @@ structure RunFacts where
   /-- Exact retained registry authorizing the certificate's factorization law. -/
   factorizationAuthorizations :
     List DarkTower.WarMachine.FactorizedPreferenceSemantics.FactorizationAuthorization
+  /-- Every constructed selection cascade's pick, fired patterns and G (`Q12`).
+  Absent from a projection that does not carry it. -/
+  cascadeComposition : List CascadeComposition := []
   deriving DecidableEq
 
 def RunFacts.openTasks (r : RunFacts) : Finset Id :=
@@ -560,13 +572,29 @@ def Q11 (r : RunFacts) : Bool :=
   | .abstainEmptyField =>
     r.emptyField && decide (r.policyG = [] ∧ r.policyPrediction = [])
 
-inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q9 | q11
+/-! Joe, 2026-11-13: "it is G over policies, so a different cascade (including a
+different pattern) should have a different G even if it chooses the same
+ticket"; "G is over cascades for the 13th time. Let's hope it stays that way."
+A selection run that scores a cascade by its pick alone gives two cascades with
+one pick and different fired patterns one G (SelectionGOverCascades). `Q12`
+refuses that record, so the recurrence fails a check instead of passing
+silently. A work run and a selection run over an empty field have no
+task-selection cascades to compare. -/
+def Q12 (r : RunFacts) : Bool :=
+  match r.kind with
+  | .work => true
+  | .selection =>
+    r.emptyField || decide (r.cascadeComposition ≠ [] ∧
+      ∀ a ∈ r.cascadeComposition, ∀ b ∈ r.cascadeComposition,
+        a.pick = b.pick → a.fired ≠ b.fired → a.g ≠ b.g)
+
+inductive Requirement where | q1 | q2 | q3 | q4 | q5 | q6 | q7 | q9 | q11 | q12
   deriving DecidableEq, Repr
 
 def violations (r : RunFacts) : List Requirement :=
   [(.q1, Q1 r), (.q2, Q2 r), (.q3, Q3 r),
    (.q4, Q4 r), (.q5, Q5 r), (.q6, Q6 r),
-   (.q7, Q7 r), (.q9, Q9 r), (.q11, Q11 r)].filterMap
+   (.q7, Q7 r), (.q9, Q9 r), (.q11, Q11 r), (.q12, Q12 r)].filterMap
     (fun (q, ok) => if ok then none else some q)
 
 def conforms (r : RunFacts) : Bool := violations r = []
@@ -824,7 +852,12 @@ def selectionRun (tc : TargetConstruction) (compared : List Id) : RunFacts :=
     policiesWithAmbiguityTerm := compared.length
     policiesWithInformationTerm := compared.length
     previousDecision := some (.pick 0 70001)
-    currentDecision := .pick 1 70000 }
+    currentDecision := .pick 1 70000
+    -- Q12: each witness cascade its own pick, so the fixture is composition-
+    -- well-formed; the Q12 cases themselves are q12PickOnly / q12OverCascades.
+    cascadeComposition := compared.map (fun c =>
+      { cascade := c, pick := c, fired := {c},
+        g := if c = 70000 then 29949 / 10000 else 34841 / 10000 }) }
 
 def selectionGood : RunFacts :=
   selectionRun selectionConstruction [70000, 70001, 70002]
@@ -1434,7 +1467,7 @@ theorem abstention_negatives_fail_only :
     violations pickPredictsStopping = [.q11] ∧
     violations rejectedCascadePredictsStopping = [.q11] ∧
     violations abstentionPredictionAbsent = [.q11] ∧
-    violations abstainOnTaskLabelledSelection = [.q2, .q7, .q11] := by native_decide
+    violations abstainOnTaskLabelledSelection = [.q2, .q7, .q11, .q12] := by native_decide
 
 theorem good_Q2 : Q2 good = true := by native_decide
 theorem good_Q11 : Q11 good = true := by native_decide
@@ -1642,5 +1675,29 @@ example : Q9 click20 = true := by decide
 #print axioms refusal_history_negatives_exact
 #print axioms unsealed_refusals_exact
 #print axioms selection_absence_negatives_fail_only_Q7
+
+/-! Q12 witnesses: the Lucy ladder field, ticket 09 picked by two cascades. -/
+def q12PickOnly : RunFacts :=
+  { click20 with
+    kind := RunKind.selection
+    cascadeComposition :=
+      [{ cascade := 1, pick := 9, fired := {1}, g := 11 / 4 },
+       { cascade := 2, pick := 9, fired := {1, 2}, g := 11 / 4 }] }
+
+def q12OverCascades : RunFacts :=
+  { click20 with
+    kind := RunKind.selection
+    cascadeComposition :=
+      [{ cascade := 1, pick := 9, fired := {1}, g := 11 / 4 },
+       { cascade := 2, pick := 9, fired := {1, 2}, g := 5 / 2 }] }
+
+def q12Unprojected : RunFacts :=
+  { click20 with
+    kind := RunKind.selection }
+
+theorem q12_refuses_pick_only_g : Q12 q12PickOnly = false := by native_decide
+theorem q12_holds_over_cascades : Q12 q12OverCascades = true := by native_decide
+theorem q12_refuses_unprojected_selection : Q12 q12Unprojected = false := by native_decide
+theorem q12_work_run_holds : Q12 click20 = true := by native_decide
 
 end DarkTower.WarMachine.Requirements
