@@ -306,13 +306,15 @@ def RunFacts.constructionTargets (r : RunFacts) : Finset Id :=
   | .work, .abstainOnTask target => {target}
   | .work, .abstainEmptyField => ∅
 
-/-- The fewest compared policies that make a run's comparison a comparison.  A
-selection between one cascade and nothing else chooses nothing.  A work run may
-have one admissible cascade for its task. -/
-def RunFacts.comparisonFloor (r : RunFacts) : Nat :=
-  match r.kind with
-  | .selection => 2
-  | .work => 1
+/-- The fewest compared policies, besides stopping, that make a run's comparison
+a comparison.  Stopping is always the other side: its G is scored separately
+(`abstentionG`) and Q11 requires the chosen G strictly below it, so one cascade
+against stopping is a choice.  Joe, 2026-11-13, on a Lucy field holding only
+ladder 10: "the choice is between doing 10 and stopping, and stopping should be
+worse at this stage".  The floor was 2 for a selection run ("a selection
+between one cascade and nothing else chooses nothing"), which made the last
+ticket of every field unworkable. -/
+def RunFacts.comparisonFloor (_r : RunFacts) : Nat := 1
 
 /-- A selection run over an empty field: nothing to construct cascades over, so
 nothing is constructed or compared. -/
@@ -895,10 +897,17 @@ def handListedMenu : RunFacts :=
       sliceFromWholeLibrary := false }
     [70000, 70001, 70002]
 
+/-- One cascade compared against stopping: a choice (Joe, 2026-11-13). -/
 def oneCascadeMenu : RunFacts :=
   selectionRun
     { selectionConstruction with policyCount := 1, policies := {70000} }
     [70000]
+
+/-- No cascade at all on a non-empty field: nothing to set against stopping. -/
+def noCascadeMenu : RunFacts :=
+  selectionRun
+    { selectionConstruction with policyCount := 0, policies := ∅ }
+    []
 
 /-- A pool not drawn as the slice: it holds a pattern the slice lacks. -/
 def menuNotFromSlice : RunFacts :=
@@ -1533,7 +1542,8 @@ theorem strict_minimum_negatives_fail_only_Q11 :
 theorem selection_good_Q2 : Q2 selectionGood = true := by native_decide
 theorem selection_good_conforms : conforms selectionGood = true := by native_decide
 theorem hand_listed_menu_not_Q2 : Q2 handListedMenu = false := by native_decide
-theorem one_cascade_menu_not_Q2 : Q2 oneCascadeMenu = false := by native_decide
+theorem one_cascade_menu_Q2 : Q2 oneCascadeMenu = true := by native_decide
+theorem no_cascade_menu_not_Q2 : Q2 noCascadeMenu = false := by native_decide
 theorem menu_not_from_slice_not_Q2 : Q2 menuNotFromSlice = false := by native_decide
 theorem unpinned_giraffe_not_Q2 : Q2 unpinnedGiraffe = false := by native_decide
 theorem library_unpinned_not_Q2 : Q2 libraryUnpinned = false := by native_decide
@@ -1552,12 +1562,13 @@ theorem selection_labelled_work_not_Q2 : Q2 selectionLabelledWork = false := by 
 theorem work_construction_for_other_task_not_Q2 :
     Q2 workConstructionForOtherTask = false := by native_decide
 theorem work_one_cascade_Q2 : Q2 workOneCascade = true := by native_decide
+/-- One cascade against stopping meets every requirement (Joe, 2026-11-13). -/
+theorem one_cascade_menu_conforms : violations oneCascadeMenu = [] := by native_decide
 
 /-- Every other requirement holds on each of these menus, so `Q2` is the only
 requirement that refuses them. -/
 theorem selection_negatives_fail_only_Q2 :
     violations handListedMenu = [.q2] ∧
-    violations oneCascadeMenu = [.q2] ∧
     violations menuNotFromSlice = [.q2] ∧
     violations unpinnedGiraffe = [.q2] ∧
     violations emptyPoolMenu = [.q2] ∧
@@ -1675,7 +1686,7 @@ example : Q9 click20 = true := by decide
 #print axioms good_Q2
 #print axioms selection_good_conforms
 #print axioms hand_listed_menu_not_Q2
-#print axioms one_cascade_menu_not_Q2
+#print axioms one_cascade_menu_Q2
 #print axioms menu_not_from_slice_not_Q2
 #print axioms unpinned_giraffe_not_Q2
 #print axioms selection_negatives_fail_only_Q2
